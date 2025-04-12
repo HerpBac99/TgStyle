@@ -1,0 +1,1027 @@
+/* 
+ * CSS переменные для всего приложения
+ * Используются для централизованного управления цветами
+ * В Telegram WebApp эти значения могут быть переопределены системными значениями
+ */
+:root {
+    /* Основной цвет фона - бирюзовый (цвет Tiffany)
+     * Может быть переопределен темой Telegram через --tg-theme-bg-color
+     * Поэтому в Telegram иногда отображается белым
+     */
+    --tg-theme-bg-color: #81D8D0; 
+    
+    /* Основной цвет текста - черный
+     * В Telegram может быть изменен на другой в зависимости от темы
+     */
+    --tg-theme-text-color: #000000;
+    
+    /* Цвет кнопок - синий
+     * В Telegram обычно соответствует основному цвету акцента приложения
+     */
+    --tg-theme-button-color: #40a7e3;
+    
+    /* Цвет текста на кнопках - белый */
+    --tg-theme-button-text-color: #ffffff;
+    
+    /* Вторичный цвет фона - полупрозрачный белый 
+     * Используется для контейнеров на основном фоне
+     */
+    --tg-theme-secondary-bg-color: rgba(255, 255, 255, 0.8);
+    
+    /* Цвет для подсказок и вспомогательного текста */
+    --tg-theme-hint-color: #999999;
+    
+    /* Цвета для облаков с комментариями - разные оттенки пастельных цветов */
+    --cloud-color-1: #e3f2fd; /* Светло-голубой */
+    --cloud-color-2: #e8f5e9; /* Светло-зеленый */
+    --cloud-color-3: #fff8e1; /* Светло-желтый */
+}
+
+/* 
+ * Обнуление стандартных отступов и установка правильного расчета размеров
+ * Применяется ко всем элементам на странице
+ */
+* {
+    margin: 0; /* Убирает внешние отступы */
+    padding: 0; /* Убирает внутренние отступы */
+    box-sizing: border-box; /* Включает padding и border в общую ширину/высоту элемента */
+}
+
+/* 
+ * Основные стили для тела документа
+ * Определяют фон, шрифт и базовое расположение элементов
+ */
+body {
+    /* Основной шрифт - Montserrat, если не доступен - системные шрифты */
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    
+    /* Цвет фона - берется из переменной CSS
+     * В Telegram WebApp это значение может быть принудительно изменено на системное
+     * Здесь мы используем !important для принудительного применения нашего цвета
+     */
+    background-color: var(--tg-theme-bg-color) !important; /* Принудительно устанавливаем цвет Tiffany, даже в Telegram */
+    
+    /* Цвет текста - берется из переменной CSS */
+    color: var(--tg-theme-text-color);
+    
+    /* Центрирование содержимого по горизонтали */
+    display: flex;
+    justify-content: center;
+    
+    /* Отступов по краям нет */
+    padding: 0;
+    
+    /* Минимальная высота - полный экран */
+    min-height: 100vh;
+}
+
+/* 
+ * Основной контейнер приложения
+ * Содержит все элементы интерфейса
+ */
+.app-container {
+    /* Ширина на весь доступный размер, но не более 500px */
+    width: 100%;
+    max-width: 500px;
+    
+    /* Элементы располагаются в колонку и центрируются */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    
+    /* Отступов по краям нет */
+    padding: 0;
+    
+    /* Позиционирование относительное для абсолютного позиционирования дочерних элементов */
+    position: relative;
+    
+    /* Высота на весь экран */
+    height: 100vh;
+    
+    /* Дополнительно устанавливаем фон контейнера на случай, если body не сработает */
+    background-color: var(--tg-theme-bg-color);
+}
+
+/* 
+ * Стили для заголовка приложения
+ * Задают внешний вид логотипа TgStyle вверху страницы
+ */
+.app-title {
+    /* Каллиграфический шрифт для красивого отображения */
+    font-family: 'Dancing Script', cursive;
+    
+    /* Большой размер шрифта */
+    font-size: 3rem;
+    
+    /* Жирное начертание */
+    font-weight: 700;
+    
+    /* Белый цвет текста, хорошо выглядит на фоне Tiffany */
+    color: #fff;
+    
+    /* Легкая тень для улучшения читаемости */
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    
+    /* Выравнивание по центру */
+    text-align: center;
+    
+    /* Отступы: сверху 100px, снизу 20px */
+    margin: 100px 0 20px 0;
+}
+
+/* 
+ * Стили для профиля пользователя
+ * Отображается в правом верхнем углу
+ */
+.user-profile {
+    /* Абсолютное позиционирование относительно .app-container */
+    position: absolute;
+    top: 20px;
+    right: 20px;
+
+    /* Элементы располагаются горизонтально и центрируются по вертикали */
+    display: flex;
+    align-items: center;
+
+    /* Отступ сверху 80px */
+    margin-top: 65px;
+
+    /* Расстояние между элементами 10px */
+    gap: 10px;
+    /* Элементы располагаются вертикально и выравниваются по правому краю */
+    flex-direction: column; 
+    align-items: flex-end;
+    /* Поверх других элементов */
+    z-index: 10;
+}
+
+/* 
+ * Стили для фото пользователя
+ * Круглая аватарка с границей
+ */
+.user-photo {
+    /* Размеры 40x40px */
+    width: 50px;
+    height: 50px;
+
+    /* Скругление в круг */
+    border-radius: 50%;
+    
+    /* Серый фон по умолчанию, если нет фото */
+    background-color: #ccc;
+    
+    /* Фото заполняет доступное пространство */
+    background-size: cover;
+    background-position: center;
+    
+    /* Белая граница 2px */
+    border: 2px solid #fff;
+    
+    /* Легкая тень для объемности */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* 
+ * Стили для имени пользователя
+ * Отображается рядом с аватаркой
+ */
+#user-name {
+    /* Небольшой размер шрифта */
+    font-size: 1.2rem;
+    font-family: 'Dancing Script', cursive;
+    /* Средняя жирность */
+    font-weight: 500;
+    
+    /* Белый цвет текста */
+    color: #bb4545;
+
+    /* Тень для улучшения читаемости на разных фонах */
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* 
+ * Стили для основного белого контейнера
+ * Содержит основной контент приложения
+ */
+.main-wrapper {
+    /* Ширина с отступами по 20px с каждой стороны */
+    width: calc(100% - 40px);
+    height: calc(100% - 40px);
+    
+    /* Белый фон 
+     * Важно: В Telegram это должно отображаться корректно даже при переопределении темы
+     */
+    background-color: #fff;
+    
+    /* Скругленные углы */
+    border-radius: 20px;
+    
+    /* Внутренние отступы 20px со всех сторон */
+    padding: 20px;
+    
+    /* Тень для объемности 
+     * Может отображаться по-разному в зависимости от темы Telegram
+     */
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    
+    /* Отступ снизу 20px */
+    margin-bottom: 20px;
+}
+
+/* 
+ * Стили для описания приложения
+ * Текст под заголовком
+ */
+.app-description {
+    /* Размер шрифта чуть больше стандартного */
+    font-size: 1.1rem;
+    
+    /* Цвет текста из переменной CSS */
+    color: var(--tg-theme-text-color);
+    
+    /* Отступ снизу 20px */
+    margin-bottom: 20px;
+}
+
+/* 
+ * Стили для кнопок
+ * Применяются ко всем кнопкам, если не переопределены
+ */
+button {
+    /* Фон цвета из переменной CSS */
+    background-color: var(--tg-theme-button-color);
+    
+    /* Цвет текста из переменной CSS */
+    color: var(--tg-theme-button-text-color);
+    
+    /* Без границы */
+    border: none;
+    
+    /* Внутренние отступы 12px по вертикали и 20px по горизонтали */
+    padding: 12px 20px;
+    
+    /* Скругленные углы */
+    border-radius: 10px;
+    
+    /* Размер шрифта 16px */
+    font-size: 16px;
+    
+    /* Указатель меняется на руку при наведении */
+    cursor: pointer;
+    
+    /* Шрифт как у основного текста */
+    font-family: 'Montserrat', sans-serif;
+    
+    /* Средняя жирность */
+    font-weight: 500;
+    
+    /* Тень для объемности */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    
+    /* Плавный переход для анимации нажатия */
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+/* 
+ * Стили для активного состояния кнопки (при нажатии)
+ * Эффект нажатия
+ */
+button:active {
+    /* Слегка сдвигается вниз */
+    transform: translateY(1px);
+    
+    /* Тень становится меньше */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* 
+ * Стили для контейнера кнопки камеры
+ * Обертка круглой кнопки камеры внизу экрана
+ */
+.camera-button-container {
+    /* Занимает всю доступную ширину */
+    width: 100%;
+    
+    /* Центрирование по горизонтали */
+    display: flex;
+    justify-content: center;
+    
+    /* Отступ снизу 30px */
+    margin-bottom: 30px;
+}
+
+/* 
+ * Стили для кнопки камеры
+ * Круглая кнопка с иконкой камеры
+ */
+.camera-btn {
+    /* Размеры 70x70px для удобного нажатия */
+    width: 70px;
+    height: 70px;
+    
+    /* Скругление в круг */
+    border-radius: 50%;
+    
+    /* Белый фон */
+    background-color: #fff;
+    
+    /* Цвет иконки синий (как у кнопок) */
+    color: var(--tg-theme-button-color);
+    
+    /* Центрирование иконки */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    /* Без внутренних отступов */
+    padding: 0;
+    
+    /* Заметная тень для объемности */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    
+    /* Плавная анимация нажатия */
+    transition: transform 0.3s ease;
+}
+
+/* 
+ * Стили для активного состояния кнопки камеры
+ * Эффект нажатия
+ */
+.camera-btn:active {
+    /* Уменьшается при нажатии */
+    transform: scale(0.95);
+}
+
+/* 
+ * Стили для SVG-иконки внутри кнопки камеры
+ * Сама иконка фотоаппарата
+ */
+.camera-btn svg {
+    /* Размеры иконки 30x30px */
+    width: 30px;
+    height: 30px;
+}
+
+/* 
+ * Стили для контейнера результатов анализа
+ * Отображается после анализа фото
+ */
+#result-container {
+    /* Фиксированное позиционирование на весь экран */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    
+    /* Фон цвета из переменной CSS */
+    background-color: var(--tg-theme-bg-color);
+    
+    /* Чуть ниже приоритет, чем у контейнера камеры */
+    z-index: 900;
+    
+    /* Внутренние отступы 20px со всех сторон */
+    padding: 20px;
+    
+    /* Вертикальная прокрутка при необходимости */
+    overflow-y: auto;
+    
+    /* Элементы в колонку с центрированием */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* 
+ * Стили для заголовка в результатах
+ * "Анализ стиля"
+ */
+#result-container h2 {
+    /* Отступ сверху 20px */
+    margin-top: 20px;
+    
+    /* Большой размер шрифта */
+    font-size: 1.8rem;
+    
+    /* Белый цвет */
+    color: #fff;
+    
+    /* Центрирование текста */
+    text-align: center;
+    
+    /* Тень для улучшения читаемости */
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* 
+ * Стили для блока с результатами анализа
+ * Основной текст анализа
+ */
+#analysis-result {
+    /* Белый фон */
+    background-color: #fff;
+    
+    /* Скругленные углы */
+    border-radius: 15px;
+    
+    /* Внутренние отступы 20px */
+    padding: 20px;
+    
+    /* Отступы сверху и снизу 15px */
+    margin: 15px 0;
+    
+    /* Выравнивание текста по левому краю */
+    text-align: left;
+    
+    /* Тень для объемности */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    
+    /* Занимает всю доступную ширину с ограничением */
+    width: 100%;
+    max-width: calc(100% - 40px);
+}
+
+/* 
+ * Стили для блока с комментариями
+ * Содержит заголовок и облака с комментариями
+ */
+#cloud-comments {
+    /* Отступ сверху 30px */
+    margin-top: 30px;
+    
+    /* Занимает всю доступную ширину с ограничением */
+    width: 100%;
+    max-width: calc(100% - 40px);
+}
+
+/* 
+ * Стили для заголовка блока комментариев
+ * "Комментарии"
+ */
+#cloud-comments h3 {
+    /* Средний размер шрифта */
+    font-size: 1.4rem;
+    
+    /* Белый цвет */
+    color: #fff;
+    
+    /* Отступ снизу 15px */
+    margin-bottom: 15px;
+    
+    /* Центрирование текста */
+    text-align: center;
+    
+    /* Тень для улучшения читаемости */
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* 
+ * Стили для обертки облаков комментариев
+ * Контейнер для всех комментариев
+ */
+.clouds-wrapper {
+    /* Элементы в колонку */
+    display: flex;
+    flex-direction: column;
+    
+    /* Расстояние между комментариями 15px */
+    gap: 15px;
+}
+
+/* 
+ * Стили для облака с комментарием
+ * Каждый отдельный комментарий
+ */
+.comment-cloud {
+    /* Внутренние отступы 15px */
+    padding: 15px;
+    
+    /* Скругленные углы */
+    border-radius: 18px;
+    
+    /* Выравнивание текста по левому краю */
+    text-align: left;
+    
+    /* Относительное позиционирование для псевдоэлементов */
+    position: relative;
+    
+    /* Максимальная ширина 85% от контейнера */
+    max-width: 85%;
+    
+    /* Тень для объемности */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* 
+ * Стили для нечетных облаков комментариев
+ * Комментарии слева (1-й, 3-й, 5-й и т.д.)
+ */
+.comment-cloud:nth-child(odd) {
+    /* Выравнивание по левому краю */
+    align-self: flex-start;
+    
+    /* Голубой фон */
+    background-color: var(--cloud-color-1);
+    
+    /* Нижний левый угол заострен для эффекта "облака" */
+    border-bottom-left-radius: 5px;
+}
+
+/* 
+ * Стили для четных облаков комментариев
+ * Комментарии справа (2-й, 4-й, 6-й и т.д.)
+ */
+.comment-cloud:nth-child(even) {
+    /* Выравнивание по правому краю */
+    align-self: flex-end;
+    
+    /* Зеленый фон */
+    background-color: var(--cloud-color-2);
+    
+    /* Нижний правый угол заострен для эффекта "облака" */
+    border-bottom-right-radius: 5px;
+}
+
+/* 
+ * Стили для каждого третьего облака комментариев
+ * Каждый 3-й комментарий (3-й, 6-й, 9-й и т.д.)
+ */
+.comment-cloud:nth-child(3n) {
+    /* Желтый фон */
+    background-color: var(--cloud-color-3);
+}
+
+/* 
+ * Стили для блока кнопок действий в результатах
+ * Кнопки "Новый анализ" и "Поделиться"
+ */
+.result-actions {
+    /* Элементы в ряд */
+    display: flex;
+    
+    /* Расстояние между кнопками 15px */
+    gap: 15px;
+    
+    /* Отступы сверху и снизу */
+    margin-top: 25px;
+    margin-bottom: 30px;
+    
+    /* Занимает всю доступную ширину с ограничением */
+    width: 100%;
+    max-width: calc(100% - 40px);
+}
+
+/* 
+ * Стили для кнопок в блоке действий
+ * Применяется к обеим кнопкам
+ */
+.result-actions button {
+    /* Занимают равное пространство */
+    flex: 1;
+}
+
+/* 
+ * Стили для кнопки "Поделиться"
+ * Отличается цветом от кнопки "Новый анализ"
+ */
+#share-result-btn {
+    /* Зеленый фон */
+    background-color: #4caf50;
+}
+
+/* 
+ * Стили для скрытых элементов
+ * Применяется к элементам, которые должны быть скрыты
+ */
+.hidden {
+    /* Полностью скрывает элемент без занимаемого места
+     * !important гарантирует, что стиль не будет переопределен
+     */
+    display: none !important;
+}
+
+/* 
+ * Стили для индикатора загрузки
+ * Отображается во время выполнения запросов
+ */
+.loading {
+    /* Центрирование содержимого */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    /* Отступы сверху и снизу 20px */
+    padding: 20px 0;
+    
+    /* Цвет текста из переменной CSS */
+    color: var(--tg-theme-text-color);
+}
+
+/* 
+ * Стили для сообщений об ошибках
+ * Отображаются при возникновении проблем
+ */
+.error {
+    /* Красный цвет текста */
+    color: #e53935;
+    
+    /* Отступы сверху и снизу 10px */
+    margin: 10px 0;
+    
+    /* Внутренние отступы 10px */
+    padding: 10px;
+    
+    /* Полупрозрачный красный фон */
+    background-color: rgba(229, 57, 53, 0.1);
+    
+    /* Скругленные углы */
+    border-radius: 8px;
+}
+
+/* 
+ * Стили для сетки истории анализов
+ * Сетка из 4 ячеек для хранения результатов анализа стиля
+ */
+.history-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+    width: 100%;
+}
+
+/* 
+ * Стили для ячеек истории
+ * Каждая ячейка представляет собой контейнер для сохраненного анализа
+ */
+.history-cell {
+    position: relative;
+    aspect-ratio: 3/4;
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: #f0f0f0;
+    background-size: cover;
+    background-position: center;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    user-select: none;
+}
+
+.history-cell:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Содержимое ячейки */
+.history-cell-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Стили для индикатора даты в ячейке */
+.history-date {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    user-select: none; /* Предотвращаем выделение текста */
+}
+
+/* Стили для ячейки в режиме удаления */
+.history-cell.delete-mode {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Стили для кнопки удаления в стиле iOS */
+.delete-history-btn {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #ff3b30;
+    color: white;
+    border: none;
+    border-radius: 16px;
+    padding: 8px 16px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+    cursor: pointer;
+    animation: fadeIn 0.3s ease;
+    transition: opacity 0.3s ease, transform 0.2s ease;
+}
+
+.delete-history-btn:hover {
+    transform: translateX(-50%) scale(1.05);
+}
+
+.delete-history-btn:active {
+    transform: translateX(-50%) scale(0.95);
+    opacity: 0.9;
+}
+
+.delete-history-btn svg {
+    flex-shrink: 0;
+}
+
+/* Анимация появления */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Стили для индикатора ошибки загрузки фото */
+.photo-error-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 12px;
+    padding: 10px;
+    z-index: 5;
+}
+
+/* 
+ * Стили для кнопки добавления анализа
+ * Кнопка "+" в центре пустой ячейки
+ */
+.add-analysis {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #0088cc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.add-analysis:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.add-analysis svg {
+    width: 24px;
+    height: 24px;
+    stroke: white;
+}
+
+/* 
+ * Стили для ячейки с сохраненным анализом
+ * Применяется к ячейке, которая содержит результат анализа
+ */
+.history-cell.filled {
+    /* Фон заменяется на изображение */
+    background-size: cover;
+    background-position: center;
+    
+    /* Зеленая рамка для выделения */
+    border: 2px solid #4caf50;
+}
+
+/* 
+ * Стили для подписи в заполненной ячейке
+ * Отображает краткую информацию о сохраненном анализе
+ */
+.history-cell-caption {
+    /* Абсолютное позиционирование внизу ячейки */
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    
+    /* Полупрозрачный черный фон */
+    background-color: rgba(0, 0, 0, 0.6);
+    
+    /* Цвет текста белый */
+    color: white;
+    
+    /* Внутренние отступы */
+    padding: 8px;
+    
+    /* Скругление нижних углов, как у родительской ячейки */
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+    
+    /* Шрифт для лучшей читаемости */
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* Кнопка сохранения результата анализа */
+#save-result-btn {
+    /* Голубой фон (отличается от кнопки поделиться) */
+    background-color: #2196f3;
+}
+
+/* 
+ * Стили для контейнера предпросмотра фотографии
+ * Используется при нажатии на фото в истории
+ */
+#photo-preview-container {
+    /* Фиксированное позиционирование с отступами 20px */
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    bottom: 20px;
+    
+    /* Черный полупрозрачный фон */
+    background-color: rgba(0, 0, 0, 0.9);
+    
+    /* Высокий z-index чтобы быть поверх других элементов */
+    z-index: 1000;
+    
+    /* Центрирование содержимого */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    
+    /* Скругленные углы */
+    border-radius: 15px;
+    
+    /* Первоначально невидим для анимации */
+    opacity: 0;
+    transform: scale(0.95);
+    
+    /* Плавная анимация появления/исчезновения */
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    
+    /* Указатель превращается в руку для обозначения кликабельности */
+    cursor: pointer;
+}
+
+/* 
+ * Стили для изображения внутри предпросмотра
+ */
+#photo-preview-container img {
+    /* Максимальные размеры не превышают контейнер */
+    max-width: 90%;
+    max-height: 90%;
+    
+    /* Сохраняет пропорции */
+    object-fit: contain;
+    
+    /* Легкая рамка для улучшения видимости на темном фоне */
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+/* 
+ * Стили для подписи с датой внутри предпросмотра
+ */
+#photo-preview-container .date-caption {
+    /* Позиционирование внизу */
+    position: absolute;
+    bottom: 15px;
+    left: 0;
+    right: 0;
+    
+    /* Центрирование текста */
+    text-align: center;
+    
+    /* Белый текст */
+    color: white;
+    
+    /* Размер шрифта */
+    font-size: 14px;
+    
+    /* Внутренние отступы */
+    padding: 5px;
+    
+    /* Полупрозрачный фон для лучшей читаемости */
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* 
+ * Стили для меню выбора источника фото
+ */
+.photo-source-menu {
+    /* Фиксированное позиционирование снизу по центру */
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    
+    /* Белый фон */
+    background-color: white;
+    
+    /* Скругленные углы */
+    border-radius: 12px;
+    
+    /* Тень для объемности */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    
+    /* Элементы в колонку */
+    display: flex;
+    flex-direction: column;
+    
+    /* Ширина меню */
+    width: 250px;
+    
+    /* Поверх других элементов */
+    z-index: 1000;
+    
+    /* Скрываем все, что выходит за пределы границ */
+    overflow: hidden;
+}
+
+/* 
+ * Стили для опций в меню выбора источника фото
+ */
+.photo-source-menu div {
+    /* Внутренние отступы */
+    padding: 15px;
+    
+    /* Центрирование текста */
+    text-align: center;
+    
+    /* Указатель превращается в руку для обозначения кликабельности */
+    cursor: pointer;
+    
+    /* Плавный переход для анимации при наведении */
+    transition: background-color 0.2s ease;
+}
+
+/* 
+ * Стили для опций при наведении
+ */
+.photo-source-menu div:hover {
+    /* Легкий серый фон при наведении */
+    background-color: #f5f5f5;
+}
+
+/* Стили для всплывающего уведомления с результатами классификации */
+.classification-toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 12px;
+    font-size: 16px;
+    text-align: center;
+    z-index: 2000;
+    min-width: 250px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Анимация спиннера */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+/* Стили для ячейки истории в режиме удаления */
+.history-cell.delete-mode {
+    transform: scale(1.05);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+}
+
+/* Предотвращение выделения текста */
+.history-cell, .history-cell * {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+} 

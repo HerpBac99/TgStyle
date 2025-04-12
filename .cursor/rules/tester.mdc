@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+- Пиши тесты с использованием Jest.
+- Тестируй каждый публичный API-эндпоинт (/auth, /analyze).
+- Проверяй краевые случаи (нет фото, неверный Telegram ID).
+- Для клиента: тестируй DOM (jsdom) и события (click, load).

@@ -1,0 +1,14 @@
+{
+  "name": "telegramstyle-client",
+  "version": "1.0.0",
+  "description": "Client for TelegramStyle application",
+  "main": "index.js",
+  "scripts": {
+    "start": "serve -s public"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "serve": "^14.2.1"
+  }
+} 
