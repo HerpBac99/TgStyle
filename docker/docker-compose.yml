@@ -1,75 +1,31 @@
 version: '3'
 
 services:
-  mongodb:
-    image: mongo:latest
-    container_name: mongodb
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    networks:
-      - app-network
-
-  server:
+  app:
     build:
       context: ..
       dockerfile: docker/Dockerfile.server
-    container_name: telegramstyle-server
-    ports:
-      - "3000:3000"
-    depends_on:
-      - mongodb
+    container_name: telegramstyle-app
+    restart: always
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/telegramstyle
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=8443
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - DOMAIN=${DOMAIN}
       - APP_URL=${APP_URL}
-    networks:
-      - app-network
-
-  nginx:
-    image: nginx:alpine
-    container_name: telegramstyle-nginx
-    ports:
-      - "80:80"
-      - "443:443"
     volumes:
-      - ../client:/usr/share/nginx/html
-      - ./nginx/conf:/etc/nginx/conf.d
-      - ../ssl:/etc/letsencrypt
-      - ./acme-challenge:/var/www/html/.well-known/acme-challenge
-    depends_on:
-      - server
-    networks:
-      - app-network
-
-  certbot:
-    image: certbot/certbot
-    container_name: telegramstyle-certbot
-    volumes:
-      - ./acme-challenge:/var/www/certbot/.well-known/acme-challenge
-      - ../ssl:/etc/letsencrypt
-    command: renew --webroot --webroot-path=/var/www/certbot
-    depends_on:
-      - nginx
-
-  client:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.client
-    container_name: telegramstyle-client
+      - ../server:/app
+      - /app/node_modules
+      - ../ssl:/app/ssl:ro
+      - ../client/public:/app/public:ro
     ports:
-      - "8080:3000"
-    depends_on:
-      - server
+      - "8080:80"
+      - "8443:8443"
     networks:
-      - app-network
+      - telegramstyle-network
 
 networks:
-  app-network:
+  telegramstyle-network:
     driver: bridge
 
 volumes:

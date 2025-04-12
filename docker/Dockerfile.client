@@ -2,11 +2,11 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-COPY ../client/package*.json ./
+COPY client/package*.json ./
 
 RUN npm install
 
-COPY ../client ./
+COPY client/ ./
 
 EXPOSE 3000
 

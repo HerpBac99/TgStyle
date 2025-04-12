@@ -2,12 +2,23 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-COPY ../server/package*.json ./
+# Копируем package.json сервера
+COPY server/package*.json ./
 
+# Устанавливаем зависимости
 RUN npm install
 
-COPY ../server ./
+# Копируем серверные файлы
+COPY server/ ./
 
-EXPOSE 3000
+# Копируем клиентские файлы в директорию public
+COPY client/public/ ./public/
 
+# Создаем директорию для сертификатов SSL
+RUN mkdir -p ./ssl
+
+# Открываем порты
+EXPOSE 80 443
+
+# Запускаем приложение
 CMD ["npm", "start"] 

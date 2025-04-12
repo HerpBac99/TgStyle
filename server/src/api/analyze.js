@@ -4,262 +4,13 @@ const { validateTelegramWebAppData } = require('../utils/telegram');
 const User = require('../models/User');
 const path = require('path');
 const fs = require('fs');
-const tf = require('@tensorflow/tfjs-node');
-const sharp = require('sharp');
+// Временно закомментировал TensorFlow
+// const tf = require('@tensorflow/tfjs-node');
+// const sharp = require('sharp');
 
-// Путь к модели относительно корня проекта
-const MODEL_PATH = path.join(__dirname, '../../../clothing_model.h5');
-
-// Параметры изображения (такие же, как в Python-скрипте)
-const IMG_HEIGHT = 224;
-const IMG_WIDTH = 224;
-const CLASS_NAMES = ['dress', 'tshirt', 'pants', 'jacket'];
-
-// Русские названия для классов одежды
-const CLASS_NAMES_RU = {
-    'dress': 'Платье',
-    'tshirt': 'Футболка',
-    'pants': 'Брюки',
-    'jacket': 'Куртка',
-    'unknown': 'Неизвестный тип'
-};
-
-// Добавляем функцию для преобразования модели h5 в формат, поддерживаемый tfjs
-async function convertH5ToTfjsFormat() {
-    try {
-        const h5Path = MODEL_PATH;
-        const outputDir = path.join(__dirname, '../../../tfjs_model');
-        
-        // Проверяем существование файла модели h5
-        if (!fs.existsSync(h5Path)) {
-            console.error(`Файл модели .h5 не найден по пути: ${h5Path}`);
-            return false;
-        }
-        
-        // Проверяем, существует ли уже сконвертированная модель
-        if (fs.existsSync(path.join(outputDir, 'model.json'))) {
-            console.log('Уже существует сконвертированная модель, используем её');
-            return true;
-        }
-        
-        console.log('Модель в формате h5 требует конвертацию для использования в TensorFlow.js');
-        console.log('Рекомендуется использовать утилиту tensorflowjs_converter для преобразования:');
-        console.log('```');
-        console.log('pip install tensorflowjs');
-        console.log(`tensorflowjs_converter --input_format keras ${h5Path} ${outputDir}`);
-        console.log('```');
-        
-        console.log('В текущем режиме будет использована симуляция классификации');
-        
-        return false;
-    } catch (error) {
-        console.error('Ошибка при проверке конвертации модели:', error);
-        return false;
-    }
-}
-
-// Загрузка модели TensorFlow
-let model;
-async function loadModel() {
-    try {
-        console.log(`Загрузка модели из ${MODEL_PATH}...`);
-        
-        // Проверяем существование файла модели
-        if (!fs.existsSync(MODEL_PATH)) {
-            console.error(`Файл модели не найден по пути: ${MODEL_PATH}`);
-            console.error('Текущая директория:', __dirname);
-            model = null;
-            
-            // Проверяем доступные файлы в директории
-            try {
-                const rootDir = path.join(__dirname, '../../..');
-                console.log('Содержимое корневой директории:');
-                fs.readdirSync(rootDir).forEach(file => {
-                    console.log(file);
-                });
-            } catch (e) {
-                console.error('Ошибка при проверке директории:', e);
-            }
-            
-            return;
-        }
-        
-        console.log('Файл модели найден, начинаем загрузку...');
-        
-        // Проверяем, требуется ли конвертация модели h5
-        const isTfjsFormatAvailable = await convertH5ToTfjsFormat();
-        
-        if (isTfjsFormatAvailable) {
-            // Если есть сконвертированная модель, загружаем её
-            const tfjsModelPath = `file://${path.join(__dirname, '../../../tfjs_model/model.json')}`;
-            try {
-                model = await tf.loadLayersModel(tfjsModelPath);
-                console.log('Модель успешно загружена из сконвертированного формата');
-                return;
-            } catch (err) {
-                console.error('Ошибка при загрузке сконвертированной модели:', err);
-            }
-        }
-        
-        // Если сконвертированная модель недоступна, пробуем прямые методы загрузки
-        try {
-            // Загружаем модель через tfjs-node
-            model = await tf.loadLayersModel(`file://${MODEL_PATH}`);
-            console.log('Модель успешно загружена через loadLayersModel');
-            
-            // Проверяем, что модель корректно загружена
-            if (model) {
-                // Печатаем сводку модели
-                console.log('Сводка модели:');
-                model.summary();
-                
-                // Пробуем вывести слои модели
-                const layers = model.layers;
-                console.log(`Модель содержит ${layers.length} слоев`);
-            }
-        } catch (layersModelError) {
-            console.warn(`Не удалось загрузить через loadLayersModel: ${layersModelError.message}`);
-            
-            try {
-                // Альтернативный способ загрузки для .h5 формата
-                model = await tf.node.loadSavedModel(MODEL_PATH);
-                console.log('Модель успешно загружена через loadSavedModel');
-            } catch (savedModelError) {
-                console.error(`Не удалось загрузить через loadSavedModel: ${savedModelError.message}`);
-                
-                // Последняя попытка через другой метод
-                try {
-                    model = await tf.loadGraphModel(`file://${MODEL_PATH}`);
-                    console.log('Модель успешно загружена через loadGraphModel');
-                } catch (graphModelError) {
-                    console.error(`Не удалось загрузить через loadGraphModel: ${graphModelError.message}`);
-                    model = null;
-                }
-            }
-        }
-    } catch (err) {
-        console.error('Ошибка при загрузке модели:', err);
-        // Создаем заглушку, если модель не может быть загружена
-        model = null;
-    }
-    
-    if (!model) {
-        console.warn('Модель не была загружена. Будет использоваться симуляция результатов.');
-    }
-}
-
-/**
- * Обрабатывает изображение для передачи в модель классификации
- * @param {Buffer} imageBuffer - Буфер изображения (из base64)
- * @returns {tf.Tensor} Тензор, готовый для подачи в модель
- */
-async function preprocessImage(imageBuffer) {
-    try {
-        // Изменяем размер и преобразуем изображение согласно Python-скрипту
-        const preprocessedImage = await sharp(imageBuffer)
-            .resize(IMG_WIDTH, IMG_HEIGHT)
-            .toFormat('jpeg')
-            .toBuffer();
-        
-        // Создаем тензор из буфера изображения
-        const tensor = tf.node.decodeImage(preprocessedImage, 3);
-        
-        // Нормализуем (0-1) как в Python-скрипте
-        const normalized = tensor.div(tf.scalar(255));
-        
-        // Добавляем размерность батча
-        const batched = normalized.expandDims(0);
-        
-        return batched;
-    } catch (err) {
-        console.error('Ошибка при предобработке изображения:', err);
-        throw err;
-    }
-}
-
-/**
- * Классифицирует изображение с помощью модели TensorFlow
- * @param {Buffer} imageBuffer - Буфер изображения (из base64)
- * @returns {Object} Результат классификации {className, confidence}
- */
-async function classifyImage(imageBuffer) {
-    try {
-        // Проверяем наличие модели
-        if (!model) {
-            console.warn('Модель не загружена, возвращаем заглушку...');
-            return simulateClassification();
-        }
-        
-        console.log('Начинаем предобработку изображения...');
-        const inputTensor = await preprocessImage(imageBuffer);
-        console.log('Изображение успешно предобработано');
-        
-        // Выполняем предсказание
-        console.log('Запуск модели для предсказания...');
-        let predictions;
-        let predictionData;
-        
-        try {
-            // Выполняем предсказание аналогично Python-скрипту
-            predictions = await model.predict(inputTensor);
-            predictionData = await predictions.data();
-            
-            console.log('Получены данные предсказания:', predictionData);
-            
-            // Проверяем, что получили валидные данные
-            if (!predictionData || predictionData.length !== CLASS_NAMES.length) {
-                console.error('Некорректные данные предсказания:', predictionData, 'ожидалось', CLASS_NAMES.length, 'классов');
-                return simulateClassification();
-            }
-        } catch (predictionError) {
-            console.error('Ошибка при выполнении предсказания:', predictionError);
-            return simulateClassification();
-        }
-        
-        // Находим класс с наибольшей вероятностью аналогично Python-скрипту
-        let maxIndex = 0;
-        let maxValue = predictionData[0];
-        
-        for (let i = 1; i < predictionData.length; i++) {
-            if (predictionData[i] > maxValue) {
-                maxIndex = i;
-                maxValue = predictionData[i];
-            }
-        }
-        
-        // Проверяем, что индекс не выходит за пределы массива
-        if (maxIndex >= CLASS_NAMES.length) {
-            console.error('Индекс класса выходит за пределы допустимых значений:', maxIndex);
-            return simulateClassification();
-        }
-        
-        const className = CLASS_NAMES[maxIndex];
-        const confidence = maxValue * 100;
-        
-        console.log(`Результат классификации: ${className} (${confidence.toFixed(2)}%)`);
-        
-        // Очищаем память
-        tf.dispose(inputTensor);
-        tf.dispose(predictions);
-        
-        // Формируем результат с проверкой на валидность
-        const result = {
-            className,
-            classNameRu: CLASS_NAMES_RU[className] || CLASS_NAMES_RU.unknown,
-            confidence: confidence.toFixed(2)
-        };
-        
-        // Дополнительно проверяем структуру результата
-        if (!result.className || !result.classNameRu || !result.confidence) {
-            console.error('Некорректная структура результата:', result);
-            return simulateClassification();
-        }
-        
-        return result;
-    } catch (err) {
-        console.error('Ошибка при классификации изображения:', err);
-        return simulateClassification();
-    }
+// Симуляция классификатора
+function classifyImage() {
+    return simulateClassification();
 }
 
 /**
@@ -267,6 +18,15 @@ async function classifyImage(imageBuffer) {
  * @returns {Object} Результат классификации {className, confidence}
  */
 function simulateClassification() {
+    const CLASS_NAMES = ['dress', 'tshirt', 'pants', 'jacket'];
+    const CLASS_NAMES_RU = {
+        'dress': 'Платье',
+        'tshirt': 'Футболка',
+        'pants': 'Брюки',
+        'jacket': 'Куртка',
+        'unknown': 'Неизвестный тип'
+    };
+    
     const randomIndex = Math.floor(Math.random() * CLASS_NAMES.length);
     const className = CLASS_NAMES[randomIndex];
     const confidence = (70 + Math.random() * 25).toFixed(2); // 70-95%
@@ -317,24 +77,12 @@ router.post('/', async (req, res) => {
         const { user } = validationResult.data;
         console.log(`Запрос от пользователя: ${user.id} (${user.first_name})`);
         
-        // Get user from database или create if not exists
-        let userDoc = await User.findOne({ telegramId: user.id });
-        
-        if (!userDoc) {
-            console.log(`Пользователь не найден, создаем нового: ${user.id}`);
-            userDoc = new User({
-                telegramId: user.id,
-                firstName: user.first_name,
-                lastName: user.last_name || '',
-                username: user.username || '',
-                registeredAt: new Date()
-            });
-            try {
-                await userDoc.save();
-                console.log(`Пользователь успешно создан: ${user.id}`);
-            } catch (saveErr) {
-                console.error(`Ошибка при создании пользователя: ${saveErr.message}`);
-            }
+        // Пропускаем поиск пользователя в MongoDB (работаем без БД)
+        let userDoc = null;
+        try {
+            userDoc = await User.findOne({ telegramId: user.id });
+        } catch (err) {
+            console.log('Пропускаем поиск в БД, так как MongoDB не активна');
         }
         
         // Determine source type
@@ -411,17 +159,21 @@ router.post('/', async (req, res) => {
         }
         
         try {
-            // Save the analysis result to the user's history
-            if (userDoc.analysisHistory) {
+            // Save the analysis result to the user's history if MongoDB is available
+            if (userDoc && userDoc.analysisHistory) {
                 userDoc.analysisHistory.push({
                     timestamp: new Date(),
                     sourceType,
                     analysis
                 });
-                await userDoc.save();
-                console.log('Анализ успешно сохранен в историю пользователя');
+                try {
+                    await userDoc.save();
+                    console.log('Анализ успешно сохранен в историю пользователя');
+                } catch (saveErr) {
+                    console.log('Пропускаем сохранение в БД, так как MongoDB не активна');
+                }
             } else {
-                console.warn('Не удалось сохранить в историю - отсутствует поле analysisHistory');
+                console.warn('Не сохраняем в историю, так как MongoDB не активна');
             }
         } catch (dbError) {
             console.error('Ошибка при сохранении в базу данных:', dbError);
@@ -595,8 +347,5 @@ function generateComments(classification, isPinterest = false) {
     const shuffled = allComments.sort(() => 0.5 - Math.random());
     return shuffled.slice(0, 3 + Math.floor(Math.random() * 3));
 }
-
-// Загружаем модель при запуске
-loadModel();
 
 module.exports = router; 
