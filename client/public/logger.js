@@ -1,304 +1,412 @@
-// Максимальное количество хранимых логов в локальном хранилище
-const MAX_STORED_LOGS = 500;
+// Константы для системы логирования
+const LOG_STORAGE_KEY = 'tgstyle_app_logs';
+const MAX_STORED_LOGS = 1000;
+// Глобальная переменная apiUrl, используемая всем приложением
+window.apiUrl = window.location.hostname.includes('localhost') 
+    ? 'http://localhost:3000/api' 
+    : 'https://flappy.keenetic.link/api';
 
-// Цвета логов для разных типов сообщений
-const LOG_COLORS = {
-  info: '#4CAF50',    // Зеленый для информационных сообщений
-  warn: '#FF9800',    // Оранжевый для предупреждений
-  error: '#F44336',   // Красный для ошибок
-  debug: '#2196F3'    // Синий для отладочных сообщений
-};
-
-// Константы для логгера
-const STORAGE_KEY = 'app_logs'; // Ключ для хранения логов в localStorage
-const LOG_ERROR_API = 'api/log-error'; // Путь к API для отправки логов
-
-// Класс для управления логированием
-class Logger {
-  constructor() {
-    this.logs = [];
-    this.logElement = null;
-    this.clearButton = null;
-    this.sendButton = null;
-    this.initialized = false;
-  }
-
-  // Инициализация логгера, загрузка сохраненных логов
-  async init() {
-    if (this.initialized) return;
+// Система логирования
+const Logger = {
+    logs: [],
     
-    try {
-      const savedLogs = localStorage.getItem(STORAGE_KEY);
-      if (savedLogs) {
-        this.logs = JSON.parse(savedLogs);
-      }
-      
-      this.initialized = true;
-      this.createLogUi();
-      console.log('Логгер инициализирован успешно');
-    } catch (err) {
-      console.error('Ошибка при инициализации логгера:', err);
-    }
-  }
-
-  // Создание UI для отображения логов
-  createLogUi() {
-    try {
-      // Создаем контейнер для логов, если его еще нет
-      if (!document.getElementById('logContainer')) {
-        const logContainer = document.createElement('div');
-        logContainer.id = 'logContainer';
-        logContainer.style.display = 'none';
-        logContainer.style.position = 'fixed';
-        logContainer.style.bottom = '0';
-        logContainer.style.left = '0';
-        logContainer.style.right = '0';
-        logContainer.style.maxHeight = '50vh';
-        logContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
-        logContainer.style.color = 'white';
-        logContainer.style.padding = '10px';
-        logContainer.style.overflow = 'auto';
-        logContainer.style.zIndex = '10000';
-        logContainer.style.borderTop = '1px solid #444';
-        logContainer.style.fontFamily = 'monospace';
-        logContainer.style.fontSize = '12px';
+    // Инициализация системы логирования
+    init() {
+        // Загружаем логи из localStorage, если они существуют
+        try {
+            const storedLogs = localStorage.getItem(LOG_STORAGE_KEY);
+            if (storedLogs) {
+                this.logs = JSON.parse(storedLogs);
+                console.log(`Загружено ${this.logs.length} ранее сохраненных логов`);
+            }
+        } catch (error) {
+            console.error('Ошибка при загрузке логов из localStorage:', error);
+        }
         
-        // Добавляем заголовок и кнопки управления
-        const header = document.createElement('div');
-        header.style.display = 'flex';
-        header.style.justifyContent = 'space-between';
-        header.style.marginBottom = '10px';
+        // Создаем UI для просмотра логов
+        this.createLogUI();
         
-        const title = document.createElement('div');
-        title.textContent = 'Логи приложения';
-        title.style.fontWeight = 'bold';
+        // Устанавливаем перехватчик для необработанных ошибок
+        window.addEventListener('error', (event) => {
+            this.log('Необработанная ошибка: ' + event.message, 'error', {
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno,
+                stack: event.error ? event.error.stack : null
+            });
+            this.saveLogs();
+        });
         
-        const buttonsContainer = document.createElement('div');
+        console.log('Система логирования инициализирована');
+        return this;
+    },
+    
+    // Создание интерфейса для просмотра логов
+    createLogUI() {
+        // Создаем кнопку просмотра логов
+        const viewLogsBtn = document.createElement('button');
+        viewLogsBtn.id = 'view-logs-btn';
+        viewLogsBtn.textContent = '🔍 Логи';
+        viewLogsBtn.style.cssText = `
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 9999;
+            cursor: pointer;
+        `;
         
-        // Кнопка очистки логов
-        this.clearButton = document.createElement('button');
-        this.clearButton.textContent = 'Очистить';
-        this.clearButton.style.marginRight = '10px';
-        this.clearButton.style.padding = '3px 8px';
-        this.clearButton.style.backgroundColor = '#444';
-        this.clearButton.style.color = 'white';
-        this.clearButton.style.border = 'none';
-        this.clearButton.style.borderRadius = '3px';
-        this.clearButton.style.cursor = 'pointer';
-        this.clearButton.onclick = () => this.clearLogs();
+        // Создаем модальное окно для просмотра логов
+        const logModal = document.createElement('div');
+        logModal.id = 'log-modal';
+        logModal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 10000;
+            display: none;
+            flex-direction: column;
+            color: white;
+            font-family: monospace;
+            padding: 10px;
+        `;
         
-        // Кнопка отправки логов на сервер
-        this.sendButton = document.createElement('button');
-        this.sendButton.textContent = 'Отправить на сервер';
-        this.sendButton.style.padding = '3px 8px';
-        this.sendButton.style.backgroundColor = '#2196F3';
-        this.sendButton.style.color = 'white';
-        this.sendButton.style.border = 'none';
-        this.sendButton.style.borderRadius = '3px';
-        this.sendButton.style.cursor = 'pointer';
-        this.sendButton.onclick = () => this.sendLogsToServer();
+        // Создаем заголовок и кнопки управления
+        const modalHeader = document.createElement('div');
+        modalHeader.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        `;
         
-        // Создаем элемент для отображения логов
-        this.logElement = document.createElement('div');
-        this.logElement.id = 'logEntries';
+        const modalTitle = document.createElement('h3');
+        modalTitle.textContent = 'Журнал логов приложения';
+        modalTitle.style.margin = '0';
+        
+        // Создаем контейнер для содержимого логов
+        const logContent = document.createElement('div');
+        logContent.id = 'log-content';
+        logContent.style.cssText = `
+            flex: 1;
+            overflow-y: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: pre-wrap;
+        `;
+        
+        // Создаем панель инструментов для работы с логами
+        const logToolbar = document.createElement('div');
+        logToolbar.style.cssText = `
+            display: flex;
+            justify-content: flex-start;
+            gap: 10px;
+            margin-top: 10px;
+        `;
+        
+        const copyLogsBtn = document.createElement('button');
+        copyLogsBtn.textContent = 'Копировать';
+        copyLogsBtn.className = 'log-btn';
+        
+        const sendLogsBtn = document.createElement('button');
+        sendLogsBtn.textContent = 'Отправить';
+        sendLogsBtn.className = 'log-btn';
+        
+        const clearLogsBtn = document.createElement('button');
+        clearLogsBtn.textContent = 'Очистить';
+        clearLogsBtn.className = 'log-btn';
+        
+        const exitLogsBtn = document.createElement('button');
+        exitLogsBtn.textContent = 'Выход';
+        exitLogsBtn.className = 'log-btn';
+        
+        // Добавляем стиль для кнопок
+        const style = document.createElement('style');
+        style.textContent = `
+            .log-btn {
+                padding: 6px 12px;
+                background-color: #40a7e3;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+            }
+            .log-btn:hover {
+                background-color: #2c7db2;
+            }
+            .log-entry {
+                margin-bottom: 4px;
+                padding-bottom: 4px;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+            }
+            .log-info { color: #90caf9; }
+            .log-debug { color: #80deea; }
+            .log-warn { color: #ffcc80; }
+            .log-error { color: #ef9a9a; }
+        `;
         
         // Собираем структуру UI
-        buttonsContainer.appendChild(this.clearButton);
-        buttonsContainer.appendChild(this.sendButton);
-        header.appendChild(title);
-        header.appendChild(buttonsContainer);
-        logContainer.appendChild(header);
-        logContainer.appendChild(this.logElement);
-        document.body.appendChild(logContainer);
+        modalHeader.appendChild(modalTitle);
         
-        // Добавляем кнопку для показа/скрытия логов
-        const toggleButton = document.createElement('button');
-        toggleButton.textContent = 'Логи';
-        toggleButton.style.position = 'fixed';
-        toggleButton.style.bottom = '10px';
-        toggleButton.style.right = '10px';
-        toggleButton.style.padding = '5px 10px';
-        toggleButton.style.backgroundColor = '#333';
-        toggleButton.style.color = 'white';
-        toggleButton.style.border = 'none';
-        toggleButton.style.borderRadius = '5px';
-        toggleButton.style.cursor = 'pointer';
-        toggleButton.style.zIndex = '10001';
-        toggleButton.onclick = () => {
-          const isVisible = logContainer.style.display !== 'none';
-          logContainer.style.display = isVisible ? 'none' : 'block';
-          toggleButton.textContent = isVisible ? 'Логи' : 'Скрыть';
+        logToolbar.appendChild(copyLogsBtn);
+        logToolbar.appendChild(sendLogsBtn);
+        logToolbar.appendChild(clearLogsBtn);
+        logToolbar.appendChild(exitLogsBtn);
+        
+        logModal.appendChild(modalHeader);
+        logModal.appendChild(logContent);
+        logModal.appendChild(logToolbar);
+        
+        document.head.appendChild(style);
+        document.body.appendChild(viewLogsBtn);
+        document.body.appendChild(logModal);
+        
+        // События для кнопок
+        viewLogsBtn.addEventListener('click', () => {
+            this.updateLogDisplay();
+            logModal.style.display = 'flex';
+        });
+        
+        copyLogsBtn.addEventListener('click', () => {
+            const logText = this.formatLogsForExport();
+            navigator.clipboard.writeText(logText)
+                .then(() => {
+                    alert('Логи скопированы в буфер обмена');
+                })
+                .catch(err => {
+                    console.error('Ошибка при копировании логов:', err);
+                    alert('Не удалось скопировать логи: ' + err.message);
+                });
+        });
+        
+        sendLogsBtn.addEventListener('click', () => {
+            this.sendLogsToServer();
+        });
+        
+        clearLogsBtn.addEventListener('click', () => {
+            if (confirm('Очистить все логи?')) {
+                this.clearLogs();
+                this.updateLogDisplay();
+            }
+        });
+        
+        exitLogsBtn.addEventListener('click', () => {
+            logModal.style.display = 'none';
+        });
+    },
+    
+    // Вывод логов в модальное окно
+    updateLogDisplay() {
+        const logContent = document.getElementById('log-content');
+        if (!logContent) return;
+        
+        logContent.innerHTML = '';
+        
+        if (this.logs.length === 0) {
+            logContent.innerHTML = '<em>Нет записей в журнале</em>';
+            return;
+        }
+        
+        const logsToShow = this.logs.slice(-500); // Показываем до 500 последних логов для производительности
+        
+        logsToShow.forEach(log => {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${log.level}`;
+            
+            // Форматируем лог
+            logEntry.innerHTML = `
+                <strong>[${log.timestamp}]</strong> 
+                <span class="log-level">[${log.level.toUpperCase()}]</span> 
+                <span class="log-message">${log.message}</span>
+                <br><small class="log-caller">${log.caller}</small>
+                ${log.data ? `<br><small class="log-data">${log.data}</small>` : ''}
+            `;
+            
+            logContent.appendChild(logEntry);
+        });
+        
+        // Прокручиваем к последнему логу
+        logContent.scrollTop = logContent.scrollHeight;
+    },
+    
+    // Форматирование логов для экспорта
+    formatLogsForExport() {
+        return this.logs.map(log => {
+            return `[${log.timestamp}] [${log.level.toUpperCase()}] ${log.message} (${log.caller})${log.data ? '\n  Данные: ' + log.data : ''}`;
+        }).join('\n');
+    },
+    
+    // Сохранение логов в localStorage
+    saveLogs() {
+        try {
+            // Обрезаем логи, если их слишком много
+            if (this.logs.length > MAX_STORED_LOGS) {
+                this.logs = this.logs.slice(-MAX_STORED_LOGS);
+            }
+            
+            localStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(this.logs));
+        } catch (error) {
+            console.error('Ошибка при сохранении логов в localStorage:', error);
+        }
+    },
+    
+    // Очистка логов
+    clearLogs() {
+        this.logs = [];
+        this.saveLogs();
+    },
+    
+    // Получение информации о вызывающей функции
+    getCallerInfo() {
+        try {
+            const stackTrace = new Error().stack;
+            const lines = stackTrace.split('\n');
+            
+            // Первая строка - это сам Error()
+            // Вторая строка - это вызов текущего метода (log)
+            // Третья строка - это вызов Logger.log или appLogger
+            // Четвертая строка - это то, что нам нужно - вызывающая функция
+            if (lines.length >= 4) {
+                const callerLine = lines[3].trim();
+                
+                // Извлекаем имя функции и номер строки
+                const functionMatch = callerLine.match(/at\s+([^\s]+)\s+\((.+):(\d+):(\d+)\)/);
+                if (functionMatch) {
+                    const [_, functionName, file, line, col] = functionMatch;
+                    // Получаем только имя файла без пути
+                    const fileName = file.split('/').pop();
+                    return `${functionName} в ${fileName}:${line}`;
+                }
+                
+                // Если не удалось извлечь по первому паттерну, пробуем другой паттерн
+                const anonymousMatch = callerLine.match(/at\s+(.+):(\d+):(\d+)/);
+                if (anonymousMatch) {
+                    const [_, file, line, col] = anonymousMatch;
+                    const fileName = file.split('/').pop();
+                    return `${fileName}:${line}`;
+                }
+                
+                // Возвращаем всю строку, если не удалось распарсить
+                return callerLine.replace(/^\s*at\s+/, '');
+            }
+            
+            return 'неизвестно';
+        } catch (e) {
+            return 'ошибка определения';
+        }
+    },
+    
+    // Основной метод логирования
+    log(message, level = 'info', data = null, caller = null) {
+        // Получаем информацию о вызывающей функции
+        const callerInfo = caller || this.getCallerInfo();
+        
+        // Создаем метку времени
+        const timestamp = new Date().toISOString();
+        
+        // Создаем объект лога
+        const logEntry = {
+            timestamp,
+            level,
+            message,
+            caller: callerInfo,
+            data: data ? JSON.stringify(data) : null
         };
-        document.body.appendChild(toggleButton);
-      }
-      
-      // Отображаем существующие логи
-      this.renderLogs();
-      
-    } catch (err) {
-      console.error('Ошибка при создании UI для логов:', err);
-    }
-  }
-
-  // Отрисовка всех логов
-  renderLogs() {
-    if (!this.logElement) return;
+        
+        // Добавляем в массив логов
+        this.logs.push(logEntry);
+        
+        // Логируем в консоль браузера
+        const consoleMsg = `[${timestamp}] [${level.toUpperCase()}] ${message} (${callerInfo})`;
+        switch (level) {
+            case 'error':
+                console.error(consoleMsg, data || '');
+                break;
+            case 'warn':
+                console.warn(consoleMsg, data || '');
+                break;
+            case 'debug':
+                console.debug(consoleMsg, data || '');
+                break;
+            default:
+                console.log(consoleMsg, data || '');
+        }
+        
+        // Сохраняем логи в localStorage
+        this.saveLogs();
+        
+        return logEntry;
+    },
     
-    // Очищаем текущее содержимое
-    this.logElement.innerHTML = '';
-    
-    // Отображаем логи в обратном порядке (новые сверху)
-    for (let i = this.logs.length - 1; i >= 0; i--) {
-      const log = this.logs[i];
-      const entry = document.createElement('div');
-      entry.style.marginBottom = '5px';
-      entry.style.borderLeft = `3px solid ${LOG_COLORS[log.type] || '#999'}`;
-      entry.style.paddingLeft = '5px';
-      entry.innerHTML = `<span style="color: #999;">[${log.timestamp}]</span> <span style="color: ${LOG_COLORS[log.type] || '#999'}">${log.type.toUpperCase()}</span>: ${log.message}`;
-      
-      this.logElement.appendChild(entry);
+    // Отправка логов на сервер
+    sendLogsToServer() {
+        const logContent = document.getElementById('log-content');
+        if (!logContent) return;
+        
+        // Показываем статус отправки
+        const previousContent = logContent.innerHTML;
+        logContent.innerHTML = '<div style="text-align: center; padding: 20px;">Отправка логов на сервер...</div>';
+        
+        // Собираем данные для отправки
+        const logsData = {
+            logs: this.logs,
+            userAgent: navigator.userAgent,
+            appVersion: '1.0.0', // Версия приложения
+            timestamp: new Date().toISOString()
+        };
+        
+        // Отправляем на сервер
+        fetch(`${window.apiUrl}/log-error`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(logsData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ошибка: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                logContent.innerHTML = '<div style="text-align: center; padding: 20px; color: #81c784;">Логи успешно отправлены на сервер!</div>';
+                setTimeout(() => {
+                    logContent.innerHTML = previousContent;
+                }, 2000);
+            } else {
+                throw new Error(data.error || 'Неизвестная ошибка');
+            }
+        })
+        .catch(error => {
+            logContent.innerHTML = `<div style="text-align: center; padding: 20px; color: #e57373;">Ошибка при отправке логов: ${error.message}</div>`;
+            setTimeout(() => {
+                logContent.innerHTML = previousContent;
+            }, 3000);
+        });
     }
-  }
+};
 
-  // Функция логирования
-  log(type, message, data = null) {
-    try {
-      const timestamp = new Date().toISOString();
-      const logEntry = {
-        type,
-        message,
-        data,
-        timestamp
-      };
-      
-      // Добавляем новую запись в начало массива
-      this.logs.push(logEntry);
-      
-      // Ограничиваем количество хранимых логов
-      if (this.logs.length > MAX_STORED_LOGS) {
-        this.logs = this.logs.slice(-MAX_STORED_LOGS);
-      }
-      
-      // Сохраняем логи в localStorage
-      this.saveLogs();
-      
-      // Отображаем в UI, если он создан
-      if (this.logElement) {
-        this.renderLogs();
-      }
-      
-      // Дублируем важные логи в консоль
-      if (type === 'error') {
-        console.error(`[${timestamp}] ${message}`, data);
-      } else if (type === 'warn') {
-        console.warn(`[${timestamp}] ${message}`, data);
-      }
-      
-      return logEntry;
-    } catch (err) {
-      console.error('Ошибка при логировании:', err);
-    }
-  }
-
-  // Методы для разных типов логов
-  info(message, data = null) {
-    return this.log('info', message, data);
-  }
-  
-  warn(message, data = null) {
-    return this.log('warn', message, data);
-  }
-  
-  error(message, data = null) {
-    return this.log('error', message, data);
-  }
-  
-  debug(message, data = null) {
-    return this.log('debug', message, data);
-  }
-
-  // Сохранение логов в localStorage
-  saveLogs() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.logs));
-    } catch (err) {
-      console.error('Ошибка при сохранении логов:', err);
-    }
-  }
-
-  // Очистка логов
-  clearLogs() {
-    this.logs = [];
-    this.saveLogs();
-    if (this.logElement) {
-      this.renderLogs();
-    }
-  }
-
-  // Отправка логов на сервер
-  async sendLogsToServer() {
-    try {
-      if (!this.logs.length) {
-        console.warn('Нет логов для отправки на сервер');
-        return;
-      }
-      
-      // Устанавливаем состояние кнопки "отправка"
-      if (this.sendButton) {
-        this.sendButton.textContent = 'Отправка...';
-        this.sendButton.disabled = true;
-      }
-      
-      // Формируем данные для отправки
-      const logData = {
-        logs: this.logs,
-        userAgent: navigator.userAgent,
-        timestamp: new Date().toISOString(),
-        sessionId: Date.now().toString()
-      };
-      
-      // Формируем URL API (учитываем возможные относительные пути)
-      const apiUrl = new URL(LOG_ERROR_API, window.location.origin).href;
-      console.log('Отправка логов на сервер:', apiUrl);
-      
-      // Отправляем на сервер
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(logData)
-      });
-      
-      console.log('Статус ответа от сервера:', response.status);
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Логи успешно отправлены на сервер:', result);
-        this.log('info', 'Логи успешно отправлены на сервер', { status: response.status });
-      } else {
-        const error = await response.text();
-        console.error('Ошибка при отправке логов:', error);
-        this.log('error', 'Ошибка при отправке логов на сервер', { status: response.status, error });
-      }
-    } catch (err) {
-      console.error('Исключение при отправке логов на сервер:', err);
-      this.log('error', `Ошибка при отправке логов: ${err.message}`);
-    } finally {
-      // Восстанавливаем состояние кнопки
-      if (this.sendButton) {
-        this.sendButton.textContent = 'Отправить на сервер';
-        this.sendButton.disabled = false;
-      }
-    }
-  }
+/**
+ * Функция-обёртка для совместимости с существующим кодом
+ * Перенаправляет все вызовы appLogger в Logger.log
+ */
+function appLogger(message, level = 'info', data = null) {
+    return Logger.log(message, level, data, 'appLogger');
 }
 
-// Создаем экземпляр логгера для использования в приложении
-const appLogger = new Logger();
-
-// Инициализируем логгер после загрузки DOM
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM загружен, инициализируем логгер');
-    appLogger.init();
-}); 
+// Экспортируем объект Logger и функцию appLogger
+window.Logger = Logger;
+window.appLogger = appLogger;
