@@ -2,9 +2,7 @@
 const LOG_STORAGE_KEY = 'tgstyle_app_logs';
 const MAX_STORED_LOGS = 1000;
 // Глобальная переменная apiUrl, используемая всем приложением
-window.apiUrl = window.location.hostname.includes('localhost') 
-    ? 'http://localhost:3000/api' 
-    : 'https://flappy.keenetic.link/api';
+window.apiUrl = 'https://tgstyle.flappy.crazedns.ru/api';
 
 // Система логирования
 const Logger = {

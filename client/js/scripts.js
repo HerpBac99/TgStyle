@@ -10,9 +10,12 @@ if (typeof window.appLogger !== 'function') {
 
 // Используем apiUrl из logger.js
 if (!window.apiUrl) {
-    window.apiUrl = 'https://flappy.keenetic.link/api';
+    window.apiUrl = 'https://tgstyle.flappy.crazedns.ru/api';
     console.warn('apiUrl не найден, используется значение по умолчанию');
 }
+
+// Для Telegram Mini App всегда используем production URL
+window.apiUrl = 'https://tgstyle.flappy.crazedns.ru/api';
 
 // Initialize Telegram WebApp
 tg.expand();

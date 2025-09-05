@@ -1,129 +1,153 @@
 const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const path = require('path');
-const dotenv = require('dotenv');
-const fs = require('fs');
-const http = require('http');
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
+const cors = require('cors');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-// Load environment variables
-dotenv.config();
+// Импорт API роутов
+const authRoutes = require('./src/api/auth');
+const analyzeRoutes = require('./src/api/analyze');
+const apiRoutes = require('./routes/api');
 
-// Initialize Express app
+// Создание Express приложения
 const app = express();
-const PORT = process.env.PORT || 8443;
-const HTTP_PORT = 80;
 
-// Middleware
+// Middleware для парсинга JSON
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-// Database connection (только если указан URI)
-const MONGODB_URI = process.env.MONGODB_URI;
-if (MONGODB_URI) {
-    mongoose.connect(MONGODB_URI)
-        .then(() => console.log('Connected to MongoDB'))
-        .catch(err => {
-            console.error('MongoDB connection error:', err);
-            console.log('Continuing without MongoDB...');
-        });
-} else {
-    console.log('MongoDB URI not provided, continuing without database');
-}
+// Middleware для статических файлов клиента
+app.use(express.static(path.join(__dirname, '..', 'client')));
 
-// API routes
-app.use('/api/auth', require('./src/api/auth'));
-app.use('/api/analyze', require('./src/api/analyze'));
-app.use('/api', require('./routes/api'));
+// API роуты
+app.use('/api/auth', authRoutes);
+app.use('/api/analyze', analyzeRoutes);
+app.use('/api', apiRoutes);
 
-// Serve static frontend files
-app.use(express.static(path.join(__dirname, 'public')));
-
-// All routes serve the main HTML file for client-side routing
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public/index.html'));
+// Роут для главной страницы
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-    });
+// Базовый роут для проверки работы сервера
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Сервер работает',
+    timestamp: new Date().toISOString(),
+    domain: process.env.DOMAIN || 'localhost',
+    port: process.env.PORT || 443
+  });
 });
 
-// Функция для запуска HTTP сервера (перенаправление на HTTPS)
-function startHttpServer() {
-    const httpServer = http.createServer((req, res) => {
-        // Перенаправляем на HTTPS
-        res.writeHead(301, {
-            Location: `https://${req.headers.host}${req.url}`
-        });
-        res.end();
-    });
-    
-    httpServer.listen(HTTP_PORT, () => {
-        console.log(`HTTP server running on port ${HTTP_PORT} (redirecting to HTTPS)`);
-    });
-}
+// Централизованная обработка ошибок
+app.use((error, req, res, next) => {
+  console.error('Error:', error.message);
 
-// Функция для запуска HTTPS сервера
-function startHttpsServer() {
-    try {
-        // Проверяем наличие SSL сертификатов
-        const sslDir = path.join(__dirname, 'ssl');
-        
-        // Пробуем сначала сертификаты Let's Encrypt
-        let certPath = path.join(sslDir, 'live/flappy.keenetic.link/fullchain.pem');
-        let keyPath = path.join(sslDir, 'live/flappy.keenetic.link/privkey.pem');
-        
-        // Если нет Let's Encrypt, используем самоподписанные
-        if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
-            console.log('Сертификаты Let\'s Encrypt не найдены, проверяем самоподписанные...');
-            certPath = path.join(sslDir, 'cert.pem');
-            keyPath = path.join(sslDir, 'key.pem');
-        } else {
-            console.log('Используем сертификаты Let\'s Encrypt');
-        }
-        
-        if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
-            // Настройки SSL
-            const options = {
-                key: fs.readFileSync(keyPath),
-                cert: fs.readFileSync(certPath)
-            };
-            
-            // Создаем HTTPS сервер
-            const httpsServer = https.createServer(options, app);
-            
-            httpsServer.listen(PORT, () => {
-                console.log(`HTTPS server running on port ${PORT}`);
-                console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-            });
-            
-            return true;
-        } else {
-            console.warn('SSL certificates not found, falling back to HTTP');
-            return false;
-        }
-    } catch (error) {
-        console.error('Error starting HTTPS server:', error);
-        return false;
+  // Определяем тип ошибки и соответствующий статус код
+  let statusCode = 500;
+  let errorCode = 'INTERNAL_ERROR';
+  let userMessage = 'Внутренняя ошибка сервера';
+
+  // Обработка специфических типов ошибок
+  if (error.name === 'ValidationError') {
+    statusCode = 400;
+    errorCode = 'VALIDATION_ERROR';
+    userMessage = 'Ошибка валидации данных';
+  } else if (error.name === 'UnauthorizedError' || error.message.includes('Unauthorized')) {
+    statusCode = 401;
+    errorCode = 'UNAUTHORIZED';
+    userMessage = 'Ошибка аутентификации';
+  }
+
+  res.status(statusCode).json({
+    success: false,
+    error: error.name || 'Error',
+    message: userMessage,
+    code: errorCode,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Функция для создания HTTPS сервера
+function createHttpsServer() {
+  try {
+    // Пути к SSL сертификатам
+    const keyPath = process.env.HTTPS_KEY_PATH || path.join(__dirname, '..', 'ssl', 'keys', 'server.key');
+    const certPath = process.env.HTTPS_CERT_PATH || path.join(__dirname, '..', 'ssl', 'certs', 'server.crt');
+
+    // Проверяем существование файлов сертификатов
+    if (!fs.existsSync(keyPath)) {
+      throw new Error(`SSL ключ не найден: ${keyPath}`);
     }
+
+    if (!fs.existsSync(certPath)) {
+      throw new Error(`SSL сертификат не найден: ${certPath}`);
+    }
+
+    // Читаем SSL сертификаты
+    const httpsOptions = {
+      key: fs.readFileSync(keyPath),
+      cert: fs.readFileSync(certPath)
+    };
+
+    return https.createServer(httpsOptions, app);
+  } catch (error) {
+    console.error('Ошибка создания HTTPS сервера:', error.message);
+    console.log('Для работы Telegram Mini App требуется HTTPS соединение');
+    console.log('Убедитесь что SSL сертификаты настроены правильно');
+    process.exit(1);
+  }
 }
 
-// Запускаем серверы
-const httpsStarted = startHttpsServer();
-if (!httpsStarted) {
-    // Если не удалось запустить HTTPS, запускаем обычный HTTP сервер
-    app.listen(PORT, () => {
-        console.log(`HTTP server running on port ${PORT}`);
-        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+// Запуск сервера
+function startServer() {
+  const port = process.env.PORT || 443;
+  const domain = process.env.DOMAIN || 'localhost';
+
+  // Проверяем обязательные переменные окружения
+  if (!process.env.DOMAIN) {
+    console.error('Ошибка: DOMAIN не настроен в переменных окружения');
+    process.exit(1);
+  }
+
+  // Создаем HTTPS сервер
+  const server = createHttpsServer();
+
+  server.listen(port, () => {
+    const serverInfo = {
+      port,
+      domain,
+      nodeEnv: 'production'
+    };
+
+    console.log(`HTTPS сервер запущен на порту ${port}`);
+    console.log(`Telegram Mini App доступен по адресу: https://${domain}`);
+  });
+
+  // Обработка сигналов завершения
+  process.on('SIGTERM', () => {
+    console.log('Получен сигнал SIGTERM, завершение работы сервера...');
+    server.close(() => {
+      console.log('Сервер остановлен');
+      process.exit(0);
     });
-} else {
-    // Запускаем HTTP сервер для перенаправления на HTTPS
-    startHttpServer();
-} 
+  });
+
+  process.on('SIGINT', () => {
+    console.log('Получен сигнал SIGINT, завершение работы сервера...');
+    server.close(() => {
+      console.log('Сервер остановлен');
+      process.exit(0);
+    });
+  });
+}
+
+// Запускаем сервер только если файл запущен напрямую
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = app; 

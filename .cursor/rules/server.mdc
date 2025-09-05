@@ -1,0 +1,404 @@
+---
+description: TgStyle - Серверная часть проекта для анализа стиля одежды с ИИ
+globs:
+alwaysApply: true
+---
+
+# TgStyle Server - Описание серверной части
+
+## Обзор проекта
+
+**TgStyle** - это серверная часть Telegram Mini App для анализа стиля одежды пользователей. Сервер предоставляет REST API для авторизации, анализа изображений и хранения данных пользователей.
+
+## Архитектура серверной части
+
+### Структура файлов
+
+```
+server/
+├── server.js              # Основной сервер Express.js
+├── package.json           # Зависимости и конфигурация
+├── package-lock.json      # Lock-файл зависимостей
+├── routes/
+│   └── api.js            # Основные API маршруты
+└── src/
+    ├── api/
+    │   ├── analyze.js    # API анализа изображений
+    │   └── auth.js       # API авторизации
+    ├── models/
+    │   └── User.js       # Модель пользователя MongoDB
+    └── utils/
+        └── telegram.js    # Утилиты Telegram
+```
+
+### Технологии
+
+- **Сервер**: Node.js + Express.js
+- **База данных**: MongoDB с Mongoose
+- **Аутентификация**: Telegram WebApp API
+- **Обработка изображений**: Canvas API (клиент), планируется Sharp/TensorFlow
+- **Безопасность**: HTTPS с Let's Encrypt сертификатами
+- **Контейнеризация**: Docker + Docker Compose
+- **Веб-сервер**: Nginx как reverse proxy
+- **Логирование**: Файловое логирование с ротацией
+
+## Основные компоненты
+
+### 1. Основной сервер (server.js)
+
+**Функциональность**:
+- Инициализация Express.js приложения
+- Настройка middleware (CORS, JSON parsing, static files)
+- Подключение к MongoDB с fallback на работу без БД
+- Настройка HTTPS с поддержкой Let's Encrypt
+- Запуск HTTP сервера для перенаправления на HTTPS
+- Обработка ошибок и middleware логирования
+
+**Ключевые настройки**:
+```javascript
+const PORT = process.env.PORT || 8443;
+const HTTP_PORT = 80;
+const MONGODB_URI = process.env.MONGODB_URI;
+```
+
+**Безопасность**:
+- Автоматическое перенаправление HTTP → HTTPS
+- Поддержка самоподписанных и Let's Encrypt сертификатов
+- Валидация SSL сертификатов
+
+### 2. API маршруты (routes/api.js)
+
+**Основные эндпоинты**:
+
+#### `POST /api/log-error`
+- **Назначение**: Сохранение логов клиента на сервере
+- **Входные данные**: `{ logs, userAgent, appVersion, timestamp }`
+- **Функциональность**:
+  - Создание директории logs если не существует
+  - Форматирование логов с метками времени
+  - Сохранение в файлы по дням (`client_logs_YYYY-MM-DD.txt`)
+
+#### `POST /api/convert-model`
+- **Назначение**: Конвертация модели Keras (.h5) в TensorFlow.js формат
+- **Входные данные**: Путь к файлу модели
+- **Функциональность**:
+  - Проверка наличия файла модели
+  - Конвертация через tensorflowjs Python пакет
+  - Возврат пути к сконвертированной модели
+
+#### `GET /api/ping`
+- **Назначение**: Проверка доступности API
+- **Ответ**: `{ success: true, message: 'API доступно' }`
+
+### 3. Анализ изображений (src/api/analyze.js)
+
+**Основной эндпоинт**: `POST /api/analyze`
+
+**Входные данные**:
+```javascript
+{
+  photo: "base64_encoded_image",
+  pinterestUrl: "optional_pinterest_url",
+  initData: "telegram_init_data"
+}
+```
+
+**Функциональность**:
+
+#### Авторизация
+- Валидация Telegram initData через `validateTelegramWebAppData()`
+- Извлечение информации о пользователе
+- Проверка подписи и срока действия токена
+
+#### Обработка изображений
+- Декодирование base64 в бинарные данные
+- Проверка размера и корректности изображения
+- Симуляция классификации (пока без реальной модели ИИ)
+
+#### Симуляция классификации
+```javascript
+function simulateClassification() {
+  const CLASS_NAMES = ['dress', 'tshirt', 'pants', 'jacket'];
+  const CLASS_NAMES_RU = {
+    'dress': 'Платье',
+    'tshirt': 'Футболка',
+    'pants': 'Брюки',
+    'jacket': 'Куртка'
+  };
+  // Возврат случайного типа одежды с уверенностью 70-95%
+}
+```
+
+#### Генерация ответов
+- Создание HTML для отображения результатов
+- Генерация персонализированных рекомендаций
+- Формирование комментариев в стиле чата
+
+#### Сохранение в базу данных
+- Запись результатов в историю пользователя
+- Поддержка работы без MongoDB (fallback)
+
+### 4. Авторизация (src/api/auth.js)
+
+**Эндпоинт**: `POST /api/auth`
+
+**Входные данные**:
+```javascript
+{
+  initData: "telegram_webapp_init_data"
+}
+```
+
+**Функциональность**:
+- Валидация Telegram initData
+- Поиск существующего пользователя в MongoDB
+- Создание нового пользователя при первом входе
+- Возврат данных пользователя
+
+**Модель пользователя**:
+```javascript
+{
+  telegramId: Number,
+  firstName: String,
+  lastName: String,
+  username: String,
+  createdAt: Date,
+  analysisHistory: [{
+    timestamp: Date,
+    sourceType: String, // 'photo' | 'pinterest'
+    analysis: String
+  }]
+}
+```
+
+### 5. Утилиты Telegram (src/utils/telegram.js)
+
+**Основные функции**:
+
+#### `validateTelegramWebAppData()`
+- Валидация подписи Telegram WebApp
+- Проверка срока действия initData
+- Извлечение данных пользователя
+
+#### `mockValidateTelegramWebAppData()`
+- Заглушка для разработки без реального токена
+- Создание тестового пользователя
+- Использование в development режиме
+
+**Алгоритм валидации**:
+```javascript
+// 1. Парсинг initData
+const urlParams = new URLSearchParams(initDataString);
+const hash = urlParams.get('hash');
+
+// 2. Создание секретного ключа
+const secretKey = crypto
+  .createHmac('sha256', 'WebAppData')
+  .update(BOT_TOKEN)
+  .digest();
+
+// 3. Вычисление ожидаемого хэша
+const calculatedHash = crypto
+  .createHmac('sha256', secretKey)
+  .update(dataCheckString)
+  .digest('hex');
+
+// 4. Сравнение хэшей
+return calculatedHash === hash;
+```
+
+## Docker и развертывание
+
+### Структура Docker
+
+```
+docker/
+├── docker-compose.yml     # Оркестрация сервисов
+├── Dockerfile.client      # Сборка клиентского образа
+├── Dockerfile.server      # Сборка серверного образа
+├── start-docker.ps1       # Скрипт запуска
+├── nginx/
+│   └── conf/
+│       └── default.conf   # Конфигурация Nginx
+└── ssl/                   # SSL сертификаты
+```
+
+### Сервисы Docker
+
+#### Nginx (Reverse Proxy)
+- **Порты**: 80, 443
+- **Функции**:
+  - Распределение запросов между клиентом и сервером
+  - SSL termination
+  - Статическое обслуживание файлов
+  - Перенаправление HTTP → HTTPS
+
+#### Сервер Node.js
+- **Порт**: 3000
+- **Функции**:
+  - Обработка API запросов
+  - Работа с базой данных
+  - Логирование
+
+#### MongoDB
+- **Порт**: 27017
+- **Функции**:
+  - Хранение пользователей
+  - История анализов
+  - Сессии пользователей
+
+### Конфигурация Nginx
+
+```nginx
+# HTTP сервер (перенаправление на HTTPS)
+server {
+    listen 80;
+    server_name flappy.keenetic.link;
+    return 301 https://$server_name$request_uri;
+}
+
+# HTTPS сервер
+server {
+    listen 443 ssl;
+    server_name flappy.keenetic.link;
+
+    # SSL сертификаты
+    ssl_certificate /etc/letsencrypt/live/flappy.keenetic.link/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/flappy.keenetic.link/privkey.pem;
+
+    # Статические файлы клиента
+    location / {
+        proxy_pass http://client:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # API запросы
+    location /api/ {
+        proxy_pass http://server:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Let's Encrypt challenge
+    location /.well-known/acme-challenge/ {
+        alias /var/www/html/.well-known/acme-challenge/;
+    }
+}
+```
+
+## Система логирования
+
+### Клиентские логи
+- **Хранение**: localStorage (до 1000 записей)
+- **Формат**: JSON с метками времени
+- **Отправка**: POST /api/log-error
+- **Файлы**: `logs/client_logs_YYYY-MM-DD.txt`
+
+### Серверные логи
+- **Уровни**: debug, info, warn, error
+- **Вывод**: Консоль + файлы
+- **Ротация**: По дням
+- **Формат**: `[timestamp] [level] message (caller)`
+
+### Структура лог-записи
+```javascript
+{
+  timestamp: "2024-01-01T12:00:00.000Z",
+  level: "info",
+  message: "Анализ успешно завершен",
+  caller: "analyze.js:125",
+  data: { /* дополнительные данные */ }
+}
+```
+
+## Обработка ошибок
+
+### Уровни обработки
+1. **Клиентские ошибки**: Перехват через window.onerror
+2. **API ошибки**: Try-catch блоки в маршрутах
+3. **База данных**: Graceful fallback без MongoDB
+4. **Сеть**: Retry логика и таймауты
+
+### Типы ошибок
+- **400**: Неверные входные данные
+- **401**: Ошибка авторизации Telegram
+- **404**: Ресурс не найден
+- **500**: Внутренняя ошибка сервера
+- **502**: Ошибка Bad Gateway (сервер недоступен)
+
+## Безопасность
+
+### Аутентификация
+- Валидация Telegram WebApp данных
+- Проверка подписи HMAC-SHA256
+- Срок действия токенов (24 часа)
+
+### Авторизация
+- Проверка принадлежности данных пользователю
+- Валидация прав доступа к ресурсам
+- Защита от CSRF атак
+
+### Защита данных
+- HTTPS-only коммуникации
+- Валидация входных данных
+- Ограничение размера файлов
+- Фильтрация опасного контента
+
+## Производительность
+
+### Оптимизации
+- Сжатие изображений на клиенте
+- Кэширование статических файлов
+- Connection pooling для MongoDB
+- Асинхронная обработка запросов
+
+### Мониторинг
+- Логирование всех запросов
+- Отслеживание ошибок
+- Мониторинг производительности
+- Анализ использования ресурсов
+
+## Будущие улучшения
+
+### Планируемые функции
+- Интеграция реальной модели ИИ (FashionCLIP/TensorFlow)
+- Кэширование результатов анализа
+- Rate limiting для API
+- WebSocket для real-time обновлений
+- Расширенная аналитика пользователей
+
+### Технические улучшения
+- Переход на TypeScript
+- Добавление Redis для кэширования
+- Микросервисная архитектура
+- GraphQL API
+- CI/CD пайплайн
+
+## Запуск и разработка
+
+### Локальная разработка
+```bash
+cd server
+npm install
+npm start
+```
+
+### Docker развертывание
+```bash
+cd docker
+docker-compose up -d
+```
+
+### Переменные окружения
+```bash
+NODE_ENV=production
+PORT=8443
+MONGODB_URI=mongodb://localhost:27017/tgstyle
+TELEGRAM_BOT_TOKEN=your_bot_token
+DOMAIN=your-domain.com
+```
+
+## Заключение
+
+Серверная часть TgStyle представляет собой полнофункциональный REST API для Telegram Mini App с поддержкой авторизации через Telegram, обработкой изображений, хранением данных в MongoDB и развертыванием через Docker. Сервер готов к интеграции с реальными моделями ИИ и масштабированию для большого количества пользователей.
