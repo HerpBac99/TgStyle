@@ -13,6 +13,9 @@ const apiRoutes = require('./routes/api');
 // Создание Express приложения
 const app = express();
 
+// Глобальная переменная для FastVLM сервера
+let fastvlmProcess = null;
+
 // Middleware для парсинга JSON
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -71,6 +74,68 @@ app.use((error, req, res, next) => {
   });
 });
 
+// Функции для управления FastVLM сервером
+function startFastVLMServer() {
+    return new Promise((resolve, reject) => {
+        try {
+            const { spawn } = require('child_process');
+            const fastvlmPath = path.join(__dirname, 'src/utils/fastvlm_server.py');
+            const pythonPath = path.join(__dirname, '../fastvlm_env/Scripts/python.exe');
+
+            console.log('🚀 Запускаем FastVLM сервер...');
+
+            fastvlmProcess = spawn(pythonPath, [fastvlmPath], {
+                cwd: path.join(__dirname, '../'),
+                stdio: ['pipe', 'pipe', 'pipe']
+            });
+
+            let startupTimeout = setTimeout(() => {
+                console.log('⏰ FastVLM сервер не запустился за 30 секунд, продолжаем без него');
+                resolve(false);
+            }, 30000);
+
+            // Ожидаем готовности сервера
+            fastvlmProcess.stdout.on('data', (data) => {
+                const output = data.toString();
+                console.log('FastVLM stdout:', output);
+
+                if (output.includes('FastVLM модель загружена')) {
+                    clearTimeout(startupTimeout);
+                    console.log('✅ FastVLM сервер успешно запущен');
+                    resolve(true);
+                }
+            });
+
+            fastvlmProcess.stderr.on('data', (data) => {
+                console.log('FastVLM stderr:', data.toString());
+            });
+
+            fastvlmProcess.on('close', (code) => {
+                console.log(`FastVLM процесс завершился с кодом ${code}`);
+                fastvlmProcess = null;
+            });
+
+            fastvlmProcess.on('error', (error) => {
+                console.error('Ошибка запуска FastVLM:', error);
+                clearTimeout(startupTimeout);
+                resolve(false);
+            });
+
+        } catch (error) {
+            console.error('Ошибка при запуске FastVLM сервера:', error);
+            resolve(false);
+        }
+    });
+}
+
+function stopFastVLMServer() {
+    if (fastvlmProcess) {
+        console.log('🛑 Останавливаем FastVLM сервер...');
+        fastvlmProcess.kill();
+        fastvlmProcess = null;
+    }
+}
+
 // Функция для создания HTTPS сервера
 function createHttpsServer() {
   try {
@@ -103,7 +168,7 @@ function createHttpsServer() {
 }
 
 // Запуск сервера
-function startServer() {
+async function startServer() {
   const port = process.env.PORT || 443;
   const domain = process.env.DOMAIN || 'localhost';
 
@@ -111,6 +176,15 @@ function startServer() {
   if (!process.env.DOMAIN) {
     console.error('Ошибка: DOMAIN не настроен в переменных окружения');
     process.exit(1);
+  }
+
+  // Запускаем FastVLM сервер
+  console.log('🤖 Инициализация FastVLM сервера...');
+  const fastvlmStarted = await startFastVLMServer();
+  if (fastvlmStarted) {
+    console.log('✅ FastVLM сервер готов');
+  } else {
+    console.log('⚠️ FastVLM сервер не запущен, анализ будет работать в режиме симуляции');
   }
 
   // Создаем HTTPS сервер
@@ -130,6 +204,7 @@ function startServer() {
   // Обработка сигналов завершения
   process.on('SIGTERM', () => {
     console.log('Получен сигнал SIGTERM, завершение работы сервера...');
+    stopFastVLMServer();
     server.close(() => {
       console.log('Сервер остановлен');
       process.exit(0);
@@ -138,6 +213,7 @@ function startServer() {
 
   process.on('SIGINT', () => {
     console.log('Получен сигнал SIGINT, завершение работы сервера...');
+    stopFastVLMServer();
     server.close(() => {
       console.log('Сервер остановлен');
       process.exit(0);

@@ -47,4 +47,115 @@ ssl/
 docker/nginx/certs/
 docker/nginx/letsencrypt/
 docker/acme-challenge/
-acme-challenge/ 
+acme-challenge/
+
+# Python virtual environment and dependencies
+fastvlm_env/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# FastVLM and ML models (large files)
+ml-fastvlm/checkpoints/**/*.bin
+ml-fastvlm/checkpoints/**/*.safetensors
+ml-fastvlm/checkpoints/**/*.zip
+ml-fastvlm/checkpoints/**/*.model
+ml-fastvlm/checkpoints/**/*.pth
+ml-fastvlm/llava/__pycache__/
+ml-fastvlm/llava/model/__pycache__/
+ml-fastvlm/app/FastVLM.xcodeproj/
+ml-fastvlm/**/*.xcodeproj/
+fastvlm-server/models/
+fastvlm-server/venv/
+fastvlm-server/__pycache__/
+
+# Alternative: ignore entire ml-fastvlm except specific files
+ml-fastvlm/
+!ml-fastvlm/README.md
+!ml-fastvlm/docs/
+!ml-fastvlm/get_models.sh
+
+# Cache and temp files
+.cache/
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE and editor files
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+server/logs/
+fastvlm-server/logs/
+
+# Build artifacts
+dist/
+build/
+client/dist/
+fastvlm-server/dist/
+
+# Environment and config files
+.env
+.env.local
+.env.development
+.env.production
+config.local.json
+
+# Test images and assets
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+!Camera.jpg
+!MainMenu.jpg
+
+# Development scripts and tools
+start-llm.sh
+start-app.sh
+*.sh
+
+# Temporary Python files
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Docker volumes and data
+docker/data/
+docker/logs/
+mongodb_data/ 

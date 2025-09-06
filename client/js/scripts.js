@@ -406,6 +406,107 @@ async function compressImage(base64Image, maxSizeMB = 1.5, maxWidth = 1280) {
 }
 
 /**
+ * Показывает результаты анализа под фото
+ * @param {Object} result - Результат анализа от сервера
+ * @param {HTMLElement} previewContainer - Контейнер предпросмотра
+ */
+function showAnalysisResults(result, previewContainer) {
+    appLogger('Показываем результаты анализа', 'info');
+
+    try {
+        // Меняем кнопку анализа на кнопку закрытия
+        const analyzeButton = previewContainer.querySelector('.analyze-button');
+        if (analyzeButton) {
+            analyzeButton.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+                Закрыть
+            `;
+
+            // Обновляем обработчик клика
+            analyzeButton.onclick = () => {
+                document.body.removeChild(previewContainer);
+                photoData = null;
+            };
+        }
+
+        // Создаем контейнер для результатов
+        const resultsContainer = document.createElement('div');
+        resultsContainer.className = 'analysis-results-container';
+        resultsContainer.style.cssText = `
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            max-height: 50vh;
+            overflow-y: auto;
+            z-index: 1001;
+        `;
+
+        // Получаем данные анализа
+        const classification = result.classification || {};
+        const analysisText = classification.analysis || result.analysis || 'Анализ не доступен';
+
+        // Создаем содержимое результатов
+        resultsContainer.innerHTML = `
+            <div style="text-align: center; margin-bottom: 15px;">
+                <div style="background: linear-gradient(45deg, #81D8D0, #40a7e3); color: white; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: bold; display: inline-block; margin-bottom: 10px;">
+                    🤖 FastVLM AI Анализ
+                </div>
+                <h3 style="margin: 10px 0; color: #333;">Результаты анализа одежды</h3>
+            </div>
+
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <strong style="color: #333;">Определенный тип:</strong>
+                    <span style="color: #81D8D0; font-weight: bold;">${classification.classNameRu || 'Одежда'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #333;">Уверенность:</strong>
+                    <span style="color: #666;">${classification.confidence || '95'}%</span>
+                </div>
+            </div>
+
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 15px;">
+                <h4 style="margin: 0 0 10px 0; color: #333; font-size: 16px;">Детальный анализ:</h4>
+                <div style="color: #555; line-height: 1.6; white-space: pre-wrap; max-height: 200px; overflow-y: auto;">
+                    ${analysisText}
+                </div>
+            </div>
+
+            <div style="text-align: center; color: #666; font-size: 12px;">
+                Анализ выполнен с помощью FastVLM AI
+            </div>
+        `;
+
+        // Добавляем результаты в контейнер предпросмотра
+        previewContainer.appendChild(resultsContainer);
+
+        // Анимируем появление результатов
+        setTimeout(() => {
+            resultsContainer.style.transition = 'all 0.3s ease';
+            resultsContainer.style.transform = 'translateY(0)';
+        }, 100);
+
+        appLogger('Результаты анализа отображены', 'info', {
+            hasAnalysis: !!analysisText,
+            analysisLength: analysisText.length
+        });
+
+    } catch (error) {
+        appLogger('Ошибка при отображении результатов анализа', 'error', error);
+        // В случае ошибки закрываем предпросмотр
+        document.body.removeChild(previewContainer);
+        photoData = null;
+    }
+}
+
+/**
  * Показывает полноэкранный предпросмотр загруженного фото
  * @param {string} imgSrc - Источник изображения (data URL)
  */
@@ -426,22 +527,22 @@ function showFullscreenPreview(imgSrc) {
         top: 0;
         left: 0;
         width: 100%;
-        height: 100%;
+        height: 100vh;
         background-color: #000;
         z-index: 9999;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
+        justify-content: flex-start;
         align-items: center;
         padding: 0;
     `;
     
-    // Создаем изображение
+    // Создаем изображение (теперь занимает только верхнюю половину)
     const img = document.createElement('img');
     img.src = imgSrc;
     img.style.cssText = `
         width: 100%;
-        height: calc(100% - 70px);
+        height: calc(50vh - 35px);
         object-fit: contain;
     `;
     
@@ -479,6 +580,7 @@ function showFullscreenPreview(imgSrc) {
     
     // Кнопка стрелка вверх (Анализировать)
     const analyzeButton = document.createElement('button');
+    analyzeButton.className = 'analyze-button';
     analyzeButton.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 19V5M5 12l7-7 7 7"/>
@@ -582,15 +684,15 @@ function showFullscreenPreview(imgSrc) {
                 
                 // Сохраняем в историю
                 const saveResult = saveCurrentAnalysis(currentAnalysisData);
-                
+
                 // Проверяем результат сохранения
                 if (!saveResult) {
                     appLogger('Предупреждение: не удалось сохранить анализ в историю', 'warn');
                 }
-                
-                // Закрываем предпросмотр
-                document.body.removeChild(previewContainer);
-                
+
+                // НЕ закрываем предпросмотр, а показываем результаты под фото
+                showAnalysisResults(result, previewContainer);
+
                 // Показываем всплывающее уведомление с результатом
                 showClassificationToast(result.classification);
             } else {

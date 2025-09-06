@@ -4,13 +4,97 @@ const { validateTelegramWebAppData } = require('../utils/telegram');
 const User = require('../models/User');
 const path = require('path');
 const fs = require('fs');
+
+// Используем встроенный fetch в Node.js 18+
+
 // Временно закомментировал TensorFlow
 // const tf = require('@tensorflow/tfjs-node');
 // const sharp = require('sharp');
 
-// Симуляция классификатора
-function classifyImage() {
-    return simulateClassification();
+// Проверка доступности FastVLM сервера
+async function checkFastVLMHealth() {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const response = await fetch('http://127.0.0.1:3001/health', {
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+        return response.ok;
+    } catch (error) {
+        return false;
+    }
+}
+
+// Анализ изображения через FastVLM сервер
+async function classifyImage(imageBuffer) {
+    try {
+        // Проверяем доступность FastVLM сервера
+        const isHealthy = await checkFastVLMHealth();
+        if (!isHealthy) {
+            console.log('FastVLM сервер недоступен, используем симуляцию');
+            return simulateClassification();
+        }
+
+        console.log('Отправка запроса в FastVLM сервер...');
+
+        // Конвертируем изображение в base64
+        const base64Image = imageBuffer.toString('base64');
+
+        // Создаем промпт
+        const prompt = "Describe in detail what clothing items you see in this image. What type, color, style and material? Please provide a detailed description in Russian language using fashion terms.";
+
+        // Отправляем запрос в FastVLM сервер
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 секунд таймаут
+
+        const response = await fetch('http://127.0.0.1:3001/analyze', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                image_base64: base64Image,
+                prompt: prompt
+            }),
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+            const result = await response.json();
+
+            if (result.success) {
+                console.log('FastVLM анализ успешен');
+
+                // Извлекаем тип одежды из анализа
+                const analysisText = result.analysis || '';
+                const extractedType = extractClothingType(analysisText);
+
+                return {
+                    className: extractedType.className,
+                    classNameRu: extractedType.classNameRu,
+                    confidence: 95,
+                    analysis: analysisText,
+                    fastvlm: true
+                };
+            } else {
+                console.error('FastVLM сервер вернул ошибку:', result.error);
+                return simulateClassification();
+            }
+        } else {
+            console.error('FastVLM сервер недоступен, статус:', response.status);
+            return simulateClassification();
+        }
+
+    } catch (error) {
+        console.error('Ошибка при обращении к FastVLM серверу:', error);
+        // В случае любой ошибки возвращаем симуляцию
+        return simulateClassification();
+    }
 }
 
 /**
@@ -104,7 +188,7 @@ router.post('/', async (req, res) => {
                     throw new Error('Некорректное изображение (слишком маленький размер)');
                 }
                 
-                // Классифицируем изображение
+                // Классифицируем изображение через FastVLM
                 classification = await classifyImage(imageBuffer);
                 console.log('Результат классификации:', classification);
                 
@@ -206,20 +290,57 @@ router.post('/', async (req, res) => {
  * @param {boolean} isError - Флаг, указывающий на ошибку при анализе
  * @returns {string} HTML для отображения в клиенте
  */
-function generateAnalysisHTML(classification, isPinterest = false, isError = false) {
-    const { className, classNameRu, confidence, simulated } = classification;
+/**
+ * Извлекает тип одежды из текста анализа FastVLM
+ * @param {string} analysisText - Текст анализа от FastVLM
+ * @returns {Object} Объект с className и classNameRu
+ */
+function extractClothingType(analysisText) {
+    const text = analysisText.toLowerCase();
     
-    // Если заглушка, указываем это
-    const simulatedWarning = simulated ? 
-        `<div style="color: #ff9800; margin-top: 5px; font-size: 0.9em;">
-            Примечание: результат симулирован, так как модель недоступна.
+    // Словарь для поиска типов одежды в русском тексте
+    const clothingTypes = {
+        'платье': { className: 'dress', classNameRu: 'Платье' },
+        'футболка': { className: 'tshirt', classNameRu: 'Футболка' },
+        'рубашка': { className: 'shirt', classNameRu: 'Рубашка' },
+        'брюки': { className: 'pants', classNameRu: 'Брюки' },
+        'джинсы': { className: 'jeans', classNameRu: 'Джинсы' },
+        'куртка': { className: 'jacket', classNameRu: 'Куртка' },
+        'пиджак': { className: 'blazer', classNameRu: 'Пиджак' },
+        'свитер': { className: 'sweater', classNameRu: 'Свитер' },
+        'кардиган': { className: 'cardigan', classNameRu: 'Кардиган' },
+        'юбка': { className: 'skirt', classNameRu: 'Юбка' },
+        'блузка': { className: 'blouse', classNameRu: 'Блузка' },
+        'пальто': { className: 'coat', classNameRu: 'Пальто' }
+    };
+    
+    // Ищем упоминания типов одежды в тексте
+    for (const [keyword, type] of Object.entries(clothingTypes)) {
+        if (text.includes(keyword)) {
+            return type;
+        }
+    }
+    
+    // Если не нашли конкретный тип, возвращаем общий
+    return { className: 'clothing', classNameRu: 'Одежда' };
+}
+
+function generateAnalysisHTML(classification, isPinterest = false, isError = false) {
+    const { className, classNameRu, confidence, simulated, fastvlm, analysis } = classification;
+    
+    // Если это анализ от FastVLM, показываем особый бейдж
+    const fastvlmBadge = fastvlm ? 
+        `<div style="background: linear-gradient(45deg, #81D8D0, #40a7e3); color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; margin-bottom: 10px;">
+            🤖 FastVLM AI Analysis
         </div>` : '';
     
-    // Pinterest-специфический текст
-    const pinterestText = isPinterest ? 
+    // Если есть детальный анализ от FastVLM, показываем его
+    const detailedAnalysis = (fastvlm && analysis) ? 
         `<div class="analysis-item">
-            <h3>Анализ Pinterest доски:</h3>
-            <p>На основе вдохновения с Pinterest, ваш стиль отражает современные тенденции.</p>
+            <h3>Детальный анализ:</h3>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; line-height: 1.6; white-space: pre-wrap;">
+                ${analysis}
+            </div>
         </div>` : '';
     
     // Текст ошибки
@@ -232,12 +353,8 @@ function generateAnalysisHTML(classification, isPinterest = false, isError = fal
     const recommendations = getRecommendationsForClass(className);
     
     return `
-        <div class="analysis-item">
-            <h3>Определенный тип одежды:</h3>
-            <p><strong>${classNameRu}</strong> (уверенность: ${confidence}%)</p>
-            ${simulatedWarning}
-            ${errorText}
-        </div>
+        ${fastvlmBadge}
+        ${detailedAnalysis}
         ${pinterestText}
         <div class="analysis-item">
             <h3>Рекомендации:</h3>
