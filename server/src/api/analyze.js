@@ -71,7 +71,34 @@ async function classifyImage(imageBuffer) {
                 console.log('FastVLM анализ успешен');
 
                 // Извлекаем тип одежды из анализа
-                const analysisText = result.analysis || '';
+                let analysisText = result.analysis || '';
+
+                // Исправляем проблемы с кодировкой текста
+                try {
+                    // Проверяем и исправляем битый текст
+                    if (analysisText.includes('�')) {
+                        console.log('Обнаружен битый текст, исправляем кодировку');
+                        // Попытка исправить распространенные проблемы с кодировкой
+                        analysisText = analysisText
+                            .replace(/�burgh/g, 'burgh')  // исправляем "�burgh" -> "burgh"
+                            .replace(/пре�/g, 'пре')      // исправляем "пре�" -> "пре"
+                            .replace(/�/g, '');           // удаляем оставшиеся символы замены
+                    }
+
+                    // Проверяем на другие проблемы с кодировкой
+                    if (analysisText.includes('\ufffd')) {
+                        analysisText = analysisText.replace(/\ufffd/g, '');
+                    }
+
+                    // Убеждаемся что текст не пустой после очистки
+                    if (!analysisText.trim()) {
+                        analysisText = 'Анализ выполнен, но текст описания недоступен.';
+                    }
+                } catch (encodingError) {
+                    console.error('Ошибка при обработке кодировки текста:', encodingError);
+                    analysisText = 'Анализ выполнен, но возникли проблемы с обработкой текста.';
+                }
+
                 const extractedType = extractClothingType(analysisText);
 
                 return {
@@ -271,8 +298,16 @@ router.post('/', async (req, res) => {
             comments,
             classification
         };
-        
+
         console.log('Отправляем результат анализа клиенту');
+        console.log('Данные ответа:', {
+            hasAnalysis: !!analysis,
+            analysisLength: analysis ? analysis.length : 0,
+            hasComments: !!comments,
+            hasClassification: !!classification,
+            classificationType: classification ? classification.className : 'none'
+        });
+
         return res.json(response);
     } catch (error) {
         console.error('Ошибка при анализе:', error);
@@ -355,7 +390,6 @@ function generateAnalysisHTML(classification, isPinterest = false, isError = fal
     return `
         ${fastvlmBadge}
         ${detailedAnalysis}
-        ${pinterestText}
         <div class="analysis-item">
             <h3>Рекомендации:</h3>
             <ul>

@@ -627,11 +627,11 @@ function showFullscreenPreview(imgSrc) {
         
         try {
             appLogger('Отправка фото на сервер для анализа', 'info');
-            
+
             // Сжимаем изображение перед отправкой
             const compressedPhotoData = await compressImage(photoData, 1.5, 1280);
-            
-            // Отправляем фото на сервер для анализа
+
+            // Отправляем фото на основной API сервер для анализа
             const response = await fetch(`${window.apiUrl}/analyze`, {
                 method: 'POST',
                 headers: {
@@ -644,15 +644,20 @@ function showFullscreenPreview(imgSrc) {
                     initData: tg.initData || null
                 })
             });
-            
+
+            appLogger('Получен ответ от сервера', 'debug', { status: response.status, ok: response.ok });
+
             if (!response.ok) {
+                const errorText = await response.text();
+                appLogger('Ошибка сервера - тело ответа', 'error', errorText);
                 throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
             }
-            
+
             const result = await response.json();
-            
+            appLogger('Распарсенный JSON от сервера', 'debug', result);
+
             if (result.success) {
-                // Проверяем наличие данных классификации в ответе
+                // Проверяем наличие данных классификации в ответе сервера
                 if (!result.classification) {
                     appLogger('Отсутствуют данные классификации в ответе сервера', 'warn', result);
                     result.classification = {
@@ -660,12 +665,12 @@ function showFullscreenPreview(imgSrc) {
                         confidence: '0'
                     };
                 }
-                
+
                 appLogger('Анализ успешно завершен', 'info', {
                     classification: result.classification
                 });
-                
-                // Создаем объект с данными анализа с дополнительными проверками
+
+                // Создаем объект с данными анализа
                 currentAnalysisData = {
                     photo: photoData, // Сохраняем оригинал фото в истории
                     analysis: result.analysis || '',
@@ -673,15 +678,7 @@ function showFullscreenPreview(imgSrc) {
                     classification: result.classification,
                     timestamp: new Date().toISOString()
                 };
-                
-                // Логируем данные перед сохранением
-                appLogger('Данные для сохранения в историю', 'debug', {
-                    hasPhoto: !!currentAnalysisData.photo,
-                    photoLength: currentAnalysisData.photo ? currentAnalysisData.photo.length : 0,
-                    classification: currentAnalysisData.classification,
-                    timestamp: currentAnalysisData.timestamp
-                });
-                
+
                 // Сохраняем в историю
                 const saveResult = saveCurrentAnalysis(currentAnalysisData);
 
@@ -703,18 +700,18 @@ function showFullscreenPreview(imgSrc) {
                 message: error.message,
                 stack: error.stack
             });
-            
-            // Возвращаем иконку и состояние кнопки
-            analyzeButton.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 19V5M5 12l7-7 7 7"/>
-                </svg>
-            `;
-            analyzeButton.disabled = false;
-            
+
             // Показываем ошибку
             displayError('Ошибка при анализе: ' + error.message);
         }
+
+        // Возвращаем иконку и состояние кнопки
+        analyzeButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 19V5M5 12l7-7 7 7"/>
+            </svg>
+        `;
+        analyzeButton.disabled = false;
     });
     
     backButton.addEventListener('click', () => {

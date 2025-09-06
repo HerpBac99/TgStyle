@@ -15,7 +15,7 @@ class Config:
     PORT = int(os.getenv('FASTVLM_PORT', '3001'))
 
     # === Настройки модели ===
-    # Принудительное использование GPU если доступен
+    # Используем GPU если доступен
     if torch.cuda.is_available():
         DEVICE = 'cuda'
         print(f"GPU доступен: {torch.cuda.get_device_name(0)}")
