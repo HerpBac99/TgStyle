@@ -86,6 +86,7 @@ ml-fastvlm/**/*.xcodeproj/
 fastvlm-server/models/
 fastvlm-server/venv/
 fastvlm-server/__pycache__/
+fastvlm-server/.env
 
 # Alternative: ignore entire ml-fastvlm except specific files
 ml-fastvlm/
