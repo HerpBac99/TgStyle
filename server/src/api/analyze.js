@@ -33,12 +33,14 @@ async function classifyImage(imageBuffer) {
     try {
         // Проверяем доступность FastVLM сервера
         const isHealthy = await checkFastVLMHealth();
+        const currentTime = new Date().toTimeString().split(' ')[0];
+
         if (!isHealthy) {
-            console.log('FastVLM сервер недоступен, используем симуляцию');
+            console.log(`[${currentTime}] [SERVER] [WARN] FastVLM сервер недоступен, используем симуляцию`);
             return simulateClassification();
         }
 
-        console.log('Отправка запроса в FastVLM сервер...');
+        console.log(`[${currentTime}] [SERVER] [INFO] Отправка запроса в FastVLM сервер...`);
 
         // Конвертируем изображение в base64
         const base64Image = imageBuffer.toString('base64');

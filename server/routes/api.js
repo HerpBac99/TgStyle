@@ -20,24 +20,33 @@ router.post('/log-error', async (req, res) => {
         const date = new Date().toISOString().split('T')[0];
         const logFile = path.join(logDir, `client_logs_${date}.txt`);
         
-        // Форматируем данные для записи
+        // Выводим клиентские логи в единый формат
+        if (Array.isArray(logs)) {
+            logs.forEach((log, index) => {
+                const timestamp = new Date(log.timestamp).toTimeString().split(' ')[0];
+                console.log(`[${timestamp}] [CLIENT] [${log.level.toUpperCase()}] ${log.message}`);
+            });
+        }
+
+        // Форматируем данные для записи в файл
         const logEntry = `
 === НАЧАЛО ЛОГА ===
 Время: ${timestamp}
 User Agent: ${userAgent}
 Версия приложения: ${appVersion}
 --- Записи логов ---
-${Array.isArray(logs) ? 
-    logs.map(log => `[${log.timestamp}] [${log.level}] ${log.message} (${log.caller}) ${log.data ? '\n  Данные: ' + log.data : ''}`).join('\n') : 
+${Array.isArray(logs) ?
+    logs.map(log => `[${log.timestamp}] [${log.level}] ${log.message} (${log.caller}) ${log.data ? '\n  Данные: ' + log.data : ''}`).join('\n') :
     'Неверный формат логов'
 }
 === КОНЕЦ ЛОГА ===
 \n`;
-        
+
         // Записываем в файл (добавляем в конец)
         fs.appendFileSync(logFile, logEntry);
-        
-        console.log(`Логи клиента сохранены в ${logFile}`);
+
+        const currentTime = new Date().toTimeString().split(' ')[0];
+        console.log(`[${currentTime}] [SERVER] [INFO] Логи клиента сохранены в ${logFile}`);
         
         res.json({ success: true });
     } catch (error) {

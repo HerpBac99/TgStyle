@@ -10,6 +10,26 @@ const authRoutes = require('./src/api/auth');
 const analyzeRoutes = require('./src/api/analyze');
 const apiRoutes = require('./routes/api');
 
+// Серверный логгер с единым форматом
+const serverLogger = {
+    info: (message, data = {}) => {
+        const timestamp = new Date().toTimeString().split(' ')[0];
+        console.log(`[${timestamp}] [SERVER] [INFO] ${message}`);
+    },
+    warn: (message, data = {}) => {
+        const timestamp = new Date().toTimeString().split(' ')[0];
+        console.log(`[${timestamp}] [SERVER] [WARN] ${message}`);
+    },
+    error: (message, data = {}) => {
+        const timestamp = new Date().toTimeString().split(' ')[0];
+        console.log(`[${timestamp}] [SERVER] [ERROR] ${message}`);
+    },
+    debug: (message, data = {}) => {
+        const timestamp = new Date().toTimeString().split(' ')[0];
+        console.log(`[${timestamp}] [SERVER] [DEBUG] ${message}`);
+    }
+};
+
 // Создание Express приложения
 const app = express();
 
@@ -29,11 +49,13 @@ app.use('/api', apiRoutes);
 
 // Роут для главной страницы
 app.get('/', (req, res) => {
+  serverLogger.debug('Главная страница запрошена', { ip: req.ip, userAgent: req.get('User-Agent') });
   res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
 });
 
 // Базовый роут для проверки работы сервера
 app.get('/api/health', (req, res) => {
+  serverLogger.info('Health check запрос');
   res.json({
     success: true,
     message: 'Сервер работает',
@@ -45,7 +67,12 @@ app.get('/api/health', (req, res) => {
 
 // Централизованная обработка ошибок
 app.use((error, req, res, next) => {
-  console.error('Error:', error.message);
+  serverLogger.error('Ошибка сервера', {
+    message: error.message,
+    stack: error.stack,
+    url: req.url,
+    method: req.method
+  });
 
   // Определяем тип ошибки и соответствующий статус код
   let statusCode = 500;
@@ -97,9 +124,12 @@ function createHttpsServer() {
 
     return https.createServer(httpsOptions, app);
   } catch (error) {
-    console.error('Ошибка создания HTTPS сервера:', error.message);
-    console.log('Для работы Telegram Mini App требуется HTTPS соединение');
-    console.log('Убедитесь что SSL сертификаты настроены правильно');
+    serverLogger.error('Ошибка создания HTTPS сервера', {
+      message: error.message,
+      stack: error.stack
+    });
+    serverLogger.warn('Для работы Telegram Mini App требуется HTTPS соединение');
+    serverLogger.warn('Убедитесь что SSL сертификаты настроены правильно');
     process.exit(1);
   }
 }
@@ -111,10 +141,11 @@ async function startServer() {
 
   // Проверяем обязательные переменные окружения
   if (!process.env.DOMAIN) {
-    console.error('Ошибка: DOMAIN не настроен в переменных окружения');
+    serverLogger.error('DOMAIN не настроен в переменных окружения');
     process.exit(1);
   }
 
+  serverLogger.info('Запуск TgStyle сервера', { port, domain });
 
   // Создаем HTTPS сервер
   const server = createHttpsServer();
@@ -126,23 +157,23 @@ async function startServer() {
       nodeEnv: 'production'
     };
 
-    console.log(`HTTPS сервер запущен на порту ${port}`);
-    console.log(`Telegram Mini App доступен по адресу: https://${domain}`);
+    serverLogger.info('HTTPS сервер успешно запущен', serverInfo);
+    serverLogger.info(`Telegram Mini App доступен по адресу: https://${domain}`);
   });
 
   // Обработка сигналов завершения
   process.on('SIGTERM', () => {
-    console.log('Получен сигнал SIGTERM, завершение работы сервера...');
+    serverLogger.warn('Получен сигнал SIGTERM, завершение работы сервера...');
     server.close(() => {
-      console.log('Сервер остановлен');
+      serverLogger.info('Сервер остановлен');
       process.exit(0);
     });
   });
 
   process.on('SIGINT', () => {
-    console.log('Получен сигнал SIGINT, завершение работы сервера...');
+    serverLogger.warn('Получен сигнал SIGINT (Ctrl+C), завершение работы сервера...');
     server.close(() => {
-      console.log('Сервер остановлен');
+      serverLogger.info('Сервер остановлен');
       process.exit(0);
     });
   });

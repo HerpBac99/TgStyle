@@ -1,45 +1,457 @@
-// Константы для системы логирования
-const LOG_STORAGE_KEY = 'tgstyle_app_logs';
-const MAX_STORED_LOGS = 1000;
+/**
+ * Клиентский логгер для TgStyle Mini App
+ * Собирает логи на клиенте и отправляет их на сервер для сохранения
+ */
+
 // Глобальная переменная apiUrl, используемая всем приложением
 window.apiUrl = 'https://tgstyle.flappy.crazedns.ru/api';
 
-// Система логирования
-const Logger = {
-    logs: [],
-    
-    // Инициализация системы логирования
+class ClientLogger {
+    constructor() {
+        this.sessionId = this.generateSessionId();
+        this.logs = [];
+        this.maxLogsInMemory = 50; // Максимум логов в памяти перед отправкой
+        this.isEnabled = true; // Всегда включено для TgStyle
+
+        this.init();
+    }
+
+    /**
+     * Инициализация логгера
+     */
     init() {
-        // Загружаем логи из localStorage, если они существуют
-        try {
-            const storedLogs = localStorage.getItem(LOG_STORAGE_KEY);
-            if (storedLogs) {
-                this.logs = JSON.parse(storedLogs);
-                console.log(`Загружено ${this.logs.length} ранее сохраненных логов`);
-            }
-        } catch (error) {
-            console.error('Ошибка при загрузке логов из localStorage:', error);
-        }
-        
-        // Создаем UI для просмотра логов
+        console.log(`TgStyle Client Logger инициализирован. Session ID: ${this.sessionId}`);
+
+        // Логируем начало сессии
+        this.info('Session Started', {
+            userAgent: navigator.userAgent,
+            url: window.location.href,
+            timestamp: new Date().toISOString(),
+            viewport: {
+                width: window.innerWidth,
+                height: window.innerHeight
+            },
+            isTelegramMiniApp: !!window.Telegram?.WebApp,
+            telegramVersion: window.Telegram?.WebApp?.version
+        });
+
+        this.setupTelegramFeatures();
+
+        // Настраиваем автоматическую отправку логов
+        this.setupAutoFlush();
+
+        // Настраиваем обработчики событий
+        this.setupEventHandlers();
+
+        // Создаем UI для просмотра логов (для совместимости)
         this.createLogUI();
-        
-        // Устанавливаем перехватчик для необработанных ошибок
+
+        return this;
+    }
+
+    /**
+     * Генерация уникального ID сессии
+     */
+    generateSessionId() {
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substr(2, 9);
+
+        // Добавляем информацию о пользователе Telegram если доступна
+        if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
+            const userId = window.Telegram.WebApp.initDataUnsafe.user.id;
+            return `tgstyle_${userId}_${timestamp}_${random}`;
+        }
+
+        return `tgstyle_client_${timestamp}_${random}`;
+    }
+
+    /**
+     * Настройка Telegram Mini App специфичных функций
+     */
+    setupTelegramFeatures() {
+        if (!window.Telegram?.WebApp) return;
+
+        const tg = window.Telegram.WebApp;
+
+        // Настраиваем кнопку "Сохранить логи" в режиме разработки
+        if (this.isEnabled) {
+            // Настраиваем кнопку "Назад" для автосохранения
+            tg.BackButton.show();
+            tg.BackButton.onClick(() => {
+                this.info('Back Button Pressed - Auto Saving Logs');
+                this.flushLogs(true);
+                // Даем время на отправку логов, затем закрываем
+                setTimeout(() => {
+                    tg.close();
+                }, 500);
+            });
+        }
+    }
+
+    /**
+     * Настройка отправки логов только при выходе из приложения
+     */
+    setupAutoFlush() {
+        // Только отправка при выходе из приложения, без периодической отправки
+
+        // Настройка для Telegram Mini App
+        if (window.Telegram?.WebApp) {
+            const tg = window.Telegram.WebApp;
+
+            // Отслеживаем событие потери фокуса (когда пользователь сворачивает Telegram)
+            window.addEventListener('blur', () => {
+                this.info('App Lost Focus - Saving Logs');
+                this.flushLogs(true);
+            });
+
+            // Событие скрытия страницы
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    this.info('App Hidden - Saving Logs');
+                    this.flushLogs(true);
+                }
+            });
+
+            // Событие beforeunload (работает не всегда в Telegram)
+            window.addEventListener('beforeunload', () => {
+                this.info('App Beforeunload - Saving Logs');
+                this.flushLogs(true);
+            });
+
+            // Событие pagehide (более надежное для мобильных)
+            window.addEventListener('pagehide', () => {
+                this.info('App Pagehide - Saving Logs');
+                this.flushLogs(true);
+            });
+        } else {
+            // Стандартные события для браузера
+            window.addEventListener('beforeunload', () => {
+                this.flushLogs(true);
+            });
+
+            // Убираем visibilitychange для браузера, чтобы не было автоматической отправки
+            // document.addEventListener('visibilitychange', () => {
+            //     if (document.hidden && this.logs.length > 0) {
+            //         this.flushLogs();
+            //     }
+            // });
+        }
+    }
+
+    /**
+     * Настройка обработчиков событий для автоматического логирования
+     */
+    setupEventHandlers() {
+        // Логируем ошибки JavaScript
         window.addEventListener('error', (event) => {
-            this.log('Необработанная ошибка: ' + event.message, 'error', {
+            this.error('JavaScript Error', {
+                message: event.message,
                 filename: event.filename,
                 lineno: event.lineno,
                 colno: event.colno,
-                stack: event.error ? event.error.stack : null
+                stack: event.error?.stack
             });
-            this.saveLogs();
         });
-        
-        console.log('Система логирования инициализирована');
-        return this;
-    },
-    
-    // Создание интерфейса для просмотра логов
+
+        // Логируем необработанные промисы
+        window.addEventListener('unhandledrejection', (event) => {
+            this.error('Unhandled Promise Rejection', {
+                reason: event.reason,
+                stack: event.reason?.stack
+            });
+        });
+
+        // Логируем клики по кнопкам
+        document.addEventListener('click', (event) => {
+            if (event.target.tagName === 'BUTTON' || event.target.classList.contains('button')) {
+                this.info('Button Click', {
+                    buttonText: event.target.textContent.trim(),
+                    buttonId: event.target.id,
+                    buttonClass: event.target.className
+                });
+            }
+        });
+    }
+
+    /**
+     * Получение call stack для клиентского логирования
+     */
+    getCallStack() {
+        try {
+            const stack = new Error().stack;
+            if (stack) {
+                const lines = stack.split('\n');
+                // Ищем первую строку которая не относится к логгеру
+                for (let i = 3; i < lines.length && i < 8; i++) {
+                    const line = lines[i];
+                    if (line && !line.includes('ClientLogger') && !line.includes('createLogEntry')) {
+                        const match = line.match(/at\s+(.+?)\s+\((.+?):(\d+):(\d+)\)/);
+                        if (match) {
+                            return {
+                                function: match[1] || 'Anonymous',
+                                file: match[2] ? match[2].split('/').pop() : 'Unknown',
+                                line: match[3] || 'Unknown',
+                                fullStack: lines.slice(1, 5).join(' | ')
+                            };
+                        }
+                        // Альтернативный формат для старых браузеров
+                        const altMatch = line.match(/at\s+(.+?):(\d+):(\d+)/);
+                        if (altMatch) {
+                            return {
+                                function: 'Anonymous',
+                                file: altMatch[1] ? altMatch[1].split('/').pop() : 'Unknown',
+                                line: altMatch[2] || 'Unknown',
+                                fullStack: lines.slice(1, 5).join(' | ')
+                            };
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            // Игнорируем ошибки получения stack trace
+        }
+
+        return {
+            function: 'Unknown',
+            file: 'Unknown',
+            line: 'Unknown',
+            fullStack: 'Stack not available'
+        };
+    }
+
+    /**
+     * Создание лог записи
+     */
+    createLogEntry(level, message, data = {}) {
+        if (!this.isEnabled) return;
+
+        const now = new Date();
+        const timestamp = now.toISOString();
+        const timeFormatted = now.toTimeString().split(' ')[0] + '.' + now.getMilliseconds().toString().padStart(3, '0');
+        const callStack = this.getCallStack();
+
+        // Формируем сообщение в формате [время]: [откуда вызван] сообщение
+        const formattedMessage = `[${timeFormatted}]: [${callStack.function} in ${callStack.file}:${callStack.line}] ${message}`;
+
+        const logEntry = {
+            sessionId: this.sessionId,
+            level,
+            message: formattedMessage,
+            originalMessage: message,
+            data,
+            callStack,
+            timestamp,
+            url: window.location.href,
+            userAgent: navigator.userAgent
+        };
+
+        // Добавляем в локальный массив
+        this.logs.push(logEntry);
+
+        // Выводим в консоль браузера с форматированием
+        const consoleMethod = console[level] || console.log;
+        consoleMethod(`[${level.toUpperCase()}] ${formattedMessage}`, data);
+
+        // Отправляем если накопилось много логов
+        if (this.logs.length >= this.maxLogsInMemory) {
+            this.flushLogs();
+        }
+    }
+
+    /**
+     * Логирование уровня DEBUG
+     */
+    debug(message, data = {}) {
+        this.createLogEntry('debug', message, data);
+    }
+
+    /**
+     * Логирование уровня INFO
+     */
+    info(message, data = {}) {
+        this.createLogEntry('info', message, data);
+    }
+
+    /**
+     * Логирование уровня WARN
+     */
+    warn(message, data = {}) {
+        this.createLogEntry('warn', message, data);
+    }
+
+    /**
+     * Логирование уровня ERROR
+     */
+    error(message, data = {}) {
+        this.createLogEntry('error', message, data);
+    }
+
+    /**
+     * Логирование пользовательских действий
+     */
+    logUserAction(action, data = {}) {
+        this.info(`User Action: ${action}`, data);
+    }
+
+    /**
+     * Логирование API запросов
+     */
+    logApiRequest(method, url, status, duration, data = {}) {
+        this.info('API Request', {
+            method,
+            url,
+            status,
+            duration,
+            ...data
+        });
+    }
+
+    /**
+     * Отправка логов на сервер
+     */
+    async flushLogs(sync = false) {
+        if (!this.isEnabled || this.logs.length === 0) return;
+
+        const logsToSend = [...this.logs];
+        this.logs = []; // Очищаем локальный массив
+
+        const payload = {
+            sessionId: this.sessionId,
+            logs: logsToSend,
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            if (sync) {
+                // Синхронная отправка для события beforeunload
+                // sendBeacon требует Blob с правильным Content-Type
+                const blob = new Blob([JSON.stringify(payload)], {
+                    type: 'application/json'
+                });
+                const sent = navigator.sendBeacon(`${window.apiUrl}/log-error`, blob);
+                if (!sent) {
+                    console.warn('sendBeacon failed, возвращаем логи в очередь');
+                    this.logs.unshift(...logsToSend);
+                } else {
+                    console.log(`Отправлено ${logsToSend.length} логов через sendBeacon`);
+                }
+            } else {
+                // Асинхронная отправка
+                const response = await fetch(`${window.apiUrl}/log-error`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                console.log(`✅ Отправлено ${logsToSend.length} логов на сервер:`, result);
+            }
+        } catch (error) {
+            console.error('❌ Ошибка отправки логов:', error);
+            // Возвращаем логи обратно в массив при ошибке
+            this.logs.unshift(...logsToSend);
+            throw error; // Пробрасываем ошибку выше для обработки
+        }
+    }
+
+    /**
+     * Принудительная отправка всех логов
+     */
+    async flush() {
+        await this.flushLogs();
+    }
+
+    /**
+     * Ручное сохранение логов (вызывается кнопкой в Telegram)
+     */
+    async manualSave() {
+        try {
+            this.info('Manual Save Started');
+            if (window.Telegram?.WebApp) {
+                const tg = window.Telegram.WebApp;
+
+                // Показываем индикатор загрузки
+                tg.MainButton.setText('💾 Сохранение...');
+                tg.MainButton.showProgress();
+
+                // Принудительно сохраняем все логи
+                await this.flushLogs().catch(err => {
+                    console.error('Ошибка flushLogs в manualSave:', err);
+                    throw err;
+                });
+
+                // Показываем успех
+                tg.MainButton.setText('✅ Логи сохранены');
+                tg.MainButton.hideProgress();
+                tg.MainButton.color = '#4CAF50'; // Зеленый цвет
+
+                // Показываем уведомление
+                tg.showAlert('Логи успешно сохранены на сервере!');
+
+                // Возвращаем кнопку в исходное состояние через 3 секунды
+                setTimeout(() => {
+                    tg.MainButton.setText('💾 Сохранить логи');
+                    tg.MainButton.color = '#FF6B6B';
+                }, 3000);
+
+            } else {
+                // Для браузера просто сохраняем
+                await this.flushLogs().catch(err => {
+                    console.error('Ошибка flushLogs в браузере:', err);
+                    throw err;
+                });
+                alert('Логи сохранены!');
+            }
+
+            this.info('Manual Save Completed Successfully');
+
+        } catch (error) {
+            console.error('Manual Save Error:', error);
+            this.error('Manual Save Failed', {
+                error: error.message,
+                stack: error.stack
+            });
+
+            if (window.Telegram?.WebApp) {
+                const tg = window.Telegram.WebApp;
+                tg.MainButton.setText('❌ Ошибка сохранения');
+                tg.MainButton.hideProgress();
+                tg.MainButton.color = '#F44336'; // Красный цвет для ошибки
+                tg.showAlert('Ошибка сохранения логов: ' + error.message);
+
+                // Возвращаем кнопку в исходное состояние через 3 секунды
+                setTimeout(() => {
+                    tg.MainButton.setText('💾 Сохранить логи');
+                    tg.MainButton.color = '#FF6B6B';
+                }, 3000);
+            } else {
+                alert('Ошибка сохранения логов: ' + error.message);
+            }
+        }
+    }
+
+    /**
+     * Получение статистики логгера
+     */
+    getStats() {
+        return {
+            sessionId: this.sessionId,
+            logsInMemory: this.logs.length,
+            isEnabled: this.isEnabled,
+            maxLogsInMemory: this.maxLogsInMemory,
+            // flushInterval убрана - автоматическая отправка отключена
+            isTelegramMiniApp: !!window.Telegram?.WebApp,
+            telegramUser: window.Telegram?.WebApp?.initDataUnsafe?.user
+        };
+    }
+
+    // Создание интерфейса для просмотра логов (упрощенная версия для совместимости)
     createLogUI() {
         // Создаем кнопку просмотра логов
         const viewLogsBtn = document.createElement('button');
@@ -87,7 +499,7 @@ const Logger = {
         `;
         
         const modalTitle = document.createElement('h3');
-        modalTitle.textContent = 'Журнал логов приложения';
+        modalTitle.textContent = 'Журнал логов TgStyle';
         modalTitle.style.margin = '0';
         
         // Создаем контейнер для содержимого логов
@@ -189,12 +601,12 @@ const Logger = {
         });
         
         sendLogsBtn.addEventListener('click', () => {
-            this.sendLogsToServer();
+            this.manualSave();
         });
         
         clearLogsBtn.addEventListener('click', () => {
             if (confirm('Очистить все логи?')) {
-                this.clearLogs();
+                this.logs = [];
                 this.updateLogDisplay();
             }
         });
@@ -202,9 +614,11 @@ const Logger = {
         exitLogsBtn.addEventListener('click', () => {
             logModal.style.display = 'none';
         });
-    },
+    }
     
-    // Вывод логов в модальное окно
+    /**
+     * Вывод логов в модальное окно
+     */
     updateLogDisplay() {
         const logContent = document.getElementById('log-content');
         if (!logContent) return;
@@ -222,13 +636,13 @@ const Logger = {
             const logEntry = document.createElement('div');
             logEntry.className = `log-entry log-${log.level}`;
             
-            // Форматируем лог
+            // Форматируем лог для отображения
             logEntry.innerHTML = `
-                <strong>[${log.timestamp}]</strong> 
+                <strong>[${this.formatTimestamp(log.timestamp)}]</strong>
                 <span class="log-level">[${log.level.toUpperCase()}]</span> 
-                <span class="log-message">${log.message}</span>
-                <br><small class="log-caller">${log.caller}</small>
-                ${log.data ? `<br><small class="log-data">${log.data}</small>` : ''}
+                <span class="log-message">${log.originalMessage || log.message}</span>
+                <br><small class="log-caller">${log.callStack ? `${log.callStack.function} in ${log.callStack.file}:${log.callStack.line}` : 'Unknown'}</small>
+                ${log.data && Object.keys(log.data).length > 0 ? `<br><small class="log-data">${JSON.stringify(log.data)}</small>` : ''}
             `;
             
             logContent.appendChild(logEntry);
@@ -236,175 +650,67 @@ const Logger = {
         
         // Прокручиваем к последнему логу
         logContent.scrollTop = logContent.scrollHeight;
-    },
+    }
     
-    // Форматирование логов для экспорта
+    /**
+     * Форматирование timestamp для отображения
+     */
+    formatTimestamp(isoString) {
+        const date = new Date(isoString);
+        return date.toTimeString().split(' ')[0] + '.' + date.getMilliseconds().toString().padStart(3, '0');
+    }
+
+    /**
+     * Форматирование логов для экспорта
+     */
     formatLogsForExport() {
         return this.logs.map(log => {
-            return `[${log.timestamp}] [${log.level.toUpperCase()}] ${log.message} (${log.caller})${log.data ? '\n  Данные: ' + log.data : ''}`;
+            const timeFormatted = this.formatTimestamp(log.timestamp);
+            const caller = log.callStack ? `${log.callStack.function} in ${log.callStack.file}:${log.callStack.line}` : 'Unknown';
+            return `[${timeFormatted}] [${log.level.toUpperCase()}] ${log.originalMessage || log.message} (${caller})${log.data && Object.keys(log.data).length > 0 ? '\n  Данные: ' + JSON.stringify(log.data) : ''}`;
         }).join('\n');
+    }
+}
+
+// Создаем глобальный экземпляр логгера
+window.clientLogger = new ClientLogger();
+
+/**
+ * Функции-обёртки для совместимости с существующим кодом
+ * Перенаправляют все вызовы в новый ClientLogger
+ */
+function appLogger(message, level = 'info', data = null) {
+    const dataObj = data ? { legacyData: data } : {};
+    window.clientLogger.createLogEntry(level, message, dataObj);
+    return window.clientLogger.logs[window.clientLogger.logs.length - 1];
+}
+
+// Устаревший объект Logger для совместимости
+const Logger = {
+    init() {
+        return window.clientLogger;
     },
-    
-    // Сохранение логов в localStorage
-    saveLogs() {
-        try {
-            // Обрезаем логи, если их слишком много
-            if (this.logs.length > MAX_STORED_LOGS) {
-                this.logs = this.logs.slice(-MAX_STORED_LOGS);
-            }
-            
-            localStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(this.logs));
-        } catch (error) {
-            console.error('Ошибка при сохранении логов в localStorage:', error);
-        }
-    },
-    
-    // Очистка логов
-    clearLogs() {
-        this.logs = [];
-        this.saveLogs();
-    },
-    
-    // Получение информации о вызывающей функции
-    getCallerInfo() {
-        try {
-            const stackTrace = new Error().stack;
-            const lines = stackTrace.split('\n');
-            
-            // Первая строка - это сам Error()
-            // Вторая строка - это вызов текущего метода (log)
-            // Третья строка - это вызов Logger.log или appLogger
-            // Четвертая строка - это то, что нам нужно - вызывающая функция
-            if (lines.length >= 4) {
-                const callerLine = lines[3].trim();
-                
-                // Извлекаем имя функции и номер строки
-                const functionMatch = callerLine.match(/at\s+([^\s]+)\s+\((.+):(\d+):(\d+)\)/);
-                if (functionMatch) {
-                    const [_, functionName, file, line, col] = functionMatch;
-                    // Получаем только имя файла без пути
-                    const fileName = file.split('/').pop();
-                    return `${functionName} в ${fileName}:${line}`;
-                }
-                
-                // Если не удалось извлечь по первому паттерну, пробуем другой паттерн
-                const anonymousMatch = callerLine.match(/at\s+(.+):(\d+):(\d+)/);
-                if (anonymousMatch) {
-                    const [_, file, line, col] = anonymousMatch;
-                    const fileName = file.split('/').pop();
-                    return `${fileName}:${line}`;
-                }
-                
-                // Возвращаем всю строку, если не удалось распарсить
-                return callerLine.replace(/^\s*at\s+/, '');
-            }
-            
-            return 'неизвестно';
-        } catch (e) {
-            return 'ошибка определения';
-        }
-    },
-    
-    // Основной метод логирования
     log(message, level = 'info', data = null, caller = null) {
-        // Получаем информацию о вызывающей функции
-        const callerInfo = caller || this.getCallerInfo();
-        
-        // Создаем метку времени
-        const timestamp = new Date().toISOString();
-        
-        // Создаем объект лога
-        const logEntry = {
-            timestamp,
-            level,
-            message,
-            caller: callerInfo,
-            data: data ? JSON.stringify(data) : null
-        };
-        
-        // Добавляем в массив логов
-        this.logs.push(logEntry);
-        
-        // Логируем в консоль браузера
-        const consoleMsg = `[${timestamp}] [${level.toUpperCase()}] ${message} (${callerInfo})`;
-        switch (level) {
-            case 'error':
-                console.error(consoleMsg, data || '');
-                break;
-            case 'warn':
-                console.warn(consoleMsg, data || '');
-                break;
-            case 'debug':
-                console.debug(consoleMsg, data || '');
-                break;
-            default:
-                console.log(consoleMsg, data || '');
-        }
-        
-        // Сохраняем логи в localStorage
-        this.saveLogs();
-        
-        return logEntry;
+        const dataObj = data ? { legacyData: data, caller } : { caller };
+        return window.clientLogger.createLogEntry(level, message, dataObj);
     },
-    
-    // Отправка логов на сервер
+    saveLogs() {
+        // Логи автоматически сохраняются в новом логгере
+    },
+    clearLogs() {
+        window.clientLogger.logs = [];
+    },
     sendLogsToServer() {
-        const logContent = document.getElementById('log-content');
-        if (!logContent) return;
-        
-        // Показываем статус отправки
-        const previousContent = logContent.innerHTML;
-        logContent.innerHTML = '<div style="text-align: center; padding: 20px;">Отправка логов на сервер...</div>';
-        
-        // Собираем данные для отправки
-        const logsData = {
-            logs: this.logs,
-            userAgent: navigator.userAgent,
-            appVersion: '1.0.0', // Версия приложения
-            timestamp: new Date().toISOString()
-        };
-        
-        // Отправляем на сервер
-        fetch(`${window.apiUrl}/log-error`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(logsData)
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP ошибка: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                logContent.innerHTML = '<div style="text-align: center; padding: 20px; color: #81c784;">Логи успешно отправлены на сервер!</div>';
-                setTimeout(() => {
-                    logContent.innerHTML = previousContent;
-                }, 2000);
-            } else {
-                throw new Error(data.error || 'Неизвестная ошибка');
-            }
-        })
-        .catch(error => {
-            logContent.innerHTML = `<div style="text-align: center; padding: 20px; color: #e57373;">Ошибка при отправке логов: ${error.message}</div>`;
-            setTimeout(() => {
-                logContent.innerHTML = previousContent;
-            }, 3000);
-        });
+        return window.clientLogger.manualSave();
+    },
+    updateLogDisplay() {
+        return window.clientLogger.updateLogDisplay();
+    },
+    formatLogsForExport() {
+        return window.clientLogger.formatLogsForExport();
     }
 };
 
-/**
- * Функция-обёртка для совместимости с существующим кодом
- * Перенаправляет все вызовы appLogger в Logger.log
- */
-function appLogger(message, level = 'info', data = null) {
-    return Logger.log(message, level, data, 'appLogger');
-}
-
-// Экспортируем объект Logger и функцию appLogger
+// Экспортируем для совместимости
 window.Logger = Logger;
 window.appLogger = appLogger;
