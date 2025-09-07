@@ -39,8 +39,8 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Middleware для статических файлов клиента
-app.use(express.static(path.join(__dirname, '..', 'client')));
+// Middleware для статических файлов клиента (собранные в dist/)
+app.use(express.static(path.join(__dirname, '..', 'dist')));
 
 // API роуты
 app.use('/api/auth', authRoutes);
@@ -50,7 +50,7 @@ app.use('/api', apiRoutes);
 // Роут для главной страницы
 app.get('/', (req, res) => {
   serverLogger.debug('Главная страница запрошена', { ip: req.ip, userAgent: req.get('User-Agent') });
-  res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
 });
 
 // Базовый роут для проверки работы сервера
