@@ -19,7 +19,7 @@ import {
   createError,
   ERROR_CODES 
 } from '@/utils/helpers.js';
-import { logger } from './logger.js';
+import { logger } from './logger';
 
 /**
  * Класс для управления историей анализов

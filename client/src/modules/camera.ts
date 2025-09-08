@@ -21,7 +21,7 @@ import {
   isImageFile,
   getFileExtension 
 } from '@/utils/helpers.js';
-import { logger } from './logger.js';
+import { logger } from './logger';
 
 /**
  * Класс для работы с камерой и изображениями

@@ -10,7 +10,7 @@ import type {
 } from '@/types/index.js';
 import { FASTVLM_CONFIG } from '@/utils/constants.js';
 import { createError, ERROR_CODES } from '@/utils/helpers.js';
-import { logger } from './logger.js';
+import { logger } from './logger';
 import { api } from './api.js';
 import { authManager } from './auth.js';
 import { cameraManager } from './camera.js';

@@ -20,7 +20,7 @@ import {
   createError,
   isOnline
 } from '@/utils/helpers.js';
-import { logger } from './logger.js';
+import { logger } from './logger';
 
 /**
  * Базовый класс для API запросов

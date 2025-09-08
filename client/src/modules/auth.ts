@@ -9,7 +9,7 @@ import type {
 } from '@/types/index.js';
 import { validateTelegramInitData } from '@/utils/validation.js';
 import { createError, ERROR_CODES } from '@/utils/helpers.js';
-import { logger } from './logger.js';
+import { logger } from './logger';
 import { api } from './api.js';
 
 /**

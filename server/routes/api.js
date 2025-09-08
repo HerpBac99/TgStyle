@@ -10,8 +10,8 @@ router.post('/log-error', async (req, res) => {
     try {
         const { logs, userAgent, appVersion, timestamp } = req.body;
         
-        // Создаем директорию для логов, если ее нет
-        const logDir = path.join(__dirname, '../logs');
+        // Создаем директорию для логов, если ее нет (на уровне проекта)
+        const logDir = path.join(__dirname, '../../logs');
         if (!fs.existsSync(logDir)) {
             fs.mkdirSync(logDir, { recursive: true });
         }

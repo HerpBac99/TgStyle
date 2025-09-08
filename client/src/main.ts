@@ -26,7 +26,7 @@ class TgStyleApp {
    * Основной метод инициализации приложения
    */
   async initialize(): Promise<void> {
-    logger.info('🚀 Starting TgStyle application', {
+    logger.info('Starting TgStyle application', {
       version: APP_CONFIG.version,
       environment: APP_CONFIG.environment,
       userAgent: navigator.userAgent,
@@ -37,9 +37,6 @@ class TgStyleApp {
     });
 
     try {
-      // Проверяем поддержку браузера
-      this.checkBrowserCompatibility();
-
       // Инициализируем Telegram WebApp
       this.initializeTelegram();
 
@@ -66,31 +63,10 @@ class TgStyleApp {
   }
 
   /**
-   * Проверка совместимости браузера
-   */
-  private checkBrowserCompatibility(): void {
-    logger.debug('Checking browser compatibility');
-
-    const support = checkBrowserSupport();
-    
-    if (!support.isValid) {
-      const message = 'Ваш браузер не поддерживает необходимые функции: ' + support.errors.join(', ');
-      logger.error('Browser compatibility check failed', { errors: support.errors });
-      throw new Error(message);
-    }
-
-    if (support.warnings.length > 0) {
-      logger.warn('Browser compatibility warnings', { warnings: support.warnings });
-    }
-
-    logger.debug('Browser compatibility check passed');
-  }
-
-  /**
    * Инициализация Telegram WebApp
    */
   private initializeTelegram(): void {
-    logger.debug('Initializing Telegram WebApp');
+    logger.info('Initializing Telegram WebApp');
 
     this.tg = window.Telegram?.WebApp || null;
 
@@ -112,7 +88,7 @@ class TgStyleApp {
 
       // Входим в полноэкранный режим если поддерживается
       if (this.tg.isVersionAtLeast('6.9') && this.tg.requestFullscreen) {
-        logger.debug('Requesting fullscreen mode');
+        logger.info('Requesting fullscreen mode');
         this.tg.requestFullscreen();
       }
 
@@ -135,7 +111,7 @@ class TgStyleApp {
    * Настройка базового поведения приложения
    */
   private setupAppBehavior(): void {
-    logger.debug('Setting up app behavior');
+    logger.info('Setting up app behavior');
 
     // Запрещаем скроллинг body
     document.body.style.overflow = 'hidden';
@@ -146,7 +122,7 @@ class TgStyleApp {
     // Устанавливаем мета-теги для мобильных устройств
     this.setupMobileMeta();
 
-    logger.debug('App behavior configured');
+    logger.info('App behavior configured');
   }
 
   /**
@@ -165,7 +141,7 @@ class TgStyleApp {
 
     // Обработка изменения размера окна
     window.addEventListener('resize', () => {
-      logger.debug('Window resized', {
+      logger.info('Window resized', {
         width: window.innerWidth,
         height: window.innerHeight,
       });
@@ -173,7 +149,7 @@ class TgStyleApp {
 
     // Обработка изменения ориентации
     window.addEventListener('orientationchange', () => {
-      logger.debug('Orientation changed');
+      logger.info('Orientation changed');
       // Небольшая задержка для корректного получения новых размеров
       setTimeout(() => {
         this.handleOrientationChange();
@@ -183,7 +159,7 @@ class TgStyleApp {
     // Обработка возврата к приложению
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
-        logger.debug('App became visible, refreshing state');
+        logger.info('App became visible, refreshing state');
         this.refreshAppState();
       }
     });
@@ -212,11 +188,11 @@ class TgStyleApp {
    * Инициализация UI
    */
   private initializeUI(): void {
-    logger.debug('Initializing UI');
+    logger.info('Initializing UI');
     
     try {
       uiManager.init();
-      logger.debug('UI initialized successfully');
+      logger.info('UI initialized successfully');
     } catch (error) {
       logger.error('Error initializing UI', error);
       throw error;
@@ -227,7 +203,7 @@ class TgStyleApp {
    * Выполнение авторизации
    */
   private async performAuthentication(): Promise<void> {
-    logger.debug('Starting authentication');
+    logger.info('Starting authentication');
 
     try {
       const authResponse = await authManager.authenticate();
@@ -275,7 +251,7 @@ class TgStyleApp {
     // Логируем статистику всех модулей
     this.logModulesStats();
 
-    logger.info('🎉 TgStyle application is ready for use');
+    logger.info('TgStyle application is ready for use');
   }
 
   /**
@@ -305,7 +281,7 @@ class TgStyleApp {
     // Принудительно применяем стили после изменения ориентации
     uiManager.init();
     
-    logger.debug('Orientation change handled');
+    logger.info('Orientation change handled');
   }
 
   /**
@@ -319,7 +295,7 @@ class TgStyleApp {
     const targetColor = '#81D8D0';
     document.body.style.backgroundColor = targetColor;
     
-    logger.debug('App state refreshed');
+    logger.info('App state refreshed');
   }
 
   /**
@@ -335,7 +311,7 @@ class TgStyleApp {
     });
     
     window.dispatchEvent(event);
-    logger.debug('App event dispatched', { type, payload });
+    logger.info('App event dispatched', { type, payload });
   }
 
   /**

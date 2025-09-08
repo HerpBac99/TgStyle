@@ -3,7 +3,7 @@
  */
 
 // Экспорт основных модулей
-export { logger, appLogger } from './logger.js';
+export { logger, appLogger } from './logger';
 export { api } from './api.js';
 export { authManager } from './auth.js';
 export { cameraManager } from './camera.js';
@@ -40,8 +40,8 @@ export {
 declare global {
   interface Window {
     // Совместимость со старым API
-    appLogger: typeof import('./logger.js').appLogger;
-    clientLogger: typeof import('./logger.js').logger;
+    appLogger: typeof import('./logger').appLogger;
+    clientLogger: typeof import('./logger').logger;
     
     // Менеджеры модулей
     authManager: typeof import('./auth.js').authManager;

@@ -22,7 +22,7 @@ import {
   addEventListenerWithCleanup,
   formatHistoryDate 
 } from '@/utils/helpers.js';
-import { logger } from './logger.js';
+import { logger } from './logger';
 import { authManager } from './auth.js';
 import { cameraManager } from './camera.js';
 import { historyManager } from './history.js';

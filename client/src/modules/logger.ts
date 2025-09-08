@@ -23,6 +23,10 @@ class TgStyleLogger implements Logger {
   constructor() {
     this.sessionId = this.initializeSession();
     this.setupErrorHandlers();
+    this.createLogUI(); // Инициализируем UI интерфейс
+
+    // Автоматическая очистка логов предыдущей сессии
+    this.clearPreviousSessionLogs();
   }
 
   /**
@@ -261,10 +265,280 @@ class TgStyleLogger implements Logger {
   }
 
   /**
+   * Очистка логов предыдущей сессии (вызывается при запуске приложения)
+   */
+  clearPreviousSessionLogs(): void {
+    const previousLogsCount = this.logs.length;
+    this.clear();
+    this.info('Previous session logs cleared', {
+      previousLogsCount,
+      sessionId: this.sessionId,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
    * Получение всех логов
    */
   getLogs(): LogEntry[] {
     return [...this.logs];
+  }
+
+  /**
+   * Создание UI интерфейса для просмотра логов
+   */
+  createLogUI(): void {
+    // Создаем кнопку просмотра логов
+    const viewLogsBtn = document.createElement('button');
+    viewLogsBtn.id = 'view-logs-btn';
+    viewLogsBtn.textContent = '🔍 Логи';
+    viewLogsBtn.style.cssText = `
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      padding: 8px 12px;
+      background-color: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 100000; /* Очень высокий z-index, чтобы быть выше всех превью */
+      cursor: pointer;
+      pointer-events: auto; /* Убеждаемся что клики работают */
+    `;
+
+    // Создаем модальное окно
+    const logModal = document.createElement('div');
+    logModal.id = 'log-modal';
+    logModal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.9);
+      z-index: 100001; /* Еще выше чем кнопка */
+      display: none;
+      flex-direction: column;
+      color: white;
+      font-family: monospace;
+      padding: 10px;
+    `;
+
+    // Заголовок модального окна
+    const modalTitle = document.createElement('h3');
+    modalTitle.textContent = 'Журнал логов TgStyle';
+    modalTitle.style.margin = '0';
+
+    // Контейнер для логов
+    const logContent = document.createElement('div');
+    logContent.id = 'log-content';
+    logContent.style.cssText = `
+      flex: 1;
+      overflow-y: auto;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: pre-wrap;
+    `;
+
+    // Панель инструментов
+    const logToolbar = document.createElement('div');
+    logToolbar.style.cssText = `
+      display: flex;
+      justify-content: flex-start;
+      gap: 10px;
+      margin-top: 10px;
+    `;
+
+    // Кнопки
+    const copyLogsBtn = document.createElement('button');
+    copyLogsBtn.textContent = 'Копировать';
+    copyLogsBtn.className = 'log-btn';
+
+    const sendLogsBtn = document.createElement('button');
+    sendLogsBtn.textContent = 'Отправить';
+    sendLogsBtn.className = 'log-btn';
+
+    const clearLogsBtn = document.createElement('button');
+    clearLogsBtn.textContent = 'Очистить';
+    clearLogsBtn.className = 'log-btn';
+
+    const exitLogsBtn = document.createElement('button');
+    exitLogsBtn.textContent = 'Выход';
+    exitLogsBtn.className = 'log-btn';
+
+    // Стили для кнопок
+    const style = document.createElement('style');
+    style.textContent = `
+      .log-btn {
+        padding: 6px 12px;
+        background-color: #40a7e3;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .log-btn:hover {
+        background-color: #2c7db2;
+      }
+      .log-entry {
+        margin-bottom: 4px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+      }
+      .log-info { color: #90caf9; }
+      .log-debug { color: #80deea; }
+      .log-warn { color: #ffcc80; }
+      .log-error { color: #ef9a9a; }
+    `;
+
+    // Собираем структуру
+    logToolbar.appendChild(copyLogsBtn);
+    logToolbar.appendChild(sendLogsBtn);
+    logToolbar.appendChild(clearLogsBtn);
+    logToolbar.appendChild(exitLogsBtn);
+
+    logModal.appendChild(modalTitle);
+    logModal.appendChild(logContent);
+    logModal.appendChild(logToolbar);
+
+    document.head.appendChild(style);
+    document.body.appendChild(viewLogsBtn);
+    document.body.appendChild(logModal);
+
+    // Обработчики событий
+    viewLogsBtn.addEventListener('click', () => {
+      this.updateLogDisplay();
+      logModal.style.display = 'flex';
+    });
+
+    copyLogsBtn.addEventListener('click', () => {
+      const logText = this.formatLogsForExport();
+      navigator.clipboard.writeText(logText)
+        .then(() => alert('Логи скопированы в буфер обмена'))
+        .catch(err => alert('Ошибка копирования: ' + err.message));
+    });
+
+    sendLogsBtn.addEventListener('click', () => {
+      this.manualSave();
+    });
+
+    clearLogsBtn.addEventListener('click', () => {
+      if (confirm('Очистить все логи?')) {
+        this.logs = [];
+        this.updateLogDisplay();
+      }
+    });
+
+    exitLogsBtn.addEventListener('click', () => {
+      logModal.style.display = 'none';
+    });
+  }
+
+  /**
+   * Обновление отображения логов в UI
+   */
+  updateLogDisplay(): void {
+    const logContent = document.getElementById('log-content');
+    if (!logContent) return;
+
+    logContent.innerHTML = '';
+
+    if (this.logs.length === 0) {
+      logContent.innerHTML = '<em>Нет записей в журнале</em>';
+      return;
+    }
+
+    const logsToShow = this.logs.slice(-500); // Показываем до 500 последних
+
+    logsToShow.forEach(log => {
+      const logEntry = document.createElement('div');
+      logEntry.className = `log-entry log-${log.level}`;
+
+      logEntry.innerHTML = `
+        <strong>[${this.formatTimestamp(log.timestamp)}]</strong>
+        <span class="log-level">[${log.level.toUpperCase()}]</span>
+        <span class="log-message">${log.message}</span>
+        ${log.data ? `<br><small class="log-data">${safeJsonStringify(log.data)}</small>` : ''}
+      `;
+
+      logContent.appendChild(logEntry);
+    });
+
+    // Прокручиваем к последнему логу
+    logContent.scrollTop = logContent.scrollHeight;
+  }
+
+  /**
+   * Форматирование timestamp для отображения
+   */
+  private formatTimestamp(isoString: string): string {
+    const date = new Date(isoString);
+    return date.toTimeString().split(' ')[0] + '.' + date.getMilliseconds().toString().padStart(3, '0');
+  }
+
+  /**
+   * Форматирование логов для экспорта
+   */
+  formatLogsForExport(): string {
+    return this.logs.map(log => {
+      const timeFormatted = this.formatTimestamp(log.timestamp);
+      return `[${timeFormatted}] [${log.level.toUpperCase()}] ${log.message}${log.data ? '\n  Данные: ' + safeJsonStringify(log.data) : ''}`;
+    }).join('\n');
+  }
+
+  /**
+   * Ручное сохранение логов с Telegram UI
+   */
+  async manualSave(): Promise<void> {
+    try {
+      this.info('Manual Save Started');
+
+      if (window.Telegram?.WebApp) {
+        const tg = window.Telegram.WebApp;
+
+        // Показываем прогресс
+        tg.MainButton.setText('💾 Сохранение...');
+        tg.MainButton.showProgress();
+
+        // Сохраняем логи
+        await this.flush();
+
+        // Показываем успех
+        tg.MainButton.setText('✅ Логи сохранены');
+        tg.MainButton.hideProgress();
+        tg.showAlert('Логи успешно сохранены на сервере!');
+
+        // Возвращаем кнопку в исходное состояние
+        setTimeout(() => {
+          tg.MainButton.setText('💾 Сохранить логи');
+        }, 3000);
+
+      } else {
+        // Для браузера
+        await this.flush();
+        alert('Логи сохранены!');
+      }
+
+      this.info('Manual Save Completed Successfully');
+
+    } catch (error) {
+      console.error('Manual Save Error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.error('Manual Save Failed', { error: errorMessage });
+
+      if (window.Telegram?.WebApp) {
+        const tg = window.Telegram.WebApp;
+        tg.MainButton.setText('❌ Ошибка сохранения');
+        tg.MainButton.hideProgress();
+        tg.showAlert('Ошибка сохранения логов: ' + errorMessage);
+      } else {
+        alert('Ошибка сохранения логов: ' + errorMessage);
+      }
+    }
   }
 }
 
@@ -276,15 +550,42 @@ export function appLogger(message: string, level: LogLevel = 'info', data?: any)
   logger[level](message, data);
 }
 
+// Устаревший объект Logger для совместимости
+const LegacyLogger = {
+  init() {
+    return logger;
+  },
+  log(message: string, level: LogLevel = 'info', data?: any) {
+    logger[level](message, data);
+  },
+  saveLogs() {
+    // Логи автоматически сохраняются в новом логгере
+  },
+  clearLogs() {
+    logger.clear();
+  },
+  sendLogsToServer() {
+    return logger.manualSave();
+  },
+  updateLogDisplay() {
+    return logger.updateLogDisplay();
+  },
+  formatLogsForExport() {
+    return logger.formatLogsForExport();
+  }
+};
+
 // Экспортируем в глобальную область для совместимости
 declare global {
   interface Window {
     appLogger: typeof appLogger;
     clientLogger: TgStyleLogger;
+    Logger: typeof LegacyLogger;
   }
 }
 
 window.appLogger = appLogger;
 window.clientLogger = logger;
+window.Logger = LegacyLogger;
 
 export default logger;
