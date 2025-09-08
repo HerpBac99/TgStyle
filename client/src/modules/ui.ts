@@ -6,13 +6,11 @@ import type {
   DOMElements, 
   HistoryItem, 
   AnalysisResponse,
-  ClassificationData,
   TelegramWebApp
 } from '@/types/index.js';
 import { 
   DOM_SELECTORS,
   CSS_CLASSES,
-  ANIMATION_DURATIONS,
   THEME_COLORS 
 } from '@/utils/constants.js';
 import { 
@@ -120,7 +118,7 @@ class UIManager {
     document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
     window.addEventListener('analysisStateChange', this.handleAnalysisStateChange.bind(this) as EventListener);
 
-    logger.debug('Event listeners setup completed');
+    // Event listeners setup completed
   }
 
   /**
@@ -130,14 +128,21 @@ class UIManager {
     event.preventDefault();
     event.stopPropagation();
 
-    logger.info('Camera button clicked');
+    logger.info('Camera button clicked', {
+      timestamp: Date.now(),
+      userAgent: navigator.userAgent.split(' ')[0]
+    });
 
     try {
-      // Захватываем фото
-      const result = await cameraManager.capturePhoto(true);
+      // Захватываем фото с выбором источника
+      const result = await cameraManager.capturePhoto();
       
       if (result.success && result.image) {
-        logger.info('Photo captured successfully');
+        logger.info('Photo captured successfully', {
+          imageSize: result.image.originalSize,
+          format: result.image.format,
+          dimensions: `${result.image.width}x${result.image.height}`
+        });
         
         // Показываем предпросмотр
         this.showFullscreenPreview(result.image.base64);
@@ -145,11 +150,11 @@ class UIManager {
         // Вибрация успеха
         authManager.vibrate('light');
       } else {
-        this.showError(result.error || 'Не удалось сделать фото');
+        this.logError(result.error || 'Не удалось сделать фото');
       }
     } catch (error) {
       logger.error('Error capturing photo', error);
-      this.showError('Ошибка при работе с камерой');
+      this.logError('Ошибка при работе с камерой');
     }
   }
 
@@ -173,7 +178,6 @@ class UIManager {
    */
   private handleVisibilityChange(): void {
     if (!document.hidden) {
-      logger.debug('App became visible, ensuring background color');
       this.ensureBackgroundColor();
     }
   }
@@ -327,16 +331,16 @@ class UIManager {
         // Обновляем историю в UI
         this.updateHistoryDisplay();
         
-        // Показываем тост с результатом
+        // Логируем результат
         if (response.classification) {
-          this.showClassificationToast(response.classification);
+          logger.info('Classification result', response.classification);
         }
       } else {
         throw new Error(response.error || 'Ошибка анализа');
       }
     } catch (error) {
       logger.error('Analysis failed', error);
-      this.showError('Ошибка при анализе: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
+      this.logError('Ошибка при анализе: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
     } finally {
       // Меняем кнопку на закрытие
       button.innerHTML = '✕';
@@ -367,11 +371,6 @@ class UIManager {
       `,
     });
 
-    const classification = result.classification || {
-      classNameRu: 'Неизвестный тип',
-      confidence: '0',
-    };
-
     resultsContainer.innerHTML = `
       <div style="text-align: center; margin-bottom: 15px;">
         <div style="background: linear-gradient(45deg, ${THEME_COLORS.PRIMARY_BG}, ${THEME_COLORS.BUTTON_COLOR}); color: white; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: bold; display: inline-block; margin-bottom: 10px;">
@@ -379,27 +378,11 @@ class UIManager {
         </div>
         <h3 style="margin: 10px 0; color: #333;">Результаты анализа одежды</h3>
       </div>
-
-      <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 15px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <strong style="color: #333;">Определенный тип:</strong>
-          <span style="color: ${THEME_COLORS.PRIMARY_BG}; font-weight: bold;">${classification.classNameRu}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <strong style="color: #333;">Уверенность:</strong>
-          <span style="color: #666;">${classification.confidence}%</span>
-        </div>
-      </div>
-
       <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 15px;">
         <h4 style="margin: 0 0 10px 0; color: #333; font-size: 16px;">Детальный анализ:</h4>
         <div style="color: #555; line-height: 1.6; white-space: pre-wrap; max-height: 200px; overflow-y: auto;">
           ${result.analysis || 'Анализ недоступен'}
         </div>
-      </div>
-
-      <div style="text-align: center; color: #666; font-size: 12px;">
-        Анализ выполнен с помощью FastVLM AI
       </div>
     `;
 
@@ -412,59 +395,6 @@ class UIManager {
     }, 100);
   }
 
-  /**
-   * Показ всплывающего уведомления с результатом классификации
-   */
-  private showClassificationToast(classification: ClassificationData): void {
-    logger.info('Showing classification toast');
-
-    const toast = createElement('div', {
-      class: CSS_CLASSES.CLASSIFICATION_TOAST,
-      style: `
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%) translateY(100px);
-        background-color: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 15px 20px;
-        border-radius: 12px;
-        font-size: 16px;
-        text-align: center;
-        z-index: 2000;
-        min-width: 250px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        transition: transform 0.3s ease, opacity 0.3s ease;
-        opacity: 0;
-      `,
-    });
-
-    toast.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 5px;">Результат анализа:</div>
-      <div>${classification.classNameRu}</div>
-      <div style="margin-top: 5px; font-size: 14px; opacity: 0.8;">Уверенность: ${classification.confidence}%</div>
-    `;
-
-    document.body.appendChild(toast);
-
-    // Анимация появления
-    setTimeout(() => {
-      toast.style.transform = 'translateX(-50%) translateY(0)';
-      toast.style.opacity = '1';
-    }, 10);
-
-    // Автоматическое скрытие
-    setTimeout(() => {
-      toast.style.transform = 'translateX(-50%) translateY(100px)';
-      toast.style.opacity = '0';
-      
-      setTimeout(() => {
-        if (toast.parentNode) {
-          toast.parentNode.removeChild(toast);
-        }
-      }, 300);
-    }, ANIMATION_DURATIONS.TOAST);
-  }
 
   /**
    * Показ сохраненного анализа
@@ -473,7 +403,7 @@ class UIManager {
     logger.info('Showing saved analysis');
 
     if (!analysisData.photo) {
-      this.showError('Не удалось загрузить данные фотографии');
+      this.logError('Не удалось загрузить данные фотографии');
       return;
     }
 
@@ -597,9 +527,12 @@ class UIManager {
    * Обновление отображения истории
    */
   updateHistoryDisplay(): void {
-    logger.debug('Updating history display');
-
     const history = historyManager.getAllItems();
+    
+    logger.debug('Updating history display', {
+      historyCount: history.length,
+      cellsCount: this.elements.historyCells.length
+    });
 
     this.elements.historyCells.forEach((cell, index) => {
       const data = history[index];
@@ -656,41 +589,10 @@ class UIManager {
   }
 
   /**
-   * Показ сообщения об ошибке
+   * Логирование ошибки без отображения пользователю
    */
-  private showError(message: string): void {
-    logger.error('Displaying error to user', { message });
-
-    // Используем Telegram alert если доступен
-    authManager.showAlert(message);
-
-    // Также создаем временный элемент для отображения ошибки
-    const errorElement = createElement('div', {
-      class: CSS_CLASSES.ERROR,
-      style: `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        padding: 20px;
-        z-index: 9999;
-        background-color: ${THEME_COLORS.ERROR};
-        color: white;
-        border-radius: 10px;
-        font-size: 16px;
-        max-width: 80%;
-        text-align: center;
-      `,
-    }, message);
-
-    document.body.appendChild(errorElement);
-
-    // Удаляем элемент через 3 секунды
-    setTimeout(() => {
-      if (errorElement.parentNode) {
-        errorElement.parentNode.removeChild(errorElement);
-      }
-    }, 3000);
+  private logError(message: string): void {
+    logger.error('Silent error handling', { message });
   }
 
   /**
@@ -1051,7 +953,7 @@ class UIManager {
     } catch (error) {
       logger.error('Failed to delete history item', error);
       this.restoreDeleteButton(button);
-      this.showError('Ошибка при удалении элемента');
+      this.logError('Ошибка при удалении элемента');
     }
   }
 
@@ -1072,7 +974,7 @@ class UIManager {
   }
 
   /**
-   * Показывает диалог подтверждения через Telegram API
+   * Показывает диалог подтверждения через Telegram API (silent fallback)
    */
   private async showConfirmDialog(message: string): Promise<boolean> {
     try {
@@ -1081,12 +983,13 @@ class UIManager {
           window.Telegram!.WebApp.showConfirm(message, resolve);
         });
       } else {
-        // Fallback на стандартный confirm
-        return confirm(message);
+        // Silent fallback - всегда подтверждаем
+        logger.info('Silent confirm', { message });
+        return true;
       }
     } catch (error) {
-      logger.warn('Failed to show Telegram confirm dialog, using fallback', error);
-      return confirm(message);
+      logger.warn('Failed to show Telegram confirm dialog', error);
+      return true; // Silent fallback
     }
   }
 

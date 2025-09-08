@@ -24,6 +24,7 @@ class TgStyleLogger implements Logger {
     this.sessionId = this.initializeSession();
     this.setupErrorHandlers();
     this.createLogUI(); // Инициализируем UI интерфейс
+    this.setupBeforeUnloadHandler(); // Сохранение при выходе
 
     // Автоматическая очистка логов предыдущей сессии
     this.clearPreviousSessionLogs();
@@ -70,11 +71,14 @@ class TgStyleLogger implements Logger {
       this.flushSync();
     });
 
-    window.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        this.flush();
-      }
-    });
+    // Убрана автоматическая отправка логов при скрытии страницы
+  }
+
+  /**
+   * Настройка сохранения логов при выходе
+   */
+  private setupBeforeUnloadHandler(): void {
+    // beforeunload уже настроен в setupErrorHandlers
   }
 
   /**
@@ -139,9 +143,10 @@ class TgStyleLogger implements Logger {
       consoleMethod(consoleMessage);
     }
 
-    // Отправляем на сервер если накопилось много логов
+    // Ограничиваем количество логов в памяти
     if (this.logs.length >= LOGGING_CONFIG.MAX_LOGS_IN_MEMORY) {
-      this.flush();
+      // Удаляем старые логи вместо автоматической отправки
+      this.logs.splice(0, Math.floor(LOGGING_CONFIG.MAX_LOGS_IN_MEMORY / 2));
     }
   }
 
@@ -199,12 +204,12 @@ class TgStyleLogger implements Logger {
       });
 
       if (response.ok) {
-        console.log(`✅ Отправлено ${logsToSend.length} логов на сервер`);
+        // Логи отправлены успешно (silent)
       } else {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
     } catch (error) {
-      console.warn('⚠️ Ошибка отправки логов:', error);
+      // Ошибка отправки логов (silent)
       // Возвращаем логи обратно в буфер
       this.logs.unshift(...logsToSend);
     }
@@ -418,8 +423,8 @@ class TgStyleLogger implements Logger {
     copyLogsBtn.addEventListener('click', () => {
       const logText = this.formatLogsForExport();
       navigator.clipboard.writeText(logText)
-        .then(() => alert('Логи скопированы в буфер обмена'))
-        .catch(err => alert('Ошибка копирования: ' + err.message));
+        .then(() => this.info('Logs copied to clipboard'))
+        .catch(err => this.error('Copy error', { error: err.message }));
     });
 
     sendLogsBtn.addEventListener('click', () => {
@@ -427,10 +432,10 @@ class TgStyleLogger implements Logger {
     });
 
     clearLogsBtn.addEventListener('click', () => {
-      if (confirm('Очистить все логи?')) {
-        this.logs = [];
-        this.updateLogDisplay();
-      }
+      // Очищаем логи без подтверждения
+      this.logs = [];
+      this.updateLogDisplay();
+      this.info('Logs cleared');
     });
 
     exitLogsBtn.addEventListener('click', () => {
@@ -510,7 +515,7 @@ class TgStyleLogger implements Logger {
         // Показываем успех
         tg.MainButton.setText('✅ Логи сохранены');
         tg.MainButton.hideProgress();
-        tg.showAlert('Логи успешно сохранены на сервере!');
+        // Логи сохранены успешно (silent)
 
         // Возвращаем кнопку в исходное состояние
         setTimeout(() => {
@@ -520,7 +525,6 @@ class TgStyleLogger implements Logger {
       } else {
         // Для браузера
         await this.flush();
-        alert('Логи сохранены!');
       }
 
       this.info('Manual Save Completed Successfully');
@@ -534,9 +538,9 @@ class TgStyleLogger implements Logger {
         const tg = window.Telegram.WebApp;
         tg.MainButton.setText('❌ Ошибка сохранения');
         tg.MainButton.hideProgress();
-        tg.showAlert('Ошибка сохранения логов: ' + errorMessage);
+        // Ошибка сохранения логов (silent)
       } else {
-        alert('Ошибка сохранения логов: ' + errorMessage);
+        // Ошибка сохранения логов (silent)
       }
     }
   }

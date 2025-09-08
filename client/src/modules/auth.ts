@@ -246,28 +246,18 @@ class AuthManager {
     return this.tg?.initData;
   }
 
-  /**
-   * Показ всплывающего сообщения через Telegram
-   */
-  showAlert(message: string): void {
-    if (this.tg?.showAlert) {
-      this.tg.showAlert(message);
-    } else {
-      // Fallback для браузера
-      alert(message);
-    }
-  }
 
   /**
-   * Показ подтверждающего диалога через Telegram
+   * Показ подтверждающего диалога через Telegram (silent fallback)
    */
   showConfirm(message: string): Promise<boolean> {
     return new Promise((resolve) => {
       if (this.tg?.showConfirm) {
         this.tg.showConfirm(message, resolve);
       } else {
-        // Fallback для браузера
-        resolve(confirm(message));
+        // Silent fallback - логируем и подтверждаем
+        logger.info('Silent confirm', { message });
+        resolve(true);
       }
     });
   }

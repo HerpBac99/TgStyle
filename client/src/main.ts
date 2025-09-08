@@ -65,7 +65,10 @@ class TgStyleApp {
    * Инициализация Telegram WebApp
    */
   private initializeTelegram(): void {
-    logger.info('Initializing Telegram WebApp');
+    logger.info('Initializing Telegram WebApp', {
+      isWebApp: !!window.Telegram?.WebApp,
+      userAgent: navigator.userAgent.split(' ')[0]
+    });
 
     this.tg = window.Telegram?.WebApp || null;
 
@@ -87,7 +90,6 @@ class TgStyleApp {
 
       // Входим в полноэкранный режим если поддерживается
       if (this.tg.isVersionAtLeast('6.9') && this.tg.requestFullscreen) {
-        logger.info('Requesting fullscreen mode');
         this.tg.requestFullscreen();
       }
 
@@ -110,8 +112,6 @@ class TgStyleApp {
    * Настройка базового поведения приложения
    */
   private setupAppBehavior(): void {
-    logger.info('Setting up app behavior');
-
     // Запрещаем скроллинг body
     document.body.style.overflow = 'hidden';
 
@@ -121,7 +121,7 @@ class TgStyleApp {
     // Устанавливаем мета-теги для мобильных устройств
     this.setupMobileMeta();
 
-    logger.info('App behavior configured');
+    logger.debug('App behavior configured');
   }
 
   /**
@@ -266,11 +266,8 @@ class TgStyleApp {
     });
 
     // Показываем ошибку пользователю
-    if (this.tg?.showAlert) {
-      this.tg.showAlert('Ошибка запуска приложения: ' + errorMessage);
-    } else {
-      alert('Ошибка запуска приложения: ' + errorMessage);
-    }
+    // Ошибка запуска приложения (silent)
+    logger.error('App initialization error', { errorMessage });
   }
 
   /**
@@ -368,9 +365,6 @@ class TgStyleApp {
     
     // Очищаем ресурсы UI
     uiManager.destroy();
-    
-    // Отправляем последние логи
-    logger.flush();
     
     // Закрываем Telegram WebApp если возможно
     if (this.tg?.close) {

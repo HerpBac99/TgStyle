@@ -1,9 +1,6 @@
 ---
-description: TgStyle - Упрощенный процесс разработки
-globs:
-alwaysApply: true
+alwaysApply: false
 ---
-
 # Упрощенный Workflow Разработки TgStyle
 
 ## 🎯 Новая схема работы

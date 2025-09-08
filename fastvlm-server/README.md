@@ -21,7 +21,7 @@ pip install -r requirements.txt
 
 ### 3. Запуск сервера
 ```bash
-python server.py
+$env:FASTVLM_MODEL="1.5b"; python server.py 
 ```
 
 Сервер запустится на `http://127.0.0.1:3001`

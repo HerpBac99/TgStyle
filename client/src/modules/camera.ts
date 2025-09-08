@@ -16,8 +16,6 @@ import {
   validateImageData
 } from '@/utils/validation.js';
 import { 
-  createError,
-  ERROR_CODES,
   isImageFile,
   getFileExtension 
 } from '@/utils/helpers.js';
@@ -30,13 +28,16 @@ class CameraManager {
   private currentImageData: ImageData | null = null;
 
   /**
-   * Показ выбора источника изображения
+   * Захват фото через камеру
    */
-  async capturePhoto(preferCamera = true): Promise<PhotoCaptureResult> {
-    logger.info('Starting photo capture', { preferCamera });
+  async capturePhoto(): Promise<PhotoCaptureResult> {
+    logger.info('Starting photo capture', { 
+      hasCurrentImage: !!this.currentImageData,
+      timestamp: Date.now()
+    });
 
     try {
-      const file = await this.selectFile({ preferCamera });
+      const file = await this.selectFile({ preferCamera: true });
       const imageData = await this.processImageFile(file);
       
       this.currentImageData = imageData;
@@ -92,7 +93,7 @@ class CameraManager {
           
           resolve(file);
         } else {
-          reject(createError(ERROR_CODES.IMAGE_TOO_LARGE, 'Файл не выбран'));
+          reject(new Error('Файл не выбран'));
         }
 
         // Очистка
@@ -100,7 +101,7 @@ class CameraManager {
       });
 
       input.addEventListener('cancel', () => {
-        reject(createError(ERROR_CODES.IMAGE_TOO_LARGE, 'Выбор файла отменен'));
+        reject(new Error('Выбор файла отменен'));
         document.body.removeChild(input);
       });
 
@@ -134,7 +135,7 @@ class CameraManager {
     // Валидация данных изображения
     const validation = validateImageData(imageData);
     if (!validation.isValid) {
-      throw createError(ERROR_CODES.UNSUPPORTED_FORMAT, validation.errors.join('; '));
+      throw new Error(validation.errors.join('; '));
     }
 
     // Сжатие если необходимо
@@ -152,18 +153,18 @@ class CameraManager {
   private validateFile(file: File): void {
     // Проверка типа файла
     if (!isImageFile(file)) {
-      throw createError(ERROR_CODES.UNSUPPORTED_FORMAT, 'Выбранный файл не является изображением');
+      throw new Error('Выбранный файл не является изображением');
     }
 
     // Проверка размера файла
     const maxSizeBytes = IMAGE_CONSTRAINTS.MAX_SIZE_MB * 1024 * 1024;
     if (file.size > maxSizeBytes) {
-      throw createError(ERROR_CODES.IMAGE_TOO_LARGE, `Размер файла превышает ${IMAGE_CONSTRAINTS.MAX_SIZE_MB}MB`);
+      throw new Error(`Размер файла превышает ${IMAGE_CONSTRAINTS.MAX_SIZE_MB}MB`);
     }
 
     // Проверка типа файла
     if (!IMAGE_CONSTRAINTS.ALLOWED_FORMATS.includes(file.type as any)) {
-      throw createError(ERROR_CODES.UNSUPPORTED_FORMAT, `Неподдерживаемый тип файла: ${file.type}`);
+      throw new Error(`Неподдерживаемый тип файла: ${file.type}`);
     }
   }
 
@@ -179,12 +180,12 @@ class CameraManager {
         if (result) {
           resolve(result);
         } else {
-          reject(createError(ERROR_CODES.STORAGE_ERROR, 'Не удалось прочитать файл'));
+          reject(new Error('Не удалось прочитать файл'));
         }
       };
       
       reader.onerror = () => {
-        reject(createError(ERROR_CODES.STORAGE_ERROR, 'Ошибка при чтении файла'));
+        reject(new Error('Ошибка при чтении файла'));
       };
       
       reader.readAsDataURL(file);
@@ -206,7 +207,7 @@ class CameraManager {
       };
       
       img.onerror = () => {
-        reject(createError(ERROR_CODES.UNSUPPORTED_FORMAT, 'Не удалось загрузить изображение'));
+        reject(new Error('Не удалось загрузить изображение'));
       };
       
       img.src = base64;
@@ -268,7 +269,7 @@ class CameraManager {
         const ctx = canvas.getContext('2d');
 
         if (!ctx) {
-          reject(createError(ERROR_CODES.STORAGE_ERROR, 'Canvas не поддерживается'));
+          reject(new Error('Canvas не поддерживается'));
           return;
         }
 
@@ -311,20 +312,20 @@ class CameraManager {
 
           const result = compressedBase64.split(',')[1];
           if (!result) {
-            reject(createError(ERROR_CODES.STORAGE_ERROR, 'Не удалось получить сжатые данные'));
+            reject(new Error('Не удалось получить сжатые данные'));
             return;
           }
           resolve(result); // Убираем data: prefix
         };
 
         img.onerror = () => {
-          reject(createError(ERROR_CODES.UNSUPPORTED_FORMAT, 'Не удалось загрузить изображение для сжатия'));
+          reject(new Error('Не удалось загрузить изображение для сжатия'));
         };
 
         img.src = `data:image/${imageData.format};base64,${imageData.base64}`;
       } catch (error) {
         logger.error('Image compression failed', error);
-        reject(createError(ERROR_CODES.STORAGE_ERROR, 'Ошибка при сжатии изображения'));
+        reject(new Error('Ошибка при сжатии изображения'));
       }
     });
   }

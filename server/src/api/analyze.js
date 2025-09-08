@@ -246,11 +246,23 @@ router.post('/', async (req, res) => {
                 }
                 
                 // Классифицируем изображение через FastVLM
-                classification = await classifyImage(imageBuffer);
-                logger.debug('Получен результат классификации', {
-                    className: classification.className,
-                    confidence: classification.confidence
+                const fastVLMResult = await classifyImage(imageBuffer);
+                logger.debug('Получен результат от FastVLM', {
+                    className: fastVLMResult.className,
+                    confidence: fastVLMResult.confidence,
+                    hasAnalysis: !!fastVLMResult.analysis,
+                    analysisLength: fastVLMResult.analysis ? fastVLMResult.analysis.length : 0
                 });
+                
+                // Используем анализ от FastVLM
+                analysis = fastVLMResult.analysis || 'Анализ недоступен';
+                
+                // Сохраняем классификацию для истории
+                classification = {
+                    className: fastVLMResult.className,
+                    classNameRu: fastVLMResult.classNameRu,
+                    confidence: fastVLMResult.confidence
+                };
                 
                 // Проверка на корректность результатов классификации
                 if (!classification || !classification.className || !classification.confidence) {
@@ -263,10 +275,9 @@ router.post('/', async (req, res) => {
                         classNameRu: 'Повседневная одежда',
                         confidence: 75 + Math.random() * 15
                     };
+                    // И генерируем анализ для заглушки
+                    analysis = generateAnalysisHTML(classification);
                 }
-                
-                // Создаем HTML для отображения результатов
-                analysis = generateAnalysisHTML(classification);
                 
                 // Генерируем комментарии на основе классификации
                 comments = generateComments(classification);
