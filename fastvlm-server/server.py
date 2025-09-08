@@ -2,6 +2,12 @@
 """
 FastVLM Server - отдельный сервер для анализа изображений
 Запускается в отдельном процессе от основного приложения
+
+Особенности:
+- GPU/CPU автоопределение и переключение
+- Мониторинг производительности
+- Graceful shutdown с очисткой памяти
+- Детальное логирование
 """
 
 import sys
@@ -11,12 +17,14 @@ import tempfile
 import signal
 import time
 import logging
+import traceback
 from logging.handlers import RotatingFileHandler
 from flask import Flask, request, jsonify
 from PIL import Image
 import io
 import os
 import psutil
+from contextlib import contextmanager
 
 # Импортируем конфигурацию
 from config import Config
@@ -25,7 +33,7 @@ from config import Config
 import torch
 
 # Импортируем FastVLM
-sys.path.append('../ml-fastvlm')
+sys.path.append('./models/ml-fastvlm')
 from llava.utils import disable_torch_init
 from llava.conversation import conv_templates
 from llava.model.builder import load_pretrained_model
@@ -42,6 +50,47 @@ context_len = None
 
 # Глобальная переменная для промпта
 default_prompt = None
+
+# Статистика производительности
+performance_stats = {
+    'total_requests': 0,
+    'successful_requests': 0,
+    'failed_requests': 0,
+    'total_processing_time': 0.0,
+    'average_processing_time': 0.0,
+    'gpu_enabled': False,
+    'model_loaded_at': None
+}
+
+@contextmanager
+def gpu_memory_manager():
+    """Контекст-менеджер для управления GPU памятью"""
+    initial_memory = 0
+    if torch.cuda.is_available():
+        initial_memory = torch.cuda.memory_allocated()
+    
+    try:
+        yield
+    finally:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            final_memory = torch.cuda.memory_allocated()
+            if final_memory > initial_memory:
+                app.logger.debug(f"GPU memory freed: {(final_memory - initial_memory) / 1024**2:.1f}MB")
+
+def update_performance_stats(processing_time, success=True):
+    """Обновление статистики производительности"""
+    global performance_stats
+    
+    performance_stats['total_requests'] += 1
+    if success:
+        performance_stats['successful_requests'] += 1
+        performance_stats['total_processing_time'] += processing_time
+        performance_stats['average_processing_time'] = (
+            performance_stats['total_processing_time'] / performance_stats['successful_requests']
+        )
+    else:
+        performance_stats['failed_requests'] += 1
 
 def setup_logging():
     """Настройка логирования"""
@@ -103,34 +152,58 @@ def load_prompt():
         print(f"Ошибка загрузки промпта. Используется промпт по умолчанию")
 
 def load_model():
-    """Загружает FastVLM модель в память"""
-    global model, tokenizer, image_processor, context_len
+    """Загружает FastVLM модель в память с оптимизацией для GPU/CPU"""
+    global model, tokenizer, image_processor, context_len, performance_stats
 
     try:
         print("Загружаем FastVLM модель в память...")
         app.logger.info("Начало загрузки модели")
+        start_time = time.time()
 
         # Проверяем существование модели
         if not os.path.exists(Config.MODEL_PATH):
             raise FileNotFoundError(f"Модель не найдена: {Config.MODEL_PATH}")
 
+        # Проверяем доступность GPU
+        gpu_available = torch.cuda.is_available()
+        device = 'cuda' if gpu_available else 'cpu'
+        
+        print(f"Загрузка на устройство: {device}")
+        if gpu_available:
+            print(f"GPU: {torch.cuda.get_device_name(0)}")
+            print(f"Память GPU: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
+        
         # Загружаем модель
         disable_torch_init()
         model_name = get_model_name_from_path(Config.MODEL_PATH)
-        tokenizer, model, image_processor, context_len = load_pretrained_model(
-            Config.MODEL_PATH, None, model_name,
-            device=Config.DEVICE,
-            torch_dtype=Config.TORCH_DTYPE
-        )
+        
+        with gpu_memory_manager():
+            tokenizer, model, image_processor, context_len = load_pretrained_model(
+                Config.MODEL_PATH, None, model_name,
+                device=device,
+                torch_dtype=Config.TORCH_DTYPE
+            )
 
-        app.logger.info(f"FastVLM модель загружена: {model_name} на {Config.DEVICE}")
-        print("FastVLM модель загружена и готова к работе!")
+        load_time = time.time() - start_time
+        performance_stats['gpu_enabled'] = gpu_available
+        performance_stats['model_loaded_at'] = time.time()
+        
+        app.logger.info(f"FastVLM модель загружена: {model_name} на {device} за {load_time:.1f}с")
+        print(f"FastVLM модель загружена и готова к работе! (загрузка: {load_time:.1f}с)")
+        
+        # Выводим информацию о памяти GPU
+        if gpu_available:
+            allocated = torch.cuda.memory_allocated() / 1024**3
+            reserved = torch.cuda.memory_reserved() / 1024**3
+            print(f"Память GPU: выделено {allocated:.1f}GB, зарезервировано {reserved:.1f}GB")
+        
         return True
 
     except Exception as e:
         error_msg = f"Ошибка загрузки модели: {e}"
         print(f"Ошибка загрузки модели: {e}")
         app.logger.error(error_msg, exc_info=True)
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
 def extract_analysis_from_output(output):
@@ -163,12 +236,19 @@ def extract_analysis_from_output(output):
 def health():
     """Проверка здоровья сервера"""
     try:
+        # Определяем текущее устройство модели
+        current_device = 'unknown'
+        if model is not None:
+            current_device = str(model.device) if hasattr(model, 'device') else 'cpu'
+        
         health_data = {
             'status': 'healthy',
             'model_loaded': model is not None,
             'timestamp': time.time(),
-            'device': Config.DEVICE,
-            'torch_version': torch.__version__
+            'device': current_device,
+            'gpu_available': torch.cuda.is_available(),
+            'torch_version': torch.__version__,
+            'performance': performance_stats
         }
 
         app.logger.debug("Health check requested")
@@ -182,11 +262,58 @@ def health():
             'timestamp': time.time()
         }), 500
 
+@app.route('/stats', methods=['GET'])
+def get_stats():
+    """Подробная статистика сервера"""
+    try:
+        current_device = 'unknown'
+        if model is not None:
+            current_device = str(model.device) if hasattr(model, 'device') else 'cpu'
+        
+        uptime = time.time() - performance_stats.get('model_loaded_at', time.time())
+        
+        stats = {
+            'server_status': {
+                'uptime_seconds': uptime,
+                'model_loaded': model is not None,
+                'current_device': current_device,
+                'gpu_available': torch.cuda.is_available()
+            },
+            'performance': performance_stats,
+            'system': {
+                'cpu_percent': psutil.cpu_percent(interval=1),
+                'memory_percent': psutil.virtual_memory().percent,
+                'memory_used_gb': round(psutil.virtual_memory().used / (1024**3), 2),
+                'memory_total_gb': round(psutil.virtual_memory().total / (1024**3), 2)
+            }
+        }
+        
+        # Добавляем GPU статистику если доступно
+        if torch.cuda.is_available():
+            stats['gpu'] = {
+                'name': torch.cuda.get_device_name(0),
+                'memory_allocated_gb': round(torch.cuda.memory_allocated(0) / (1024**3), 2),
+                'memory_reserved_gb': round(torch.cuda.memory_reserved(0) / (1024**3), 2),
+                'memory_total_gb': round(torch.cuda.get_device_properties(0).total_memory / (1024**3), 2)
+            }
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        app.logger.error(f"Stats error: {e}")
+        return jsonify({
+            'error': str(e),
+            'timestamp': time.time()
+        }), 500
+
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    """Анализ изображения"""
+    """Анализ изображения с мониторингом производительности"""
+    analysis_start_time = time.time()
+    
     try:
         if model is None:
+            update_performance_stats(0, success=False)
             return jsonify({
                 'success': False,
                 'error': 'Model not loaded'
@@ -195,6 +322,7 @@ def analyze():
         # Получаем данные
         data = request.get_json()
         if not data or 'image_base64' not in data:
+            update_performance_stats(0, success=False)
             return jsonify({
                 'success': False,
                 'error': 'No image provided'
@@ -202,14 +330,17 @@ def analyze():
 
         image_base64 = data['image_base64']
         prompt = data.get('prompt', default_prompt)
+        use_gpu = data.get('force_gpu', torch.cuda.is_available())
 
-        app.logger.info("Начало анализа изображения")
+        app.logger.info(f"Начало анализа изображения (устройство: {model.device})")
 
         # Декодируем изображение
         try:
             image_data = base64.b64decode(image_base64)
             image = Image.open(io.BytesIO(image_data))
+            app.logger.debug(f"Изображение загружено: {image.size}, режим: {image.mode}")
         except Exception as e:
+            update_performance_stats(time.time() - analysis_start_time, success=False)
             app.logger.error(f"Ошибка декодирования изображения: {e}")
             return jsonify({
                 'success': False,
@@ -222,6 +353,8 @@ def analyze():
             temp_image_path = temp_file.name
 
         try:
+            inference_start_time = time.time()
+            
             # Создаем промпт для модели
             qs = prompt
             if model.config.mm_use_im_start_end:
@@ -234,40 +367,59 @@ def analyze():
             conv.append_message(conv.roles[1], None)
             prompt_full = conv.get_prompt()
 
-            # Токенизируем промпт
-            input_ids = tokenizer_image_token(prompt_full, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
+            # Выполняем анализ с управлением памятью
+            with gpu_memory_manager():
+                # Токенизируем промпт
+                input_ids = tokenizer_image_token(prompt_full, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
 
-            # Обрабатываем изображение
-            image_tensor = process_images([image], image_processor, model.config)[0]
+                # Обрабатываем изображение
+                image_tensor = process_images([image], image_processor, model.config)[0]
 
-            # Выполняем анализ
-            with torch.no_grad():
-                output_ids = model.generate(
-                    input_ids,
-                    images=image_tensor.unsqueeze(0).to(model.device).half(),
-                    image_sizes=[image.size],
-                    do_sample=Config.DO_SAMPLE,
-                    temperature=Config.TEMPERATURE,
-                    top_p=None,
-                    num_beams=1,
-                    max_new_tokens=Config.MAX_NEW_TOKENS,
-                    use_cache=True
-                )
+                # Выполняем анализ
+                with torch.no_grad():
+                    output_ids = model.generate(
+                        input_ids,
+                        images=image_tensor.unsqueeze(0).to(model.device).half(),
+                        image_sizes=[image.size],
+                        do_sample=Config.DO_SAMPLE,
+                        temperature=Config.TEMPERATURE,
+                        top_p=None,
+                        num_beams=1,
+                        max_new_tokens=Config.MAX_NEW_TOKENS,
+                        use_cache=True
+                    )
 
             # Декодируем результат
             result_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
 
             # Извлекаем чистый анализ
             clean_analysis = extract_analysis_from_output(result_text)
+            
+            inference_time = time.time() - inference_start_time
+            total_time = time.time() - analysis_start_time
+            
+            # Обновляем статистику
+            update_performance_stats(total_time, success=True)
 
-            app.logger.info("Анализ успешно завершен")
+            app.logger.info(f"Анализ успешно завершен за {total_time:.2f}с (инференс: {inference_time:.2f}с)")
 
-            return jsonify({
+            response_data = {
                 'success': True,
                 'analysis': clean_analysis,
                 'model_used': model.config.model_type,
-                'device': str(model.device)
-            })
+                'device': str(model.device),
+                'timing': {
+                    'total_time': round(total_time, 2),
+                    'inference_time': round(inference_time, 2),
+                    'preprocessing_time': round(inference_start_time - analysis_start_time, 2)
+                }
+            }
+            
+            # Добавляем информацию о GPU если используется
+            if torch.cuda.is_available() and 'cuda' in str(model.device):
+                response_data['gpu_memory_used'] = round(torch.cuda.memory_allocated() / 1024**2, 1)  # MB
+
+            return jsonify(response_data)
 
         finally:
             # Удаляем временный файл
@@ -277,11 +429,16 @@ def analyze():
                 pass
 
     except Exception as e:
+        total_time = time.time() - analysis_start_time
+        update_performance_stats(total_time, success=False)
         error_msg = f"Ошибка анализа: {e}"
         app.logger.error(error_msg, exc_info=True)
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'timing': {
+                'total_time': round(total_time, 2)
+            }
         }), 500
 
 @app.route('/load', methods=['GET'])

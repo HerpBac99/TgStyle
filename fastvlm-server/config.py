@@ -6,7 +6,7 @@ class Config:
 
     # === Пути ===
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    MODEL_PATH = os.path.join(BASE_DIR, '../ml-fastvlm/checkpoints/llava-fastvithd_1.5b_stage3')
+    MODEL_PATH = os.path.join(BASE_DIR, 'models/llava-fastvithd_1.5b_stage3')
     LOG_DIR = os.path.join(BASE_DIR, 'logs')
     ENV_FILE = os.path.join(BASE_DIR, '.env')
 
