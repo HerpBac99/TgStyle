@@ -10,29 +10,11 @@ const authRoutes = require('./src/api/auth');
 const analyzeRoutes = require('./src/api/analyze');
 const apiRoutes = require('./routes/api');
 
-// Серверный логгер с единым форматом
-const serverLogger = {
-    info: (message, data = {}) => {
-        const timestamp = new Date().toTimeString().split(' ')[0];
-        console.log(`[${timestamp}] [SERVER] [INFO] ${message}`);
-    },
-    warn: (message, data = {}) => {
-        const timestamp = new Date().toTimeString().split(' ')[0];
-        console.log(`[${timestamp}] [SERVER] [WARN] ${message}`);
-    },
-    error: (message, data = {}) => {
-        const timestamp = new Date().toTimeString().split(' ')[0];
-        console.log(`[${timestamp}] [SERVER] [ERROR] ${message}`);
-    },
-    debug: (message, data = {}) => {
-        const timestamp = new Date().toTimeString().split(' ')[0];
-        console.log(`[${timestamp}] [SERVER] [DEBUG] ${message}`);
-    }
-};
+// Импорт логгера Winston
+const { logger, logApiError, logSuccess } = require('./src/controllers/logsController');
 
 // Создание Express приложения
 const app = express();
-
 
 // Middleware для парсинга JSON
 app.use(cors());
@@ -49,13 +31,13 @@ app.use('/api', apiRoutes);
 
 // Роут для главной страницы
 app.get('/', (req, res) => {
-  serverLogger.debug('Главная страница запрошена', { ip: req.ip, userAgent: req.get('User-Agent') });
+  logger.debug('Главная страница запрошена', { ip: req.ip, userAgent: req.get('User-Agent') });
   res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
 });
 
 // Базовый роут для проверки работы сервера
 app.get('/api/health', (req, res) => {
-  serverLogger.info('Health check запрос');
+  logger.info('Health check запрос');
   res.json({
     success: true,
     message: 'Сервер работает',
@@ -67,12 +49,19 @@ app.get('/api/health', (req, res) => {
 
 // Централизованная обработка ошибок
 app.use((error, req, res, next) => {
-  serverLogger.error('Ошибка сервера', {
-    message: error.message,
-    stack: error.stack,
-    url: req.url,
-    method: req.method
-  });
+    // Игнорируем обычные клиентские ошибки
+    if (error.message === 'request aborted' ||
+        error.code === 'ECONNABORTED' ||
+        error.code === 'ECONNRESET') {
+      return; // Не логируем эти ошибки
+    }
+
+    logger.error('Ошибка сервера', {
+      message: error.message,
+      stack: error.stack,
+      url: req.url,
+      method: req.method
+    });
 
   // Определяем тип ошибки и соответствующий статус код
   let statusCode = 500;
@@ -124,12 +113,12 @@ function createHttpsServer() {
 
     return https.createServer(httpsOptions, app);
   } catch (error) {
-    serverLogger.error('Ошибка создания HTTPS сервера', {
+    logger.error('Ошибка создания HTTPS сервера', {
       message: error.message,
       stack: error.stack
     });
-    serverLogger.warn('Для работы Telegram Mini App требуется HTTPS соединение');
-    serverLogger.warn('Убедитесь что SSL сертификаты настроены правильно');
+    logger.warn('Для работы Telegram Mini App требуется HTTPS соединение');
+    logger.warn('Убедитесь что SSL сертификаты настроены правильно');
     process.exit(1);
   }
 }
@@ -141,11 +130,11 @@ async function startServer() {
 
   // Проверяем обязательные переменные окружения
   if (!process.env.DOMAIN) {
-    serverLogger.error('DOMAIN не настроен в переменных окружения');
+    logger.error('DOMAIN не настроен в переменных окружения');
     process.exit(1);
   }
 
-  serverLogger.info('Запуск TgStyle сервера', { port, domain });
+  logger.info('Запуск TgStyle сервера', { port, domain });
 
   // Создаем HTTPS сервер
   const server = createHttpsServer();
@@ -157,23 +146,23 @@ async function startServer() {
       nodeEnv: 'production'
     };
 
-    serverLogger.info('HTTPS сервер успешно запущен', serverInfo);
-    serverLogger.info(`Telegram Mini App доступен по адресу: https://${domain}`);
+    logger.info('HTTPS сервер успешно запущен', serverInfo);
+    logger.info(`Telegram Mini App доступен по адресу: https://${domain}`);
   });
 
   // Обработка сигналов завершения
   process.on('SIGTERM', () => {
-    serverLogger.warn('Получен сигнал SIGTERM, завершение работы сервера...');
+    logger.warn('Получен сигнал SIGTERM, завершение работы сервера...');
     server.close(() => {
-      serverLogger.info('Сервер остановлен');
+      logger.info('Сервер остановлен');
       process.exit(0);
     });
   });
 
   process.on('SIGINT', () => {
-    serverLogger.warn('Получен сигнал SIGINT (Ctrl+C), завершение работы сервера...');
+    logger.warn('Получен сигнал SIGINT (Ctrl+C), завершение работы сервера...');
     server.close(() => {
-      serverLogger.info('Сервер остановлен');
+      logger.info('Сервер остановлен');
       process.exit(0);
     });
   });

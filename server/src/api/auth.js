@@ -2,16 +2,18 @@ const express = require('express');
 const router = express.Router();
 const { validateTelegramWebAppData } = require('../utils/telegram');
 const User = require('../models/User');
+const { logger } = require('../controllers/logsController');
 
 /**
  * Handle Telegram authentication
  * POST /api/auth
  */
 router.post('/', async (req, res) => {
+    const { initData } = req.body;
     try {
-        const { initData } = req.body;
         
         if (!initData) {
+            logger.debug('Попытка аутентификации без initData');
             return res.status(400).json({
                 success: false,
                 error: 'No initData provided'
@@ -54,7 +56,11 @@ router.post('/', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Auth error:', error);
+        logger.error('Ошибка аутентификации Telegram', {
+            error: error.message,
+            stack: error.stack,
+            initData: initData ? initData.substring(0, 100) + '...' : 'undefined'
+        });
         return res.status(500).json({
             success: false,
             error: 'Internal server error'

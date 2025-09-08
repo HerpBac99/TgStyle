@@ -4,6 +4,7 @@ const { validateTelegramWebAppData } = require('../utils/telegram');
 const User = require('../models/User');
 const path = require('path');
 const fs = require('fs');
+const { logger, logSuccess, logWarning } = require('../controllers/logsController');
 
 // Используем встроенный fetch в Node.js 18+
 
@@ -36,11 +37,11 @@ async function classifyImage(imageBuffer) {
         const currentTime = new Date().toTimeString().split(' ')[0];
 
         if (!isHealthy) {
-            console.log(`[${currentTime}] [SERVER] [WARN] FastVLM сервер недоступен, используем симуляцию`);
+            logger.warn('FastVLM сервер недоступен, используем симуляцию');
             return simulateClassification();
         }
 
-        console.log(`[${currentTime}] [SERVER] [INFO] Отправка запроса в FastVLM сервер...`);
+        logger.info('Отправка запроса в FastVLM сервер');
 
         // Конвертируем изображение в base64
         const base64Image = imageBuffer.toString('base64');
@@ -70,7 +71,9 @@ async function classifyImage(imageBuffer) {
             const result = await response.json();
 
             if (result.success) {
-                console.log('FastVLM анализ успешен');
+                logger.info('FastVLM анализ успешен', {
+                    analysisLength: result.analysis.length
+                });
 
                 // Извлекаем тип одежды из анализа
                 let analysisText = result.analysis || '';
@@ -79,7 +82,7 @@ async function classifyImage(imageBuffer) {
                 try {
                     // Проверяем и исправляем битый текст
                     if (analysisText.includes('�')) {
-                        console.log('Обнаружен битый текст, исправляем кодировку');
+                        logger.warn('Обнаружен битый текст, исправляем кодировку');
                         // Попытка исправить распространенные проблемы с кодировкой
                         analysisText = analysisText
                             .replace(/�burgh/g, 'burgh')  // исправляем "�burgh" -> "burgh"
@@ -97,7 +100,10 @@ async function classifyImage(imageBuffer) {
                         analysisText = 'Анализ выполнен, но текст описания недоступен.';
                     }
                 } catch (encodingError) {
-                    console.error('Ошибка при обработке кодировки текста:', encodingError);
+                    logger.error('Ошибка при обработке кодировки текста', {
+                        error: encodingError.message,
+                        originalText: analysisText.substring(0, 100)
+                    });
                     analysisText = 'Анализ выполнен, но возникли проблемы с обработкой текста.';
                 }
 
@@ -111,16 +117,24 @@ async function classifyImage(imageBuffer) {
                     fastvlm: true
                 };
             } else {
-                console.error('FastVLM сервер вернул ошибку:', result.error);
+                logger.error('FastVLM сервер вернул ошибку', {
+                    error: result.error
+                });
                 return simulateClassification();
             }
         } else {
-            console.error('FastVLM сервер недоступен, статус:', response.status);
+            logger.error('FastVLM сервер недоступен', {
+                status: response.status,
+                statusText: response.statusText
+            });
             return simulateClassification();
         }
 
     } catch (error) {
-        console.error('Ошибка при обращении к FastVLM серверу:', error);
+        logger.error('Ошибка при обращении к FastVLM серверу', {
+            error: error.message,
+            stack: error.stack
+        });
         // В случае любой ошибки возвращаем симуляцию
         return simulateClassification();
     }
@@ -158,11 +172,15 @@ function simulateClassification() {
  */
 router.post('/', async (req, res) => {
     try {
-        console.log('Получен запрос на анализ изображения');
+        logger.info('Получен запрос на анализ изображения');
         const { photo, pinterestUrl, initData } = req.body;
         
         if ((!photo && !pinterestUrl) || !initData) {
-            console.error('Отсутствуют необходимые параметры в запросе');
+            logger.error('Отсутствуют необходимые параметры в запросе', {
+                hasPhoto: !!photo,
+                hasPinterestUrl: !!pinterestUrl,
+                hasInitData: !!initData
+            });
             return res.status(400).json({
                 success: false,
                 error: 'Missing required parameters'
@@ -172,14 +190,18 @@ router.post('/', async (req, res) => {
         // Логируем размер фото
         if (photo) {
             const photoSize = (photo.length * 0.75) / 1024; // примерный размер в KB (base64 длиннее бинарных данных на ~33%)
-            console.log(`Размер полученного фото: ${photoSize.toFixed(2)} KB`);
+            logger.info('Получено фото для анализа', {
+                sizeKB: photoSize.toFixed(2)
+            });
         }
         
         // Validate Telegram initData
         const validationResult = validateTelegramWebAppData(initData);
         
         if (!validationResult.isValid) {
-            console.error('Ошибка валидации Telegram initData:', validationResult.error);
+            logger.error('Ошибка валидации Telegram initData', {
+                error: validationResult.error
+            });
             return res.status(401).json({
                 success: false,
                 error: validationResult.error
@@ -188,19 +210,23 @@ router.post('/', async (req, res) => {
         
         // Extract user information
         const { user } = validationResult.data;
-        console.log(`Запрос от пользователя: ${user.id} (${user.first_name})`);
+        logger.info('Запрос на анализ от пользователя', {
+            userId: user.id,
+            userName: user.first_name,
+            sourceType: photo ? 'photo' : 'pinterest'
+        });
         
         // Пропускаем поиск пользователя в MongoDB (работаем без БД)
         let userDoc = null;
         try {
             userDoc = await User.findOne({ telegramId: user.id });
         } catch (err) {
-            console.log('Пропускаем поиск в БД, так как MongoDB не активна');
+            logger.debug('Пропускаем поиск в БД, MongoDB не активна');
         }
         
         // Determine source type
         const sourceType = photo ? 'photo' : 'pinterest';
-        console.log(`Тип источника: ${sourceType}`);
+        logger.debug('Определен тип источника', { sourceType });
         
         let classification;
         let analysis;
@@ -210,7 +236,9 @@ router.post('/', async (req, res) => {
             try {
                 // Декодируем base64 в бинарные данные
                 const imageBuffer = Buffer.from(photo, 'base64');
-                console.log(`Изображение успешно преобразовано из base64, размер: ${imageBuffer.length} байт`);
+                logger.debug('Изображение преобразовано из base64', {
+                    sizeBytes: imageBuffer.length
+                });
                 
                 // Проверяем, что изображение корректное
                 if (imageBuffer.length < 100) {
@@ -219,11 +247,16 @@ router.post('/', async (req, res) => {
                 
                 // Классифицируем изображение через FastVLM
                 classification = await classifyImage(imageBuffer);
-                console.log('Результат классификации:', classification);
+                logger.debug('Получен результат классификации', {
+                    className: classification.className,
+                    confidence: classification.confidence
+                });
                 
                 // Проверка на корректность результатов классификации
                 if (!classification || !classification.className || !classification.confidence) {
-                    console.error('Некорректные данные классификации');
+                    logger.warn('Некорректные данные классификации, используем заглушку', {
+                        classification: classification
+                    });
                     // Создаем заглушку для классификации
                     classification = {
                         className: 'unknown',
@@ -238,7 +271,10 @@ router.post('/', async (req, res) => {
                 // Генерируем комментарии на основе классификации
                 comments = generateComments(classification);
             } catch (imageError) {
-                console.error('Ошибка при обработке изображения:', imageError);
+                logger.error('Ошибка при обработке изображения', {
+                    error: imageError.message,
+                    stack: imageError.stack
+                });
                 
                 // Создаем заглушку для ошибки
                 classification = {
@@ -251,11 +287,13 @@ router.post('/', async (req, res) => {
                 analysis = generateAnalysisHTML(classification, false, true);
                 comments = generateComments(classification, false, true);
                 
-                console.log('Используем заглушку из-за ошибки обработки:', classification);
+                logger.warn('Используем заглушку из-за ошибки обработки изображения', {
+                    classification: classification
+                });
             }
         } else {
             // Если это Pinterest URL, используем заглушку
-            console.log('Используем заглушку для Pinterest URL');
+            logger.info('Обработка Pinterest URL, используем симуляцию');
             const mockResult = simulateClassification();
             analysis = generateAnalysisHTML(mockResult, true);
             comments = generateComments(mockResult, true);
@@ -264,7 +302,10 @@ router.post('/', async (req, res) => {
         
         // Проверяем, что все необходимые данные существуют
         if (!classification || !analysis) {
-            console.error('Ошибка при формировании результатов анализа');
+            logger.error('Ошибка при формировании результатов анализа', {
+                hasClassification: !!classification,
+                hasAnalysis: !!analysis
+            });
             return res.status(500).json({
                 success: false,
                 error: 'Failed to generate analysis results'
@@ -281,15 +322,21 @@ router.post('/', async (req, res) => {
                 });
                 try {
                     await userDoc.save();
-                    console.log('Анализ успешно сохранен в историю пользователя');
+                    logSuccess('Анализ сохранен в историю пользователя', {
+                        userId: user.id,
+                        sourceType
+                    });
                 } catch (saveErr) {
-                    console.log('Пропускаем сохранение в БД, так как MongoDB не активна');
+                    logger.debug('Пропускаем сохранение в БД, MongoDB не активна');
                 }
             } else {
-                console.warn('Не сохраняем в историю, так как MongoDB не активна');
+                logWarning('Не сохраняем в историю, MongoDB не активна');
             }
         } catch (dbError) {
-            console.error('Ошибка при сохранении в базу данных:', dbError);
+            logger.error('Ошибка при сохранении в базу данных', {
+                error: dbError.message,
+                stack: dbError.stack
+            });
             // Продолжаем выполнение, так как ошибка БД не должна влиять на результат анализа
         }
         
@@ -301,8 +348,7 @@ router.post('/', async (req, res) => {
             classification
         };
 
-        console.log('Отправляем результат анализа клиенту');
-        console.log('Данные ответа:', {
+        logger.info('Отправляем результат анализа клиенту', {
             hasAnalysis: !!analysis,
             analysisLength: analysis ? analysis.length : 0,
             hasComments: !!comments,
@@ -312,7 +358,10 @@ router.post('/', async (req, res) => {
 
         return res.json(response);
     } catch (error) {
-        console.error('Ошибка при анализе:', error);
+        logger.error('Ошибка при анализе изображения', {
+            error: error.message,
+            stack: error.stack
+        });
         return res.status(500).json({
             success: false,
             error: 'Internal server error: ' + error.message

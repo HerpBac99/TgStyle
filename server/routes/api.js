@@ -5,13 +5,16 @@ const express = require('express');
 const router = express.Router();
 const { exec } = require('child_process');
 
+// Импорт логгера Winston
+const { logger, logSuccess, logWarning } = require('../src/controllers/logsController');
+
 // Маршрут для логирования ошибок клиента
 router.post('/log-error', async (req, res) => {
     try {
         const { logs, userAgent, appVersion, timestamp } = req.body;
         
-        // Создаем директорию для логов, если ее нет (на уровне проекта)
-        const logDir = path.join(__dirname, '../../logs');
+        // Создаем директорию для логов, если ее нет (в папке logs/client корня проекта)
+        const logDir = path.join(__dirname, '../../logs/client');
         if (!fs.existsSync(logDir)) {
             fs.mkdirSync(logDir, { recursive: true });
         }
@@ -45,12 +48,14 @@ ${Array.isArray(logs) ?
         // Записываем в файл (добавляем в конец)
         fs.appendFileSync(logFile, logEntry);
 
-        const currentTime = new Date().toTimeString().split(' ')[0];
-        console.log(`[${currentTime}] [SERVER] [INFO] Логи клиента сохранены в ${logFile}`);
+        logger.info('Логи клиента сохранены', { logFile, logCount: logs.length });
         
         res.json({ success: true });
     } catch (error) {
-        console.error('Ошибка при сохранении логов:', error);
+        logger.error('Ошибка при сохранении логов клиента', {
+            error: error.message,
+            stack: error.stack
+        });
         res.status(500).json({ 
             success: false, 
             error: 'Не удалось сохранить логи на сервере' 
@@ -89,7 +94,10 @@ router.post('/convert-model', async (req, res) => {
         // Проверяем, есть ли у нас Python и tensorflowjs
         exec('python -c "import tensorflowjs"', (error) => {
             if (error) {
-                console.error('Ошибка проверки tensorflowjs:', error);
+                logger.error('Ошибка проверки tensorflowjs', {
+                    error: error.message,
+                    command: 'python -c "import tensorflowjs"'
+                });
                 return res.status(500).json({
                     success: false,
                     error: 'Требуется установить tensorflowjs через pip',
@@ -100,13 +108,15 @@ router.post('/convert-model', async (req, res) => {
             // Выполняем команду конвертации модели
             const command = `python -m tensorflowjs.converters.converter --input_format keras ${h5Path} ${outputDir}`;
             
-            console.log('Выполняем конвертацию модели...');
-            console.log('Команда:', command);
+            logger.info('Начинаем конвертацию модели TensorFlow', { command });
             
             exec(command, (error, stdout, stderr) => {
                 if (error) {
-                    console.error('Ошибка конвертации модели:', error);
-                    console.error('STDERR:', stderr);
+                    logger.error('Ошибка конвертации модели TensorFlow', {
+                        error: error.message,
+                        stderr: stderr,
+                        command: command
+                    });
                     return res.status(500).json({
                         success: false,
                         error: 'Ошибка при конвертации модели',
@@ -115,8 +125,10 @@ router.post('/convert-model', async (req, res) => {
                     });
                 }
                 
-                console.log('Модель успешно сконвертирована');
-                console.log('STDOUT:', stdout);
+                logger.info('Модель TensorFlow успешно сконвертирована', {
+                    outputDir,
+                    stdout: stdout.substring(0, 200) // Логируем только первые 200 символов stdout
+                });
                 
                 return res.json({
                     success: true,
@@ -127,7 +139,10 @@ router.post('/convert-model', async (req, res) => {
             });
         });
     } catch (error) {
-        console.error('Ошибка при конвертации модели:', error);
+        logger.error('Ошибка при конвертации модели', {
+            error: error.message,
+            stack: error.stack
+        });
         return res.status(500).json({
             success: false,
             error: 'Внутренняя ошибка сервера',

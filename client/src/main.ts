@@ -8,7 +8,6 @@ import '../css/styles.css';
 
 import type { TelegramWebApp } from '@/types/index';
 import { APP_CONFIG, APP_EVENTS } from '@/utils/constants';
-import { checkBrowserSupport } from '@/utils/helpers';
 import { logger } from '@/modules/logger';
 import { authManager } from '@/modules/auth';
 import { uiManager } from '@/modules/ui';
