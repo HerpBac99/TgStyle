@@ -52,8 +52,15 @@ const logFormat = winston.format.combine(
 const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: 'HH:mm:ss' }),
   winston.format.colorize({ all: true }),
-  winston.format.printf(({ timestamp, level, message }) => {
-    return `[${timestamp}] [SERVER] [${level}] ${message}`;
+  winston.format.printf(({ timestamp, level, message, ...meta }) => {
+    let logMessage = `[${timestamp}] [${level}] ${message}`;
+
+    // Добавляем метаданные если они есть
+    if (Object.keys(meta).length > 0) {
+      logMessage += ` | ${JSON.stringify(meta)}`;
+    }
+
+    return logMessage;
   })
 );
 
@@ -107,20 +114,6 @@ const logger = winston.createLogger({
     })
   ]
 });
-
-// В режиме разработки добавляем более подробный вывод
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.simple(),
-      winston.format.printf(({ level, message }) => {
-        return `[${level}] ${message}`;
-      })
-    ),
-    level: 'debug'
-  }));
-}
 
 // Функции для удобного использования
 const logMethods = {

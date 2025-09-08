@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { validateTelegramWebAppData } = require('../utils/telegram');
-const User = require('../models/User');
+// const User = require('../models/User'); // Убрали MongoDB
 const { logger } = require('../controllers/logsController');
 
 /**
@@ -32,27 +32,22 @@ router.post('/', async (req, res) => {
         
         // Extract user information
         const { user } = validationResult.data;
-        
-        // Check if user exists, if not create one
-        let userDoc = await User.findOne({ telegramId: user.id });
-        
-        if (!userDoc) {
-            userDoc = new User({
-                telegramId: user.id,
-                firstName: user.first_name,
-                lastName: user.last_name || '',
-                username: user.username || ''
-            });
-            await userDoc.save();
-        }
-        
+
+        // Возвращаем данные пользователя без MongoDB
+        logger.info('Пользователь аутентифицирован', {
+            userId: user.id,
+            userName: user.first_name,
+            userLastName: user.last_name || '',
+            userUsername: user.username || ''
+        });
+
         return res.json({
             success: true,
             user: {
-                id: userDoc.telegramId,
-                firstName: userDoc.firstName,
-                lastName: userDoc.lastName,
-                username: userDoc.username
+                id: user.id,
+                firstName: user.first_name,
+                lastName: user.last_name || '',
+                username: user.username || ''
             }
         });
     } catch (error) {
