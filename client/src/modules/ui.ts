@@ -6,7 +6,8 @@ import type {
   DOMElements, 
   HistoryItem, 
   AnalysisResponse,
-  ClassificationData 
+  ClassificationData,
+  TelegramWebApp
 } from '@/types/index.js';
 import { 
   DOM_SELECTORS,
@@ -27,6 +28,28 @@ import { cameraManager } from './camera.js';
 import { historyManager } from './history.js';
 import { analysisManager } from './analysis.js';
 
+// Объявляем глобальную переменную Telegram
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp: TelegramWebApp;
+    };
+  }
+}
+
+/**
+ * Интерфейс для состояния долгого нажатия
+ */
+interface LongPressState {
+  isActive: boolean;
+  pressTimer: number | null;
+  startPosition: { x: number; y: number } | null;
+  targetElement: HTMLElement | null;
+  targetIndex: number | null;
+  moveHandler: ((event: MouseEvent | TouchEvent) => void) | null;
+  documentClickHandler: ((event: Event) => void) | null;
+}
+
 /**
  * Класс для управления UI
  */
@@ -41,6 +64,15 @@ class UIManager {
 
   private cleanupFunctions: (() => void)[] = [];
   private currentPreview: HTMLElement | null = null;
+  private longPressState: LongPressState = {
+    isActive: false,
+    pressTimer: null,
+    startPosition: null,
+    targetElement: null,
+    targetIndex: null,
+    moveHandler: null,
+    documentClickHandler: null,
+  };
 
   constructor() {
     this.initializeElements();
@@ -82,15 +114,7 @@ class UIManager {
       this.cleanupFunctions.push(cleanup);
     }
 
-    // Обработчики ячеек истории
-    this.elements.historyCells.forEach((cell, index) => {
-      const cleanup = addEventListenerWithCleanup(
-        cell,
-        'click',
-        () => this.handleHistoryCellClick(index)
-      );
-      this.cleanupFunctions.push(cleanup);
-    });
+    // Обработчики ячеек истории добавляются динамически в updateHistoryDisplay
 
     // Глобальные обработчики через стандартные addEventListener
     document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
@@ -604,7 +628,10 @@ class UIManager {
 
         contentDiv.appendChild(caption);
 
-        // Обработчик клика
+        // Добавляем обработчики долгого нажатия для удаления
+        this.addLongPressHandlers(cell, index);
+
+        // Обработчик клика для просмотра (будет переопределен в addLongPressHandlers)
         cell.onclick = () => this.showSavedAnalysis(data);
       } else {
         // Пустая ячейка
@@ -623,7 +650,7 @@ class UIManager {
         contentDiv.appendChild(addButton);
 
         // Обработчик клика для создания нового анализа
-        cell.onclick = () => this.handleCameraButtonClick(new Event('click'));
+        cell.onclick = () => this.handleHistoryCellClick(index);
       }
     });
   }
@@ -690,11 +717,420 @@ class UIManager {
     // Закрываем предпросмотр если открыт
     this.closePreview();
     
+    // Выходим из режима удаления если активен
+    if (this.longPressState.isActive) {
+      this.exitDeleteMode();
+    }
+    
     // Очищаем обработчики событий
     this.cleanupFunctions.forEach(cleanup => cleanup());
     this.cleanupFunctions = [];
     
     logger.info('UI Manager destroyed');
+  }
+
+  /**
+   * Добавляет обработчики долгого нажатия к ячейке истории
+   */
+  private addLongPressHandlers(element: HTMLElement, index: number): void {
+    logger.debug('Adding long press handlers', { index });
+
+    // Обработчики событий
+    const startHandler = (e: MouseEvent | TouchEvent) => {
+      this.startLongPress(e, element, index);
+    };
+
+    const endHandler = () => {
+      this.endLongPress();
+    };
+
+    // Добавляем обработчики
+    element.addEventListener('mousedown', startHandler);
+    element.addEventListener('touchstart', startHandler, { passive: true });
+    
+    element.addEventListener('mouseup', endHandler);
+    element.addEventListener('mouseleave', endHandler);
+    element.addEventListener('touchend', endHandler);
+    element.addEventListener('touchcancel', endHandler);
+  }
+
+  /**
+   * Начинает отслеживание долгого нажатия
+   */
+  private startLongPress(
+    event: MouseEvent | TouchEvent,
+    element: HTMLElement,
+    index: number
+  ): void {
+    // Если уже активно, не начинаем новое
+    if (this.longPressState.isActive) {
+      return;
+    }
+
+    logger.debug('Starting long press tracking', { index });
+
+    // Получаем начальную позицию
+    const startX = event.type === 'touchstart' 
+      ? (event as TouchEvent).touches[0]?.clientX || 0
+      : (event as MouseEvent).clientX;
+    const startY = event.type === 'touchstart' 
+      ? (event as TouchEvent).touches[0]?.clientY || 0
+      : (event as MouseEvent).clientY;
+
+    // Сохраняем состояние
+    this.longPressState.startPosition = { x: startX, y: startY };
+    this.longPressState.targetElement = element;
+    this.longPressState.targetIndex = index;
+
+    // Создаем обработчик движения
+    this.longPressState.moveHandler = (moveEvent: MouseEvent | TouchEvent) => {
+      this.handleLongPressMovement(moveEvent);
+    };
+
+    // Добавляем обработчики движения
+    element.addEventListener('mousemove', this.longPressState.moveHandler);
+    element.addEventListener('touchmove', this.longPressState.moveHandler, { passive: true });
+
+    // Запускаем таймер
+    this.longPressState.pressTimer = window.setTimeout(() => {
+      this.activateLongPress(element, index);
+      event.preventDefault();
+    }, 500); // 500ms как в оригинале
+  }
+
+  /**
+   * Обрабатывает движение во время нажатия
+   */
+  private handleLongPressMovement(event: MouseEvent | TouchEvent): void {
+    if (!this.longPressState.startPosition || !this.longPressState.pressTimer) {
+      return;
+    }
+
+    const currentX = event.type.includes('touch') 
+      ? (event as TouchEvent).touches[0]?.clientX || 0
+      : (event as MouseEvent).clientX;
+    const currentY = event.type.includes('touch') 
+      ? (event as TouchEvent).touches[0]?.clientY || 0
+      : (event as MouseEvent).clientY;
+
+    // Вычисляем расстояние движения
+    const deltaX = Math.abs(currentX - this.longPressState.startPosition.x);
+    const deltaY = Math.abs(currentY - this.longPressState.startPosition.y);
+
+    // Если движение превышает лимит (10px), отменяем долгое нажатие
+    if (deltaX > 10 || deltaY > 10) {
+      logger.debug('Long press cancelled due to movement', { deltaX, deltaY });
+      this.cancelLongPress();
+    }
+  }
+
+  /**
+   * Активирует режим долгого нажатия
+   */
+  private activateLongPress(element: HTMLElement, index: number): void {
+    logger.info('Long press activated', { index });
+
+    this.longPressState.isActive = true;
+
+    // Добавляем CSS класс
+    element.classList.add('delete-mode');
+
+    // Тактильная обратная связь через Telegram API
+    this.triggerHapticFeedback();
+
+    // Добавляем кнопку удаления
+    this.addDeleteButton(element, index);
+
+    // Добавляем глобальный обработчик клика для выхода из режима
+    this.longPressState.documentClickHandler = (event: Event) => {
+      if (!element.contains(event.target as Node)) {
+        this.exitDeleteMode();
+      }
+    };
+    document.addEventListener('click', this.longPressState.documentClickHandler);
+  }
+
+  /**
+   * Заканчивает отслеживание долгого нажатия
+   */
+  private endLongPress(): void {
+    if (this.longPressState.pressTimer) {
+      clearTimeout(this.longPressState.pressTimer);
+      this.longPressState.pressTimer = null;
+    }
+
+    // Удаляем обработчики движения
+    if (this.longPressState.moveHandler && this.longPressState.targetElement) {
+      this.longPressState.targetElement.removeEventListener('mousemove', this.longPressState.moveHandler);
+      this.longPressState.targetElement.removeEventListener('touchmove', this.longPressState.moveHandler);
+    }
+
+    this.longPressState.moveHandler = null;
+  }
+
+  /**
+   * Отменяет долгое нажатие
+   */
+  private cancelLongPress(): void {
+    this.endLongPress();
+    this.resetLongPressState();
+  }
+
+  /**
+   * Сбрасывает состояние долгого нажатия
+   */
+  private resetLongPressState(): void {
+    this.longPressState.isActive = false;
+    this.longPressState.pressTimer = null;
+    this.longPressState.startPosition = null;
+    this.longPressState.targetElement = null;
+    this.longPressState.targetIndex = null;
+    this.longPressState.moveHandler = null;
+  }
+
+  /**
+   * Активирует тактильную обратную связь через Telegram API
+   */
+  private triggerHapticFeedback(): void {
+    try {
+      // Используем Telegram WebApp API для вибрации
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        // Используем 'medium' для умеренной вибрации
+        window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+        logger.debug('Telegram haptic feedback triggered');
+      } else {
+        // Fallback на стандартную вибрацию браузера
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+          logger.debug('Browser vibration triggered');
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to trigger haptic feedback', error);
+    }
+  }
+
+  /**
+   * Добавляет кнопку удаления к элементу
+   */
+  private addDeleteButton(element: HTMLElement, index: number): void {
+    logger.debug('Adding delete button', { index });
+
+    // Создаем кнопку удаления
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'delete-history-btn';
+    deleteButton.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"></path>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+      Удалить
+    `;
+
+    // Стили кнопки
+    deleteButton.style.cssText = `
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(244, 67, 54, 0.9);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s ease;
+      opacity: 0;
+      animation: fadeInUp 0.3s ease forwards;
+    `;
+
+    // Добавляем CSS анимацию если её нет
+    this.ensureLongPressStyles();
+
+    // Обработчик клика по кнопке удаления
+    deleteButton.addEventListener('click', async (event: Event) => {
+      event.stopPropagation();
+      await this.handleDeleteClick(deleteButton, index);
+    });
+
+    // Добавляем кнопку к элементу
+    element.appendChild(deleteButton);
+  }
+
+  /**
+   * Добавляет необходимые CSS стили для долгого нажатия
+   */
+  private ensureLongPressStyles(): void {
+    if (!document.querySelector('#longpress-styles')) {
+      const styleSheet = document.createElement('style');
+      styleSheet.id = 'longpress-styles';
+      styleSheet.textContent = `
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+
+        .delete-mode {
+          position: relative;
+          z-index: 100;
+          transform: scale(1.02);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          transition: all 0.2s ease;
+        }
+
+        .delete-history-btn:hover {
+          background: rgba(244, 67, 54, 1) !important;
+          transform: translateX(-50%) scale(1.05) !important;
+        }
+      `;
+      document.head.appendChild(styleSheet);
+    }
+  }
+
+  /**
+   * Обработчик клика по кнопке удаления
+   */
+  private async handleDeleteClick(button: HTMLButtonElement, index: number): Promise<void> {
+    logger.info('Delete button clicked', { index });
+
+    // Блокируем кнопку
+    button.disabled = true;
+    button.style.opacity = '0.7';
+    button.innerHTML = 'Удаление...';
+
+    try {
+      // Запрашиваем подтверждение через Telegram API
+      const confirmed = await this.showConfirmDialog('Удалить этот элемент из истории?');
+      
+      if (confirmed) {
+        // Удаляем элемент из истории
+        const success = historyManager.removeItem(index);
+        
+        if (success) {
+          logger.info('History item deleted successfully', { index });
+          
+          // Тактильная обратная связь об успехе
+          this.triggerSuccessHaptic();
+          
+          // Анимируем исчезновение кнопки
+          button.style.opacity = '0';
+          button.style.transform = 'translateX(-50%) translateY(10px)';
+          
+          setTimeout(() => {
+            if (button.parentNode) {
+              button.parentNode.removeChild(button);
+            }
+          }, 300);
+          
+          // Выходим из режима удаления
+          this.exitDeleteMode();
+          
+          // Обновляем отображение истории
+          this.updateHistoryDisplay();
+        } else {
+          throw new Error('Не удалось удалить элемент');
+        }
+      } else {
+        // Пользователь отменил удаление
+        this.restoreDeleteButton(button);
+      }
+    } catch (error) {
+      logger.error('Failed to delete history item', error);
+      this.restoreDeleteButton(button);
+      this.showError('Ошибка при удалении элемента');
+    }
+  }
+
+  /**
+   * Восстанавливает состояние кнопки удаления
+   */
+  private restoreDeleteButton(button: HTMLButtonElement): void {
+    button.disabled = false;
+    button.style.opacity = '1';
+    button.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"></path>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+      Удалить
+    `;
+  }
+
+  /**
+   * Показывает диалог подтверждения через Telegram API
+   */
+  private async showConfirmDialog(message: string): Promise<boolean> {
+    try {
+      if (window.Telegram?.WebApp?.showConfirm) {
+        return new Promise((resolve) => {
+          window.Telegram!.WebApp.showConfirm(message, resolve);
+        });
+      } else {
+        // Fallback на стандартный confirm
+        return confirm(message);
+      }
+    } catch (error) {
+      logger.warn('Failed to show Telegram confirm dialog, using fallback', error);
+      return confirm(message);
+    }
+  }
+
+  /**
+   * Тактильная обратная связь для успешного действия
+   */
+  private triggerSuccessHaptic(): void {
+    try {
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+        logger.debug('Success haptic feedback triggered');
+      }
+    } catch (error) {
+      logger.warn('Failed to trigger success haptic feedback', error);
+    }
+  }
+
+  /**
+   * Выходит из режима удаления
+   */
+  private exitDeleteMode(): void {
+    if (!this.longPressState.targetElement) {
+      return;
+    }
+
+    logger.debug('Exiting delete mode');
+
+    // Удаляем CSS класс
+    this.longPressState.targetElement.classList.remove('delete-mode');
+
+    // Удаляем кнопку удаления
+    const deleteButton = this.longPressState.targetElement.querySelector('.delete-history-btn');
+    if (deleteButton) {
+      deleteButton.remove();
+    }
+
+    // Удаляем глобальный обработчик клика
+    if (this.longPressState.documentClickHandler) {
+      document.removeEventListener('click', this.longPressState.documentClickHandler);
+      this.longPressState.documentClickHandler = null;
+    }
+
+    // Сбрасываем состояние
+    this.resetLongPressState();
   }
 
   /**
@@ -707,6 +1143,7 @@ class UIManager {
       hasPreview: !!this.currentPreview,
       eventListenersCount: this.cleanupFunctions.length,
       historyCellsCount: this.elements.historyCells.length,
+      longPressActive: this.longPressState.isActive,
     };
   }
 }
