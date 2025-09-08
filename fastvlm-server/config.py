@@ -6,7 +6,17 @@ class Config:
 
     # === Пути ===
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    MODEL_PATH = os.path.join(BASE_DIR, 'models/llava-fastvithd_1.5b_stage3')
+    
+    # Доступные модели
+    AVAILABLE_MODELS = {
+        '1.5b': os.path.join(BASE_DIR, 'models/llava-fastvithd_1.5b_stage3'),
+        '7b-int4': os.path.join(BASE_DIR, 'models/llava-fastvithd_7b_int4')
+    }
+    
+    # Выбор модели через переменную окружения или по умолчанию
+    MODEL_TYPE = os.getenv('FASTVLM_MODEL', '7b-int4')  # По умолчанию используем 7B-int4
+    MODEL_PATH = AVAILABLE_MODELS.get(MODEL_TYPE, AVAILABLE_MODELS['1.5b'])
+    
     LOG_DIR = os.path.join(BASE_DIR, 'logs')
     ENV_FILE = os.path.join(BASE_DIR, '.env')
 
@@ -67,4 +77,5 @@ class Config:
         print(f"✅ Конфигурация загружена:")
         print(f"   Порт: {cls.PORT}")
         print(f"   Устройство: {cls.DEVICE}")
+        print(f"   Тип модели: {cls.MODEL_TYPE}")
         print(f"   Модель: {os.path.basename(cls.MODEL_PATH)}")

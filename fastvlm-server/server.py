@@ -118,7 +118,7 @@ def setup_logging():
     root_logger.addHandler(handler)
     root_logger.setLevel(getattr(logging, Config.LOG_LEVEL))
 
-    print(f"Логирование настроено: {log_file}")
+    app.logger.info(f"Логирование настроено: {log_file}")
 
 def load_prompt():
     """Загружает промпт из файла prompt.md"""
@@ -139,24 +139,21 @@ def load_prompt():
             default_prompt = content.strip()
 
         app.logger.info(f"Промпт загружен из файла: {prompt_file}")
-        print(f"Промпт загружен из файла: {len(default_prompt)} символов")
 
     except FileNotFoundError:
-        default_prompt = 'Опиши подробно какие предметы одежды ты видишь на этом изображении. Какой тип, цвет, стиль и материал? Пожалуйста, отвечай на русском языке, используя точные термины моды.'
+        default_prompt = 'Describe in detail the clothing items you see in this image. What type, color, style, and material? Please answer in Russian, using precise fashion terminology.'
         app.logger.warning(f"Файл промпта не найден: {prompt_file}. Используется промпт по умолчанию")
-        print(f"Файл промпта не найден. Используется промпт по умолчанию")
 
     except Exception as e:
         default_prompt = 'Опиши подробно какие предметы одежды ты видишь на этом изображении. Какой тип, цвет, стиль и материал? Пожалуйста, отвечай на русском языке, используя точные термины моды.'
         app.logger.error(f"Ошибка загрузки промпта: {e}. Используется промпт по умолчанию")
-        print(f"Ошибка загрузки промпта. Используется промпт по умолчанию")
 
 def load_model():
     """Загружает FastVLM модель в память с оптимизацией для GPU/CPU"""
     global model, tokenizer, image_processor, context_len, performance_stats
 
     try:
-        print("Загружаем FastVLM модель в память...")
+        app.logger.info("Загружаем FastVLM модель в память...")
         app.logger.info("Начало загрузки модели")
         start_time = time.time()
 
@@ -168,10 +165,10 @@ def load_model():
         gpu_available = torch.cuda.is_available()
         device = 'cuda' if gpu_available else 'cpu'
         
-        print(f"Загрузка на устройство: {device}")
+        app.logger.info(f"Загрузка на устройство: {device}")
         if gpu_available:
-            print(f"GPU: {torch.cuda.get_device_name(0)}")
-            print(f"Память GPU: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
+            app.logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+            app.logger.info(f"Память GPU: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
         
         # Загружаем модель
         disable_torch_init()
@@ -189,19 +186,19 @@ def load_model():
         performance_stats['model_loaded_at'] = time.time()
         
         app.logger.info(f"FastVLM модель загружена: {model_name} на {device} за {load_time:.1f}с")
-        print(f"FastVLM модель загружена и готова к работе! (загрузка: {load_time:.1f}с)")
+        app.logger.info(f"FastVLM модель загружена и готова к работе! (загрузка: {load_time:.1f}с)")
         
         # Выводим информацию о памяти GPU
         if gpu_available:
             allocated = torch.cuda.memory_allocated() / 1024**3
             reserved = torch.cuda.memory_reserved() / 1024**3
-            print(f"Память GPU: выделено {allocated:.1f}GB, зарезервировано {reserved:.1f}GB")
+            app.logger.info(f"Память GPU: выделено {allocated:.1f}GB, зарезервировано {reserved:.1f}GB")
         
         return True
 
     except Exception as e:
         error_msg = f"Ошибка загрузки модели: {e}"
-        print(f"Ошибка загрузки модели: {e}")
+        app.logger.info(f"Ошибка загрузки модели: {e}")
         app.logger.error(error_msg, exc_info=True)
         app.logger.error(f"Traceback: {traceback.format_exc()}")
         return False
@@ -528,7 +525,7 @@ def get_model_info():
 
 def signal_handler(signum, frame):
     """Обработка сигналов завершения"""
-    print("Получен сигнал завершения, останавливаем сервер...")
+    app.logger.info("Получен сигнал завершения, останавливаем сервер...")
     app.logger.info("Server shutdown initiated")
 
     if model and torch.cuda.is_available():
@@ -541,7 +538,7 @@ def signal_handler(signum, frame):
 def start_server():
     """Запуск Flask сервера"""
     try:
-        print(f"Запускаем FastVLM сервер на {Config.HOST}:{Config.PORT}...")
+        app.logger.info(f"Запускаем FastVLM сервер на {Config.HOST}:{Config.PORT}...")
         app.logger.info(f"Server starting on {Config.HOST}:{Config.PORT}")
 
         app.run(
@@ -552,7 +549,7 @@ def start_server():
         )
     except Exception as e:
         error_msg = f"Ошибка запуска FastVLM сервера: {e}"
-        print(error_msg)
+        app.logger.info(error_msg)
         app.logger.error(error_msg, exc_info=True)
 
 if __name__ == '__main__':
@@ -565,13 +562,13 @@ if __name__ == '__main__':
     # Настраиваем логирование
     setup_logging()
 
-    print("FastVLM Server starting...")
+    app.logger.info("FastVLM Server starting...")
 
     # Валидируем конфигурацию
     try:
         Config.validate_config()
     except Exception as e:
-        print(f"Ошибка конфигурации: {e}")
+        app.logger.info(f"Ошибка конфигурации: {e}")
         sys.exit(1)
 
     # Устанавливаем обработчики сигналов
@@ -586,5 +583,5 @@ if __name__ == '__main__':
         # Запускаем сервер
         start_server()
     else:
-        print("Не удалось загрузить модель, сервер не запущен")
+        app.logger.info("Не удалось загрузить модель, сервер не запущен")
         sys.exit(1)
