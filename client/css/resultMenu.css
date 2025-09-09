@@ -241,3 +241,15 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/*
+ * Стили для выделения текста (дополнение к mainMenu.css)
+ * Разрешаем выделение текста в контейнере с анализом
+ */
+.analysis-text,
+.analysis-text * {
+    user-select: text; /* Разрешаем выделение текста */
+    -webkit-user-select: text; /* Для WebKit браузеров */
+    -moz-user-select: text; /* Для Firefox */
+    -ms-user-select: text; /* Для IE/Edge */
+}

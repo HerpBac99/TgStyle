@@ -338,14 +338,11 @@ class UIManager {
         // Fallback - копируем в буфер обмена
         const shareText = 'Попробуй TgStyle - анализ стиля одежды с помощью ИИ!';
         navigator.clipboard.writeText(shareText).then(() => {
-          this.showTemporaryMessage('Скопировано в буфер обмена!');
         }).catch(() => {
-          this.showTemporaryMessage('Функция пока недоступна');
         });
       }
     } catch (error) {
       logger.warn('Failed to share', error);
-      this.showTemporaryMessage('Функция пока недоступна');
     }
 
     // Тактильная обратная связь
@@ -353,48 +350,7 @@ class UIManager {
   }
 
   /**
-   * Показывает временное сообщение
-   */
-  private showTemporaryMessage(message: string): void {
-    const toast = createElement('div', {
-      style: `
-        position: fixed;
-        bottom: 100px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 12px 20px;
-        border-radius: 20px;
-        font-size: 14px;
-        z-index: 10001;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-      `,
-    }, message);
-
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-      toast.style.opacity = '1';
-    }, 10);
-
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      setTimeout(() => {
-        if (toast.parentNode) {
-          toast.parentNode.removeChild(toast);
-        }
-      }, 300);
-    }, 2000);
-  }
-
-
-
-
-
-  /**
-   * Показ сохраненного анализа
+   * Показать сохраненный анализ
    */
   private showSavedAnalysis(analysisData: HistoryItem): void {
     logger.info('Showing saved analysis');
@@ -412,7 +368,7 @@ class UIManager {
         left: 20px;
         right: 20px;
         bottom: 20px;
-        background-color: rgba(0, 0, 0, 0.9);
+        background-color: rgba(0, 0, 0, 0.95);
         z-index: 1000;
         display: flex;
         flex-direction: column;
@@ -431,46 +387,67 @@ class UIManager {
       src: `data:image/jpeg;base64,${analysisData.photo}`,
       style: `
         max-width: 100%;
-        max-height: 80%;
+        max-height: 60%;
         object-fit: contain;
         border-radius: 10px;
         margin-bottom: 10px;
       `,
     });
 
-    // Информация о классификации
-    let infoContainer = createElement('div');
-    if (analysisData.classification) {
-      infoContainer.style.cssText = `
+    // Контейнер для информации
+    const infoContainer = createElement('div', {
+      style: `
+        width: 100%;
+        max-height: 35%;
+        overflow-y: auto;
         background-color: rgba(0, 0, 0, 0.7);
         color: white;
-        padding: 10px 15px;
         border-radius: 10px;
-        font-size: 16px;
-        text-align: center;
+        padding: 15px;
+        font-size: 14px;
+        line-height: 1.4;
         margin-bottom: 10px;
-        width: 90%;
-      `;
-      infoContainer.innerHTML = `<strong>Определено:</strong> ${analysisData.classification.classNameRu} (уверенность: ${analysisData.classification.confidence}%)`;
+      `,
+    });
+
+    // Информация о классификации
+    let classificationInfo = '';
+    if (analysisData.classification) {
+      classificationInfo = `<strong>Определено:</strong> ${analysisData.classification.classNameRu} (уверенность: ${analysisData.classification.confidence}%)<br><br>`;
     }
+
+    // Текст анализа LLM
+    let analysisText = '';
+    if (analysisData.analysis) {
+      analysisText = `<strong>Анализ стиля:</strong><br>${analysisData.analysis}`;
+    } else {
+      analysisText = '<em>Текст анализа недоступен</em>';
+    }
+
+    // Комментарии
+    let commentsText = '';
+    if (analysisData.comments && analysisData.comments.length > 0) {
+      commentsText = `<br><br><strong>Комментарии:</strong><br>• ${analysisData.comments.join('<br>• ')}`;
+    }
+
+    infoContainer.innerHTML = classificationInfo + analysisText + commentsText;
 
     // Дата фотографии
     const dateCaption = createElement('div', {
       style: `
         color: white;
-        font-size: 14px;
-        padding: 5px;
-        background-color: rgba(0, 0, 0, 0.5);
-        border-radius: 5px;
+        font-size: 12px;
+        padding: 8px 12px;
+        background-color: rgb(78, 187, 14);
+        border-radius: 8px;
+        margin-top: 5px;
       `,
     }, formatHistoryDate(analysisData.timestamp));
 
     photoPreview.addEventListener('click', () => this.closePhotoPreview());
 
     photoPreview.appendChild(img);
-    if (analysisData.classification) {
-      photoPreview.appendChild(infoContainer);
-    }
+    photoPreview.appendChild(infoContainer);
     photoPreview.appendChild(dateCaption);
 
     document.body.appendChild(photoPreview);

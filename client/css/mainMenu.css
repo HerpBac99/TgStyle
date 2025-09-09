@@ -47,6 +47,26 @@
     box-sizing: border-box; /* Включает padding и border в общую ширину/высоту элемента */
 }
 
+/*
+ * Запрещаем выделение текста на всем приложении для лучшего UX
+ * Исключаем контейнер с анализом текста
+ */
+* {
+    user-select: none; /* Запрещаем выделение текста */
+    -webkit-user-select: none; /* Для WebKit браузеров (Safari, Chrome) */
+    -moz-user-select: none; /* Для Firefox */
+    -ms-user-select: none; /* Для IE/Edge */
+}
+
+/* Разрешаем выделение текста только в контейнере с анализом */
+.analysis-text,
+.analysis-text * {
+    user-select: text; /* Разрешаем выделение текста */
+    -webkit-user-select: text; /* Для WebKit браузеров */
+    -moz-user-select: text; /* Для Firefox */
+    -ms-user-select: text; /* Для IE/Edge */
+}
+
 /* 
  * Основные стили для тела документа
  * Определяют фон, шрифт и базовое расположение элементов
