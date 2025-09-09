@@ -36,8 +36,8 @@ class Config:
     TORCH_DTYPE = torch.float16
 
     # === Настройки генерации ===
-    MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', '256'))
-    TEMPERATURE = float(os.getenv('TEMPERATURE', '0.2'))
+    MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', '512'))  # Увеличено для полных ответов
+    TEMPERATURE = float(os.getenv('TEMPERATURE', '0.4'))
     DO_SAMPLE = os.getenv('DO_SAMPLE', 'true').lower() == 'true'
 
     # === Настройки производительности ===

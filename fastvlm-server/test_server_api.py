@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Simple FastVLM Performance Test - CPU vs GPU comparison
+FastVLM Prompt & Response Viewer
+Shows only the full prompt sent to LLM and the full response received.
 """
 
 import os
@@ -15,10 +16,6 @@ from pathlib import Path
 TEST_IMAGE_PATH = "2.jpg"
 SERVER_URL = "http://127.0.0.1:3001"
 
-def log(message):
-    """Simple logging without emoji"""
-    print(message)
-
 def load_image_as_base64(image_path):
     """Load image and convert to base64"""
     try:
@@ -26,155 +23,106 @@ def load_image_as_base64(image_path):
             image_data = f.read()
         return base64.b64encode(image_data).decode('utf-8')
     except Exception as e:
-        log(f"Error loading image: {e}")
+        print(f"Error loading image: {e}")
         return None
 
-def test_analysis(image_path, force_gpu=None):
-    """Test image analysis with optional GPU forcing"""
+def load_prompt():
+    """Load prompt from prompt.md file"""
+    try:
+        prompt_file = Path(__file__).parent / "prompt.md"
+        with open(prompt_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Extract prompt from markdown code block
+        if '```' in content:
+            start = content.find('```') + 3
+            end = content.find('```', start)
+            if end > start:
+                return content[start:end].strip()
+
+        # Fallback: return whole content if no code blocks
+        return content.strip()
+    except Exception as e:
+        print(f"Error loading prompt: {e}")
+        return 'Describe the clothing in this image in detail.'
+
+def analyze_image(image_path):
+    """Send image to FastVLM and get analysis"""
     # Load image
     image_base64 = load_image_as_base64(image_path)
     if not image_base64:
         return None
-    
+
+    # Load prompt
+    prompt = load_prompt()
+
+    # Show full prompt
+    print("=" * 80)
+    print("PROMPT SENT TO LLM:")
+    print("=" * 80)
+    print(prompt)
+    print("=" * 80)
+    print()
+
     # Prepare request
     data = {
-        'prompt': 'Describe the clothing in this image in detail. Answer in Russian.',
+        'prompt': prompt,
         'image_base64': image_base64
     }
-    
-    if force_gpu is not None:
-        data['force_gpu'] = force_gpu
-    
-    # Send request
-    device_str = "GPU" if force_gpu else "CPU" if force_gpu is False else "Auto"
-    log(f"Testing {device_str}...")
-    
-    start_time = time.time()
-    
+
     try:
         response = requests.post(
             f"{SERVER_URL}/analyze",
             json=data,
             timeout=60
         )
-        
-        end_time = time.time()
-        total_time = end_time - start_time
-        
+
         if response.status_code == 200:
             result = response.json()
-            timing = result.get('timing', {})
-            inference_time = timing.get('inference_time', 0)
-            device = result.get('device', 'unknown')
-            
-            # Get GPU memory info
-            gpu_memory = result.get('gpu_memory_used')
-            
-            return {
-                'success': True,
-                'total_time': total_time,
-                'inference_time': inference_time,
-                'device': device,
-                'gpu_memory': gpu_memory
-            }
+            analysis = result.get('analysis', 'No analysis received')
+
+            # Show full response
+            print("=" * 80)
+            print("LLM RESPONSE:")
+            print("=" * 80)
+            print(analysis)
+            print("=" * 80)
+
+            return analysis
         else:
-            log(f"Server error: {response.status_code}")
+            print(f"Server error: {response.status_code}")
+            print(f"Response: {response.text}")
             return None
-            
+
     except Exception as e:
-        log(f"Request error: {e}")
+        print(f"Request error: {e}")
         return None
-
-def get_gpu_info():
-    """Get GPU information"""
-    try:
-        response = requests.get(f"{SERVER_URL}/gpu", timeout=10)
-        if response.status_code == 200:
-            return response.json()
-        return None
-    except:
-        return None
-
-def check_server():
-    """Check if server is available"""
-    try:
-        response = requests.get(f"{SERVER_URL}/health", timeout=10)
-        if response.status_code == 200:
-            health_data = response.json()
-            log(f"Server available")
-            log(f"Model loaded: {health_data.get('model_loaded')}")
-            log(f"Device: {health_data.get('device')}")
-            
-            # Show GPU info
-            gpu_info = get_gpu_info()
-            if gpu_info and gpu_info.get('gpu_available'):
-                total_mb = gpu_info.get('gpu_memory_total_mb', 0)
-                allocated_mb = gpu_info.get('gpu_memory_allocated_mb', 0)
-                log(f"GPU: {gpu_info.get('gpu_name')}")
-                log(f"VRAM: {allocated_mb:.0f}MB / {total_mb:.0f}MB ({allocated_mb/total_mb*100:.1f}%)")
-            
-            return True
-        return False
-    except:
-        log("Server unavailable")
-        return False
 
 def main():
     """Main function"""
-    log("FastVLM Performance Test")
-    log("=" * 40)
-    
-    # Check server
-    if not check_server():
-        log("Server not available. Make sure it's running.")
+    # Use command line argument or default image
+    if len(sys.argv) >= 2:
+        image_path = sys.argv[1]
+    else:
+        # Use default image from project root
+        project_root = Path(__file__).parent.parent
+        image_path = str(project_root / TEST_IMAGE_PATH)
+
+    # Check if image exists
+    if not os.path.exists(image_path):
+        print(f"Image not found: {image_path}")
         sys.exit(1)
-    
-    # Find test image
-    project_root = Path(__file__).parent.parent
-    test_image = project_root / TEST_IMAGE_PATH
-    
-    if not test_image.exists():
-        log(f"Test image not found: {test_image}")
-        sys.exit(1)
-    
-    log(f"Using image: {test_image.name}")
-    log("")
-    
-    # Test CPU
-    log("Testing CPU:")
-    cpu_result = test_analysis(str(test_image), force_gpu=False)
-    if cpu_result and cpu_result['success']:
-        log(f"CPU: {cpu_result['total_time']:.2f}s")
+
+    print(f"Using image: {image_path}")
+    print()
+
+    # Run analysis
+    result = analyze_image(image_path)
+
+    if result:
+        print("\n✓ Analysis completed successfully")
     else:
-        log("CPU: FAILED")
-    
-    log("")
-    
-    # Test GPU
-    log("Testing GPU:")
-    gpu_result = test_analysis(str(test_image), force_gpu=True)
-    if gpu_result and gpu_result['success']:
-        log(f"GPU: {gpu_result['total_time']:.2f}s")
-        if gpu_result.get('gpu_memory'):
-            log(f"VRAM used: {gpu_result['gpu_memory']:.1f}MB")
-    else:
-        log("GPU: FAILED")
-    
-    log("")
-    
-    # Comparison
-    if cpu_result and gpu_result and cpu_result['success'] and gpu_result['success']:
-        cpu_time = cpu_result['total_time']
-        gpu_time = gpu_result['total_time']
-        
-        if gpu_time < cpu_time:
-            speedup = cpu_time / gpu_time
-            log(f"GPU is {speedup:.1f}x faster")
-        else:
-            slowdown = gpu_time / cpu_time
-            log(f"CPU is {slowdown:.1f}x faster")
-    else:
-        log("Comparison failed - one or both tests failed")
+        print("\n✗ Analysis failed")
 
 if __name__ == "__main__":
     main()

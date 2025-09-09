@@ -206,6 +206,22 @@ def load_model():
 def extract_analysis_from_output(output):
     """Извлекает текст анализа из вывода FastVLM"""
     try:
+        # Для JSON ответов ищем валидный JSON объект
+        import re
+        import json
+
+        # Ищем JSON объект в выводе (начинается с { и заканчивается })
+        json_match = re.search(r'\{.*\}', output.strip(), re.DOTALL)
+        if json_match:
+            json_str = json_match.group(0)
+            try:
+                # Проверяем, что это валидный JSON
+                parsed_json = json.loads(json_str)
+                return json.dumps(parsed_json, ensure_ascii=False, indent=2)
+            except json.JSONDecodeError:
+                pass
+
+        # Если JSON не найден, используем старый метод
         lines = output.strip().split('\n')
 
         # Ищем последнюю строку с результатом
@@ -213,12 +229,13 @@ def extract_analysis_from_output(output):
         for line in reversed(lines):
             line = line.strip()
             if line and not line.startswith('`torch_dtype`') and not line.startswith('The following'):
-                # Очищаем от мусора
+                # Очищаем от мусора и сохраняем русские символы
                 clean_line = line.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
                 clean_line = ' '.join(clean_line.split())
                 result_lines.insert(0, clean_line)
 
-        result_text = '\n'.join(result_lines[:10])
+        # Убираем ограничение на 10 строк - берем все строки!
+        result_text = '\n'.join(result_lines)
 
         if not result_text:
             result_text = output.strip()
@@ -307,7 +324,7 @@ def get_stats():
 def analyze():
     """Анализ изображения с мониторингом производительности"""
     analysis_start_time = time.time()
-    
+
     try:
         if model is None:
             update_performance_stats(0, success=False)
