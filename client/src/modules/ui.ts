@@ -5,7 +5,6 @@
 import type { 
   DOMElements, 
   HistoryItem, 
-  AnalysisResponse,
   TelegramWebApp
 } from '@/types/index.js';
 import { 
@@ -24,7 +23,6 @@ import { logger } from './logger';
 import { authManager } from './auth.js';
 import { cameraManager } from './camera.js';
 import { historyManager } from './history.js';
-import { analysisManager } from './analysis.js';
 
 // Объявляем глобальную переменную Telegram
 declare global {
@@ -214,13 +212,14 @@ class UIManager {
    * Отображение полноэкранного предпросмотра
    */
   private showFullscreenPreview(imageBase64: string): void {
-    logger.info('Showing fullscreen preview');
+    logger.info('Showing fullscreen preview with loading animation');
 
     // Удаляем существующий предпросмотр если есть
     if (this.currentPreview) {
       this.closePreview();
     }
 
+    // Основной контейнер с фоном как у всего приложения
     const previewContainer = createElement('div', {
       id: 'fullscreen-preview',
       style: `
@@ -229,13 +228,31 @@ class UIManager {
         left: 0;
         width: 100%;
         height: 100vh;
-        background-color: #000;
+        background-color: var(--tg-theme-bg-color, #81D8D0);
         z-index: 9999;
         display: flex;
         flex-direction: column;
-        justify-content: flex-start;
+        justify-content: center;
         align-items: center;
-        padding: 0;
+        padding: 20px;
+        opacity: 0;
+        transform: scale(0.95);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      `,
+    });
+
+    // Контейнер для фото с красивыми отступами
+    const imageContainer = createElement('div', {
+      style: `
+        width: 100%;
+        max-width: 400px;
+        background: white;
+        border-radius: 20px;
+        padding: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        transform: translateY(20px);
+        opacity: 0;
+        transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
       `,
     });
 
@@ -244,156 +261,208 @@ class UIManager {
       src: `data:image/jpeg;base64,${imageBase64}`,
       style: `
         width: 100%;
-        height: calc(50vh - 35px);
+        height: auto;
+        max-height: 300px;
         object-fit: contain;
+        border-radius: 12px;
       `,
     });
 
-    // Создаем панель кнопок
-    const buttonContainer = createElement('div', {
+    // Индикатор загрузки
+    const loadingContainer = createElement('div', {
+      id: 'loading-indicator',
       style: `
-        display: flex;
-        justify-content: space-between;
-        width: 100%;
-        height: 70px;
-        background-color: #18191a;
-        padding: 10px 20px;
+        margin-top: 30px;
+        text-align: center;
+        opacity: 0;
+        transform: translateY(20px);
+        transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.4s;
       `,
     });
 
-    // Кнопка "назад"
-    const backButton = this.createButton('⬅️', 'Назад', () => {
-      this.closePreview();
+    const loadingSpinner = createElement('div', {
+      style: `
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255,255,255,0.3);
+        border-top: 3px solid white;
+        border-radius: 50%;
+        margin: 0 auto 15px;
+        animation: spin 1s linear infinite;
+      `,
     });
 
-    // Кнопка "анализировать"
-    const analyzeButton = this.createButton('⬆️', 'Анализировать', async () => {
-      await this.handleAnalyzeClick(analyzeButton, previewContainer);
+    const loadingText = createElement('p', {
+      textContent: 'Анализируем вашу одежду...',
+      style: `
+        color: white;
+        font-size: 16px;
+        font-weight: 500;
+        margin: 0;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      `,
     });
-    analyzeButton.style.backgroundColor = THEME_COLORS.PRIMARY_BG;
 
-    buttonContainer.appendChild(backButton);
-    buttonContainer.appendChild(analyzeButton);
+    // Контейнер для результата (изначально скрыт)
+    const resultContainer = createElement('div', {
+      id: 'analysis-result',
+      style: `
+        position: fixed;
+        bottom: -100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border-radius: 20px 20px 0 0;
+        padding: 25px;
+        max-height: 60vh;
+        overflow-y: auto;
+        box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
+        transition: bottom 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 10000;
+      `,
+    });
 
-    previewContainer.appendChild(img);
-    previewContainer.appendChild(buttonContainer);
+    // Добавляем CSS для анимации спиннера
+    if (!document.querySelector('#loading-spinner-styles')) {
+      const style = document.createElement('style');
+      style.id = 'loading-spinner-styles';
+      style.textContent = `
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Собираем элементы
+    loadingContainer.appendChild(loadingSpinner);
+    loadingContainer.appendChild(loadingText);
+    
+    imageContainer.appendChild(img);
+    
+    previewContainer.appendChild(imageContainer);
+    previewContainer.appendChild(loadingContainer);
+    previewContainer.appendChild(resultContainer);
 
     document.body.appendChild(previewContainer);
     this.currentPreview = previewContainer;
 
-    logger.info('Fullscreen preview displayed');
-  }
-
-  /**
-   * Создание кнопки
-   */
-  private createButton(icon: string, _text: string, onClick: () => void): HTMLButtonElement {
-    const button = createElement('button', {
-      style: `
-        background-color: transparent;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 50px;
-        height: 50px;
-        padding: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-        cursor: pointer;
-      `,
-    }, icon);
-
-    button.addEventListener('click', onClick);
-    return button;
-  }
-
-  /**
-   * Обработчик клика по кнопке анализа
-   */
-  private async handleAnalyzeClick(button: HTMLButtonElement, container: HTMLElement): Promise<void> {
-    logger.info('Analyze button clicked');
-
-    // Меняем кнопку на лоадер
-    button.innerHTML = '⏳';
-    button.disabled = true;
-
-    try {
-      const response = await analysisManager.analyzeCurrentImage();
+    // Запускаем анимацию появления
+    requestAnimationFrame(() => {
+      previewContainer.style.opacity = '1';
+      previewContainer.style.transform = 'scale(1)';
       
-      if (response.success) {
-        logger.info('Analysis completed successfully');
-        
-        // Показываем результаты под фото
-        this.showAnalysisResults(response, container);
-        
-        // Обновляем историю в UI
-        this.updateHistoryDisplay();
-        
-        // Логируем результат
-        if (response.classification) {
-          logger.info('Classification result', response.classification);
-        }
-      } else {
-        throw new Error(response.error || 'Ошибка анализа');
-      }
-    } catch (error) {
-      logger.error('Analysis failed', error);
-      this.logError('Ошибка при анализе: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
-    } finally {
-      // Меняем кнопку на закрытие
-      button.innerHTML = '✕';
-      button.disabled = false;
-      button.onclick = () => this.closePreview();
-    }
-  }
-
-  /**
-   * Показ результатов анализа
-   */
-  private showAnalysisResults(result: AnalysisResponse, container: HTMLElement): void {
-    logger.info('Showing analysis results');
-
-    const resultsContainer = createElement('div', {
-      style: `
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(10px);
-        border-radius: 20px 20px 0 0;
-        padding: 20px;
-        max-height: 50vh;
-        overflow-y: auto;
-        z-index: 1001;
-      `,
+      setTimeout(() => {
+        imageContainer.style.opacity = '1';
+        imageContainer.style.transform = 'translateY(0)';
+      }, 200);
+      
+      setTimeout(() => {
+        loadingContainer.style.opacity = '1';
+        loadingContainer.style.transform = 'translateY(0)';
+      }, 400);
     });
 
-    resultsContainer.innerHTML = `
-      <div style="text-align: center; margin-bottom: 15px;">
-        <div style="background: linear-gradient(45deg, ${THEME_COLORS.PRIMARY_BG}, ${THEME_COLORS.BUTTON_COLOR}); color: white; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: bold; display: inline-block; margin-bottom: 10px;">
-          🤖 FastVLM AI Анализ
-        </div>
-        <h3 style="margin: 10px 0; color: #333;">Результаты анализа одежды</h3>
+    logger.info('Fullscreen preview with loading animation displayed');
+  }
+
+  /**
+   * Показать результат анализа в расширяющемся контейнере
+   */
+  showAnalysisResult(result: string): void {
+    logger.info('Showing analysis result');
+
+    const resultContainer = document.getElementById('analysis-result');
+    const loadingIndicator = document.getElementById('loading-indicator');
+
+    if (!resultContainer) {
+      logger.error('Result container not found');
+      return;
+    }
+
+    // Скрываем индикатор загрузки
+    if (loadingIndicator) {
+      loadingIndicator.style.opacity = '0';
+      loadingIndicator.style.transform = 'translateY(-20px)';
+      setTimeout(() => {
+        loadingIndicator.style.display = 'none';
+      }, 300);
+    }
+
+    // Добавляем контент результата
+    resultContainer.innerHTML = `
+      <div style="
+        border-bottom: 3px solid #81D8D0;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+        text-align: center;
+      ">
+        <h3 style="
+          margin: 0;
+          color: #333;
+          font-size: 18px;
+          font-weight: 600;
+        ">✨ Анализ завершен</h3>
       </div>
-      <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 15px;">
-        <h4 style="margin: 0 0 10px 0; color: #333; font-size: 16px;">Детальный анализ:</h4>
-        <div style="color: #555; line-height: 1.6; white-space: pre-wrap; max-height: 200px; overflow-y: auto;">
-          ${result.analysis || 'Анализ недоступен'}
-        </div>
+      <div style="
+        line-height: 1.6;
+        color: #444;
+        font-size: 15px;
+        white-space: pre-wrap;
+      ">${result}</div>
+      <div style="
+        margin-top: 25px;
+        text-align: center;
+        border-top: 1px solid #eee;
+        padding-top: 20px;
+      ">
+        <button id="close-result-btn" style="
+          background: #81D8D0;
+          color: white;
+          border: none;
+          padding: 12px 30px;
+          border-radius: 25px;
+          font-size: 16px;
+          font-weight: 500;
+          cursor: pointer;
+          box-shadow: 0 4px 15px rgba(129, 216, 208, 0.3);
+          transition: all 0.3s ease;
+        ">
+          Готово
+        </button>
       </div>
     `;
 
-    container.appendChild(resultsContainer);
+    // Добавляем обработчик кнопки закрытия
+    const closeBtn = document.getElementById('close-result-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        this.closePreview();
+      });
 
-    // Анимация появления
+      // Эффект hover для кнопки
+      closeBtn.addEventListener('mouseenter', () => {
+        closeBtn.style.transform = 'translateY(-2px)';
+        closeBtn.style.boxShadow = '0 6px 20px rgba(129, 216, 208, 0.4)';
+      });
+
+      closeBtn.addEventListener('mouseleave', () => {
+        closeBtn.style.transform = 'translateY(0)';
+        closeBtn.style.boxShadow = '0 4px 15px rgba(129, 216, 208, 0.3)';
+      });
+    }
+
+    // Анимируем появление контейнера результата
     setTimeout(() => {
-      resultsContainer.style.transition = 'all 0.3s ease';
-      resultsContainer.style.transform = 'translateY(0)';
-    }, 100);
+      resultContainer.style.bottom = '0';
+    }, 500);
+
+    logger.info('Analysis result displayed');
   }
+
+
+
 
 
   /**

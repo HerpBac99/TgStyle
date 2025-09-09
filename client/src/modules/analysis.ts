@@ -350,6 +350,70 @@ class AnalysisManager {
   }
 
   /**
+   * Анализ изображения по base64 строке (для автоматического анализа)
+   */
+  async analyzeImage(imageBase64: string): Promise<AnalysisResponse> {
+    logger.info('Starting automatic image analysis');
+
+    try {
+      // Обновляем состояние
+      this.updateState({
+        status: 'uploading',
+        progress: 10,
+        currentStep: 'Подготовка изображения...',
+      });
+
+      // Подготавливаем запрос
+      const request = this.prepareAnalysisRequest(imageBase64);
+      
+      this.updateState({
+        status: 'processing',
+        progress: 30,
+        currentStep: 'Отправка на анализ...',
+      });
+
+      // Выполняем анализ с повторными попытками
+      const response = await this.performAnalysisWithRetry(request);
+
+      const analysisResult = this.transformAnalysisResult(response);
+      this.updateState({
+        status: 'completed',
+        progress: 100,
+        currentStep: 'Анализ завершен',
+        ...(analysisResult && { result: analysisResult }),
+      });
+
+      // Сохраняем в историю если анализ успешен
+      if (response.success) {
+        await this.saveToHistory(response, imageBase64);
+      }
+
+      // Показываем результат в UI
+      if (response.success && response.analysis) {
+        // Импортируем uiManager динамически чтобы избежать циклических зависимостей
+        const { uiManager } = await import('./ui.js');
+        uiManager.showAnalysisResult(response.analysis);
+      }
+
+      logger.info('Automatic image analysis completed successfully');
+      return response;
+
+    } catch (error) {
+      logger.error('Automatic image analysis failed', error);
+      
+      this.updateState({
+        status: 'error',
+        progress: 0,
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка анализа',
+      });
+
+      throw error;
+    } finally {
+      this.retryCount = 0;
+    }
+  }
+
+  /**
    * Получение статистики анализа
    */
   getStats() {

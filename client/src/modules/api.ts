@@ -217,8 +217,6 @@ class TgStyleApi extends ApiClient {
    * Авторизация пользователя
    */
   async authenticate(initData: string): Promise<AuthResponse> {
-    logger.info('Starting authentication');
-    
     const request: AuthRequest = { initData };
     const response = await this.post<AuthResponse>('/auth', request, TIMEOUTS.AUTH_REQUEST);
     

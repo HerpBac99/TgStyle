@@ -8,7 +8,84 @@ const { exec } = require('child_process');
 // Импорт логгера Winston
 const { logger, logSuccess, logWarning } = require('../src/controllers/logsController');
 
-// Маршрут для логирования ошибок клиента
+// Новый маршрут для клиентских логов (без вывода в терминал сервера)
+router.post('/log-client', async (req, res) => {
+    try {
+        const { 
+            sessionId,
+            username,
+            userId,
+            logFileName,
+            logs, 
+            userAgent, 
+            appVersion, 
+            timestamp,
+            isTelegramMiniApp,
+            disableServerTerminalOutput
+        } = req.body;
+        
+        // Создаем директорию для логов, если ее нет
+        const logDir = path.join(__dirname, '../../logs/client');
+        if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir, { recursive: true });
+        }
+        
+        // Используем переданное имя файла или создаем стандартное
+        const fileName = logFileName || `${username || 'unknown'}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.log`;
+        const logFile = path.join(logDir, fileName);
+        
+        // НЕ выводим логи в терминал сервера (согласно требованию)
+        // Только сохраняем в файл
+        
+        // Форматируем данные для записи в файл
+        const logEntry = `
+=== НАЧАЛО ЛОГА ===
+Session ID: ${sessionId}
+Username: ${username || 'unknown'}
+User ID: ${userId || 'unknown'}
+Время: ${timestamp}
+User Agent: ${userAgent}
+Версия приложения: ${appVersion}
+Telegram Mini App: ${isTelegramMiniApp ? 'Да' : 'Нет'}
+--- Записи логов ---
+${Array.isArray(logs) ?
+    logs.map(log => `[${log.timestamp}] [${log.level.toUpperCase()}] ${log.message}${log.data ? '\n  Данные: ' + JSON.stringify(log.data, null, 2) : ''}`).join('\n') :
+    'Неверный формат логов'
+}
+=== КОНЕЦ ЛОГА ===
+
+`;
+
+        // Записываем в файл (добавляем в конец)
+        fs.appendFileSync(logFile, logEntry);
+
+        // Логируем только факт сохранения (без деталей, чтобы не засорять терминал)
+        if (!disableServerTerminalOutput) {
+            logger.info('Клиентские логи сохранены', { 
+                logFile: fileName, 
+                logCount: Array.isArray(logs) ? logs.length : 0,
+                username: username || 'unknown'
+            });
+        }
+        
+        res.json({ 
+            success: true,
+            logFile: fileName,
+            logCount: Array.isArray(logs) ? logs.length : 0
+        });
+    } catch (error) {
+        logger.error('Ошибка при сохранении клиентских логов', {
+            error: error.message,
+            stack: error.stack
+        });
+        res.status(500).json({ 
+            success: false, 
+            error: 'Не удалось сохранить логи на сервере' 
+        });
+    }
+});
+
+// Старый маршрут для логирования ошибок клиента (оставлен для совместимости)
 router.post('/log-error', async (req, res) => {
     try {
         const { logs, userAgent, appVersion, timestamp } = req.body;

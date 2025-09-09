@@ -20,6 +20,7 @@ import {
   getFileExtension 
 } from '@/utils/helpers.js';
 import { logger } from './logger';
+import { analysisManager } from './analysis';
 
 /**
  * Класс для работы с камерой и изображениями
@@ -49,6 +50,17 @@ class CameraManager {
         originalSize: Math.round(imageData.originalSize / 1024) + 'KB',
         compressedSize: imageData.compressedSize ? Math.round(imageData.compressedSize / 1024) + 'KB' : 'N/A',
       });
+
+      // Автоматически запускаем анализ фото
+      logger.info('Starting automatic photo analysis');
+      try {
+        // Запускаем анализ в фоне, не ждем результата
+        analysisManager.analyzeImage(imageData.base64).catch(error => {
+          logger.error('Auto-analysis failed', error);
+        });
+      } catch (error) {
+        logger.error('Error starting auto-analysis', error);
+      }
 
       return {
         success: true,

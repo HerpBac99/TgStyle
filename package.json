@@ -6,8 +6,6 @@
   "scripts": {
     "build": "tsc && vite build",
     "start": "set NODE_ENV=production&& node server/server.js",
-    "dev": "vite",
-    "dev:server": "nodemon server/server.js",
     "type-check": "tsc --noEmit"
   },
   "keywords": [
