@@ -106,15 +106,6 @@ export function getBase64Size(base64String: string): number {
   return Math.ceil((base64String.length - padding) * 0.75);
 }
 
-/**
- * Обрезает base64 строку до максимального размера
- */
-export function truncateBase64(base64String: string, maxLength: number): string {
-  if (base64String.length <= maxLength) {
-    return base64String;
-  }
-  return base64String.substring(0, maxLength) + '...';
-}
 
 /**
  * Проверяет, является ли файл изображением

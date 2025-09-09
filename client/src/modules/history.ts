@@ -7,17 +7,15 @@ import {
   STORAGE_KEYS,
   HISTORY_CONSTRAINTS 
 } from '@/utils/constants.js';
-import { 
+import {
   validateHistory,
-  validateHistoryItem,
-  validateStorageSize 
+  validateHistoryItem
 } from '@/utils/validation.js';
-import { 
+import {
   safeJsonParse,
   safeJsonStringify,
-  truncateBase64,
   createError,
-  ERROR_CODES 
+  ERROR_CODES
 } from '@/utils/helpers.js';
 import { logger } from './logger';
 
@@ -84,25 +82,10 @@ class HistoryManager {
    */
   private saveToStorage(): void {
     try {
-      // Оптимизируем фото перед сохранением
-      const optimizedHistory = this.optimizeForStorage(this.history);
-      
-      // Проверяем размер данных
-      const validation = validateStorageSize(optimizedHistory, HISTORY_CONSTRAINTS.MAX_STORAGE_SIZE_MB);
-      
-      if (!validation.isValid) {
-        logger.warn('History too large for storage, reducing', { errors: validation.errors });
-        // Дополнительная оптимизация
-        optimizedHistory.forEach(item => {
-          if (item?.photo) {
-            item.photo = truncateBase64(item.photo, HISTORY_CONSTRAINTS.MAX_PHOTO_SIZE / 2);
-          }
-        });
-      }
-
-      const historyJson = safeJsonStringify(optimizedHistory);
+      // Сохраняем историю как есть, без оптимизации размера
+      const historyJson = safeJsonStringify(this.history);
       localStorage.setItem(STORAGE_KEYS.HISTORY, historyJson);
-      
+
       logger.debug('History saved to storage');
     } catch (error) {
       logger.error('Error saving history to storage', error);
@@ -136,26 +119,6 @@ class HistoryManager {
     return result;
   }
 
-  /**
-   * Оптимизация истории для хранения
-   */
-  private optimizeForStorage(history: HistoryItem[]): HistoryItem[] {
-    return history.map(item => {
-      if (!item || item.isEmpty) {
-        return item;
-      }
-
-      const optimized = { ...item };
-      
-      // Сжимаем фото если необходимо
-      if (optimized.photo && optimized.photo.length > HISTORY_CONSTRAINTS.MAX_PHOTO_SIZE) {
-        optimized.photo = truncateBase64(optimized.photo, HISTORY_CONSTRAINTS.MAX_PHOTO_SIZE);
-        logger.debug('Photo truncated for storage');
-      }
-      
-      return optimized;
-    });
-  }
 
   /**
    * Добавление нового элемента в историю

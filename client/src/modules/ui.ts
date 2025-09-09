@@ -823,7 +823,6 @@ class UIManager {
         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
         <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
       </svg>
-      Удалить
     `;
 
     // Стили кнопки
@@ -888,11 +887,30 @@ class UIManager {
           transform: scale(1.02);
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
           transition: all 0.2s ease;
+          user-select: none; /* Запрещаем выделение текста */
+          -webkit-user-select: none; /* Для WebKit браузеров */
+          -moz-user-select: none; /* Для Firefox */
+          -ms-user-select: none; /* Для IE/Edge */
+        }
+
+        .delete-history-btn {
+          user-select: none; /* Запрещаем выделение текста */
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
         }
 
         .delete-history-btn:hover {
           background: rgba(244, 67, 54, 1) !important;
           transform: translateX(-50%) scale(1.05) !important;
+        }
+
+        /* Запрещаем выделение текста для всех ячеек истории при долгом нажатии */
+        .history-cell {
+          user-select: none;
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
         }
       `;
       document.head.appendChild(styleSheet);

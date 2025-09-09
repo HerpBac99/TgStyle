@@ -186,8 +186,17 @@ class AnalysisManager {
    */
   private async saveToHistory(response: AnalysisResponse, imageBase64: string): Promise<void> {
     try {
+      // Используем сжатое изображение для истории (если доступно)
+      const imageForHistory = cameraManager.getImageForAnalysis() || imageBase64;
+
+      // Проверяем валидность base64 перед сохранением
+      if (!imageForHistory || imageForHistory.length < 100) {
+        logger.warn('Invalid image data for history, skipping save');
+        return;
+      }
+
       const historyItem: any = {
-        photo: imageBase64,
+        photo: imageForHistory,
         timestamp: new Date().toISOString(),
         sourceType: 'photo' as const,
       };

@@ -74,10 +74,7 @@ export function validateHistoryItem(item: HistoryItem): ValidationResult {
     errors.push('Отсутствует временная метка');
   }
 
-  // Проверяем размер фото
-  if (item.photo && item.photo.length > HISTORY_CONSTRAINTS.MAX_PHOTO_SIZE) {
-    warnings.push('Изображение будет сжато для экономии места');
-  }
+  // Размер фото больше не проверяется - сохраняем оригинал
 
   // Проверяем валидность timestamp
   if (item.timestamp && isNaN(new Date(item.timestamp).getTime())) {
@@ -210,34 +207,6 @@ export function validateApiResponse(response: any): ValidationResult {
   };
 }
 
-/**
- * Валидирует размер данных для localStorage
- */
-export function validateStorageSize(data: any, maxSizeMB: number): ValidationResult {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-
-  try {
-    const jsonString = JSON.stringify(data);
-    const sizeInBytes = new Blob([jsonString]).size;
-    const sizeInMB = sizeInBytes / (1024 * 1024);
-
-    if (sizeInMB > maxSizeMB) {
-      errors.push(`Данные слишком большие: ${sizeInMB.toFixed(1)}MB (лимит: ${maxSizeMB}MB)`);
-    } else if (sizeInMB > maxSizeMB * 0.8) {
-      warnings.push(`Данные близки к лимиту: ${sizeInMB.toFixed(1)}MB из ${maxSizeMB}MB`);
-    }
-
-  } catch (error) {
-    errors.push('Ошибка сериализации данных');
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-    warnings,
-  };
-}
 
 /**
  * Валидирует URL

@@ -19,4 +19,4 @@ python predict.py --image-file "../2.jpg" --prompt "Describe in detail what clot
 The image shows a woman wearing a white tank top, a long, dark brown cardigan, and light blue jeans. She is also wearing black sandals and sunglasses. The jeans are a classic fit with a slight flare at the bottom. The overall outfit appears casual and comfortable, suitable for a relaxed day out. The colors are neutral, with the white tank top and light blue jeans providing a soft contrast to the dark brown cardigan. The black sandals add a touch of sophistication to the casual ensemble.
 
 
-cd fastvlm-server; python server.py;
+cd fastvlm-server; python -m venv venv; pip install -r requirements.txt; $env:FASTVLM_MODEL="1.5b"; python server.py 

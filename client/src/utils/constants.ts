@@ -31,8 +31,6 @@ export const STORAGE_KEYS = {
 // Ограничения истории
 export const HISTORY_CONSTRAINTS = {
   MAX_ITEMS: 4,
-  MAX_STORAGE_SIZE_MB: 4,
-  MAX_PHOTO_SIZE: 100000, // Максимальная длина base64 строки для фото в истории
 } as const;
 
 // Настройки логирования
