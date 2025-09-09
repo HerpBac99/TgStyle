@@ -1,0 +1,243 @@
+/* 
+ * Стили для экрана анализа фото
+ * Новый дизайн с фото сверху и результатом снизу
+ */
+.analysis-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background-color: var(--tg-theme-bg-color, #81D8D0);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.analysis-screen:not(.hidden) {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Верхняя половина - контейнер для фото */
+.analysis-top-section {
+    height: 50vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+/* Контейнер для фото с молочной рамкой */
+.photo-container {
+    width: 100%;
+    max-width: 350px;
+    height: 100%;
+    max-height: 400px;
+    background: #f8f6f3;
+    border-radius: 16px;
+    padding: 1px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: translateY(20px);
+    opacity: 0;
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+}
+
+.analysis-screen:not(.hidden) .photo-container {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* Само фото */
+.analysis-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 12px;
+}
+
+/* Нижняя половина - результат анализа */
+.analysis-bottom-section {
+    height: 50vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* Индикатор загрузки */
+.analysis-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.4s;
+}
+
+.analysis-screen:not(.hidden) .analysis-loading {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.analysis-loading.hidden {
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
+/* Спиннер загрузки */
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-top: 3px solid white;
+    border-radius: 50%;
+    margin: 0 auto 15px;
+    animation: spin 1s linear infinite;
+}
+
+/* Текст загрузки */
+.loading-text {
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+    margin: 0;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* Контейнер результата анализа */
+.analysis-result-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: white;
+    border-radius: 16px 16px 0 0;
+    margin: 16px 16px 0 16px;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.1);
+    opacity: 0;
+    transform: translateY(100%);
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+.analysis-result-container:not(.hidden) {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Заголовок результата */
+.result-header {
+    background: #f8f6f3;
+    padding: 16px 24px;
+    border-radius: 16px 16px 0 0;
+    text-align: center;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.result-header h3 {
+    margin: 0;
+    color: #333;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+/* Текст анализа */
+.analysis-text {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+    line-height: 1.6;
+    color: #444;
+    font-size: 15px;
+    white-space: pre-wrap;
+}
+
+/* Кнопки действий */
+.result-actions {
+    padding: 20px 24px;
+    border-top: 1px solid #e0e0e0;
+    background: #fafafa;
+    display: flex;
+    gap: 12px;
+    border-radius: 0 0 16px 16px;
+}
+
+/* Базовые стили для кнопок действий */
+.action-btn {
+    border: none;
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* Кнопка лайк */
+.like-btn {
+    flex: 1;
+    background: #ff4757;
+    color: white;
+    box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
+}
+
+.like-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 71, 87, 0.4);
+}
+
+/* Кнопка поделиться */
+.share-btn {
+    flex: 1;
+    background: #3742fa;
+    color: white;
+    box-shadow: 0 4px 12px rgba(55, 66, 250, 0.3);
+}
+
+.share-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(55, 66, 250, 0.4);
+}
+
+/* Кнопка закрыть */
+.close-btn {
+    background: #81D8D0;
+    color: white;
+    box-shadow: 0 4px 12px rgba(129, 216, 208, 0.3);
+    padding: 14px;
+}
+
+.close-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(129, 216, 208, 0.4);
+}
+
+/* Анимация нажатия для всех кнопок */
+.action-btn:active {
+    transform: scale(0.95);
+}
+
+/* Анимация спиннера */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

@@ -57,10 +57,6 @@ export type {
   FastVLMHealthCheck,
 } from './analysis.js';
 
-export { 
-  IMAGE_CONSTRAINTS, 
-  ANALYSIS_TIMEOUTS 
-} from './analysis.js';
 
 // Общие типы приложения
 export interface AppConfig {

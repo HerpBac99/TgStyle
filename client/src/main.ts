@@ -4,7 +4,6 @@
  */
 
 // Импортируем стили
-import '../css/styles.css';
 
 import type { TelegramWebApp } from '@/types/index';
 import { APP_CONFIG, APP_EVENTS } from '@/utils/constants';

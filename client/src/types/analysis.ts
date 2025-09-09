@@ -116,22 +116,6 @@ export interface ValidationResult {
   warnings: string[];
 }
 
-// Константы для анализа
-export const IMAGE_CONSTRAINTS = {
-  MAX_SIZE_MB: 5,
-  MAX_WIDTH: 2048,
-  MAX_HEIGHT: 2048,
-  MIN_WIDTH: 100,
-  MIN_HEIGHT: 100,
-  ALLOWED_FORMATS: ['image/jpeg', 'image/png', 'image/webp'] as const,
-  COMPRESSION_QUALITY: 0.8,
-} as const;
-
-export const ANALYSIS_TIMEOUTS = {
-  UPLOAD: 30000, // 30 seconds
-  PROCESSING: 60000, // 60 seconds
-  TOTAL: 90000, // 90 seconds
-} as const;
 
 // Типы для FastVLM интеграции
 export interface FastVLMRequest {

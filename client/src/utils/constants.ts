@@ -145,16 +145,8 @@ export const CSS_CLASSES = {
   SUCCESS: 'success',
   FILLED: 'filled',
   DELETE_MODE: 'delete-mode',
-  CLASSIFICATION_TOAST: 'classification-toast',
 } as const;
 
-// Настройки анимаций
-export const ANIMATION_DURATIONS = {
-  FAST: 150,
-  NORMAL: 300,
-  SLOW: 500,
-  TOAST: 4000,
-} as const;
 
 // Настройки FastVLM
 export const FASTVLM_CONFIG = {
@@ -164,10 +156,3 @@ export const FASTVLM_CONFIG = {
   PROMPT_TEMPLATE: 'Опиши одежду на фото детально на русском языке: тип, цвет, стиль, материал, рекомендации по сочетанию.',
 } as const;
 
-// Режимы отладки
-export const DEBUG_MODE = {
-  ENABLED: false, // В production всегда false
-  SHOW_LOGS: false,
-  MOCK_API: false,
-  VERBOSE_LOGGING: false,
-} as const;

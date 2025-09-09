@@ -209,256 +209,184 @@ class UIManager {
   }
 
   /**
-   * Отображение полноэкранного предпросмотра
+   * Отображение экрана анализа фото
    */
   private showFullscreenPreview(imageBase64: string): void {
-    logger.info('Showing fullscreen preview with loading animation');
+    logger.info('Showing analysis screen');
 
-    // Удаляем существующий предпросмотр если есть
-    if (this.currentPreview) {
-      this.closePreview();
+    // Получаем элементы экрана анализа
+    const analysisScreen = getElement('#analysis-screen');
+    const analysisPhoto = getElement('#analysis-photo') as HTMLImageElement;
+    const loadingIndicator = getElement('#analysis-loading');
+    const resultContainer = getElement('#analysis-result-container');
+
+    if (!analysisScreen || !analysisPhoto || !loadingIndicator || !resultContainer) {
+      logger.error('Analysis screen elements not found');
+      return;
     }
 
-    // Основной контейнер с фоном как у всего приложения
-    const previewContainer = createElement('div', {
-      id: 'fullscreen-preview',
-      style: `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100vh;
-        background-color: var(--tg-theme-bg-color, #81D8D0);
-        z-index: 9999;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        padding: 20px;
-        opacity: 0;
-        transform: scale(0.95);
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      `,
-    });
+    // Устанавливаем фото
+    analysisPhoto.src = `data:image/jpeg;base64,${imageBase64}`;
 
-    // Контейнер для фото с красивыми отступами
-    const imageContainer = createElement('div', {
-      style: `
-        width: 100%;
-        max-width: 400px;
-        background: white;
-        border-radius: 20px;
-        padding: 15px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        transform: translateY(20px);
-        opacity: 0;
-        transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
-      `,
-    });
+    // Скрываем результат, показываем загрузку
+    resultContainer.classList.add('hidden');
+    loadingIndicator.classList.remove('hidden');
 
-    // Создаем изображение
-    const img = createElement('img', {
-      src: `data:image/jpeg;base64,${imageBase64}`,
-      style: `
-        width: 100%;
-        height: auto;
-        max-height: 300px;
-        object-fit: contain;
-        border-radius: 12px;
-      `,
-    });
+    // Показываем экран анализа
+    analysisScreen.classList.remove('hidden');
+    this.currentPreview = analysisScreen;
 
-    // Индикатор загрузки
-    const loadingContainer = createElement('div', {
-      id: 'loading-indicator',
-      style: `
-        margin-top: 30px;
-        text-align: center;
-        opacity: 0;
-        transform: translateY(20px);
-        transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.4s;
-      `,
-    });
-
-    const loadingSpinner = createElement('div', {
-      style: `
-        width: 40px;
-        height: 40px;
-        border: 3px solid rgba(255,255,255,0.3);
-        border-top: 3px solid white;
-        border-radius: 50%;
-        margin: 0 auto 15px;
-        animation: spin 1s linear infinite;
-      `,
-    });
-
-    const loadingText = createElement('p', {
-      textContent: 'Анализируем вашу одежду...',
-      style: `
-        color: white;
-        font-size: 16px;
-        font-weight: 500;
-        margin: 0;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.3);
-      `,
-    });
-
-    // Контейнер для результата (изначально скрыт)
-    const resultContainer = createElement('div', {
-      id: 'analysis-result',
-      style: `
-        position: fixed;
-        bottom: -100%;
-        left: 0;
-        right: 0;
-        background: white;
-        border-radius: 20px 20px 0 0;
-        padding: 25px;
-        max-height: 60vh;
-        overflow-y: auto;
-        box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
-        transition: bottom 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 10000;
-      `,
-    });
-
-    // Добавляем CSS для анимации спиннера
-    if (!document.querySelector('#loading-spinner-styles')) {
-      const style = document.createElement('style');
-      style.id = 'loading-spinner-styles';
-      style.textContent = `
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    // Собираем элементы
-    loadingContainer.appendChild(loadingSpinner);
-    loadingContainer.appendChild(loadingText);
-    
-    imageContainer.appendChild(img);
-    
-    previewContainer.appendChild(imageContainer);
-    previewContainer.appendChild(loadingContainer);
-    previewContainer.appendChild(resultContainer);
-
-    document.body.appendChild(previewContainer);
-    this.currentPreview = previewContainer;
-
-    // Запускаем анимацию появления
-    requestAnimationFrame(() => {
-      previewContainer.style.opacity = '1';
-      previewContainer.style.transform = 'scale(1)';
-      
-      setTimeout(() => {
-        imageContainer.style.opacity = '1';
-        imageContainer.style.transform = 'translateY(0)';
-      }, 200);
-      
-      setTimeout(() => {
-        loadingContainer.style.opacity = '1';
-        loadingContainer.style.transform = 'translateY(0)';
-      }, 400);
-    });
-
-    logger.info('Fullscreen preview with loading animation displayed');
+    logger.info('Analysis screen displayed');
   }
 
   /**
-   * Показать результат анализа в расширяющемся контейнере
+   * Показать результат анализа
    */
   showAnalysisResult(result: string): void {
     logger.info('Showing analysis result');
 
-    const resultContainer = document.getElementById('analysis-result');
-    const loadingIndicator = document.getElementById('loading-indicator');
+    const loadingIndicator = getElement('#analysis-loading');
+    const resultContainer = getElement('#analysis-result-container');
+    const analysisText = getElement('#analysis-text');
 
-    if (!resultContainer) {
-      logger.error('Result container not found');
+    if (!loadingIndicator || !resultContainer || !analysisText) {
+      logger.error('Analysis result elements not found');
       return;
     }
 
-    // Скрываем индикатор загрузки
-    if (loadingIndicator) {
-      loadingIndicator.style.opacity = '0';
-      loadingIndicator.style.transform = 'translateY(-20px)';
-      setTimeout(() => {
-        loadingIndicator.style.display = 'none';
-      }, 300);
+    // Скрываем загрузку, показываем результат
+    loadingIndicator.classList.add('hidden');
+    resultContainer.classList.remove('hidden');
+
+    // Устанавливаем текст анализа
+    analysisText.textContent = result;
+
+    // Настраиваем обработчики кнопок
+    this.setupResultButtons();
+
+    logger.info('Analysis result displayed');
+  }
+
+  /**
+   * Настройка обработчиков кнопок в результате анализа
+   */
+  private setupResultButtons(): void {
+    // Кнопка лайк
+    const likeBtn = getElement('#like-btn');
+    if (likeBtn) {
+      likeBtn.addEventListener('click', () => {
+        this.handleLikeClick();
+      });
     }
 
-    // Добавляем контент результата
-    resultContainer.innerHTML = `
-      <div style="
-        border-bottom: 3px solid #81D8D0;
-        padding-bottom: 15px;
-        margin-bottom: 20px;
-        text-align: center;
-      ">
-        <h3 style="
-          margin: 0;
-          color: #333;
-          font-size: 18px;
-          font-weight: 600;
-        ">✨ Анализ завершен</h3>
-      </div>
-      <div style="
-        line-height: 1.6;
-        color: #444;
-        font-size: 15px;
-        white-space: pre-wrap;
-      ">${result}</div>
-      <div style="
-        margin-top: 25px;
-        text-align: center;
-        border-top: 1px solid #eee;
-        padding-top: 20px;
-      ">
-        <button id="close-result-btn" style="
-          background: #81D8D0;
-          color: white;
-          border: none;
-          padding: 12px 30px;
-          border-radius: 25px;
-          font-size: 16px;
-          font-weight: 500;
-          cursor: pointer;
-          box-shadow: 0 4px 15px rgba(129, 216, 208, 0.3);
-          transition: all 0.3s ease;
-        ">
-          Готово
-        </button>
-      </div>
-    `;
+    // Кнопка поделиться
+    const shareBtn = getElement('#share-btn');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', () => {
+        this.handleShareClick();
+      });
+    }
 
-    // Добавляем обработчик кнопки закрытия
-    const closeBtn = document.getElementById('close-result-btn');
+    // Кнопка закрыть
+    const closeBtn = getElement('#close-analysis-btn');
     if (closeBtn) {
       closeBtn.addEventListener('click', () => {
         this.closePreview();
       });
+    }
+  }
 
-      // Эффект hover для кнопки
-      closeBtn.addEventListener('mouseenter', () => {
-        closeBtn.style.transform = 'translateY(-2px)';
-        closeBtn.style.boxShadow = '0 6px 20px rgba(129, 216, 208, 0.4)';
-      });
+  /**
+   * Обработчик клика по кнопке лайк
+   */
+  private handleLikeClick(): void {
+    logger.info('Like button clicked');
 
-      closeBtn.addEventListener('mouseleave', () => {
-        closeBtn.style.transform = 'translateY(0)';
-        closeBtn.style.boxShadow = '0 4px 15px rgba(129, 216, 208, 0.3)';
-      });
+    const likeBtn = getElement('#like-btn');
+    if (likeBtn) {
+      // Анимация нажатия
+      likeBtn.style.transform = 'scale(0.95)';
+      likeBtn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        ❤️ Понравилось!
+      `;
+
+      setTimeout(() => {
+        likeBtn.style.transform = 'scale(1)';
+      }, 200);
     }
 
-    // Анимируем появление контейнера результата
-    setTimeout(() => {
-      resultContainer.style.bottom = '0';
-    }, 500);
+    // Тактильная обратная связь
+    authManager.vibrate('light');
+  }
 
-    logger.info('Analysis result displayed');
+  /**
+   * Обработчик клика по кнопке поделиться
+   */
+  private handleShareClick(): void {
+    logger.info('Share button clicked');
+
+    try {
+      // Используем Telegram WebApp API для поделиться
+      if (window.Telegram?.WebApp?.openTelegramLink) {
+        const shareText = 'Попробуй TgStyle - анализ стиля одежды с помощью ИИ!';
+        const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(shareText)}`;
+        window.Telegram.WebApp.openTelegramLink(shareUrl);
+      } else {
+        // Fallback - копируем в буфер обмена
+        const shareText = 'Попробуй TgStyle - анализ стиля одежды с помощью ИИ!';
+        navigator.clipboard.writeText(shareText).then(() => {
+          this.showTemporaryMessage('Скопировано в буфер обмена!');
+        }).catch(() => {
+          this.showTemporaryMessage('Функция пока недоступна');
+        });
+      }
+    } catch (error) {
+      logger.warn('Failed to share', error);
+      this.showTemporaryMessage('Функция пока недоступна');
+    }
+
+    // Тактильная обратная связь
+    authManager.vibrate('light');
+  }
+
+  /**
+   * Показывает временное сообщение
+   */
+  private showTemporaryMessage(message: string): void {
+    const toast = createElement('div', {
+      style: `
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 20px;
+        font-size: 14px;
+        z-index: 10001;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      `,
+    }, message);
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '1';
+    }, 10);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 300);
+    }, 2000);
   }
 
 
@@ -578,13 +506,12 @@ class UIManager {
   }
 
   /**
-   * Закрытие текущего предпросмотра
+   * Закрытие экрана анализа
    */
   private closePreview(): void {
-    if (this.currentPreview) {
-      if (this.currentPreview.parentNode) {
-        this.currentPreview.parentNode.removeChild(this.currentPreview);
-      }
+    const analysisScreen = getElement('#analysis-screen');
+    if (analysisScreen) {
+      analysisScreen.classList.add('hidden');
       this.currentPreview = null;
       
       // Очищаем текущее изображение в менеджере камеры

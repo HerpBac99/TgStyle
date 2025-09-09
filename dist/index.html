@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TgStyle</title>
+    <title>TgStyle</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" crossorigin src="/assets/main-DLrJE7UA.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-m7HuOPrM.css">
+  <script type="module" crossorigin src="/assets/main-DNBjYfD-.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-l_8PhkUF.css">
 </head>
 <body>
     <div class="app-container">
@@ -76,6 +76,62 @@
                     <circle cx="12" cy="13" r="4"></circle>
                 </svg>
             </button>
+        </div>
+    </div>
+
+    <!-- Экран анализа фото -->
+    <div id="analysis-screen" class="analysis-screen hidden">
+        <!-- Верхняя половина - фото -->
+        <div class="analysis-top-section">
+            <div class="photo-container">
+                <img id="analysis-photo" src="" alt="Анализируемое фото" class="analysis-photo">
+            </div>
+        </div>
+
+        <!-- Нижняя половина - результат -->
+        <div class="analysis-bottom-section">
+            <!-- Индикатор загрузки -->
+            <div id="analysis-loading" class="analysis-loading">
+                <div class="loading-spinner"></div>
+                <p class="loading-text">Анализируем вашу одежду...</p>
+            </div>
+
+            <!-- Контейнер результата -->
+            <div id="analysis-result-container" class="analysis-result-container hidden">
+                <!-- Заголовок -->
+                <div class="result-header">
+                    <h3>✨ Анализ завершен</h3>
+                </div>
+
+                <!-- Текст анализа -->
+                <div id="analysis-text" class="analysis-text">
+                    <!-- Сюда будет вставлен текст анализа -->
+                </div>
+
+                <!-- Кнопки действий -->
+                <div class="result-actions">
+                    <button id="like-btn" class="action-btn like-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                        </svg>
+                        Лайк
+                    </button>
+
+                    <button id="share-btn" class="action-btn share-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/>
+                        </svg>
+                        Поделиться
+                    </button>
+
+                    <button id="close-analysis-btn" class="action-btn close-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </body>
