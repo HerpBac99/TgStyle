@@ -360,140 +360,81 @@ class UIManager {
       return;
     }
 
-    const photoPreview = createElement('div', {
-      id: 'photo-preview-container',
-      style: `
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        right: 20px;
-        bottom: 20px;
-        background-color: rgba(0, 0, 0, 0.95);
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        align-items: center;
-        border-radius: 15px;
-        padding: 15px;
-        opacity: 0;
-        transform: scale(0.95);
-        transition: opacity 0.3s ease, transform 0.3s ease;
-        cursor: pointer;
-      `,
-    });
+    // Получаем элементы из HTML
+    const savedAnalysisScreen = getElement('#saved-analysis-screen');
+    const savedAnalysisPhoto = getElement('#saved-analysis-photo') as HTMLImageElement;
+    const savedAnalysisData = getElement('#saved-analysis-data');
+    const savedAnalysisDate = getElement('#saved-analysis-date');
 
-    const img = createElement('img', {
-      src: `data:image/jpeg;base64,${analysisData.photo}`,
-      style: `
-        max-width: 100%;
-        max-height: 60%;
-        object-fit: contain;
-        border-radius: 10px;
-        margin-bottom: 10px;
-      `,
-    });
+    if (!savedAnalysisScreen || !savedAnalysisPhoto || !savedAnalysisData || !savedAnalysisDate) {
+      logger.error('Saved analysis screen elements not found');
+      return;
+    }
 
-    // Контейнер для информации
-    const infoContainer = createElement('div', {
-      style: `
-        width: 100%;
-        max-height: 35%;
-        overflow-y: auto;
-        background-color: rgba(0, 0, 0, 0.7);
-        color: white;
-        border-radius: 10px;
-        padding: 15px;
-        font-size: 14px;
-        line-height: 1.4;
-        margin-bottom: 10px;
-      `,
-    });
+    // Устанавливаем фото
+    savedAnalysisPhoto.src = `data:image/jpeg;base64,${analysisData.photo}`;
+
+    // Формируем текст анализа
+    let analysisContent = '';
 
     // Информация о классификации
-    let classificationInfo = '';
     if (analysisData.classification) {
-      classificationInfo = `<strong>Определено:</strong> ${analysisData.classification.classNameRu} (уверенность: ${analysisData.classification.confidence}%)<br><br>`;
+      analysisContent += `<strong>Определено:</strong> ${analysisData.classification.classNameRu} (уверенность: ${analysisData.classification.confidence}%)<br><br>`;
     }
 
     // Текст анализа LLM
-    let analysisText = '';
     if (analysisData.analysis) {
-      analysisText = `<strong>Анализ стиля:</strong><br>${analysisData.analysis}`;
+      analysisContent += `<strong>Анализ стиля:</strong><br>${analysisData.analysis}`;
     } else {
-      analysisText = '<em>Текст анализа недоступен</em>';
+      analysisContent += '<em>Текст анализа недоступен</em>';
     }
 
     // Комментарии
-    let commentsText = '';
     if (analysisData.comments && analysisData.comments.length > 0) {
-      commentsText = `<br><br><strong>Комментарии:</strong><br>• ${analysisData.comments.join('<br>• ')}`;
+      analysisContent += `<br><br><strong>Комментарии:</strong><br>• ${analysisData.comments.join('<br>• ')}`;
     }
 
-    infoContainer.innerHTML = classificationInfo + analysisText + commentsText;
+    savedAnalysisData.innerHTML = analysisContent;
+    savedAnalysisDate.textContent = formatHistoryDate(analysisData.timestamp);
 
-    // Дата фотографии
-    const dateCaption = createElement('div', {
-      style: `
-        color: white;
-        font-size: 12px;
-        padding: 8px 12px;
-        background-color: rgb(78, 187, 14);
-        border-radius: 8px;
-        margin-top: 5px;
-      `,
-    }, formatHistoryDate(analysisData.timestamp));
+    // Добавляем обработчик клика для закрытия
+    savedAnalysisScreen.addEventListener('click', () => this.closeSavedAnalysis());
 
-    photoPreview.addEventListener('click', () => this.closePhotoPreview());
+    // Показываем экран
+    savedAnalysisScreen.classList.remove('hidden');
+    this.currentPreview = savedAnalysisScreen;
 
-    photoPreview.appendChild(img);
-    photoPreview.appendChild(infoContainer);
-    photoPreview.appendChild(dateCaption);
-
-    document.body.appendChild(photoPreview);
-
-    // Анимация появления
-    setTimeout(() => {
-      photoPreview.style.opacity = '1';
-      photoPreview.style.transform = 'scale(1)';
-    }, 10);
-
-    this.currentPreview = photoPreview;
+    logger.info('Saved analysis displayed');
   }
 
   /**
-   * Закрытие предпросмотра фотографии
+   * Закрытие экрана сохраненного анализа
    */
-  private closePhotoPreview(): void {
-    const photoPreview = getElement('#photo-preview-container');
-    if (!photoPreview) return;
+  private closeSavedAnalysis(): void {
+    const savedAnalysisScreen = getElement('#saved-analysis-screen');
+    if (!savedAnalysisScreen) return;
 
-    logger.info('Closing photo preview');
+    logger.info('Closing saved analysis screen');
 
-    photoPreview.style.opacity = '0';
-    photoPreview.style.transform = 'scale(0.95)';
-
-    setTimeout(() => {
-      if (photoPreview.parentNode) {
-        photoPreview.parentNode.removeChild(photoPreview);
-      }
-    }, 300);
-
+    savedAnalysisScreen.classList.add('hidden');
     this.currentPreview = null;
   }
-
+  
   /**
    * Закрытие экрана анализа
    */
   private closePreview(): void {
+    // Закрываем экран анализа
     const analysisScreen = getElement('#analysis-screen');
     if (analysisScreen) {
       analysisScreen.classList.add('hidden');
-      this.currentPreview = null;
-      
-      // Очищаем текущее изображение в менеджере камеры
-      cameraManager.clearCurrentImage();
     }
+
+    // Закрываем экран сохраненного анализа
+    this.closeSavedAnalysis();
+
+    // Очищаем текущее изображение в менеджере камеры
+    cameraManager.clearCurrentImage();
   }
 
   /**
