@@ -47,6 +47,9 @@ PyYAML>=6.0.0
 # HTTP requests
 requests>=2.31.0
 
+# Google Gemini API
+google-genai>=1.0.0
+
 # Progress bars and logging
 tqdm>=4.67.0
 

@@ -18,6 +18,8 @@ client/build/
 logs/
 *.log
 
+results/
+
 # Runtime data
 pids/
 *.pid

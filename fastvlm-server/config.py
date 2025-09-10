@@ -1,6 +1,21 @@
 import os
 import torch
 
+# Загружаем переменные окружения из .env файла
+def load_env_file():
+    """Загрузка переменных окружения из .env файла"""
+    env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if os.path.exists(env_file):
+        with open(env_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
+
+# Вызываем загрузку переменных окружения
+load_env_file()
+
 class Config:
     """Конфигурация FastVLM сервера"""
 
@@ -49,6 +64,13 @@ class Config:
     LOG_MAX_BYTES = int(os.getenv('LOG_MAX_BYTES', '10485760'))  # 10MB
     LOG_BACKUP_COUNT = int(os.getenv('LOG_BACKUP_COUNT', '5'))
 
+    # === Настройки Gemini API ===
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')  # Требуется API ключ
+    GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
+    GEMINI_TEMPERATURE = float(os.getenv('GEMINI_TEMPERATURE', '0.7'))  # Творческая температура
+    GEMINI_MAX_TOKENS = int(os.getenv('GEMINI_MAX_TOKENS', '4096'))  # Увеличиваем для полных ответов
+    GEMINI_THINKING_BUDGET = int(os.getenv('GEMINI_THINKING_BUDGET', '0'))  # Отключаем thinking для скорости
+
     @classmethod
     def load_env(cls):
         """Загрузка переменных окружения из .env файла"""
@@ -73,9 +95,14 @@ class Config:
 
         if cls.PORT < 1024 or cls.PORT > 65535:
             raise ValueError(f"Некорректный порт: {cls.PORT}")
+        
+        # Проверяем API ключ Gemini (предупреждение, не критическая ошибка)
+        if not cls.GEMINI_API_KEY:
+            print("⚠️  GEMINI_API_KEY не установлен. Gemini функции будут недоступны.")
 
-        print(f"✅ Конфигурация загружена:")
-        print(f"   Порт: {cls.PORT}")
-        print(f"   Устройство: {cls.DEVICE}")
-        print(f"   Тип модели: {cls.MODEL_TYPE}")
-        print(f"   Модель: {os.path.basename(cls.MODEL_PATH)}")
+        print(f"Конфигурация загружена:")
+        print(f"Порт: {cls.PORT}")
+        print(f"Устройство: {cls.DEVICE}")
+        print(f"Тип модели: {cls.MODEL_TYPE}")
+        print(f"Модель: {os.path.basename(cls.MODEL_PATH)}")
+        print(f"Gemini API: {'Настроен' if cls.GEMINI_API_KEY else 'Не настроен'}")

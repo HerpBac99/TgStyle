@@ -31,7 +31,7 @@ export default defineConfig({
     cors: true,
     proxy: {
       '/api': {
-        target: 'https://localhost:443',
+        target: 'https://localhost:8443',
         changeOrigin: true,
         secure: false
       }
