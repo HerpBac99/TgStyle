@@ -51,9 +51,17 @@ class Config:
     TORCH_DTYPE = torch.float16
 
     # === Настройки генерации ===
-    MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', '512'))  # Увеличено для полных ответов
-    TEMPERATURE = float(os.getenv('TEMPERATURE', '0.4'))
-    DO_SAMPLE = os.getenv('DO_SAMPLE', 'true').lower() == 'true'
+    MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', '512'))  # Оптимизировано для структурированных ответов
+    TEMPERATURE = float(os.getenv('TEMPERATURE', '0.1'))  # Очень низкая температура для точности
+    DO_SAMPLE = os.getenv('DO_SAMPLE', 'false').lower() == 'true'  # Детерминированная генерация
+    TOP_P = float(os.getenv('TOP_P', '0.8'))  # Ограничиваем разнообразие
+    REPETITION_PENALTY = float(os.getenv('REPETITION_PENALTY', '1.2'))  # Повышаем штраф за повторения
+    
+    # === Дополнительные параметры для структурированного анализа ===
+    NUM_BEAMS = int(os.getenv('NUM_BEAMS', '3'))  # Beam search для лучшего качества
+    EARLY_STOPPING = os.getenv('EARLY_STOPPING', 'true').lower() == 'true'
+    LENGTH_PENALTY = float(os.getenv('LENGTH_PENALTY', '1.0'))  # Нейтральный штраф за длину
+    NO_REPEAT_NGRAM_SIZE = int(os.getenv('NO_REPEAT_NGRAM_SIZE', '3'))  # Предотвращаем повторение 3-грамм
 
     # === Настройки производительности ===
     MAX_IMAGE_SIZE = int(os.getenv('MAX_IMAGE_SIZE', '2048'))
@@ -63,6 +71,31 @@ class Config:
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     LOG_MAX_BYTES = int(os.getenv('LOG_MAX_BYTES', '10485760'))  # 10MB
     LOG_BACKUP_COUNT = int(os.getenv('LOG_BACKUP_COUNT', '5'))
+
+    # === Стоп-последовательности для предотвращения зацикливания ===
+    STOP_SEQUENCES = [
+        "END ANALYSIS",
+        "\n\n\n",
+        "In conclusion",
+        "Overall,", 
+        "The analysis",
+        "<|endoftext|>",
+        "ANALYSIS COMPLETE"
+    ]
+    
+    # === Специальная конфигурация для анализа одежды ===
+    FASHION_ANALYSIS_CONFIG = {
+        'conv_mode': 'qwen_2',
+        'max_new_tokens': MAX_NEW_TOKENS,
+        'temperature': TEMPERATURE,
+        'do_sample': DO_SAMPLE,
+        'top_p': TOP_P,
+        'repetition_penalty': REPETITION_PENALTY,
+        'num_beams': NUM_BEAMS,
+        'early_stopping': EARLY_STOPPING,
+        'length_penalty': LENGTH_PENALTY,
+        'no_repeat_ngram_size': NO_REPEAT_NGRAM_SIZE,
+    }
 
     # === Настройки Gemini API ===
     GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')  # Требуется API ключ

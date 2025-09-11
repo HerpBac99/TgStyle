@@ -238,17 +238,6 @@ def create_stylist_response(fastvlm_analysis):
         safe_analysis = str(fastvlm_analysis).replace('{', '{{').replace('}', '}}')
         formatted_prompt = style_prompt.replace('{fastvlm_analysis}', fastvlm_analysis)
 
-        app.logger.info(f"=== ФОРМАТИРОВАННЫЙ ПРОМПТ ===")
-        app.logger.info(f"Форматированный промпт: {formatted_prompt}")
-        app.logger.info(f"=== КОНЕЦ ФОРМАТИРОВАННОГО ПРОМПТА ===")
-
-        # Отправляем запрос в Gemini с настройками из конфигурации
-        app.logger.info(f"Отправляем запрос в Gemini с настройками:")
-        app.logger.info(f"  - Модель: {Config.GEMINI_MODEL}")
-        app.logger.info(f"  - Температура: {Config.GEMINI_TEMPERATURE}")
-        app.logger.info(f"  - Макс токенов: {Config.GEMINI_MAX_TOKENS}")
-        app.logger.info(f"  - Thinking budget: {Config.GEMINI_THINKING_BUDGET}")
-        
         response = gemini_client.models.generate_content(
             model=Config.GEMINI_MODEL,
             contents=formatted_prompt,
@@ -260,43 +249,7 @@ def create_stylist_response(fastvlm_analysis):
                 ) if Config.GEMINI_THINKING_BUDGET > 0 else None
             )
         )
-
-        # Детальное логирование ответа
-        app.logger.info(f"=== ДИАГНОСТИКА ОТВЕТА GEMINI ===")
-        app.logger.info(f"Тип ответа: {type(response)}")
-        app.logger.info(f"Атрибуты ответа: {[attr for attr in dir(response) if not attr.startswith('_')]}")
-        
-        # Проверяем candidates
-        if hasattr(response, 'candidates'):
-            app.logger.info(f"Количество candidates: {len(response.candidates) if response.candidates else 0}")
-            if response.candidates:
-                candidate = response.candidates[0]
-                app.logger.info(f"Первый candidate: {type(candidate)}")
-                app.logger.info(f"Candidate атрибуты: {[attr for attr in dir(candidate) if not attr.startswith('_')]}")
-                
-                # Проверяем finish_reason
-                if hasattr(candidate, 'finish_reason'):
-                    app.logger.info(f"Finish reason: {candidate.finish_reason}")
-                
-                # Проверяем safety_ratings
-                if hasattr(candidate, 'safety_ratings'):
-                    app.logger.info(f"Safety ratings: {candidate.safety_ratings}")
-
-        # Проверяем usage_metadata
-        if hasattr(response, 'usage_metadata'):
-            usage = response.usage_metadata
-            app.logger.info(f"Usage metadata: {usage}")
-            if hasattr(usage, 'prompt_token_count'):
-                app.logger.info(f"  - Prompt tokens: {usage.prompt_token_count}")
-            if hasattr(usage, 'candidates_token_count'):
-                app.logger.info(f"  - Candidate tokens: {usage.candidates_token_count}")
-            if hasattr(usage, 'total_token_count'):
-                app.logger.info(f"  - Total tokens: {usage.total_token_count}")
-
         creative_response = response.text.strip()
-        app.logger.info(f"Длина полученного текста: {len(creative_response)} символов")
-        app.logger.info(f"=== КОНЕЦ ДИАГНОСТИКИ ===")
-        
         return creative_response
         
     except Exception as e:
@@ -391,47 +344,97 @@ def save_fastvlm_result(clean_analysis, raw_output, image_info):
         return None
 
 def extract_analysis_from_output(output):
-    """Извлекает текст анализа из вывода FastVLM"""
+    """Извлекает структурированный анализ из вывода FastVLM (обновлено для английского промпта)"""
     try:
-        # Для JSON ответов ищем валидный JSON объект
-        import re
-        import json
-
-        # Ищем JSON объект в выводе (начинается с { и заканчивается })
-        json_match = re.search(r'\{.*\}', output.strip(), re.DOTALL)
-        if json_match:
-            json_str = json_match.group(0)
-            try:
-                # Проверяем, что это валидный JSON
-                parsed_json = json.loads(json_str)
-                return json.dumps(parsed_json, ensure_ascii=False, indent=2)
-            except json.JSONDecodeError:
-                pass
-
-        # Если JSON не найден, используем старый метод
         lines = output.strip().split('\n')
-
-        # Ищем последнюю строку с результатом
-        result_lines = []
-        for line in reversed(lines):
+        
+        # Английские маркеры для нового промпта
+        start_markers = [
+            '### main information',
+            '**gender:**',
+            '**age:**', 
+            '### head',
+            '**hair length:**',
+            '**hair:**',
+            '### torso',
+            '### legs'
+        ]
+        
+        # Стоп-маркеры для завершения анализа
+        stop_markers = [
+            'end analysis',
+            'analysis complete',
+            '<|endoftext|>',
+            '<|im_end|>',
+            'the analysis shows',
+            'in conclusion',
+            'overall,',
+            'the clothing'
+        ]
+        
+        start_idx = 0
+        end_idx = len(lines)
+        
+        # Находим начало структурированного анализа
+        for i, line in enumerate(lines):
+            line_lower = line.lower().strip()
+            if any(marker in line_lower for marker in start_markers):
+                start_idx = i
+                break
+            # Альтернативно: пропускаем строки с промптом
+            if line.strip() and not any(skip in line_lower for skip in [
+                'user:', 'system:', '<|im_start|>user', 'analyze the clothing', 
+                'you are a fashion', 'assistant:'
+            ]):
+                start_idx = i
+                break
+        
+        # Находим конец анализа
+        for i, line in enumerate(lines[start_idx:], start_idx):
+            line_lower = line.lower().strip()
+            if any(marker in line_lower for marker in stop_markers):
+                end_idx = i
+                break
+        
+        # Извлекаем только структурированную часть
+        analysis_lines = lines[start_idx:end_idx]
+        
+        # Очищаем от мусора и служебных токенов
+        cleaned_lines = []
+        for line in analysis_lines:
             line = line.strip()
-            if line and not line.startswith('`torch_dtype`') and not line.startswith('The following'):
-                # Очищаем от мусора и сохраняем русские символы
+            
+            # Пропускаем служебные токены
+            if any(skip in line for skip in [
+                '<|im_end|>', '<|im_start|>', '`torch_dtype`', 'The following',
+                '<|endoftext|>'
+            ]):
+                continue
+            
+            # Пропускаем пустые строки и строки с промптом
+            if line and not any(skip in line.lower() for skip in [
+                'user:', 'assistant:', 'system:', 'analyze the image',
+                'you are a fashion'
+            ]):
+                # Очищаем кодировку
                 clean_line = line.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
-                clean_line = ' '.join(clean_line.split())
-                result_lines.insert(0, clean_line)
-
-        # Убираем ограничение на 10 строк - берем все строки!
-        result_text = '\n'.join(result_lines)
-
-        if not result_text:
+                clean_line = ' '.join(clean_line.split())  # Нормализуем пробелы
+                cleaned_lines.append(clean_line)
+        
+        # Объединяем очищенные строки
+        result_text = '\n'.join(cleaned_lines)
+        
+        # Если результат пустой, возвращаем исходный вывод
+        if not result_text.strip():
+            app.logger.warning("Не удалось извлечь структурированный анализ, возвращаем исходный текст")
             result_text = output.strip()
-
+        
+        app.logger.debug(f"Извлечен анализ длиной {len(result_text)} символов")
         return result_text
 
     except Exception as e:
         app.logger.error(f"Ошибка при извлечении анализа: {e}")
-        return "Ошибка при обработке результатов анализа"
+        return output.strip()  # Возвращаем исходный текст при ошибке
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -576,7 +579,12 @@ def analyze():
                 # Обрабатываем изображение
                 image_tensor = process_images([image], image_processor, model.config)[0]
 
-                # Выполняем анализ
+                # Установка seed для детерминизма
+                torch.manual_seed(42)
+                if torch.cuda.is_available():
+                    torch.cuda.manual_seed_all(42)
+                
+                # Выполняем анализ с оптимизированными параметрами
                 with torch.no_grad():
                     output_ids = model.generate(
                         input_ids,
@@ -584,20 +592,23 @@ def analyze():
                         image_sizes=[image.size],
                         do_sample=Config.DO_SAMPLE,
                         temperature=Config.TEMPERATURE,
-                        top_p=None,
-                        num_beams=1,
+                        top_p=Config.TOP_P if Config.DO_SAMPLE else None,
+                        repetition_penalty=Config.REPETITION_PENALTY,
+                        num_beams=Config.NUM_BEAMS,  # Используем настроенное значение beam search
                         max_new_tokens=Config.MAX_NEW_TOKENS,
-                        use_cache=True
+                        length_penalty=Config.LENGTH_PENALTY,
+                        early_stopping=Config.EARLY_STOPPING,
+                        no_repeat_ngram_size=Config.NO_REPEAT_NGRAM_SIZE,
+                        use_cache=True,
+                        pad_token_id=tokenizer.eos_token_id,
+                        eos_token_id=tokenizer.eos_token_id
                     )
 
             # Декодируем результат
             result_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
             # Извлекаем чистый анализ
-            clean_analysis = extract_analysis_from_output(result_text)
-            
-            app.logger.info(f"=== ОЧИЩЕННЫЙ АНАЛИЗ ===")
-            app.logger.info(f"Очищенный анализ: {clean_analysis}")
-            app.logger.info(f"=== КОНЕЦ ОЧИЩЕННОГО АНАЛИЗА ===")
+            # clean_analysis = extract_analysis_from_output(result_text)
+            clean_analysis = (result_text)
 
             # Рассчитываем время инференса
             inference_time = time.time() - inference_start_time
@@ -613,10 +624,6 @@ def analyze():
             # Создаем креативный ответ стилиста через Gemini API
             stylist_response = create_stylist_response(clean_analysis)
 
-            app.logger.info(f"=== ОТВЕТ СТИЛИСТА ===")
-            app.logger.info(f"Ответ стилиста: {stylist_response}")
-            app.logger.info(f"=== КОНЕЦ ОТВЕТА СТИЛИСТА ===")
-
             # Рассчитываем общее время
             total_time = time.time() - analysis_start_time
 
@@ -627,6 +634,7 @@ def analyze():
 
             response_data = {
                 'success': True,
+                'technical_analysis': clean_analysis,
                 'analysis': stylist_response,  # Только креативный ответ стилиста
                 'model_used': model.config.model_type,
                 'device': str(model.device),

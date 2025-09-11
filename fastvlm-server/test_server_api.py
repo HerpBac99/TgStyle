@@ -56,14 +56,6 @@ def analyze_image(image_path):
     # Load prompt
     prompt = load_prompt()
 
-    # Show full prompt
-    print("=" * 80)
-    print("PROMPT SENT TO LLM:")
-    print("=" * 80)
-    print(prompt)
-    print("=" * 80)
-    print()
-
     # Prepare request
     data = {
         'prompt': prompt,
@@ -79,16 +71,26 @@ def analyze_image(image_path):
 
         if response.status_code == 200:
             result = response.json()
-            analysis = result.get('analysis', 'No analysis received')
+
+            # ДЕБАГ: проверяем что пришло
+            
+            technical_analysis = result.get('technical_analysis', 'No technical analysis received')
+            print("=" * 80)
+            print("TECHNICAL ANALYSIS:")
+            print("=" * 80)
+            print(technical_analysis)
+            print("=" * 80)
+
+            stylist_response = result.get('analysis', 'No analysis received')
 
             # Show full response
             print("=" * 80)
             print("LLM RESPONSE:")
             print("=" * 80)
-            print(analysis)
+            print(stylist_response)
             print("=" * 80)
 
-            return analysis
+            return stylist_response
         else:
             print(f"Server error: {response.status_code}")
             print(f"Response: {response.text}")
