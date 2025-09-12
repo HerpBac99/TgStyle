@@ -127,6 +127,9 @@ fastvlm-server/logs/
 
 # Build artifacts
 dist/
+index.html
+client/index.html
+*.html
 build/
 client/dist/
 fastvlm-server/dist/

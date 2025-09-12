@@ -131,7 +131,6 @@ export const DOM_SELECTORS = {
   CAMERA_BTN: '#camera-btn',
   HISTORY_CELLS: '.history-cell',
   APP_CONTAINER: '.app-container',
-  MAIN_WRAPPER: '.main-wrapper',
   HISTORY_GRID: '.history-grid',
 } as const;
 
