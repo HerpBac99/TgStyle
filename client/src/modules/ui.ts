@@ -575,11 +575,12 @@ class UIManager {
       this.carouselState.currentCenterIndex = Math.min(filledCount, this.carouselState.totalCards - 1);
     }
 
-    // Рассчитываем трансформацию
-    const cardWidth = 136; // 120px + 16px gap
+    // Рассчитываем трансформацию для новых размеров карт
+    const cardWidth = 220; // 200px + 20px gap
     const offset = -this.carouselState.currentCenterIndex * cardWidth;
     
-    carousel.style.transform = `translateX(calc(50% - 68px + ${offset}px))`;
+    // Центрируем карусель относительно контейнера
+    carousel.style.transform = `translateX(calc(50% - 100px + ${offset}px))`;
 
     // Обновляем центральную карту
     this.updateCenterCard();
@@ -653,12 +654,12 @@ class UIManager {
     this.carouselState.currentCenterIndex = position;
     this.carouselSwipeState.currentPosition = position;
 
-    // Анимированное перемещение
-    const cardWidth = 136; // 120px + 16px gap
+    // Анимированное перемещение с новыми размерами
+    const cardWidth = 220; // 200px + 20px gap
     const offset = -position * cardWidth;
     
     carousel.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-    carousel.style.transform = `translateX(calc(50% - 68px + ${offset}px))`;
+    carousel.style.transform = `translateX(calc(50% - 100px + ${offset}px))`;
 
     // Убираем transition после анимации
     setTimeout(() => {
