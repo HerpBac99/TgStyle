@@ -141,19 +141,26 @@ class HistoryManager {
         item.timestamp = new Date().toISOString();
       }
 
-      // Найдем последний заполненный элемент и добавим новый после него
+      // Найдем позицию для вставки нового элемента
       const filledItems = this.history.filter(historyItem => historyItem && !historyItem.isEmpty);
-      
+
       if (filledItems.length >= this.maxItems) {
         // Если история полная, удаляем самый старый (первый) элемент
         this.history.shift();
         this.history.push({ ...item, isEmpty: false });
         logger.info('Item added, oldest item removed');
       } else {
-        // Добавляем новый элемент в позицию после последнего заполненного
-        const insertPosition = filledItems.length;
-        this.history[insertPosition] = { ...item, isEmpty: false };
-        logger.info('Item added to position', { position: insertPosition });
+        // Добавляем новый элемент после последнего заполненного элемента
+        const insertPosition = this.findInsertPosition();
+        if (insertPosition >= this.history.length) {
+          // Добавляем в конец массива
+          this.history.push({ ...item, isEmpty: false });
+          logger.info('Item added to end of array');
+        } else {
+          // Вставляем на найденную позицию
+          this.history[insertPosition] = { ...item, isEmpty: false };
+          logger.info('Item added to position', { position: insertPosition });
+        }
       }
 
       // Сохраняем в localStorage
@@ -260,6 +267,23 @@ class HistoryManager {
    */
   getFirstEmptySlotIndex(): number {
     return this.history.findIndex(item => !item || item.isEmpty);
+  }
+
+  /**
+   * Находит позицию для вставки нового элемента (после последнего заполненного)
+   */
+  private findInsertPosition(): number {
+    // Находим индекс последнего заполненного элемента
+    let lastFilledIndex = -1;
+    for (let i = 0; i < this.history.length; i++) {
+      const item = this.history[i];
+      if (item && !item.isEmpty) {
+        lastFilledIndex = i;
+      }
+    }
+
+    // Возвращаем позицию после последнего заполненного элемента
+    return lastFilledIndex + 1;
   }
 
   /**
