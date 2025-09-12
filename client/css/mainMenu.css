@@ -1,35 +1,30 @@
-/* 
+/*
  * CSS переменные для всего приложения
- * Используются для централизованного управления цветами
- * В Telegram WebApp эти значения могут быть переопределены системными значениями
+ * Новый дизайн с градиентным фоном
  */
 :root {
-    /* Основной цвет фона - бирюзовый (цвет Tiffany)
-     * Может быть переопределен темой Telegram через --tg-theme-bg-color
-     * Поэтому в Telegram иногда отображается белым
-     */
-    --tg-theme-bg-color: #81D8D0; 
+    /* Градиентный фон - от светло-мятного до бежевого */
+    --gradient-bg: linear-gradient(135deg, #a9e2ab 0%, #E8F5E8 50%, #e4e4b3 100%);
     
-    /* Основной цвет текста - черный
-     * В Telegram может быть изменен на другой в зависимости от темы
-     */
-    --tg-theme-text-color: #000000;
+    /* Основной цвет текста - темно-коричневый */
+    --tg-theme-text-color: #5D4037;
     
-    /* Цвет кнопок - синий
-     * В Telegram обычно соответствует основному цвету акцента приложения
-     */
-    --tg-theme-button-color: #40a7e3;
+    /* Цвет кнопок - терракотовый */
+    --tg-theme-button-color: #A0522D;
     
     /* Цвет текста на кнопках - белый */
     --tg-theme-button-text-color: #ffffff;
     
-    /* Вторичный цвет фона - полупрозрачный белый 
-     * Используется для контейнеров на основном фоне
-     */
-    --tg-theme-secondary-bg-color: rgba(255, 255, 255, 0.8);
+    /* Вторичный цвет фона - полупрозрачный белый */
+    --tg-theme-secondary-bg-color: rgba(255, 255, 255, 0.9);
     
     /* Цвет для подсказок и вспомогательного текста */
-    --tg-theme-hint-color: #999999;
+    --tg-theme-hint-color: #8D6E63;
+    
+    /* Цвета для карт карусели */
+    --card-bg-color: rgba(255, 255, 255, 0.95);
+    --card-border-color: rgba(255, 255, 255, 0.8);
+    --card-shadow: 0 8px 32px rgba(93, 64, 55, 0.1);
 }
 
 /* 
@@ -70,11 +65,8 @@ body {
     /* Основной шрифт - Montserrat, если не доступен - системные шрифты */
     font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     
-    /* Цвет фона - берется из переменной CSS
-     * В Telegram WebApp это значение может быть принудительно изменено на системное
-     * Здесь мы используем !important для принудительного применения нашего цвета
-     */
-    background-color: var(--tg-theme-bg-color) !important; /* Принудительно устанавливаем цвет Tiffany, даже в Telegram */
+    /* Градиентный фон */
+    background: var(--gradient-bg) !important;
     
     /* Цвет текста - берется из переменной CSS */
     color: var(--tg-theme-text-color);
@@ -113,8 +105,8 @@ body {
     /* Высота на весь экран */
     height: 100vh;
     
-    /* Дополнительно устанавливаем фон контейнера на случай, если body не сработает */
-    background-color: var(--tg-theme-bg-color);
+    /* Дополнительно устанавливаем градиентный фон контейнера */
+    background: var(--gradient-bg);
 }
 
 /* 
@@ -207,8 +199,8 @@ body {
     /* Средняя жирность */
     font-weight: 500;
     
-    /* Белый цвет текста */
-    color: #bb4545;
+    /* Цвет текста соответствует новой схеме */
+    color: var(--tg-theme-text-color);
 
     /* Тень для улучшения читаемости на разных фонах */
     text-shadow: 0 1px 2px rgba(0,0,0,0.1);
@@ -378,63 +370,92 @@ button:active {
 
 
 /* 
- * Стили для сетки истории анализов
- * Сетка из 4 ячеек для хранения результатов анализа стиля
+ * Стили для карусели истории анализов
+ * Горизонтальная карусель с центральной увеличенной картой
  */
-.history-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-    margin: 16px 0;
+.history-carousel-container {
     width: 100%;
+    margin: 32px 0;
+    overflow: hidden;
+}
+
+.history-carousel {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 16px;
+    padding: 20px 0;
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transform-origin: center;
 }
 
 /* 
- * Стили для ячеек истории
- * Каждая ячейка представляет собой контейнер для сохраненного анализа
+ * Стили для карт карусели
+ * Каждая карта представляет собой контейнер для сохраненного анализа
  */
-.history-cell {
+.history-card {
     position: relative;
-    aspect-ratio: 3/4;
-    border-radius: 12px;
+    width: 120px;
+    height: 160px;
+    border-radius: 20px;
     overflow: hidden;
-    background-color: #f0f0f0;
-    background-size: cover;
-    background-position: center;
+    background: var(--card-bg-color);
+    backdrop-filter: blur(10px);
+    border: 2px solid var(--card-border-color);
+    box-shadow: var(--card-shadow);
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(0, 0, 0, 0.1);
     user-select: none;
+    flex-shrink: 0;
+    background-size: cover;
+    background-position: center;
 }
 
-.history-cell:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+/* Центральная карта - увеличенная и перекрывающая соседние */
+.history-card.center {
+    width: 150px;
+    height: 200px;
+    z-index: 10;
+    transform: scale(1.1);
+    box-shadow: 0 12px 48px rgba(93, 64, 55, 0.2);
+    border: 3px solid rgba(255, 255, 255, 1);
 }
 
-/* Содержимое ячейки */
-.history-cell-content {
+.history-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 16px 64px rgba(93, 64, 55, 0.15);
+}
+
+.history-card.center:hover {
+    transform: translateY(-4px) scale(1.12);
+    box-shadow: 0 20px 80px rgba(93, 64, 55, 0.25);
+}
+
+/* Содержимое карты */
+.history-card-content {
     width: 100%;
     height: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
+    position: relative;
 }
 
-/* Стили для индикатора даты в ячейке */
+/* Стили для индикатора даты в карте */
 .history-date {
     position: absolute;
     bottom: 8px;
     left: 8px;
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: rgba(0, 0, 0, 0.7);
     color: white;
     padding: 4px 8px;
     border-radius: 12px;
-    font-size: 11px;
-    user-select: none; /* Предотвращаем выделение текста */
+    font-size: 10px;
+    user-select: none;
+    backdrop-filter: blur(5px);
 }
 
 
@@ -467,18 +488,50 @@ button:active {
 }
 
 /* 
- * Стили для подписи в заполненной ячейке
+ * Стили для точек навигации карусели
+ * Показывают текущую позицию в карусели
+ */
+.carousel-dots {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: rgba(93, 64, 55, 0.3);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.dot.active {
+    background-color: var(--tg-theme-button-color);
+    transform: scale(1.2);
+}
+
+.dot:hover {
+    background-color: rgba(93, 64, 55, 0.6);
+    transform: scale(1.1);
+}
+
+/* 
+ * Стили для подписи в заполненной карте
  * Отображает краткую информацию о сохраненном анализе
  */
- .history-cell-caption {
-    /* Абсолютное позиционирование внизу ячейки */
+.history-card-caption {
+    /* Абсолютное позиционирование внизу карты */
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
     
-    /* Полупрозрачный черный фон */
-    background-color: rgba(0, 0, 0, 0.6);
+    /* Полупрозрачный черный фон с размытием */
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
     
     /* Цвет текста белый */
     color: white;
@@ -486,11 +539,12 @@ button:active {
     /* Внутренние отступы */
     padding: 8px;
     
-    /* Скругление нижних углов, как у родительской ячейки */
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
+    /* Скругление нижних углов, как у родительской карты */
+    border-bottom-left-radius: 18px;
+    border-bottom-right-radius: 18px;
     
     /* Шрифт для лучшей читаемости */
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
+    text-align: center;
 }

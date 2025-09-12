@@ -141,18 +141,19 @@ class HistoryManager {
         item.timestamp = new Date().toISOString();
       }
 
-      // Ищем пустой слот или создаем новый в начале
-      const emptyIndex = this.history.findIndex(historyItem => !historyItem || historyItem.isEmpty);
+      // Найдем последний заполненный элемент и добавим новый после него
+      const filledItems = this.history.filter(historyItem => historyItem && !historyItem.isEmpty);
       
-      if (emptyIndex !== -1) {
-        // Заполняем пустой слот
-        this.history[emptyIndex] = { ...item, isEmpty: false };
-        logger.info('Item added to empty slot', { index: emptyIndex });
+      if (filledItems.length >= this.maxItems) {
+        // Если история полная, удаляем самый старый (первый) элемент
+        this.history.shift();
+        this.history.push({ ...item, isEmpty: false });
+        logger.info('Item added, oldest item removed');
       } else {
-        // Сдвигаем все элементы и добавляем новый в начало
-        this.history.unshift({ ...item, isEmpty: false });
-        this.history = this.history.slice(0, this.maxItems);
-        logger.info('Item added to beginning, oldest item removed');
+        // Добавляем новый элемент в позицию после последнего заполненного
+        const insertPosition = filledItems.length;
+        this.history[insertPosition] = { ...item, isEmpty: false };
+        logger.info('Item added to position', { position: insertPosition });
       }
 
       // Сохраняем в localStorage

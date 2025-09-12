@@ -9,8 +9,7 @@ import type {
 } from '@/types/index.js';
 import { 
   DOM_SELECTORS,
-  CSS_CLASSES,
-  THEME_COLORS 
+  CSS_CLASSES
 } from '@/utils/constants.js';
 import { 
   getElement,
@@ -47,6 +46,17 @@ interface LongPressState {
 }
 
 /**
+ * Интерфейс для состояния свайпа карусели
+ */
+interface CarouselSwipeState {
+  isDragging: boolean;
+  startX: number;
+  currentX: number;
+  startTime: number;
+  currentPosition: number;
+}
+
+/**
  * Класс для управления UI
  */
 class UIManager {
@@ -68,6 +78,20 @@ class UIManager {
     targetIndex: null,
     moveHandler: null,
     documentClickHandler: null,
+  };
+  private carouselSwipeState: CarouselSwipeState = {
+    isDragging: false,
+    startX: 0,
+    currentX: 0,
+    startTime: 0,
+    currentPosition: 0,
+  };
+  
+  // Состояние карусели
+  private carouselState = {
+    currentCenterIndex: 0, // Индекс элемента в центре
+    totalCards: 0,         // Общее количество карт
+    containerWidth: 0,     // Ширина контейнера
   };
 
   constructor() {
@@ -192,20 +216,20 @@ class UIManager {
   }
 
   /**
-   * Принудительная установка цвета фона
+   * Принудительная установка градиентного фона
    */
   private ensureBackgroundColor(): void {
-    const targetColor = THEME_COLORS.PRIMARY_BG;
+    const gradientBg = 'linear-gradient(135deg, #C8E6C9 0%, #E8F5E8 50%, #F5F5DC 100%)';
     
     // Устанавливаем для body
-    document.body.style.backgroundColor = targetColor;
+    document.body.style.background = gradientBg;
     
     // Устанавливаем для контейнера приложения
     if (this.elements.appContainer) {
-      this.elements.appContainer.style.backgroundColor = targetColor;
+      this.elements.appContainer.style.background = gradientBg;
     }
 
-    logger.debug('Background color enforced', { color: targetColor });
+    logger.debug('Gradient background enforced');
   }
 
   /**
@@ -441,65 +465,351 @@ class UIManager {
    * Обновление отображения истории
    */
   updateHistoryDisplay(): void {
-    const history = historyManager.getAllItems();
+    const filledItems = historyManager.getFilledItems();
     
     logger.debug('Updating history display', {
-      historyCount: history.length,
-      cellsCount: this.elements.historyCells.length
+      filledItems: filledItems.length,
+      currentCenter: this.carouselState.currentCenterIndex
     });
 
-    this.elements.historyCells.forEach((cell, index) => {
-      const data = history[index];
+    // Создаем карусель динамически
+    this.createCarouselCards(filledItems);
+    
+    // Позиционируем карусель
+    this.positionCarousel();
+    
+    // Обновляем навигацию
+    this.updateCarouselNavigation();
+  }
+
+  /**
+   * Создание карт карусели динамически
+   */
+  private createCarouselCards(filledItems: HistoryItem[]): void {
+    const carousel = getElement(DOM_SELECTORS.HISTORY_CAROUSEL);
+    if (!carousel) return;
+
+    // Очищаем карусель
+    carousel.innerHTML = '';
+
+    // Всегда создаем минимум одну карту (пустую для новых фото)
+    const totalCards = Math.max(1, filledItems.length + 1);
+    this.carouselState.totalCards = totalCards;
+
+    // Создаем карты
+    for (let i = 0; i < totalCards; i++) {
+      const card = this.createCard(i, filledItems[i] || null);
+      carousel.appendChild(card);
+    }
+
+    // Обновляем ссылку на карты
+    this.elements.historyCells = getElements(DOM_SELECTORS.HISTORY_CARDS);
+
+    logger.debug('Carousel cards created', { totalCards, filledItems: filledItems.length });
+  }
+
+  /**
+   * Создание одной карты
+   */
+  private createCard(index: number, data: HistoryItem | null): HTMLElement {
+    const card = createElement('div', {
+      class: 'history-card',
+      'data-index': index.toString(),
+    });
+
+    const content = createElement('div', {
+      class: 'history-card-content',
+    });
+
+    if (data && !data.isEmpty) {
+      // Заполненная карта
+      card.classList.add(CSS_CLASSES.FILLED);
       
-      // Очищаем содержимое ячейки
-      const contentDiv = cell.querySelector('.history-cell-content') as HTMLElement;
-      if (!contentDiv) return;
+      if (data.photo) {
+        card.style.backgroundImage = `url(data:image/jpeg;base64,${data.photo})`;
+      }
 
-      contentDiv.innerHTML = '';
-      cell.className = 'history-cell';
-      cell.onclick = null;
+      const caption = createElement('div', {
+        class: 'history-card-caption',
+      }, formatHistoryDate(data.timestamp));
 
-      if (data && !data.isEmpty) {
-        // Заполненная ячейка
-        cell.classList.add(CSS_CLASSES.FILLED);
-        
-        // Устанавливаем фоновое изображение
-        if (data.photo) {
-          cell.style.backgroundImage = `url(data:image/jpeg;base64,${data.photo})`;
-        }
+      content.appendChild(caption);
 
-        // Добавляем подпись с датой
-        const caption = createElement('div', {
-          class: 'history-cell-caption',
-        }, formatHistoryDate(data.timestamp));
+      // Обработчики
+      this.addLongPressHandlers(card, index);
+      card.onclick = () => this.showSavedAnalysis(data);
+    } else {
+      // Пустая карта (для новых фото)
+      const addButton = createElement('div', {
+        class: 'add-analysis',
+      });
+      addButton.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14"></path>
+        </svg>
+      `;
+      
+      content.appendChild(addButton);
+      card.onclick = () => this.handleHistoryCellClick(index);
+    }
 
-        contentDiv.appendChild(caption);
+    card.appendChild(content);
+    return card;
+  }
 
-        // Добавляем обработчики долгого нажатия для удаления
-        this.addLongPressHandlers(cell, index);
+  /**
+   * Позиционирование карусели для отображения центральной карты
+   */
+  private positionCarousel(): void {
+    const carousel = getElement(DOM_SELECTORS.HISTORY_CAROUSEL);
+    if (!carousel) return;
 
-        // Обработчик клика для просмотра (будет переопределен в addLongPressHandlers)
-        cell.onclick = () => this.showSavedAnalysis(data);
+    // Для первого запуска показываем пустую карту по центру
+    const filledCount = historyManager.getFilledCount();
+    
+    if (filledCount === 0) {
+      // Первый запуск - пустая карта в центре
+      this.carouselState.currentCenterIndex = 0;
+    } else {
+      // Показываем самую новую (правую) карту, но центральная остается пустой
+      this.carouselState.currentCenterIndex = Math.min(filledCount, this.carouselState.totalCards - 1);
+    }
+
+    // Рассчитываем трансформацию
+    const cardWidth = 136; // 120px + 16px gap
+    const offset = -this.carouselState.currentCenterIndex * cardWidth;
+    
+    carousel.style.transform = `translateX(calc(50% - 68px + ${offset}px))`;
+
+    // Обновляем центральную карту
+    this.updateCenterCard();
+
+    logger.debug('Carousel positioned', { 
+      centerIndex: this.carouselState.currentCenterIndex,
+      offset,
+      filledCount
+    });
+  }
+
+  /**
+   * Обновление центральной карты (добавляем класс center)
+   */
+  private updateCenterCard(): void {
+    const cards = getElements(DOM_SELECTORS.HISTORY_CARDS);
+    
+    cards.forEach((card, index) => {
+      if (index === this.carouselState.currentCenterIndex) {
+        card.classList.add('center');
       } else {
-        // Пустая ячейка
-        cell.style.backgroundImage = '';
-        
-        // Добавляем кнопку "+"
-        const addButton = createElement('div', {
-          class: 'add-analysis',
-        });
-        addButton.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 5v14M5 12h14"></path>
-          </svg>
-        `;
-        
-        contentDiv.appendChild(addButton);
-
-        // Обработчик клика для создания нового анализа
-        cell.onclick = () => this.handleHistoryCellClick(index);
+        card.classList.remove('center');
       }
     });
+  }
+
+  /**
+   * Обновление навигации карусели (точки)
+   */
+  private updateCarouselNavigation(): void {
+    const dotsContainer = getElement(DOM_SELECTORS.CAROUSEL_DOTS);
+    if (!dotsContainer) return;
+
+    // Очищаем контейнер точек
+    dotsContainer.innerHTML = '';
+
+    // Создаем точки только если больше одной карты
+    if (this.carouselState.totalCards > 1) {
+      for (let i = 0; i < this.carouselState.totalCards; i++) {
+        const dot = createElement('div', {
+          class: `dot${i === this.carouselState.currentCenterIndex ? ' active' : ''}`,
+          'data-dot': i.toString(),
+        });
+
+        // Обработчик клика по точке
+        dot.addEventListener('click', () => this.moveCarouselToPosition(i));
+        
+        dotsContainer.appendChild(dot);
+      }
+    }
+
+    logger.debug('Carousel navigation updated', { 
+      totalCards: this.carouselState.totalCards,
+      currentCenter: this.carouselState.currentCenterIndex 
+    });
+  }
+
+  /**
+   * Переключение карусели на определенную позицию
+   */
+  private moveCarouselToPosition(position: number): void {
+    const carousel = getElement(DOM_SELECTORS.HISTORY_CAROUSEL);
+    if (!carousel) return;
+
+    // Проверяем границы
+    if (position < 0 || position >= this.carouselState.totalCards) {
+      return;
+    }
+
+    // Обновляем состояние
+    this.carouselState.currentCenterIndex = position;
+    this.carouselSwipeState.currentPosition = position;
+
+    // Анимированное перемещение
+    const cardWidth = 136; // 120px + 16px gap
+    const offset = -position * cardWidth;
+    
+    carousel.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+    carousel.style.transform = `translateX(calc(50% - 68px + ${offset}px))`;
+
+    // Убираем transition после анимации
+    setTimeout(() => {
+      carousel.style.transition = '';
+    }, 300);
+
+    // Обновляем центральную карту и точки
+    this.updateCenterCard();
+    this.updateActiveDot(position);
+
+    logger.info('Carousel moved to position', { 
+      position, 
+      offset,
+      totalCards: this.carouselState.totalCards
+    });
+  }
+
+  /**
+   * Обновление активной точки навигации
+   */
+  private updateActiveDot(activeIndex: number): void {
+    const dots = getElements(`${DOM_SELECTORS.CAROUSEL_DOTS} .dot`);
+    
+    dots.forEach((dot, index) => {
+      if (index === activeIndex) {
+        dot.classList.add('active');
+      } else {
+        dot.classList.remove('active');
+      }
+    });
+  }
+
+  /**
+   * Настройка обработчиков для карусели
+   */
+  private setupCarouselNavigation(): void {
+    // Настройка свайп-управления карусели
+    this.setupCarouselSwipe();
+
+    logger.debug('Carousel navigation handlers setup');
+  }
+
+  /**
+   * Настройка свайп-управления карусели
+   */
+  private setupCarouselSwipe(): void {
+    const carousel = getElement(DOM_SELECTORS.HISTORY_CAROUSEL);
+    if (!carousel) return;
+
+    // Touch events
+    const touchStartCleanup = addEventListenerWithCleanup(
+      carousel,
+      'touchstart',
+      this.handleCarouselTouchStart.bind(this),
+      { passive: true }
+    );
+
+    const touchMoveCleanup = addEventListenerWithCleanup(
+      carousel,
+      'touchmove',
+      this.handleCarouselTouchMove.bind(this),
+      { passive: false }
+    );
+
+    const touchEndCleanup = addEventListenerWithCleanup(
+      carousel,
+      'touchend',
+      this.handleCarouselTouchEnd.bind(this),
+      { passive: true }
+    );
+
+    this.cleanupFunctions.push(touchStartCleanup, touchMoveCleanup, touchEndCleanup);
+
+    logger.debug('Carousel swipe handlers setup');
+  }
+
+  /**
+   * Обработчик начала касания карусели
+   */
+  private handleCarouselTouchStart(event: TouchEvent): void {
+    const touch = event.touches[0];
+    if (!touch) return;
+    
+    this.carouselSwipeState = {
+      isDragging: true,
+      startX: touch.clientX,
+      currentX: touch.clientX,
+      startTime: Date.now(),
+      currentPosition: 0,
+    };
+  }
+
+  /**
+   * Обработчик движения касания карусели
+   */
+  private handleCarouselTouchMove(event: TouchEvent): void {
+    if (!this.carouselSwipeState.isDragging) return;
+
+    const touch = event.touches[0];
+    if (!touch) return;
+    
+    this.carouselSwipeState.currentX = touch.clientX;
+    
+    const deltaX = this.carouselSwipeState.currentX - this.carouselSwipeState.startX;
+    
+    // Предотвращаем вертикальный скролл при горизонтальном свайпе
+    if (Math.abs(deltaX) > 10) {
+      event.preventDefault();
+    }
+  }
+
+  /**
+   * Обработчик окончания касания карусели
+   */
+  private handleCarouselTouchEnd(): void {
+    if (!this.carouselSwipeState.isDragging) return;
+
+    const deltaX = this.carouselSwipeState.currentX - this.carouselSwipeState.startX;
+    const deltaTime = Date.now() - this.carouselSwipeState.startTime;
+    const velocity = Math.abs(deltaX) / deltaTime;
+
+    // Определяем направление свайпа (требуется минимальное расстояние и скорость)
+    if (Math.abs(deltaX) > 50 || velocity > 0.3) {
+      if (deltaX > 0) {
+        // Свайп вправо - предыдущий элемент
+        this.moveToPreviousCarouselItem();
+      } else {
+        // Свайп влево - следующий элемент
+        this.moveToNextCarouselItem();
+      }
+    }
+
+    this.carouselSwipeState.isDragging = false;
+  }
+
+  /**
+   * Переход к предыдущему элементу карусели
+   */
+  private moveToPreviousCarouselItem(): void {
+    const newPosition = Math.max(0, this.carouselState.currentCenterIndex - 1);
+    this.moveCarouselToPosition(newPosition);
+    logger.info('Carousel moved to previous item', { position: newPosition });
+  }
+
+  /**
+   * Переход к следующему элементу карусели
+   */
+  private moveToNextCarouselItem(): void {
+    const newPosition = Math.min(this.carouselState.totalCards - 1, this.carouselState.currentCenterIndex + 1);
+    this.moveCarouselToPosition(newPosition);
+    logger.info('Carousel moved to next item', { position: newPosition });
   }
 
   /**
@@ -517,6 +827,9 @@ class UIManager {
     
     // Применяем цвет фона
     this.ensureBackgroundColor();
+    
+    // Настраиваем навигацию карусели
+    this.setupCarouselNavigation();
     
     // Обновляем отображение истории
     this.updateHistoryDisplay();

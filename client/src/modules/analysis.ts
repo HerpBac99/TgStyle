@@ -71,6 +71,15 @@ class AnalysisManager {
       // Сохраняем в историю если анализ успешен
       if (response.success) {
         await this.saveToHistory(response, imageBase64);
+        
+        // Обновляем отображение истории после сохранения
+        try {
+          const { uiManager } = await import('./ui.js');
+          uiManager.updateHistoryDisplay();
+          logger.info('History display updated after analysis');
+        } catch (uiError) {
+          logger.error('Failed to update history display', uiError);
+        }
       }
 
       logger.info('Image analysis completed successfully');

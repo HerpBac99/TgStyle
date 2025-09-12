@@ -30,7 +30,7 @@ export const STORAGE_KEYS = {
 
 // Ограничения истории
 export const HISTORY_CONSTRAINTS = {
-  MAX_ITEMS: 4,
+  MAX_ITEMS: 10, // Увеличено до 10 слотов для карусели
 } as const;
 
 // Настройки логирования
@@ -129,9 +129,13 @@ export const DOM_SELECTORS = {
   USER_NAME: '#user-name',
   USER_PHOTO: '#user-photo',
   CAMERA_BTN: '#camera-btn',
-  HISTORY_CELLS: '.history-cell',
+  HISTORY_CELLS: '.history-card', // Обновлено для карусели
+  HISTORY_CARDS: '.history-card', // Новый селектор для карт
   APP_CONTAINER: '.app-container',
-  HISTORY_GRID: '.history-grid',
+  HISTORY_CAROUSEL: '.history-carousel',
+  HISTORY_CAROUSEL_CONTAINER: '.history-carousel-container',
+  CAROUSEL_DOTS: '.carousel-dots',
+  DOT: '.dot',
 } as const;
 
 // Классы CSS для состояний
