@@ -271,19 +271,20 @@ class HistoryManager {
 
   /**
    * Находит позицию для вставки нового элемента (после последнего заполненного)
+   * Оптимизированная версия с поиском с конца массива
    */
   private findInsertPosition(): number {
-    // Находим индекс последнего заполненного элемента
-    let lastFilledIndex = -1;
-    for (let i = 0; i < this.history.length; i++) {
+    // Ищем последний заполненный элемент с конца массива
+    for (let i = this.history.length - 1; i >= 0; i--) {
       const item = this.history[i];
       if (item && !item.isEmpty) {
-        lastFilledIndex = i;
+        // Возвращаем позицию после найденного элемента
+        return i + 1;
       }
     }
 
-    // Возвращаем позицию после последнего заполненного элемента
-    return lastFilledIndex + 1;
+    // Если не нашли ни одного заполненного элемента, возвращаем 0
+    return 0;
   }
 
   /**

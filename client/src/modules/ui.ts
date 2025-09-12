@@ -7,9 +7,10 @@ import type {
   HistoryItem, 
   TelegramWebApp
 } from '@/types/index.js';
-import { 
+import {
   DOM_SELECTORS,
-  CSS_CLASSES
+  CSS_CLASSES,
+  CAROUSEL_CONFIG
 } from '@/utils/constants.js';
 import { 
   getElement,
@@ -125,6 +126,20 @@ class UIManager {
    */
   private setupEventListeners(): void {
     // Обработчик кнопки камеры
+    this.setupCameraButtonListener();
+
+    // Глобальные обработчики
+    this.setupGlobalEventListeners();
+
+    // Обработчики ячеек истории добавляются динамически в updateHistoryDisplay
+
+    logger.debug('Event listeners setup completed');
+  }
+
+  /**
+   * Настраивает обработчик кнопки камеры
+   */
+  private setupCameraButtonListener(): void {
     if (this.elements.cameraBtn) {
       const cleanup = addEventListenerWithCleanup(
         this.elements.cameraBtn,
@@ -133,13 +148,27 @@ class UIManager {
       );
       this.cleanupFunctions.push(cleanup);
     }
+  }
 
-    // Обработчики ячеек истории добавляются динамически в updateHistoryDisplay
-
-    // Глобальные обработчики через стандартные addEventListener
+  /**
+   * Настраивает глобальные обработчики событий
+   */
+  private setupGlobalEventListeners(): void {
+    // Обработчик изменения состояния анализа
     window.addEventListener('analysisStateChange', this.handleAnalysisStateChange.bind(this) as EventListener);
 
-    // Event listeners setup completed
+    // Обработчик видимости страницы (для очистки состояния при сворачивании)
+    document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
+  }
+
+  /**
+   * Обработчик изменения видимости страницы
+   */
+  private handleVisibilityChange(): void {
+    if (document.hidden && this.longPressState.isActive) {
+      // Если страница свернута и активен режим удаления, выходим из него
+      this.exitDeleteMode();
+    }
   }
 
   /**
@@ -488,48 +517,13 @@ class UIManager {
    * Создание одной карты
    */
   private createCard(index: number, data: HistoryItem | null): HTMLElement {
-    const card = createElement('div', {
-      class: 'history-card',
-      'data-index': index.toString(),
-    });
-
-    const content = createElement('div', {
-      class: 'history-card-content',
-    });
+    const card = this.createCardElement(index);
+    const content = this.createCardContent();
 
     if (data && !data.isEmpty) {
-      // Заполненная карта
-      card.classList.add(CSS_CLASSES.FILLED);
-
-      if (data.photo) {
-        card.style.backgroundImage = `url(data:image/jpeg;base64,${data.photo})`;
-      }
-
-      const caption = createElement('div', {
-        class: 'history-card-caption',
-      }, formatHistoryDate(data.timestamp));
-
-      content.appendChild(caption);
-
-      // Находим реальный индекс элемента в общем массиве истории
-      const realIndex = this.findRealHistoryIndex(data);
-
-      // Обработчики
-      this.addLongPressHandlers(card, realIndex);
-      card.onclick = () => this.showSavedAnalysis(data);
+      this.setupFilledCard(card, content, data);
     } else {
-      // Пустая карта (для новых фото)
-      const addButton = createElement('div', {
-        class: 'add-analysis',
-      });
-      addButton.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 5v14M5 12h14"></path>
-        </svg>
-      `;
-
-      content.appendChild(addButton);
-      card.onclick = () => this.handleHistoryCellClick(index);
+      this.setupEmptyCard(card, content, index);
     }
 
     card.appendChild(content);
@@ -537,12 +531,100 @@ class UIManager {
   }
 
   /**
+   * Создает базовый элемент карты
+   */
+  private createCardElement(index: number): HTMLElement {
+    return createElement('div', {
+      class: 'history-card',
+      'data-index': index.toString(),
+    });
+  }
+
+  /**
+   * Создает контейнер контента карты
+   */
+  private createCardContent(): HTMLElement {
+    return createElement('div', {
+      class: 'history-card-content',
+    });
+  }
+
+  /**
+   * Настраивает заполненную карту
+   */
+  private setupFilledCard(card: HTMLElement, content: HTMLElement, data: HistoryItem): void {
+    card.classList.add(CSS_CLASSES.FILLED);
+
+    if (data.photo) {
+      card.style.backgroundImage = `url(data:image/jpeg;base64,${data.photo})`;
+    }
+
+    const caption = createElement('div', {
+      class: 'history-card-caption',
+    }, formatHistoryDate(data.timestamp));
+
+    content.appendChild(caption);
+
+    // Находим реальный индекс элемента в общем массиве истории
+    const realIndex = this.findRealHistoryIndex(data);
+
+    // Обработчики
+    this.addLongPressHandlers(card, realIndex);
+    card.onclick = () => this.showSavedAnalysis(data);
+  }
+
+  /**
+   * Настраивает пустую карту
+   */
+  private setupEmptyCard(card: HTMLElement, content: HTMLElement, index: number): void {
+    const addButton = this.createAddButton();
+    content.appendChild(addButton);
+    card.onclick = () => this.handleHistoryCellClick(index);
+  }
+
+  /**
+   * Создает кнопку добавления для пустой карты
+   */
+  private createAddButton(): HTMLElement {
+    const addButton = createElement('div', {
+      class: 'add-analysis',
+    });
+    addButton.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 5v14M5 12h14"></path>
+      </svg>
+    `;
+    return addButton;
+  }
+
+  /**
    * Находит реальный индекс элемента в общем массиве истории
+   * Оптимизированная версия с использованием Map для быстрого поиска
    */
   private findRealHistoryIndex(data: HistoryItem): number {
     const allItems = historyManager.getAllItems();
 
-    // Ищем элемент по совпадению данных (timestamp + photo)
+    // Создаем композитный ключ для быстрого поиска
+    const searchKey = `${data.timestamp}_${data.photo?.substring(0, 50) || ''}`;
+
+    // Создаем Map для быстрого поиска (если элементов много)
+    const itemMap = new Map<string, number>();
+
+    for (let i = 0; i < allItems.length; i++) {
+      const item = allItems[i];
+      if (item && !item.isEmpty) {
+        const key = `${item.timestamp}_${item.photo?.substring(0, 50) || ''}`;
+        itemMap.set(key, i);
+      }
+    }
+
+    // Быстрый поиск по ключу
+    const foundIndex = itemMap.get(searchKey);
+    if (foundIndex !== undefined) {
+      return foundIndex;
+    }
+
+    // Fallback на линейный поиск (на случай если композитный ключ не сработал)
     for (let i = 0; i < allItems.length; i++) {
       const item = allItems[i];
       if (item &&
@@ -576,11 +658,10 @@ class UIManager {
     }
 
     // Рассчитываем трансформацию для новых размеров карт
-    const cardWidth = 220; // 200px + 20px gap
-    const offset = -this.carouselState.currentCenterIndex * cardWidth;
-    
+    const offset = -this.carouselState.currentCenterIndex * CAROUSEL_CONFIG.TOTAL_CARD_WIDTH;
+
     // Центрируем карусель относительно контейнера
-    carousel.style.transform = `translateX(calc(50% - 100px + ${offset}px))`;
+    carousel.style.transform = `translateX(calc(50% - ${CAROUSEL_CONFIG.CENTER_OFFSET}px + ${offset}px))`;
 
     // Обновляем центральную карту
     this.updateCenterCard();
@@ -655,11 +736,10 @@ class UIManager {
     this.carouselSwipeState.currentPosition = position;
 
     // Анимированное перемещение с новыми размерами
-    const cardWidth = 220; // 200px + 20px gap
-    const offset = -position * cardWidth;
-    
-    carousel.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-    carousel.style.transform = `translateX(calc(50% - 100px + ${offset}px))`;
+    const offset = -position * CAROUSEL_CONFIG.TOTAL_CARD_WIDTH;
+
+    carousel.style.transition = `transform ${CAROUSEL_CONFIG.TRANSITION_DURATION}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+    carousel.style.transform = `translateX(calc(50% - ${CAROUSEL_CONFIG.CENTER_OFFSET}px + ${offset}px))`;
 
     // Убираем transition после анимации
     setTimeout(() => {
@@ -782,7 +862,7 @@ class UIManager {
     const velocity = Math.abs(deltaX) / deltaTime;
 
     // Определяем направление свайпа (требуется минимальное расстояние и скорость)
-    if (Math.abs(deltaX) > 50 || velocity > 0.3) {
+    if (Math.abs(deltaX) > CAROUSEL_CONFIG.SWIPE_THRESHOLD || velocity > CAROUSEL_CONFIG.SWIPE_VELOCITY_THRESHOLD) {
       if (deltaX > 0) {
         // Свайп вправо - предыдущий элемент
         this.moveToPreviousCarouselItem();
@@ -922,7 +1002,7 @@ class UIManager {
     this.longPressState.pressTimer = window.setTimeout(() => {
       this.activateLongPress(element, index);
       event.preventDefault();
-    }, 500); // 500ms как в оригинале
+    }, CAROUSEL_CONFIG.LONG_PRESS_DELAY);
   }
 
   /**
@@ -944,8 +1024,9 @@ class UIManager {
     const deltaX = Math.abs(currentX - this.longPressState.startPosition.x);
     const deltaY = Math.abs(currentY - this.longPressState.startPosition.y);
 
-    // Если движение превышает лимит (10px), отменяем долгое нажатие
-    if (deltaX > 10 || deltaY > 10) {
+    // Если движение превышает лимит, отменяем долгое нажатие
+    const movementThreshold = 10;
+    if (deltaX > movementThreshold || deltaY > movementThreshold) {
       logger.debug('Long press cancelled due to movement', { deltaX, deltaY });
       this.cancelLongPress();
     }
@@ -960,7 +1041,7 @@ class UIManager {
     this.longPressState.isActive = true;
 
     // Добавляем CSS класс
-    element.classList.add('delete-mode');
+    element.classList.add(CSS_CLASSES.DELETE_MODE);
 
     // Тактильная обратная связь через Telegram API
     this.triggerHapticFeedback();
@@ -1043,43 +1124,23 @@ class UIManager {
   private addDeleteButton(element: HTMLElement, index: number): void {
     logger.debug('Adding delete button', { index });
 
-    // Создаем кнопку удаления
-    const deleteButton = document.createElement('button');
-    deleteButton.className = 'delete-history-btn';
-    deleteButton.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 6h18"></path>
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
-        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-      </svg>
-    `;
-
-    // Стили кнопки
-    deleteButton.style.cssText = `
-      position: absolute;
-      bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(244, 67, 54, 0.9);
-      color: white;
-      border: none;
-      border-radius: 20px;
-      padding: 8px 16px;
-      font-size: 12px;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-      z-index: 1000;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-      transition: all 0.2s ease;
-      opacity: 0;
-      animation: fadeInUp 0.3s ease forwards;
-    `;
+    const deleteButton = this.createDeleteButton(index);
+    this.setupDeleteButtonStyles(deleteButton);
 
     // Добавляем CSS анимацию если её нет
     this.ensureLongPressStyles();
+
+    // Добавляем кнопку к элементу
+    element.appendChild(deleteButton);
+  }
+
+  /**
+   * Создает кнопку удаления
+   */
+  private createDeleteButton(index: number): HTMLElement {
+    const deleteButton = document.createElement('button');
+    deleteButton.className = CSS_CLASSES.DELETE_HISTORY_BTN;
+    deleteButton.innerHTML = this.getDeleteButtonIcon();
 
     // Обработчик клика по кнопке удаления
     deleteButton.addEventListener('click', async (event: Event) => {
@@ -1087,8 +1148,50 @@ class UIManager {
       await this.handleDeleteClick(deleteButton, index);
     });
 
-    // Добавляем кнопку к элементу
-    element.appendChild(deleteButton);
+    return deleteButton;
+  }
+
+  /**
+   * Возвращает SVG иконку для кнопки удаления
+   */
+  private getDeleteButtonIcon(): string {
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"></path>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+    `;
+  }
+
+  /**
+   * Настраивает стили кнопки удаления
+   */
+  private setupDeleteButtonStyles(button: HTMLElement): void {
+    const styles = {
+      position: 'absolute',
+      bottom: '10px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      background: 'rgba(244, 67, 54, 0.9)',
+      color: 'white',
+      border: 'none',
+      borderRadius: '20px',
+      padding: '8px 16px',
+      fontSize: '12px',
+      fontWeight: 'bold',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      cursor: 'pointer',
+      zIndex: '1000',
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+      transition: 'all 0.2s ease',
+      opacity: '0',
+      animation: 'fadeInUp 0.3s ease forwards',
+    };
+
+    Object.assign(button.style, styles);
   }
 
   /**
@@ -1152,45 +1255,14 @@ class UIManager {
   private async handleDeleteClick(button: HTMLButtonElement, index: number): Promise<void> {
     logger.info('Delete button clicked', { index });
 
-    // Блокируем кнопку
-    button.disabled = true;
-    button.style.opacity = '0.7';
-    button.innerHTML = 'Удаление...';
+    this.disableDeleteButton(button);
 
     try {
-      // Запрашиваем подтверждение через Telegram API
-      const confirmed = await this.showConfirmDialog('Удалить этот элемент из истории?');
-      
+      const confirmed = await this.requestDeleteConfirmation();
+
       if (confirmed) {
-        // Удаляем элемент из истории
-        const success = historyManager.removeItem(index);
-        
-        if (success) {
-          logger.info('History item deleted successfully', { index });
-          
-          // Тактильная обратная связь об успехе
-          this.triggerSuccessHaptic();
-          
-          // Анимируем исчезновение кнопки
-          button.style.opacity = '0';
-          button.style.transform = 'translateX(-50%) translateY(10px)';
-          
-          setTimeout(() => {
-            if (button.parentNode) {
-              button.parentNode.removeChild(button);
-            }
-          }, 300);
-          
-          // Выходим из режима удаления
-          this.exitDeleteMode();
-          
-          // Обновляем отображение истории
-          this.updateHistoryDisplay();
-        } else {
-          throw new Error('Не удалось удалить элемент');
-        }
+        await this.performDelete(button, index);
       } else {
-        // Пользователь отменил удаление
         this.restoreDeleteButton(button);
       }
     } catch (error) {
@@ -1198,6 +1270,61 @@ class UIManager {
       this.restoreDeleteButton(button);
       this.logError('Ошибка при удалении элемента');
     }
+  }
+
+  /**
+   * Блокирует кнопку удаления и показывает состояние загрузки
+   */
+  private disableDeleteButton(button: HTMLButtonElement): void {
+    button.disabled = true;
+    button.style.opacity = '0.7';
+    button.innerHTML = 'Удаление...';
+  }
+
+  /**
+   * Запрашивает подтверждение удаления
+   */
+  private async requestDeleteConfirmation(): Promise<boolean> {
+    return await this.showConfirmDialog('Удалить этот элемент из истории?');
+  }
+
+  /**
+   * Выполняет удаление элемента
+   */
+  private async performDelete(button: HTMLButtonElement, index: number): Promise<void> {
+    const success = historyManager.removeItem(index);
+
+    if (success) {
+      logger.info('History item deleted successfully', { index });
+
+      // Тактильная обратная связь об успехе
+      this.triggerSuccessHaptic();
+
+      // Анимируем исчезновение кнопки
+      this.animateDeleteButtonDisappearance(button);
+
+      // Выходим из режима удаления
+      this.exitDeleteMode();
+
+      // Обновляем отображение истории
+      this.updateHistoryDisplay();
+    } else {
+      throw new Error('Не удалось удалить элемент');
+    }
+  }
+
+  /**
+   * Анимирует исчезновение кнопки удаления
+   */
+  private animateDeleteButtonDisappearance(button: HTMLButtonElement): void {
+    button.style.opacity = '0';
+    button.style.transform = 'translateX(-50%) translateY(10px)';
+
+    setTimeout(() => {
+      if (button.parentNode) {
+        button.parentNode.removeChild(button);
+      }
+    }, 300);
   }
 
   /**
@@ -1261,10 +1388,10 @@ class UIManager {
     logger.debug('Exiting delete mode');
 
     // Удаляем CSS класс
-    this.longPressState.targetElement.classList.remove('delete-mode');
+    this.longPressState.targetElement.classList.remove(CSS_CLASSES.DELETE_MODE);
 
     // Удаляем кнопку удаления
-    const deleteButton = this.longPressState.targetElement.querySelector('.delete-history-btn');
+    const deleteButton = this.longPressState.targetElement.querySelector(`.${CSS_CLASSES.DELETE_HISTORY_BTN}`);
     if (deleteButton) {
       deleteButton.remove();
     }

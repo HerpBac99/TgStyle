@@ -146,6 +146,23 @@ export const CSS_CLASSES = {
   SUCCESS: 'success',
   FILLED: 'filled',
   DELETE_MODE: 'delete-mode',
+  CENTER: 'center',
+  DELETE_HISTORY_BTN: 'delete-history-btn',
+} as const;
+
+// Настройки карусели
+export const CAROUSEL_CONFIG = {
+  CARD_WIDTH: 200,
+  CARD_GAP: 20,
+  TOTAL_CARD_WIDTH: 220, // CARD_WIDTH + CARD_GAP
+  CENTER_OFFSET: 100, // Смещение для центрирования
+  SWIPE_THRESHOLD: 20, // Минимальное расстояние для свайпа
+  SWIPE_VELOCITY_THRESHOLD: 0.1, // Минимальная скорость для свайпа
+  TRANSITION_DURATION: 300, // Длительность анимации в мс
+  LONG_PRESS_DELAY: 500, // Задержка долгого нажатия в мс
+  HAPTIC_FEEDBACK_LIGHT: 'light' as const,
+  HAPTIC_FEEDBACK_MEDIUM: 'medium' as const,
+  HAPTIC_FEEDBACK_SUCCESS: 'success' as const,
 } as const;
 
 
