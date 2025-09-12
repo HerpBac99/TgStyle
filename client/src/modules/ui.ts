@@ -137,7 +137,6 @@ class UIManager {
     // Обработчики ячеек истории добавляются динамически в updateHistoryDisplay
 
     // Глобальные обработчики через стандартные addEventListener
-    document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
     window.addEventListener('analysisStateChange', this.handleAnalysisStateChange.bind(this) as EventListener);
 
     // Event listeners setup completed
@@ -195,14 +194,7 @@ class UIManager {
     }
   }
 
-  /**
-   * Обработчик изменения видимости страницы
-   */
-  private handleVisibilityChange(): void {
-    if (!document.hidden) {
-      this.ensureBackgroundColor();
-    }
-  }
+  
 
   /**
    * Обработчик изменения состояния анализа
@@ -215,22 +207,6 @@ class UIManager {
     // Например, показать прогресс-бар или спиннер
   }
 
-  /**
-   * Принудительная установка градиентного фона
-   */
-  private ensureBackgroundColor(): void {
-    const gradientBg = 'linear-gradient(135deg, #C8E6C9 0%, #E8F5E8 50%, #F5F5DC 100%)';
-    
-    // Устанавливаем для body
-    document.body.style.background = gradientBg;
-    
-    // Устанавливаем для контейнера приложения
-    if (this.elements.appContainer) {
-      this.elements.appContainer.style.background = gradientBg;
-    }
-
-    logger.debug('Gradient background enforced');
-  }
 
   /**
    * Отображение экрана анализа фото
@@ -825,16 +801,13 @@ class UIManager {
    */
   init(): void {
     logger.info('Initializing UI Manager');
-    
-    // Применяем цвет фона
-    this.ensureBackgroundColor();
-    
+
     // Настраиваем навигацию карусели
     this.setupCarouselNavigation();
-    
+
     // Обновляем отображение истории
     this.updateHistoryDisplay();
-    
+
     logger.info('UI Manager initialized successfully');
   }
 

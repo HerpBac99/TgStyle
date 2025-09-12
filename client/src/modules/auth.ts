@@ -65,40 +65,12 @@ class AuthManager {
         this.tg.requestFullscreen();
       }
 
-      // Применяем цвет фона
-      this.applyTheme();
-
       // Уведомляем Telegram что приложение готово
       this.tg.ready();
       
       logger.info('Telegram WebApp configured successfully');
     } catch (error) {
       logger.error('Error configuring Telegram WebApp', error);
-    }
-  }
-
-  /**
-   * Применение темы приложения
-   */
-  private applyTheme(): void {
-    if (!this.tg) return;
-
-    try {
-      // Устанавливаем цвет фона в Telegram
-      const tiffanyColor = '#81D8D0';
-      this.tg.setBackgroundColor(tiffanyColor);
-      
-      // Также применяем принудительно через CSS
-      document.body.style.backgroundColor = tiffanyColor;
-      
-      const appContainer = document.querySelector('.app-container') as HTMLElement;
-      if (appContainer) {
-        appContainer.style.backgroundColor = tiffanyColor;
-      }
-
-      logger.debug('Theme applied successfully', { color: tiffanyColor });
-    } catch (error) {
-      logger.error('Error applying theme', error);
     }
   }
 
@@ -155,9 +127,6 @@ class AuthManager {
       // Извлекаем данные пользователя
       this.user = this.extractUserData();
       this.displayUserProfile();
-
-      // Применяем тему приложения
-      this.applyTheme();
 
       // Получаем initData для валидации на сервере
       const initData = this.tg?.initData;

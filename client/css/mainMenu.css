@@ -4,8 +4,8 @@
  */
 :root {
     /* Градиентный фон - от светло-мятного до бежевого */
-    --gradient-bg: linear-gradient(135deg, #a9e2ab 0%, #E8F5E8 50%, #e4e4b3 100%);
-    
+    /*--gradient-bg: linear-gradient(135deg, #a9e2ab 0%, #E8F5E8 50%, #e4e4b3 100%); */
+    --gradient-bg: #173F35;
     /* Основной цвет текста - темно-коричневый */
     --tg-theme-text-color: #5D4037;
     
@@ -104,9 +104,6 @@ body {
     
     /* Высота на весь экран */
     height: 100vh;
-    
-    /* Дополнительно устанавливаем градиентный фон контейнера */
-    background: var(--gradient-bg);
 }
 
 /* 
@@ -278,18 +275,18 @@ button:active {
  * Круглая кнопка с иконкой камеры
  */
 .camera-btn {
-    /* Размеры 70x70px для удобного нажатия */
-    width: 70px;
-    height: 70px;
+    /* Размеры 90x90px для удобного нажатия */
+    width: 90px;
+    height: 90px;
     
     /* Скругление в круг */
     border-radius: 50%;
     
     /* Белый фон */
-    background-color: #fff;
+    background-color: var(--tg-theme-button-color);
     
     /* Цвет иконки синий (как у кнопок) */
-    color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
     
     /* Центрирование иконки */
     display: flex;
@@ -320,9 +317,9 @@ button:active {
  * Сама иконка фотоаппарата
  */
 .camera-btn svg {
-    /* Размеры иконки 30x30px */
-    width: 30px;
-    height: 30px;
+    /* Размеры иконки 70x70px */
+    width: 70px;
+    height:70px;
 }
 
 

@@ -2,18 +2,12 @@
  * Главный файл экспорта всех TypeScript типов
  */
 
-// Экспорт типов Telegram WebApp
+// Экспорт типов Telegram WebApp (только используемые)
 export type {
   TelegramUser,
   TelegramChat,
   TelegramWebAppInitData,
-  TelegramThemeParams,
-  TelegramHapticFeedback,
-  TelegramMainButton,
-  TelegramBackButton,
-  TelegramSettingsButton,
   TelegramWebApp,
-  TelegramWebAppGlobal,
 } from './telegram.js';
 
 // Экспорт типов API

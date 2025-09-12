@@ -50,12 +50,12 @@ class TgStyleApp {
       // Завершаем инициализацию
       this.completeInitialization();
 
-      logger.info('✅ TgStyle application initialized successfully', {
+      logger.info('TgStyle application initialized successfully', {
         initTime: Date.now() - this.initStartTime + 'ms',
       });
 
     } catch (error) {
-      logger.error('❌ Failed to initialize TgStyle application', error);
+      logger.error('Failed to initialize TgStyle application', error);
       this.handleInitializationError(error);
     }
   }
@@ -174,12 +174,6 @@ class TgStyleApp {
         'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
       );
     }
-
-    // Устанавливаем цвет статус-бара
-    const themeColor = document.createElement('meta');
-    themeColor.name = 'theme-color';
-    themeColor.content = '#81D8D0'; // Tiffany цвет
-    document.head.appendChild(themeColor);
   }
 
   /**
