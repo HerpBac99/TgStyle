@@ -183,8 +183,8 @@ class UIManager {
    * Обработчик клика по ячейке истории
    */
   private handleHistoryCellClick(index: number): void {
-    const historyItem = historyManager.getItem(index);
-    
+    const historyItem = historyManager.getFilledItem(index);
+
     if (historyItem) {
       logger.info('History cell clicked', { index });
       this.showSavedAnalysis(historyItem);
@@ -500,7 +500,7 @@ class UIManager {
     if (data && !data.isEmpty) {
       // Заполненная карта
       card.classList.add(CSS_CLASSES.FILLED);
-      
+
       if (data.photo) {
         card.style.backgroundImage = `url(data:image/jpeg;base64,${data.photo})`;
       }
@@ -511,8 +511,11 @@ class UIManager {
 
       content.appendChild(caption);
 
+      // Находим реальный индекс элемента в общем массиве истории
+      const realIndex = this.findRealHistoryIndex(data);
+
       // Обработчики
-      this.addLongPressHandlers(card, index);
+      this.addLongPressHandlers(card, realIndex);
       card.onclick = () => this.showSavedAnalysis(data);
     } else {
       // Пустая карта (для новых фото)
@@ -524,13 +527,34 @@ class UIManager {
           <path d="M12 5v14M5 12h14"></path>
         </svg>
       `;
-      
+
       content.appendChild(addButton);
       card.onclick = () => this.handleHistoryCellClick(index);
     }
 
     card.appendChild(content);
     return card;
+  }
+
+  /**
+   * Находит реальный индекс элемента в общем массиве истории
+   */
+  private findRealHistoryIndex(data: HistoryItem): number {
+    const allItems = historyManager.getAllItems();
+
+    // Ищем элемент по совпадению данных (timestamp + photo)
+    for (let i = 0; i < allItems.length; i++) {
+      const item = allItems[i];
+      if (item &&
+          !item.isEmpty &&
+          item.timestamp === data.timestamp &&
+          item.photo === data.photo) {
+        return i;
+      }
+    }
+
+    logger.warn('Could not find real history index for item', { timestamp: data.timestamp });
+    return -1; // Не нашли
   }
 
   /**

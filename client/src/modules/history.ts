@@ -218,6 +218,17 @@ class HistoryManager {
   }
 
   /**
+   * Получение заполненного элемента по индексу в массиве заполненных элементов
+   */
+  getFilledItem(index: number): HistoryItem | null {
+    const filledItems = this.getFilledItems();
+    if (index < 0 || index >= filledItems.length) {
+      return null;
+    }
+    return filledItems[index] || null;
+  }
+
+  /**
    * Очистка всей истории
    */
   clear(): void {
