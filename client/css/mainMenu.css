@@ -5,12 +5,12 @@
 :root {
     /* Градиентный фон - от светло-мятного до бежевого */
     /*--gradient-bg: linear-gradient(135deg, #a9e2ab 0%, #E8F5E8 50%, #e4e4b3 100%); */
-    --gradient-bg: #173F35;
+    --gradient-bg: linear-gradient(135deg, #FFDAB9 0%, #E6E6FA 50%, #E6E6FA 100%);
     /* Основной цвет текста - темно-коричневый */
     --tg-theme-text-color: #5D4037;
     
     /* Цвет кнопок - терракотовый */
-    --tg-theme-button-color: #A0522D;
+    --tg-theme-button-color: #A0522D !important;
     
     /* Цвет текста на кнопках - белый */
     --tg-theme-button-text-color: #ffffff;
@@ -22,8 +22,8 @@
     --tg-theme-hint-color: #8D6E63;
     
     /* Цвета для карт карусели */
-    --card-bg-color: rgba(255, 255, 255, 0.95);
-    --card-border-color: rgba(255, 255, 255, 0.8);
+    --card-bg-color: #f7eee6;
+    --card-border-color: #ffffff;
     --card-shadow: 0 8px 32px rgba(93, 64, 55, 0.1);
 }
 
@@ -191,7 +191,7 @@ body {
  */
 #user-name {
     /* Небольшой размер шрифта */
-    font-size: 1.2rem;
+    font-size: 0.8rem;
     font-family: 'Dancing Script', cursive;
     /* Средняя жирность */
     font-weight: 500;
@@ -276,17 +276,19 @@ button:active {
  */
 .camera-btn {
     /* Размеры 90x90px для удобного нажатия */
-    width: 90px;
-    height: 90px;
+    width: 80px;
+    height: 80px;
     
     /* Скругление в круг */
     border-radius: 50%;
+
+    border: 2px solid #fff;
     
-    /* Белый фон */
-    background-color: var(--tg-theme-button-color);
+    /* Терракотовый фон - прямой цвет, не переменная */
+    background-color: #FF69B4 !important;
     
-    /* Цвет иконки синий (как у кнопок) */
-    color: var(--tg-theme-button-text-color);
+    /* Цвет иконки белый */
+    color: #ffffff !important;
     
     /* Центрирование иконки */
     display: flex;
@@ -318,8 +320,11 @@ button:active {
  */
 .camera-btn svg {
     /* Размеры иконки 70x70px */
-    width: 70px;
-    height:70px;
+    width: 50px;
+    height: 50px;
+    
+    /* Смещение вверх на 2px для центрирования */
+    transform: translateY(-2px);
 }
 
 
@@ -375,7 +380,7 @@ button:active {
     overflow: hidden;
     background: var(--card-bg-color);
     backdrop-filter: blur(10px);
-    border: 2px solid var(--card-border-color);
+    border: 5px solid var(--card-border-color);
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     display: flex;
@@ -391,7 +396,7 @@ button:active {
 .history-card.center {
     z-index: 10;
     transform: scale(1.2);
-    border: 3px solid rgba(255, 255, 255, 1);
+    border: 5px solid var(--card-border-color);
 }
 
 .history-card:hover {
@@ -435,7 +440,7 @@ button:active {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background-color: #0088cc;
+    background-color: rgba(218, 109, 163, 0.8) !important;
     display: flex;
     align-items: center;
     justify-content: center;

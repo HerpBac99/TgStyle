@@ -6,7 +6,6 @@ import type {
   AnalysisRequest,
   AnalysisResponse,
   AnalysisState,
-  ClassificationData,
 } from '@/types/index.js';
 import { FASTVLM_CONFIG } from '@/utils/constants.js';
 import { createError, ERROR_CODES } from '@/utils/helpers.js';
@@ -233,71 +232,6 @@ class AnalysisManager {
       logger.error('Error saving to history', error);
       // Не прерываем процесс, просто логируем ошибку
     }
-  }
-
-  /**
-   * Симуляция анализа (fallback)
-   */
-  async simulateAnalysis(): Promise<AnalysisResponse> {
-    logger.info('Starting simulated analysis');
-
-    const classNames = ['dress', 'tshirt', 'pants', 'jacket', 'shirt', 'skirt'];
-    const classNamesRu = {
-      'dress': 'Платье',
-      'tshirt': 'Футболка', 
-      'pants': 'Брюки',
-      'jacket': 'Куртка',
-      'shirt': 'Рубашка',
-      'skirt': 'Юбка',
-    } as Record<string, string>;
-
-    // Симулируем время обработки
-    this.updateState({
-      status: 'processing',
-      progress: 20,
-      currentStep: 'Симуляция анализа...',
-    });
-
-    await this.delay(1500);
-
-    this.updateState({
-      status: 'processing',
-      progress: 70,
-      currentStep: 'Генерация результата...',
-    });
-
-    await this.delay(1000);
-
-    // Генерируем случайный результат
-    const randomClass = classNames[Math.floor(Math.random() * classNames.length)]!;
-    const confidence = Math.floor(Math.random() * 26) + 70; // 70-95%
-
-    const classification: ClassificationData = {
-      classNameRu: classNamesRu[randomClass] || 'Одежда',
-      confidence: confidence.toString(),
-    };
-
-    const response: AnalysisResponse = {
-      success: true,
-      classification,
-      analysis: `Симулированный анализ: определен тип одежды "${classification.classNameRu}" с уверенностью ${confidence}%. Это качественный предмет гардероба, подходящий для различных случаев.`,
-      comments: [
-        'Хорошее качество материала',
-        'Стильный дизайн',
-        'Универсальная вещь',
-      ],
-    };
-
-    const analysisResult = this.transformAnalysisResult(response);
-    this.updateState({
-      status: 'completed',
-      progress: 100,
-      currentStep: 'Симуляция завершена',
-      ...(analysisResult && { result: analysisResult }),
-    });
-
-    logger.info('Simulated analysis completed', { classification });
-    return response;
   }
 
   /**
