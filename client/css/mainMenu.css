@@ -207,36 +207,6 @@ body {
 }
 
 /* 
- * Стили для основного белого контейнера
- * Содержит основной контент приложения
- */
-.main-wrapper {
-    /* Ширина с отступами по 20px с каждой стороны */
-    width: calc(100% - 40px);
-    height: calc(100% - 40px);
-    
-    /* Белый фон 
-     * Важно: В Telegram это должно отображаться корректно даже при переопределении темы
-     */
-    background-color: #fff;
-    
-    /* Скругленные углы */
-    border-radius: 20px;
-    
-    /* Внутренние отступы 20px со всех сторон */
-    padding: 20px;
-    
-    /* Тень для объемности 
-     * Может отображаться по-разному в зависимости от темы Telegram
-     */
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-    
-    /* Отступ снизу 20px */
-    margin-bottom: 20px;
-}
-
-
-/* 
  * Стили для кнопок
  * Применяются ко всем кнопкам, если не переопределены
  */
@@ -409,7 +379,6 @@ button:active {
     background: var(--card-bg-color);
     backdrop-filter: blur(10px);
     border: 2px solid var(--card-border-color);
-    box-shadow: var(--card-shadow);
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     display: flex;
@@ -425,18 +394,15 @@ button:active {
 .history-card.center {
     z-index: 10;
     transform: scale(1.2);
-    box-shadow: 0 16px 64px rgba(93, 64, 55, 0.3);
     border: 3px solid rgba(255, 255, 255, 1);
 }
 
 .history-card:hover {
     transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 16px 64px rgba(93, 64, 55, 0.15);
 }
 
 .history-card.center:hover {
     transform: translateY(-4px) scale(1.12);
-    box-shadow: 0 20px 80px rgba(93, 64, 55, 0.25);
 }
 
 /* Содержимое карты */
