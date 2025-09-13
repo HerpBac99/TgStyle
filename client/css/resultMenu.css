@@ -8,7 +8,7 @@
     left: 0;
     width: 100%;
     height: 100vh;
-    background-color: var(--tg-theme-bg-color, #81D8D0);
+    background: var(--gradient-bg) !important;
     z-index: 9999;
     display: flex;
     flex-direction: column;
@@ -33,13 +33,13 @@
 
 /* Контейнер для фото с молочной рамкой */
 .photo-container {
-    width: 100%;
-    max-width: 350px;
-    height: 100%;
+    width: 250px;
+    aspect-ratio: 3 / 4;
     max-height: 400px;
     background: #f8f6f3;
     border-radius: 16px;
     padding: 1px;
+    border: 5px solid var(--card-border-color);
     box-shadow: 0 8px 24px rgba(0,0,0,0.15);
     display: flex;
     align-items: center;
@@ -126,6 +126,7 @@
     bottom: 0;
     background: white;
     border-radius: 16px 16px 0 0;
+    border: 5px solid var(--card-border-color);
     margin: 16px 16px 0 16px;
     box-shadow: 0 -4px 16px rgba(0,0,0,0.1);
     opacity: 0;
@@ -143,7 +144,7 @@
 /* Заголовок результата */
 .result-header {
     background: #f8f6f3;
-    padding: 16px 24px;
+    padding: 5px 5px;
     border-radius: 16px 16px 0 0;
     text-align: center;
     border-bottom: 1px solid #e0e0e0;
@@ -159,7 +160,7 @@
 /* Текст анализа */
 .analysis-text {
     flex: 1;
-    padding: 24px;
+    padding: 8px;
     overflow-y: auto;
     line-height: 1.6;
     color: #444;
@@ -195,20 +196,36 @@
 /* Кнопка лайк */
 .like-btn {
     flex: 1;
-    background: #ff4757;
+    background: transparent;
+    border: none;
     color: white;
-    box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.like-btn svg {
+    stroke: white;
+    stroke-width: 2;
+    fill: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .like-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(255, 71, 87, 0.4);
+    transform: scale(1.05);
+}
+
+.like-btn.liked svg {
+    fill: #ff4757;
+    stroke: #ff4757;
 }
 
 /* Кнопка поделиться */
 .share-btn {
     flex: 1;
-    background: #3742fa;
+    background: #6dc3fc;
     color: white;
     box-shadow: 0 4px 12px rgba(55, 66, 250, 0.3);
 }
@@ -220,7 +237,7 @@
 
 /* Кнопка закрыть */
 .close-btn {
-    background: #81D8D0;
+    background: #79caf8;
     color: white;
     box-shadow: 0 4px 12px rgba(129, 216, 208, 0.3);
     padding: 14px;

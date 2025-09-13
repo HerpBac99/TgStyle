@@ -48,12 +48,6 @@ export const TIMEOUTS = {
   HEALTH_CHECK: 3000, // 3 секунды
 } as const;
 
-// Таймауты для анализа (совместимость)
-export const ANALYSIS_TIMEOUTS = {
-  UPLOAD: 30000, // 30 seconds
-  PROCESSING: 60000, // 60 seconds
-  TOTAL: 90000, // 90 seconds
-} as const;
 
 // Ограничения изображений
 export const IMAGE_CONSTRAINTS = {
@@ -73,18 +67,6 @@ export const IMAGE_COMPRESSION = {
   MAX_HEIGHT: 1280,
   QUALITY: 0.9,
   FORMAT: 'jpeg' as const,
-} as const;
-
-// Цвета темы приложения
-export const THEME_COLORS = {
-  PRIMARY_BG: '#81D8D0', // Tiffany цвет
-  BUTTON_COLOR: '#40a7e3',
-  WHITE: '#ffffff',
-  BLACK: '#000000',
-  ERROR: '#e53935',
-  SUCCESS: '#4caf50',
-  WARNING: '#ff9800',
-  INFO: '#2196f3',
 } as const;
 
 // Коды ошибок
@@ -170,7 +152,6 @@ export const CAROUSEL_CONFIG = {
 export const FASTVLM_CONFIG = {
   HEALTH_CHECK_INTERVAL: 30000, // 30 секунд
   MAX_RETRIES: 3,
-  RETRY_DELAY: 1000, // 1 секунда
-  PROMPT_TEMPLATE: 'Опиши одежду на фото детально на русском языке: тип, цвет, стиль, материал, рекомендации по сочетанию.',
+  RETRY_DELAY: 1000 // 1 секунда
 } as const;
 

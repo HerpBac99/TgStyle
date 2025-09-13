@@ -32,7 +32,6 @@ export {
   STORAGE_KEYS,
   HISTORY_CONSTRAINTS,
   IMAGE_COMPRESSION,
-  THEME_COLORS,
   APP_EVENTS,
 } from '@/utils/constants.js';
 

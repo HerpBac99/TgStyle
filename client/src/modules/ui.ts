@@ -333,18 +333,24 @@ class UIManager {
 
     const likeBtn = getElement('#like-btn');
     if (likeBtn) {
-      // Анимация нажатия
-      likeBtn.style.transform = 'scale(0.95)';
-      likeBtn.innerHTML = `
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-        </svg>
-        ❤️ Понравилось!
-      `;
+      // Переключаем состояние лайка
+      const isLiked = likeBtn.classList.contains('liked');
 
-      setTimeout(() => {
-        likeBtn.style.transform = 'scale(1)';
-      }, 200);
+      if (isLiked) {
+        // Убираем лайк
+        likeBtn.classList.remove('liked');
+        logger.info('Like removed');
+      } else {
+        // Добавляем лайк
+        likeBtn.classList.add('liked');
+        logger.info('Like added');
+
+        // Анимация нажатия
+        likeBtn.style.transform = 'scale(0.8)';
+        setTimeout(() => {
+          likeBtn.style.transform = 'scale(1)';
+        }, 150);
+      }
     }
 
     // Тактильная обратная связь
