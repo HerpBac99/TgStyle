@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FastVLM Prompt & Response Viewer
+Qwen2.5-VL Prompt & Response Viewer
 Shows only the full prompt sent to LLM and the full response received.
 """
 
@@ -13,8 +13,8 @@ import requests
 from pathlib import Path
 
 # Configuration
-TEST_IMAGE_PATH = "2.jpg"
-SERVER_URL = "http://127.0.0.1:3001"
+TEST_IMAGE_PATH = "12.jpg"
+SERVER_URL = "http://127.0.0.1:3002"  # Qwen сервер на порту 3002
 
 def load_image_as_base64(image_path):
     """Load image and convert to base64"""
@@ -44,10 +44,10 @@ def load_prompt():
         return content.strip()
     except Exception as e:
         print(f"Error loading prompt: {e}")
-        return 'Describe the clothing in this image in detail.'
+        return 'Find elements of clothing and accessories in the picture. Describe the clothing and accessories in MAXIMUM DETAIL. It is FORBIDDEN to omit even the smallest details.'
 
 def analyze_image(image_path):
-    """Send image to FastVLM and get analysis"""
+    """Send image to Qwen2.5-VL and get analysis"""
     # Load image
     image_base64 = load_image_as_base64(image_path)
     if not image_base64:
@@ -66,14 +66,14 @@ def analyze_image(image_path):
         response = requests.post(
             f"{SERVER_URL}/analyze",
             json=data,
-            timeout=60
+            timeout=120  # Увеличенный таймаут для Qwen
         )
 
         if response.status_code == 200:
             result = response.json()
 
             # ДЕБАГ: проверяем что пришло
-            
+
             technical_analysis = result.get('technical_analysis', 'No technical analysis received')
             print("=" * 80)
             print("TECHNICAL ANALYSIS:")

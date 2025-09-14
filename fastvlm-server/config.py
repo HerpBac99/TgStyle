@@ -51,17 +51,17 @@ class Config:
     TORCH_DTYPE = torch.float16
 
     # === Настройки генерации ===
-    MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', '512'))  # Оптимизировано для структурированных ответов
-    TEMPERATURE = float(os.getenv('TEMPERATURE', '0.1'))  # Очень низкая температура для точности
+    MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', '1024'))  # Увеличиваем для структурированных ответов
+    TEMPERATURE = float(os.getenv('TEMPERATURE', '0.01'))  # Минимальная температура для строгого форматирования
     DO_SAMPLE = os.getenv('DO_SAMPLE', 'false').lower() == 'true'  # Детерминированная генерация
-    TOP_P = float(os.getenv('TOP_P', '0.8'))  # Ограничиваем разнообразие
-    REPETITION_PENALTY = float(os.getenv('REPETITION_PENALTY', '1.2'))  # Повышаем штраф за повторения
+    TOP_P = float(os.getenv('TOP_P', '0.9'))  # Немного увеличиваем для разнообразия в рамках формата
+    REPETITION_PENALTY = float(os.getenv('REPETITION_PENALTY', '1.1'))  # Умеренный штраф за повторения
     
     # === Дополнительные параметры для структурированного анализа ===
-    NUM_BEAMS = int(os.getenv('NUM_BEAMS', '3'))  # Beam search для лучшего качества
-    EARLY_STOPPING = os.getenv('EARLY_STOPPING', 'true').lower() == 'true'
-    LENGTH_PENALTY = float(os.getenv('LENGTH_PENALTY', '1.0'))  # Нейтральный штраф за длину
-    NO_REPEAT_NGRAM_SIZE = int(os.getenv('NO_REPEAT_NGRAM_SIZE', '3'))  # Предотвращаем повторение 3-грамм
+    NUM_BEAMS = int(os.getenv('NUM_BEAMS', '1'))  # Отключаем beam search для детерминизма
+    EARLY_STOPPING = os.getenv('EARLY_STOPPING', 'false').lower() == 'true'  # Позволяем полную генерацию
+    LENGTH_PENALTY = float(os.getenv('LENGTH_PENALTY', '0.8'))  # Небольшой штраф за длину
+    NO_REPEAT_NGRAM_SIZE = int(os.getenv('NO_REPEAT_NGRAM_SIZE', '2'))  # Предотвращаем повторение 2-грамм
 
     # === Настройки производительности ===
     MAX_IMAGE_SIZE = int(os.getenv('MAX_IMAGE_SIZE', '2048'))
@@ -72,15 +72,18 @@ class Config:
     LOG_MAX_BYTES = int(os.getenv('LOG_MAX_BYTES', '10485760'))  # 10MB
     LOG_BACKUP_COUNT = int(os.getenv('LOG_BACKUP_COUNT', '5'))
 
-    # === Стоп-последовательности для предотвращения зацикливания ===
+    # === Стоп-последовательности для структурированного анализа ===
     STOP_SEQUENCES = [
         "END ANALYSIS",
-        "\n\n\n",
+        "ANALYSIS COMPLETE",
+        "\n\n\n\n",  # Четыре переноса подряд
         "In conclusion",
         "Overall,", 
         "The analysis",
         "<|endoftext|>",
-        "ANALYSIS COMPLETE"
+        "================================================================================\n\n",  # Завершение последнего элемента
+        "SUMMARY:",
+        "FINAL NOTES:"
     ]
     
     # === Специальная конфигурация для анализа одежды ===

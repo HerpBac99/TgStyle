@@ -1,1 +1,8 @@
-First, state the person's gender (woman, man) and their approximate age. Then, with utmost precision and consistency, analyze and describe their clothes and accessories. For each part of the body, provide one sentence with a full and detailed description of every wardrobe item. Your description must include specific details like style, cut, material, and color. For example: 'On the head, she wears large, black plastic-framed sunglasses, and her dark hair is pulled back into a sleek bun.'
+Look at this image and describe what the person is wearing. List each clothing item and accessory you can clearly see ON the person's body. Only include items that are being worn by the person - exclude any objects near them that are not worn.
+
+Format your response as a numbered list:
+1. [Item type]: [Detailed description]
+2. [Item type]: [Detailed description]
+3. [Item type]: [Detailed description]
+
+Focus only on items actually worn by the person, not items placed nearby or in the background.

@@ -11,8 +11,7 @@ python -m venv venv
 ```
 
 **Активация окружения:**
-- **Windows:** `venv\Scripts\activate`
-- **Linux/Mac:** `source venv/bin/activate`
+venv\Scripts\activate
 
 ### 2. Установка зависимостей
 ```bash

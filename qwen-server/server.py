@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-FastVLM Server - отдельный сервер для анализа изображений
-Запускается в отдельном процессе от основного приложения
+Qwen2.5-VL Server - отдельный сервер для анализа изображений
+Использует модель Qwen2.5-VL от Alibaba Cloud
 
 Особенности:
 - GPU/CPU автоопределение и переключение
@@ -30,16 +30,10 @@ from contextlib import contextmanager
 # Импортируем конфигурацию
 from config import Config
 
-# Импортируем необходимые модули для FastVLM
+# Импортируем необходимые модули для Qwen2.5-VL
 import torch
-
-# Импортируем FastVLM
-sys.path.append('./models/ml-fastvlm')
-from llava.utils import disable_torch_init
-from llava.conversation import conv_templates
-from llava.model.builder import load_pretrained_model
-from llava.mm_utils import tokenizer_image_token, process_images, get_model_name_from_path
-from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
+from transformers import AutoProcessor, AutoModelForVision2Seq
+from qwen_vl_utils import process_vision_info
 
 # Импортируем Gemini API
 try:
@@ -47,15 +41,13 @@ try:
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
-    app.logger.warning("Google GenAI library not available. Install with: pip install google-genai")
+    print("Google GenAI library not available. Install with: pip install google-genai")
 
 app = Flask(__name__)
 
 # Глобальные переменные для модели
 model = None
-tokenizer = None
-image_processor = None
-context_len = None
+processor = None
 
 # Глобальные переменные для Gemini
 gemini_client = None
@@ -64,8 +56,8 @@ gemini_client = None
 default_prompt = None
 style_prompt = None
 
-# Директория для сохранения результатов FastVLM
-FASTVLM_RESULTS_DIR = os.path.join(os.path.dirname(__file__), 'results')
+# Директория для сохранения результатов Qwen2.5-VL
+QWEN_RESULTS_DIR = os.path.join(os.path.dirname(__file__), 'results')
 
 # Статистика производительности
 performance_stats = {
@@ -84,7 +76,7 @@ def gpu_memory_manager():
     initial_memory = 0
     if torch.cuda.is_available():
         initial_memory = torch.cuda.memory_allocated()
-    
+
     try:
         yield
     finally:
@@ -97,7 +89,7 @@ def gpu_memory_manager():
 def update_performance_stats(processing_time, success=True):
     """Обновление статистики производительности"""
     global performance_stats
-    
+
     performance_stats['total_requests'] += 1
     if success:
         performance_stats['successful_requests'] += 1
@@ -110,7 +102,7 @@ def update_performance_stats(processing_time, success=True):
 
 def setup_logging():
     """Настройка логирования"""
-    log_file = os.path.join(Config.LOG_DIR, 'fastvlm.log')
+    log_file = os.path.join(Config.LOG_DIR, 'qwen.log')
 
     # Создаем форматтер
     formatter = logging.Formatter(
@@ -158,11 +150,11 @@ def load_prompt():
         app.logger.debug(f"Промпт загружен из файла: {prompt_file}")
 
     except FileNotFoundError:
-        default_prompt = 'Describe in detail the clothing items you see in this image. What type, color, style, and material? Please answer in Russian, using precise fashion terminology.'
+        default_prompt = 'Find elements of clothing and accessories in the picture. Describe the clothing and accessories in MAXIMUM DETAIL. It is FORBIDDEN to omit even the smallest details.'
         app.logger.warning(f"Файл промпта не найден: {prompt_file}. Используется промпт по умолчанию")
 
     except Exception as e:
-        default_prompt = 'Опиши подробно какие предметы одежды ты видишь на этом изображении. Какой тип, цвет, стиль и материал? Пожалуйста, отвечай на русском языке, используя точные термины моды.'
+        default_prompt = 'Find elements of clothing and accessories in the picture. Describe the clothing and accessories in MAXIMUM DETAIL. It is FORBIDDEN to omit even the smallest details.'
         app.logger.error(f"Ошибка загрузки промпта: {e}. Используется промпт по умолчанию")
 
 def load_style_prompt():
@@ -203,40 +195,40 @@ def load_style_prompt():
 def initialize_gemini():
     """Инициализация Gemini API клиента"""
     global gemini_client
-    
+
     try:
         if not GEMINI_AVAILABLE:
             app.logger.warning("Google GenAI library not available. Install with: pip install google-genai")
             return False
-        
+
         if not Config.GEMINI_API_KEY:
             app.logger.warning("GEMINI_API_KEY не установлен. Gemini функции недоступны.")
             return False
-        
+
         # Создаем клиента Gemini
         gemini_client = genai.Client(api_key=Config.GEMINI_API_KEY)
         app.logger.debug(f"Gemini API клиент инициализирован (модель: {Config.GEMINI_MODEL})")
         return True
-        
+
     except Exception as e:
         app.logger.error(f"Ошибка инициализации Gemini API: {e}")
         return False
 
-def create_stylist_response(fastvlm_analysis):
-    """Создает креативный ответ ИИ стилиста на основе анализа FastVLM через Gemini"""
+def create_stylist_response(qwen_analysis):
+    """Создает креативный ответ ИИ стилиста на основе анализа Qwen2.5-VL через Gemini"""
     global gemini_client, style_prompt
-    
+
     if not gemini_client:
-        app.logger.debug("Gemini API недоступен, используем базовый анализ FastVLM")
-        return fastvlm_analysis
-    
+        app.logger.debug("Gemini API недоступен, используем базовый анализ Qwen2.5-VL")
+        return qwen_analysis
+
     try:
         app.logger.debug("Генерация креативного ответа стилиста через Gemini API")
-        
+
         # Используем промпт из файла style_prompt.md
         # Экранируем JSON для безопасной вставки в промпт
-        safe_analysis = str(fastvlm_analysis).replace('{', '{{').replace('}', '}}')
-        formatted_prompt = style_prompt.replace('{fastvlm_analysis}', fastvlm_analysis)
+        safe_analysis = str(qwen_analysis).replace('{', '{{').replace('}', '}}')
+        formatted_prompt = style_prompt.replace('{fastvlm_analysis}', qwen_analysis)
 
         response = gemini_client.models.generate_content(
             model=Config.GEMINI_MODEL,
@@ -251,72 +243,70 @@ def create_stylist_response(fastvlm_analysis):
         )
         creative_response = response.text.strip()
         return creative_response
-        
+
     except Exception as e:
         app.logger.error(f"Ошибка создания креативного ответа: {e}")
-        # Fallback на оригинальный анализ FastVLM
-        return fastvlm_analysis
+        # Fallback на оригинальный анализ Qwen2.5-VL
+        return qwen_analysis
 
 def load_model():
-    """Загружает FastVLM модель в память с оптимизацией для GPU/CPU"""
-    global model, tokenizer, image_processor, context_len, performance_stats
+    """Загружает Qwen2.5-VL модель в память с оптимизацией для GPU/CPU"""
+    global model, processor, performance_stats
 
     try:
-        app.logger.debug("Загружаем FastVLM модель в память...")
+        app.logger.debug("Загружаем Qwen2.5-VL модель в память...")
         app.logger.debug("Начало загрузки модели")
         start_time = time.time()
 
-        # Проверяем существование модели
-        if not os.path.exists(Config.MODEL_PATH):
-            raise FileNotFoundError(f"Модель не найдена: {Config.MODEL_PATH}")
+        # Определяем устройство
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-        # Проверяем доступность GPU
-        gpu_available = torch.cuda.is_available()
-        device = 'cuda' if gpu_available else 'cpu'
-        
         app.logger.debug(f"Загрузка на устройство: {device}")
-        if gpu_available:
+        if torch.cuda.is_available():
             app.logger.debug(f"GPU: {torch.cuda.get_device_name(0)}")
             app.logger.debug(f"Память GPU: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
-        
-        # Загружаем модель
-        disable_torch_init()
-        model_name = get_model_name_from_path(Config.MODEL_PATH)
-        
+
+        # Загружаем модель и процессор
         with gpu_memory_manager():
-            tokenizer, model, image_processor, context_len = load_pretrained_model(
-                Config.MODEL_PATH, None, model_name,
-                device=device,
-                torch_dtype=Config.TORCH_DTYPE
+            model = AutoModelForVision2Seq.from_pretrained(
+                Config.MODEL_NAME,
+                torch_dtype=Config.TORCH_DTYPE,
+                device_map="auto" if device == 'cuda' else None,
+                trust_remote_code=True
+            )
+
+            processor = AutoProcessor.from_pretrained(
+                Config.MODEL_NAME,
+                trust_remote_code=True
             )
 
         load_time = time.time() - start_time
-        performance_stats['gpu_enabled'] = gpu_available
+        performance_stats['gpu_enabled'] = torch.cuda.is_available()
         performance_stats['model_loaded_at'] = time.time()
-        
-        app.logger.debug(f"FastVLM модель загружена: {model_name} на {device} за {load_time:.1f}с")
-        app.logger.debug(f"FastVLM модель загружена и готова к работе! (загрузка: {load_time:.1f}с)")
-        
+
+        app.logger.info(f"🤖 Qwen2.5-VL модель загружена: {Config.MODEL_NAME} на {device}")
+        app.logger.info(f"⚡ Модель готова к работе! Время загрузки: {load_time:.1f}с в {time.strftime('%H:%M:%S')}")
+
         # Выводим информацию о памяти GPU
-        if gpu_available:
+        if torch.cuda.is_available():
             allocated = torch.cuda.memory_allocated() / 1024**3
             reserved = torch.cuda.memory_reserved() / 1024**3
             app.logger.debug(f"Память GPU: выделено {allocated:.1f}GB, зарезервировано {reserved:.1f}GB")
-        
+
         return True
 
     except Exception as e:
         error_msg = f"Ошибка загрузки модели: {e}"
         app.logger.debug(f"Ошибка загрузки модели: {e}")
-        app.logger.error(error_msg, exc_debug=True)
+        app.logger.error(error_msg, )
         app.logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
-def save_fastvlm_result(clean_analysis, raw_output, image_debug):
-    """Сохраняет результат FastVLM в JSON файл"""
+def save_qwen_result(clean_analysis, raw_output, image_debug):
+    """Сохраняет результат Qwen2.5-VL в JSON файл"""
     try:
         # Создаем директорию если не существует
-        os.makedirs(FASTVLM_RESULTS_DIR, exist_ok=True)
+        os.makedirs(QWEN_RESULTS_DIR, exist_ok=True)
 
         # Парсим clean_analysis как JSON если это строка
         try:
@@ -330,111 +320,18 @@ def save_fastvlm_result(clean_analysis, raw_output, image_debug):
 
         # Сохраняем в JSON файл
         timestamp = int(time.time())
-        filename = f"fastvlm_result_{timestamp}.json"
-        filepath = os.path.join(FASTVLM_RESULTS_DIR, filename)
+        filename = f"qwen_result_{timestamp}.json"
+        filepath = os.path.join(QWEN_RESULTS_DIR, filename)
 
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(result_data, f, ensure_ascii=False, indent=2)
 
-        app.logger.debug(f"Результат FastVLM сохранен: {filepath}")
+        app.logger.debug(f"Результат Qwen2.5-VL сохранен: {filepath}")
         return filepath
 
     except Exception as e:
-        app.logger.error(f"Ошибка сохранения результата FastVLM: {e}")
+        app.logger.error(f"Ошибка сохранения результата Qwen2.5-VL: {e}")
         return None
-
-def extract_analysis_from_output(output):
-    """Извлекает структурированный анализ из вывода FastVLM (обновлено для английского промпта)"""
-    try:
-        lines = output.strip().split('\n')
-        
-        # Английские маркеры для нового промпта
-        start_markers = [
-            '### main debugrmation',
-            '**gender:**',
-            '**age:**', 
-            '### head',
-            '**hair length:**',
-            '**hair:**',
-            '### torso',
-            '### legs'
-        ]
-        
-        # Стоп-маркеры для завершения анализа
-        stop_markers = [
-            'end analysis',
-            'analysis complete',
-            '<|endoftext|>',
-            '<|im_end|>',
-            'the analysis shows',
-            'in conclusion',
-            'overall,',
-            'the clothing'
-        ]
-        
-        start_idx = 0
-        end_idx = len(lines)
-        
-        # Находим начало структурированного анализа
-        for i, line in enumerate(lines):
-            line_lower = line.lower().strip()
-            if any(marker in line_lower for marker in start_markers):
-                start_idx = i
-                break
-            # Альтернативно: пропускаем строки с промптом
-            if line.strip() and not any(skip in line_lower for skip in [
-                'user:', 'system:', '<|im_start|>user', 'analyze the clothing', 
-                'you are a fashion', 'assistant:'
-            ]):
-                start_idx = i
-                break
-        
-        # Находим конец анализа
-        for i, line in enumerate(lines[start_idx:], start_idx):
-            line_lower = line.lower().strip()
-            if any(marker in line_lower for marker in stop_markers):
-                end_idx = i
-                break
-        
-        # Извлекаем только структурированную часть
-        analysis_lines = lines[start_idx:end_idx]
-        
-        # Очищаем от мусора и служебных токенов
-        cleaned_lines = []
-        for line in analysis_lines:
-            line = line.strip()
-            
-            # Пропускаем служебные токены
-            if any(skip in line for skip in [
-                '<|im_end|>', '<|im_start|>', '`torch_dtype`', 'The following',
-                '<|endoftext|>'
-            ]):
-                continue
-            
-            # Пропускаем пустые строки и строки с промптом
-            if line and not any(skip in line.lower() for skip in [
-                'user:', 'assistant:', 'system:', 'analyze the image',
-                'you are a fashion'
-            ]):
-                # Очищаем кодировку
-                clean_line = line.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
-                clean_line = ' '.join(clean_line.split())  # Нормализуем пробелы
-                cleaned_lines.append(clean_line)
-        
-        # Объединяем очищенные строки
-        result_text = '\n'.join(cleaned_lines)
-        
-        # Если результат пустой, возвращаем исходный вывод
-        if not result_text.strip():
-            app.logger.warning("Не удалось извлечь структурированный анализ, возвращаем исходный текст")
-            result_text = output.strip()
-        
-        app.logger.debug(f"Извлечен анализ длиной {len(result_text)} символов")
-        return result_text
-
-    except Exception as e:
-        app.logger.error(f"Ошибка при извлечении анализа: {e}")
-        return output.strip()  # Возвращаем исходный текст при ошибке
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -444,7 +341,7 @@ def health():
         current_device = 'unknown'
         if model is not None:
             current_device = str(model.device) if hasattr(model, 'device') else 'cpu'
-        
+
         health_data = {
             'status': 'healthy',
             'model_loaded': model is not None,
@@ -473,9 +370,9 @@ def get_stats():
         current_device = 'unknown'
         if model is not None:
             current_device = str(model.device) if hasattr(model, 'device') else 'cpu'
-        
+
         uptime = time.time() - performance_stats.get('model_loaded_at', time.time())
-        
+
         stats = {
             'server_status': {
                 'uptime_seconds': uptime,
@@ -491,7 +388,7 @@ def get_stats():
                 'memory_total_gb': round(psutil.virtual_memory().total / (1024**3), 2)
             }
         }
-        
+
         # Добавляем GPU статистику если доступно
         if torch.cuda.is_available():
             stats['gpu'] = {
@@ -500,9 +397,9 @@ def get_stats():
                 'memory_reserved_gb': round(torch.cuda.memory_reserved(0) / (1024**3), 2),
                 'memory_total_gb': round(torch.cuda.get_device_properties(0).total_memory / (1024**3), 2)
             }
-        
+
         return jsonify(stats)
-        
+
     except Exception as e:
         app.logger.error(f"Stats error: {e}")
         return jsonify({
@@ -516,7 +413,7 @@ def analyze():
     analysis_start_time = time.time()
 
     try:
-        if model is None:
+        if model is None or processor is None:
             update_performance_stats(0, success=False)
             return jsonify({
                 'success': False,
@@ -534,15 +431,17 @@ def analyze():
 
         image_base64 = data['image_base64']
         prompt = data.get('prompt', default_prompt)
-        use_gpu = data.get('force_gpu', torch.cuda.is_available())
 
-        app.logger.debug(f"Начало анализа изображения (устройство: {model.device})")
+        decode_start_time = time.time()
+        app.logger.info(f"🚀 Начало анализа изображения (устройство: {model.device}) в {time.strftime('%H:%M:%S')}")
 
         # Декодируем изображение
         try:
             image_data = base64.b64decode(image_base64)
             image = Image.open(io.BytesIO(image_data))
-            
+            decode_time = time.time() - decode_start_time
+            app.logger.debug(f"📸 Декодирование изображения: {decode_time:.3f}с")
+
         except Exception as e:
             update_performance_stats(time.time() - analysis_start_time, success=False)
             app.logger.error(f"Ошибка декодирования изображения: {e}")
@@ -552,80 +451,100 @@ def analyze():
             }), 400
 
         # Сохраняем во временный файл
+        save_start_time = time.time()
         with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
             image.save(temp_file, 'JPEG')
             temp_image_path = temp_file.name
+        save_time = time.time() - save_start_time
+        app.logger.debug(f"💾 Сохранение временного файла: {save_time:.3f}с")
 
         try:
             inference_start_time = time.time()
-            
-            # Создаем промпт для модели
-            qs = prompt
-            if model.config.mm_use_im_start_end:
-                qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
-            else:
-                qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
+            app.logger.info(f"⚡ Начало inference в {time.strftime('%H:%M:%S')}")
 
-            conv = conv_templates["qwen_2"].copy()
-            conv.append_message(conv.roles[0], qs)
-            conv.append_message(conv.roles[1], None)
-            prompt_full = conv.get_prompt()
+            # Подготавливаем сообщения для Qwen2.5-VL
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "image": temp_image_path,
+                        },
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ]
+
+            # Обрабатываем входные данные
+            process_start_time = time.time()
+            image_inputs, video_inputs, video_kwargs = process_vision_info(messages, return_video_kwargs=True)
+            process_time = time.time() - process_start_time
+            app.logger.debug(f"🔄 Обработка vision info: {process_time:.3f}с")
+
+            # Подготавливаем входные данные для модели
+            processor_start_time = time.time()
+            inputs = processor(
+                text=[processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)],
+                images=image_inputs,
+                videos=video_inputs,
+                return_tensors="pt",
+                padding=True,
+            ).to(model.device)
+            processor_time = time.time() - processor_start_time
+            app.logger.debug(f"🎛️ Обработка процессором: {processor_time:.3f}с")
 
             # Выполняем анализ с управлением памятью
+            generation_start_time = time.time()
+            app.logger.info(f"🧠 Начало генерации в {time.strftime('%H:%M:%S')}")
             with gpu_memory_manager():
-                # Токенизируем промпт
-                input_ids = tokenizer_image_token(prompt_full, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
-
-                # Обрабатываем изображение
-                image_tensor = process_images([image], image_processor, model.config)[0]
-
-                # Установка seed для детерминизма
-                torch.manual_seed(42)
-                if torch.cuda.is_available():
-                    torch.cuda.manual_seed_all(42)
-                
-                # Выполняем анализ с оптимизированными параметрами
                 with torch.no_grad():
-                    output_ids = model.generate(
-                        input_ids,
-                        images=image_tensor.unsqueeze(0).to(model.device).half(),
-                        image_sizes=[image.size],
-                        do_sample=Config.DO_SAMPLE,
-                        temperature=Config.TEMPERATURE,
-                        top_p=Config.TOP_P if Config.DO_SAMPLE else None,
-                        repetition_penalty=Config.REPETITION_PENALTY,
-                        num_beams=Config.NUM_BEAMS,  # Используем настроенное значение beam search
+                    generated_ids = model.generate(
+                        **inputs,
                         max_new_tokens=Config.MAX_NEW_TOKENS,
-                        length_penalty=Config.LENGTH_PENALTY,
-                        early_stopping=Config.EARLY_STOPPING,
-                        no_repeat_ngram_size=Config.NO_REPEAT_NGRAM_SIZE,
+                        temperature=Config.TEMPERATURE,
+                        do_sample=Config.DO_SAMPLE,
+                        top_p=Config.TOP_P if Config.DO_SAMPLE else None,
                         use_cache=True,
-                        pad_token_id=tokenizer.eos_token_id,
-                        eos_token_id=tokenizer.eos_token_id
+                        pad_token_id=processor.tokenizer.eos_token_id,
                     )
+            generation_time = time.time() - generation_start_time
+            app.logger.info(f"✨ Генерация завершена: {generation_time:.2f}с")
 
             # Декодируем результат
-            result_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
+            decode_start_time = time.time()
+            generated_ids_trimmed = [
+                out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+            ]
+            result_text = processor.batch_decode(
+                generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )[0]
+            decode_response_time = time.time() - decode_start_time
+            app.logger.debug(f"📝 Декодирование ответа: {decode_response_time:.3f}с")
+
             # Извлекаем чистый анализ
-            # clean_analysis = extract_analysis_from_output(result_text)
-            clean_analysis = (result_text)
+            clean_analysis = result_text.strip()
 
             # Рассчитываем время инференса
             inference_time = time.time() - inference_start_time
 
-            # Сохраняем результат FastVLM для отладки
+            # Сохраняем результат Qwen2.5-VL для отладки
             image_debug = {
                 'size': image.size,
                 'mode': image.mode,
                 'filename': temp_image_path.split('\\')[-1] if temp_image_path else 'unknown'
             }
-            save_fastvlm_result(clean_analysis, result_text, image_debug)
+            save_qwen_result(clean_analysis, result_text, image_debug)
 
             # Создаем креативный ответ стилиста через Gemini API
             stylist_response = create_stylist_response(clean_analysis)
 
             # Рассчитываем общее время
             total_time = time.time() - analysis_start_time
+            
+            # Финальное логирование времени
+            app.logger.info(f"🏁 Анализ завершен в {time.strftime('%H:%M:%S')}")
+            app.logger.info(f"⏱️ Общее время: {total_time:.2f}с | Inference: {inference_time:.2f}с | Генерация: {generation_time:.2f}с")
 
             # Обновляем статистику
             update_performance_stats(total_time, success=True)
@@ -636,7 +555,7 @@ def analyze():
                 'success': True,
                 'technical_analysis': clean_analysis,
                 'analysis': stylist_response,  # Только креативный ответ стилиста
-                'model_used': model.config.model_type,
+                'model_used': Config.MODEL_NAME,
                 'device': str(model.device),
                 'timing': {
                     'total_time': round(total_time, 2),
@@ -644,7 +563,7 @@ def analyze():
                     'preprocessing_time': round(inference_start_time - analysis_start_time, 2)
                 }
             }
-            
+
             # Добавляем информацию о GPU если используется
             if torch.cuda.is_available() and 'cuda' in str(model.device):
                 response_data['gpu_memory_used'] = round(torch.cuda.memory_allocated() / 1024**2, 1)  # MB
@@ -664,7 +583,7 @@ def analyze():
 
         update_performance_stats(total_time, success=False)
         error_msg = f"Ошибка анализа: {e}"
-        app.logger.error(error_msg, exc_debug=True)
+        app.logger.error(error_msg, )
 
         # Собираем информацию о времени
         timing_debug = {'total_time': round(total_time, 2)}
@@ -748,11 +667,10 @@ def get_model_debug():
 
         model_debug = {
             'loaded': True,
-            'model_name': model.config.model_type,
+            'model_name': Config.MODEL_NAME,
             'device': str(model.device),
-            'context_length': context_len,
             'torch_dtype': str(Config.TORCH_DTYPE),
-            'model_path': Config.MODEL_PATH
+            'model_path': Config.MODEL_NAME
         }
 
         app.logger.debug(f"Model debug: {model_debug['model_name']}")
@@ -780,7 +698,7 @@ def signal_handler(signum, frame):
 def start_server():
     """Запуск Flask сервера"""
     try:
-        app.logger.debug(f"Запускаем FastVLM сервер на {Config.HOST}:{Config.PORT}...")
+        app.logger.debug(f"Запускаем Qwen2.5-VL сервер на {Config.HOST}:{Config.PORT}...")
         app.logger.debug(f"Server starting on {Config.HOST}:{Config.PORT}")
 
         app.run(
@@ -790,9 +708,9 @@ def start_server():
             use_reloader=False
         )
     except Exception as e:
-        error_msg = f"Ошибка запуска FastVLM сервера: {e}"
+        error_msg = f"Ошибка запуска Qwen2.5-VL сервера: {e}"
         app.logger.debug(error_msg)
-        app.logger.error(error_msg, exc_debug=True)
+        app.logger.error(error_msg, )
 
 if __name__ == '__main__':
     # Загружаем переменные окружения
@@ -804,7 +722,7 @@ if __name__ == '__main__':
     # Настраиваем логирование
     setup_logging()
 
-    app.logger.debug("FastVLM Server starting...")
+    app.logger.debug("Qwen2.5-VL Server starting...")
 
     # Валидируем конфигурацию
     try:
@@ -819,8 +737,8 @@ if __name__ == '__main__':
 
     # Загружаем промпт
     load_prompt()
-    
-    # Загружаем промпт стилиста 
+
+    # Загружаем промпт стилиста
     load_style_prompt()
 
     # Инициализируем Gemini API
