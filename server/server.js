@@ -31,7 +31,7 @@ app.use('/api', apiRoutes);
 
 // Роут для главной страницы
 app.get('/', (req, res) => {
-  logger.debug('Главная страница запрошена', { ip: req.ip, userAgent: req.get('User-Agent') });
+  logger.info('Главная страница запрошена', { ip: req.ip, userAgent: req.get('User-Agent') });
   res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
 });
 

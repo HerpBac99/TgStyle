@@ -13,7 +13,7 @@ router.post('/', async (req, res) => {
     try {
         
         if (!initData) {
-            logger.debug('Попытка аутентификации без initData');
+            logger.info('Попытка аутентификации без initData');
             return res.status(400).json({
                 success: false,
                 error: 'No initData provided'

@@ -84,7 +84,7 @@ class AuthManager {
     }
 
     const user = this.tg.initDataUnsafe.user;
-    logger.debug('User data extracted', {
+    logger.info('User data extracted', {
       id: user.id,
       firstName: user.first_name,
       hasPhoto: !!user.photo_url,
@@ -111,7 +111,7 @@ class AuthManager {
         (userPhoto as HTMLElement).style.backgroundImage = `url(${this.user.photo_url})`;
       }
 
-      logger.debug('User profile displayed');
+      logger.info('User profile displayed');
     } catch (error) {
       logger.error('Error displaying user profile', error);
     }
@@ -163,7 +163,7 @@ class AuthManager {
       }
 
       // Отправляем на сервер для валидации
-      logger.debug('Sending initData to server for validation');
+      logger.info('Sending initData to server for validation');
       const response = await api.authenticate(initData);
 
       if (response.success) {
@@ -243,7 +243,7 @@ class AuthManager {
         navigator.vibrate(duration);
       }
     } catch (error) {
-      logger.debug('Vibration not supported', error);
+      logger.info('Vibration not supported', error);
     }
   }
 

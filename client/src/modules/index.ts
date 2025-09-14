@@ -38,7 +38,7 @@ export {
 // Объявляем глобальные типы для Window
 declare global {
   interface Window {
-    // Совместимость со старым API
+    // Основной API логгера
     appLogger: typeof import('./logger').appLogger;
     clientLogger: typeof import('./logger').logger;
     

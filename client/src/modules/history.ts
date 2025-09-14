@@ -84,7 +84,7 @@ class HistoryManager {
     try {
       // Сохраняем историю как есть, без оптимизации размера
       const historyJson = safeJsonStringify(this.history);
-      localStorage.setItem(STORAGE_KEYS.HISTORY, historyJson);
+        localStorage.setItem(STORAGE_KEYS.HISTORY, historyJson);
 
       logger.debug('History saved to storage');
     } catch (error) {

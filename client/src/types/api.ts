@@ -59,6 +59,7 @@ export interface LogEntry {
   sessionId?: string;
   userAgent?: string;
   url?: string;
+  caller?: string;
 }
 
 export interface LogRequest {

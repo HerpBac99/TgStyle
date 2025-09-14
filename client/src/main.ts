@@ -120,7 +120,7 @@ class TgStyleApp {
     // Устанавливаем мета-теги для мобильных устройств
     this.setupMobileMeta();
 
-    logger.debug('App behavior configured');
+    logger.info('App behavior configured');
   }
 
   /**

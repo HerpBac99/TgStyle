@@ -112,7 +112,7 @@ class UIManager {
       appContainer: getElement(DOM_SELECTORS.APP_CONTAINER),
     };
 
-    logger.debug('DOM elements initialized', {
+    logger.info('DOM elements initialized', {
       hasUserName: !!this.elements.userName,
       hasUserPhoto: !!this.elements.userPhoto,
       hasCameraBtn: !!this.elements.cameraBtn,
@@ -133,7 +133,7 @@ class UIManager {
 
     // Обработчики ячеек истории добавляются динамически в updateHistoryDisplay
 
-    logger.debug('Event listeners setup completed');
+    logger.info('Event listeners setup completed');
   }
 
   /**
@@ -230,7 +230,7 @@ class UIManager {
    */
   private handleAnalysisStateChange(event: CustomEvent): void {
     const state = event.detail;
-    logger.debug('Analysis state changed', state);
+    logger.info('Analysis state changed', state);
     
     // Можно добавить обновление UI в зависимости от состояния
     // Например, показать прогресс-бар или спиннер
@@ -478,7 +478,7 @@ class UIManager {
   updateHistoryDisplay(): void {
     const filledItems = historyManager.getFilledItems();
     
-    logger.debug('Updating history display', {
+    logger.info('Updating history display', {
       filledItems: filledItems.length,
       currentCenter: this.carouselState.currentCenterIndex
     });
@@ -516,7 +516,7 @@ class UIManager {
     // Обновляем ссылку на карты
     this.elements.historyCells = getElements(DOM_SELECTORS.HISTORY_CARDS);
 
-    logger.debug('Carousel cards created', { totalCards, filledItems: filledItems.length });
+    logger.info('Carousel cards created', { totalCards, filledItems: filledItems.length });
   }
 
   /**
@@ -672,7 +672,7 @@ class UIManager {
     // Обновляем центральную карту
     this.updateCenterCard();
 
-    logger.debug('Carousel positioned', { 
+    logger.info('Carousel positioned', { 
       centerIndex: this.carouselState.currentCenterIndex,
       offset,
       filledCount
@@ -719,7 +719,7 @@ class UIManager {
       }
     }
 
-    logger.debug('Carousel navigation updated', { 
+    logger.info('Carousel navigation updated', { 
       totalCards: this.carouselState.totalCards,
       currentCenter: this.carouselState.currentCenterIndex 
     });
@@ -785,7 +785,7 @@ class UIManager {
     // Настройка свайп-управления карусели
     this.setupCarouselSwipe();
 
-    logger.debug('Carousel navigation handlers setup');
+    logger.info('Carousel navigation handlers setup');
   }
 
   /**
@@ -819,7 +819,7 @@ class UIManager {
 
     this.cleanupFunctions.push(touchStartCleanup, touchMoveCleanup, touchEndCleanup);
 
-    logger.debug('Carousel swipe handlers setup');
+    logger.info('Carousel swipe handlers setup');
   }
 
   /**
@@ -946,7 +946,7 @@ class UIManager {
    * Добавляет обработчики долгого нажатия к ячейке истории
    */
   private addLongPressHandlers(element: HTMLElement, index: number): void {
-    logger.debug('Adding long press handlers', { index });
+    logger.info('Adding long press handlers', { index });
 
     // Обработчики событий
     const startHandler = (e: MouseEvent | TouchEvent) => {
@@ -980,7 +980,7 @@ class UIManager {
       return;
     }
 
-    logger.debug('Starting long press tracking', { index });
+    logger.info('Starting long press tracking', { index });
 
     // Получаем начальную позицию
     const startX = event.type === 'touchstart' 
@@ -1033,7 +1033,7 @@ class UIManager {
     // Если движение превышает лимит, отменяем долгое нажатие
     const movementThreshold = 10;
     if (deltaX > movementThreshold || deltaY > movementThreshold) {
-      logger.debug('Long press cancelled due to movement', { deltaX, deltaY });
+      logger.info('Long press cancelled due to movement', { deltaX, deltaY });
       this.cancelLongPress();
     }
   }
@@ -1111,12 +1111,12 @@ class UIManager {
       if (window.Telegram?.WebApp?.HapticFeedback) {
         // Используем 'medium' для умеренной вибрации
         window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
-        logger.debug('Telegram haptic feedback triggered');
+        logger.info('Telegram haptic feedback triggered');
       } else {
         // Fallback на стандартную вибрацию браузера
         if (navigator.vibrate) {
           navigator.vibrate(50);
-          logger.debug('Browser vibration triggered');
+          logger.info('Browser vibration triggered');
         }
       }
     } catch (error) {
@@ -1128,7 +1128,7 @@ class UIManager {
    * Добавляет кнопку удаления к элементу
    */
   private addDeleteButton(element: HTMLElement, index: number): void {
-    logger.debug('Adding delete button', { index });
+    logger.info('Adding delete button', { index });
 
     const deleteButton = this.createDeleteButton(index);
     this.setupDeleteButtonStyles(deleteButton);
@@ -1376,7 +1376,7 @@ class UIManager {
     try {
       if (window.Telegram?.WebApp?.HapticFeedback) {
         window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-        logger.debug('Success haptic feedback triggered');
+        logger.info('Success haptic feedback triggered');
       }
     } catch (error) {
       logger.warn('Failed to trigger success haptic feedback', error);
@@ -1391,7 +1391,7 @@ class UIManager {
       return;
     }
 
-    logger.debug('Exiting delete mode');
+    logger.info('Exiting delete mode');
 
     // Удаляем CSS класс
     this.longPressState.targetElement.classList.remove(CSS_CLASSES.DELETE_MODE);

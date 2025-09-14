@@ -51,7 +51,7 @@ class ApiClient {
     const startTime = Date.now();
 
     try {
-      logger.debug(`API Request: ${options.method || 'GET'} ${url}`);
+      logger.info(`API Request: ${options.method || 'GET'} ${url}`);
 
       const response = await fetch(url, {
         ...options,
@@ -63,11 +63,11 @@ class ApiClient {
       });
 
       const duration = Date.now() - startTime;
-      logger.debug(`API Response: ${response.status} ${response.statusText} (${duration}ms)`);
+      logger.info(`API Response: ${response.status} ${response.statusText} (${duration}ms)`);
 
       // Логируем API запрос
       if (window.appLogger) {
-        window.appLogger(`API Request`, 'info', {
+        window.appLogger.info(`API Request`, {
           method: options.method || 'GET',
           url: endpoint,
           status: response.status,
@@ -93,7 +93,7 @@ class ApiClient {
       }
 
       const data = await response.json() as T;
-      logger.debug('API Response Data', data);
+      logger.info('API Response Data', data);
 
       return data;
     } catch (error) {
@@ -274,7 +274,7 @@ class TgStyleApi extends ApiClient {
       const response = await this.get('/health', TIMEOUTS.HEALTH_CHECK);
       return Boolean(response && typeof response === 'object');
     } catch (error) {
-      logger.debug('FastVLM health check failed', error);
+      logger.info('FastVLM health check failed', error);
       return false;
     }
   }

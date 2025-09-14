@@ -96,7 +96,7 @@ class CameraManager {
         const file = target.files?.[0];
         
         if (file) {
-          logger.debug('File selected', {
+          logger.info('File selected', {
             name: file.name,
             size: file.size,
             type: file.type,
@@ -314,7 +314,7 @@ class CameraManager {
             compressedBase64 = canvas.toDataURL('image/jpeg', currentQuality);
           }
 
-          logger.debug('Image compressed', {
+          logger.info('Image compressed', {
             originalSize: Math.round(imageData.originalSize / 1024) + 'KB',
             compressedSize: Math.round(this.getBase64Size(compressedBase64) / 1024) + 'KB',
             originalDimensions: `${imageData.width}x${imageData.height}`,

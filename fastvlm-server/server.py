@@ -92,7 +92,7 @@ def gpu_memory_manager():
             torch.cuda.empty_cache()
             final_memory = torch.cuda.memory_allocated()
             if final_memory > initial_memory:
-                app.logger.debug(f"GPU memory freed: {(final_memory - initial_memory) / 1024**2:.1f}MB")
+                app.logger.info(f"GPU memory freed: {(final_memory - initial_memory) / 1024**2:.1f}MB")
 
 def update_performance_stats(processing_time, success=True):
     """Обновление статистики производительности"""
@@ -227,7 +227,7 @@ def create_stylist_response(fastvlm_analysis):
     global gemini_client, style_prompt
     
     if not gemini_client:
-        app.logger.debug("Gemini API недоступен, используем базовый анализ FastVLM")
+        app.logger.info("Gemini API недоступен, используем базовый анализ FastVLM")
         return fastvlm_analysis
     
     try:
@@ -429,7 +429,7 @@ def extract_analysis_from_output(output):
             app.logger.warning("Не удалось извлечь структурированный анализ, возвращаем исходный текст")
             result_text = output.strip()
         
-        app.logger.debug(f"Извлечен анализ длиной {len(result_text)} символов")
+        app.logger.info(f"Извлечен анализ длиной {len(result_text)} символов")
         return result_text
 
     except Exception as e:
@@ -455,7 +455,7 @@ def health():
             'performance': performance_stats
         }
 
-        app.logger.debug("Health check requested")
+        app.logger.info("Health check requested")
         return jsonify(health_data)
 
     except Exception as e:
@@ -695,7 +695,7 @@ def get_load():
             'timestamp': time.time()
         }
 
-        app.logger.debug(f"Load check: CPU {cpu_percent}%, Memory {memory.percent}%")
+        app.logger.info(f"Load check: CPU {cpu_percent}%, Memory {memory.percent}%")
         return jsonify(load_data)
 
     except Exception as e:
@@ -725,7 +725,7 @@ def get_gpu_info():
             'device': 'cuda'
         }
 
-        app.logger.debug(f"GPU info: {gpu_info['gpu_name']}")
+        app.logger.info(f"GPU info: {gpu_info['gpu_name']}")
         return jsonify(gpu_info)
 
     except Exception as e:
@@ -755,7 +755,7 @@ def get_model_info():
             'model_path': Config.MODEL_PATH
         }
 
-        app.logger.debug(f"Model info: {model_info['model_name']}")
+        app.logger.info(f"Model info: {model_info['model_name']}")
         return jsonify(model_info)
 
     except Exception as e:
@@ -786,7 +786,7 @@ def start_server():
         app.run(
             host=Config.HOST,
             port=Config.PORT,
-            debug=False,
+            info=False,
             use_reloader=False
         )
     except Exception as e:

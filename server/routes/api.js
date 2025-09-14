@@ -8,6 +8,15 @@ const { exec } = require('child_process');
 // Импорт логгера Winston
 const { logger, logSuccess, logWarning } = require('../src/controllers/logsController');
 
+// Безопасная функция JSON.stringify
+function safeJsonStringify(obj, defaultValue = '{}') {
+    try {
+        return JSON.stringify(obj);
+    } catch (error) {
+        return defaultValue;
+    }
+}
+
 // Новый маршрут для клиентских логов (без вывода в терминал сервера)
 router.post('/log-client', async (req, res) => {
     try {
@@ -57,7 +66,7 @@ ${Array.isArray(logs) ?
 `;
 
         // Записываем в файл (добавляем в конец)
-        fs.appendFileSync(logFile, logEntry);
+        fs.writeFileSync(logFile, logEntry);
 
         // Логируем только факт сохранения (без деталей, чтобы не засорять терминал)
         if (!disableServerTerminalOutput) {
@@ -96,15 +105,16 @@ router.post('/log-error', async (req, res) => {
             fs.mkdirSync(logDir, { recursive: true });
         }
         
-        // Формируем имя файла с датой
-        const date = new Date().toISOString().split('T')[0];
-        const logFile = path.join(logDir, `client_logs_${date}.txt`);
+        // Формируем имя файла с датой и временем для каждого сохранения
+        const now = new Date();
+        const date = now.toISOString().split('T')[0];
+        const time = now.toTimeString().split(' ')[0].replace(/:/g, '-');
+        const logFile = path.join(logDir, `client_logs_${date}_${time}.txt`);
         
-        // Выводим клиентские логи в единый формат
+        // Логируем только в файл, без вывода в терминал
         if (Array.isArray(logs)) {
             logs.forEach((log, index) => {
-                const timestamp = new Date(log.timestamp).toTimeString().split(' ')[0];
-                console.log(`[${timestamp}] [CLIENT] [${log.level.toUpperCase()}] ${log.message}`);
+                // Тихий режим - логи только в файл
             });
         }
 
@@ -116,14 +126,17 @@ User Agent: ${userAgent}
 Версия приложения: ${appVersion}
 --- Записи логов ---
 ${Array.isArray(logs) ?
-    logs.map(log => `[${log.timestamp}] [${log.level}] ${log.message} (${log.caller}) ${log.data ? '\n  Данные: ' + log.data : ''}`).join('\n') :
+    logs.map(log => {
+        const timeFormatted = new Date(log.timestamp).toTimeString().split(' ')[0];
+        return `[${timeFormatted}] [${log.level.toUpperCase()}] ${log.message}${log.caller && log.caller !== 'Unknown in Unknown:Unknown' ? ` (${log.caller})` : ''}${log.data ? '\n  Данные: ' + safeJsonStringify(log.data) : ''}`;
+    }).join('\n') :
     'Неверный формат логов'
 }
 === КОНЕЦ ЛОГА ===
 \n`;
 
         // Записываем в файл (добавляем в конец)
-        fs.appendFileSync(logFile, logEntry);
+        fs.writeFileSync(logFile, logEntry);
 
         logger.info('Логи клиента сохранены', { logFile, logCount: logs.length });
         

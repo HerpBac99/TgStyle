@@ -1,33 +1,60 @@
 /**
- * Упрощенный логгер для TgStyle с выводом в терминал сервера
+ * Улучшенный логгер для TgStyle с перехватом console и Telegram интеграцией
+ * Вдохновлено LoggerService и ClientLogger примерами
  */
 
 import type { Logger, LogEntry, LogLevel } from '@/types/index.js';
-import { 
+import {
   API_URL,
   LOGGING_CONFIG,
   TIMEOUTS
 } from '@/utils/constants.js';
-import { 
+import {
   generateSessionId,
   formatTimestamp,
   safeJsonStringify
 } from '@/utils/helpers.js';
+
+// Глобальные декларации для лучшей интеграции
+declare global {
+  interface Window {
+    appLogger: typeof appLogger;
+    clientLogger: TgStyleLogger;
+    Logger: any;
+  }
+}
 
 class TgStyleLogger implements Logger {
   private sessionId: string;
   private logs: LogEntry[] = [];
   private userId: number | undefined;
   private isEnabled = true;
+  private isLoggingInProgress = false; // Защита от рекурсии
+
+  // Сохраняем оригинальные методы консоли
+  private originalConsoleLog: typeof console.log;
+  private originalConsoleError: typeof console.error;
+  private originalConsoleWarn: typeof console.warn;
+  private originalConsoleDebug: typeof console.debug;
 
   constructor() {
+    // Сохраняем оригинальные методы консоли
+    this.originalConsoleLog = console.log.bind(console);
+    this.originalConsoleWarn = console.warn.bind(console);
+    this.originalConsoleError = console.error.bind(console);
+    this.originalConsoleDebug = console.debug.bind(console);
+
     this.sessionId = this.initializeSession();
     this.setupErrorHandlers();
+    this.setupConsoleInterception(); // Перехват console методов
     this.createLogUI(); // Инициализируем UI интерфейс
-    this.setupBeforeUnloadHandler(); // Сохранение при выходе
+    this.setupAutoFlush(); // Автоматическая отправка
 
     // Автоматическая очистка логов предыдущей сессии
     this.clearPreviousSessionLogs();
+
+    // Устанавливаем глобальный логгер для совместимости
+    this.setupGlobalLogger();
   }
 
   /**
@@ -39,8 +66,43 @@ class TgStyleLogger implements Logger {
     this.userId = telegramUserId;
     const sessionId = generateSessionId(this.userId);
     
-    console.log(`🚀 TgStyle Logger v2.0 инициализирован. Session: ${sessionId}`);
+    console.log(`TgStyle Logger v2.0 инициализирован. Session: ${sessionId}`);
     return sessionId;
+  }
+
+  /**
+   * Настройка перехвата методов console
+   */
+  private setupConsoleInterception(): void {
+    // Определяем метод-перехватчик
+    const createInterceptor = (originalMethod: Function, level: LogLevel) => {
+      return (...args: any[]) => {
+        // Проверяем, не происходит ли рекурсия
+        if (this.isLoggingInProgress) {
+          originalMethod.apply(console, args);
+          return;
+        }
+
+        // Первый аргумент обычно является сообщением
+        const message = args[0];
+
+        // Остальные аргументы считаем данными
+        let data: any = undefined;
+        if (args.length > 1) {
+          // Если есть только один дополнительный аргумент и это объект, используем его напрямую
+          data = args.length === 2 && typeof args[1] === 'object' ? args[1] : args.slice(1);
+        }
+
+        // Логируем через наш логгер
+        this.log(level, message, data);
+      };
+    };
+
+    // Заменяем стандартные методы console нашими перехватчиками
+    console.log = createInterceptor(this.originalConsoleLog, 'info');
+    console.debug = createInterceptor(this.originalConsoleDebug, 'debug');
+    console.warn = createInterceptor(this.originalConsoleWarn, 'warn');
+    console.error = createInterceptor(this.originalConsoleError, 'error');
   }
 
   /**
@@ -65,20 +127,167 @@ class TgStyleLogger implements Logger {
         stack: event.reason?.stack,
       });
     });
-
-    // Автоматическая отправка логов при закрытии приложения
-    window.addEventListener('beforeunload', () => {
-      this.flushSync();
-    });
-
-    // Убрана автоматическая отправка логов при скрытии страницы
   }
 
   /**
-   * Настройка сохранения логов при выходе
+   * Настройка автоматической отправки логов
    */
-  private setupBeforeUnloadHandler(): void {
-    // beforeunload уже настроен в setupErrorHandlers
+  private setupAutoFlush(): void {
+    // Простая логика: сохраняем логи только при закрытии страницы
+    // pagehide - самый надежный обработчик для мобильных и Telegram
+
+    window.addEventListener('pagehide', () => {
+      if (this.logs.length > 0) {
+        // Тихая отправка при закрытии страницы
+        this.flushSync(true);
+      }
+    });
+  }
+
+  /**
+   * Установка глобального логгера для совместимости
+   */
+  private setupGlobalLogger(): void {
+    window.appLogger = {
+      info: (message: string, data?: any) => this.info(message, data),
+      debug: (message: string, data?: any) => this.debug(message, data),
+      warn: (message: string, data?: any) => this.warn(message, data),
+      error: (message: string, data?: any) => this.error(message, data),
+    };
+
+    window.clientLogger = this;
+  }
+
+  /**
+   * Получение call stack для клиентского логирования
+   */
+  private getCallStack(): { function: string; file: string; line: string; fullStack: string } {
+    try {
+      const stack = new Error().stack;
+      if (stack) {
+        const lines = stack.split('\n');
+
+        // В production режиме stack trace может быть укороченным
+        // Ищем первую строку которая не относится к логгеру
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i]?.trim();
+          if (!line) continue;
+
+          // Пропускаем строки самого логгера
+          if (line.includes('Logger') ||
+              line.includes('getCallStack') ||
+              line.includes('createLogEntry') ||
+              line.includes('log(') ||
+              line === 'Error') {
+            continue;
+          }
+
+          // Ищем строки с "at" - это call stack entries
+          if (line.startsWith('at ')) {
+            // Упрощенный парсинг для production режима
+            // Убираем "at " в начале
+            const callInfo = line.substring(3);
+
+            // Разбираем оставшуюся часть
+            let funcName = 'Anonymous';
+            let fileName = 'Unknown';
+            let lineNum = '0';
+
+            // Ищем скобки - это указывает на формат "functionName (file.js:123:456)"
+            const bracketStart = callInfo.indexOf('(');
+            const bracketEnd = callInfo.lastIndexOf(')');
+
+            if (bracketStart !== -1 && bracketEnd !== -1 && bracketEnd > bracketStart) {
+              // Есть скобки - формат "functionName (file.js:123:456)"
+              funcName = callInfo.substring(0, bracketStart).trim();
+              const location = callInfo.substring(bracketStart + 1, bracketEnd);
+
+              // Разбираем location
+              const colonIndex = location.lastIndexOf(':');
+              if (colonIndex !== -1) {
+                const fileAndLine = location.substring(0, colonIndex);
+                const linePart = location.substring(colonIndex + 1);
+
+                // Разбираем file:line
+                const lastColon = fileAndLine.lastIndexOf(':');
+                if (lastColon !== -1) {
+                  fileName = fileAndLine.substring(0, lastColon);
+                  lineNum = fileAndLine.substring(lastColon + 1);
+                } else {
+                  fileName = fileAndLine;
+                  lineNum = linePart;
+                }
+
+                // Очищаем имя файла
+                if (fileName.includes('/')) {
+                  fileName = fileName.split('/').pop() || 'Unknown';
+                }
+                if (fileName.includes('?')) {
+                  fileName = fileName.split('?')[0] ?? 'Unknown';
+                }
+                if (fileName.endsWith('.js')) {
+                  fileName = fileName.slice(0, -3);
+                }
+              }
+            } else {
+              // Нет скобок - формат "file.js:123:456"
+              const colonIndex = callInfo.lastIndexOf(':');
+              if (colonIndex !== -1) {
+                fileName = callInfo.substring(0, colonIndex);
+                lineNum = callInfo.substring(colonIndex + 1);
+
+                // Очищаем имя файла
+                if (fileName.includes('/')) {
+                  fileName = fileName.split('/').pop() || 'Unknown';
+                }
+                if (fileName.includes('?')) {
+                  fileName = fileName.split('?')[0] ?? 'Unknown';
+                }
+                if (fileName.endsWith('.js')) {
+                  fileName = fileName.slice(0, -3);
+                }
+              }
+            }
+
+            // Очищаем имя функции
+            if (funcName && funcName.includes('<')) {
+              funcName = funcName.split('<')[0]?.trim() || 'Anonymous';
+            }
+
+            return {
+              function: funcName,
+              file: fileName,
+              line: lineNum,
+              fullStack: lines.slice(Math.max(0, i-1), Math.min(lines.length, i+2)).join(' | ')
+            };
+          }
+        }
+
+        // Если ничего не нашли, попробуем взять первую подходящую строку
+        const relevantLine = lines.find(line =>
+          line && line.trim().startsWith('at ') &&
+          !line.includes('Logger') && !line.includes('Error')
+        );
+
+        if (relevantLine) {
+          return {
+            function: 'External',
+            file: 'Unknown',
+            line: '0',
+            fullStack: relevantLine.trim()
+          };
+        }
+      }
+    } catch (e) {
+      // Игнорируем ошибки получения stack trace
+    }
+
+    return {
+      function: 'Unknown',
+      file: 'Unknown',
+      line: 'Unknown',
+      fullStack: 'Stack not available'
+    };
   }
 
   /**
@@ -87,38 +296,20 @@ class TgStyleLogger implements Logger {
   private createLogEntry(level: LogLevel, message: string, data?: any): LogEntry {
     const timestamp = new Date().toISOString();
     const timeFormatted = formatTimestamp(timestamp);
-    
+
     // Получаем информацию о вызывающем коде
-    const stack = new Error().stack;
-    let caller = 'Unknown';
-    
-    if (stack) {
-      const stackLines = stack.split('\n');
-      // Ищем первую строку, которая не относится к логгеру
-      for (let i = 3; i < stackLines.length && i < 8; i++) {
-        const line = stackLines[i];
-        if (line && !line.includes('Logger') && !line.includes('createLogEntry')) {
-          const match = line.match(/at\s+(.+?)\s+\((.+?):(\d+):(\d+)\)/) ||
-                       line.match(/at\s+(.+?):(\d+):(\d+)/);
-          if (match) {
-            const funcName = match[1] || 'Anonymous';
-            const fileName = (match[2] || match[1] || '').split('/').pop();
-            const lineNum = match[3] || match[2] || 'Unknown';
-            caller = `${funcName} in ${fileName}:${lineNum}`;
-            break;
-          }
-        }
-      }
-    }
+    const callStack = this.getCallStack();
+    const caller = `${callStack.function} in ${callStack.file}:${callStack.line}`;
 
     const logEntry: LogEntry = {
       level,
-      message: `[${timeFormatted}] [${caller}] ${message}`,
+      message: `[${timeFormatted}] ${message}`,
       data,
       timestamp,
       sessionId: this.sessionId,
       userAgent: navigator.userAgent,
       url: window.location.href,
+      caller,
     };
 
     return logEntry;
@@ -128,25 +319,49 @@ class TgStyleLogger implements Logger {
    * Вывод лога в консоль и сохранение
    */
   private log(level: LogLevel, message: string, data?: any): void {
-    if (!this.isEnabled) return;
-
-    const logEntry = this.createLogEntry(level, message, data);
-    this.logs.push(logEntry);
-
-    // Выводим в консоль браузера
-    const consoleMethod = console[level] || console.log;
-    const consoleMessage = `[${level.toUpperCase()}] ${logEntry.message}`;
-    
-    if (data) {
-      consoleMethod(consoleMessage, data);
-    } else {
-      consoleMethod(consoleMessage);
+    // Проверка на рекурсию
+    if (this.isLoggingInProgress) {
+      this.originalConsoleWarn('[LoggerService] Recursive logging detected:', message);
+      return;
     }
 
-    // Ограничиваем количество логов в памяти
-    if (this.logs.length >= LOGGING_CONFIG.MAX_LOGS_IN_MEMORY) {
-      // Удаляем старые логи вместо автоматической отправки
-      this.logs.splice(0, Math.floor(LOGGING_CONFIG.MAX_LOGS_IN_MEMORY / 2));
+    if (!this.isEnabled) return;
+
+    this.isLoggingInProgress = true;
+
+    try {
+      const logEntry = this.createLogEntry(level, message, data);
+
+      // Выводим в консоль браузера
+      const consoleMessage = `[${level.toUpperCase()}] ${logEntry.message}`;
+
+      // Подготовка данных для вывода в консоль
+      const outputData = data !== undefined ? (Array.isArray(data) ? data : [data]) : [];
+
+      // Используем прямые ссылки на нативные методы консоли
+      switch (level) {
+        case 'error':
+          this.originalConsoleError(consoleMessage, ...outputData);
+          break;
+        case 'warn':
+          this.originalConsoleWarn(consoleMessage, ...outputData);
+          break;
+        case 'debug':
+          this.originalConsoleDebug(consoleMessage, ...outputData);
+          break;
+        default:
+          this.originalConsoleLog(consoleMessage, ...outputData);
+      }
+
+      this.logs.push(logEntry);
+
+      // Ограничиваем количество логов в памяти
+      if (this.logs.length >= LOGGING_CONFIG.MAX_LOGS_IN_MEMORY) {
+        // Удаляем старые логи
+        this.logs.splice(0, Math.floor(LOGGING_CONFIG.MAX_LOGS_IN_MEMORY / 2));
+      }
+    } finally {
+      this.isLoggingInProgress = false;
     }
   }
 
@@ -179,66 +394,122 @@ class TgStyleLogger implements Logger {
   }
 
   /**
+   * Отправка данных с повторными попытками в случае ошибки
+   */
+  private async sendWithRetry(url: string, data: any, retries: number): Promise<any> {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: safeJsonStringify(data),
+        signal: AbortSignal.timeout(TIMEOUTS.LOG_REQUEST)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      if (retries <= 0) {
+        throw error;
+      }
+      const delay = 2 ** (3 - retries) * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      this.warn(`Retrying to send logs... (${retries - 1} attempts left)`);
+      return this.sendWithRetry(url, data, retries - 1);
+    }
+  }
+
+  /**
    * Асинхронная отправка логов на сервер
    */
   async flush(): Promise<void> {
     if (this.logs.length === 0) return;
 
     const logsToSend = [...this.logs];
-    this.logs = []; // Очищаем буфер
+    // НЕ очищаем буфер - логи остаются в рамках сессии
 
+    // Сбор данных о пользователе и приложении
+    let telegramUserData: any = null;
+    if (window.Telegram?.WebApp?.initDataUnsafe) {
+      telegramUserData = window.Telegram.WebApp.initDataUnsafe.user;
+    }
+
+    let finalUsername = 'unknown_user';
+    if (telegramUserData?.username) {
+      finalUsername = telegramUserData.username;
+    } else if (telegramUserData?.first_name) {
+      finalUsername = telegramUserData.first_name;
+    } else if (telegramUserData?.id) {
+      finalUsername = `Player_${telegramUserData.id}`;
+    }
+
+    const logsData = {
+      sessionId: this.sessionId,
+      logs: logsToSend,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      appVersion: '2.0.0',
+      userData: telegramUserData,
+      username: finalUsername
+    };
+
+    // Тихая отправка - без логирования
     try {
-      const response = await fetch(`${API_URL}/log-error`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: safeJsonStringify({
-          sessionId: this.sessionId,
-          logs: logsToSend,
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
-          appVersion: '2.0.0',
-        }),
-        signal: AbortSignal.timeout(TIMEOUTS.LOG_REQUEST),
-      });
-
-      if (response.ok) {
-        // Логи отправлены успешно (silent)
-      } else {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      const data = await this.sendWithRetry(`${API_URL}/log-error`, logsData, 3);
+      // Тихий успех - логи уже сохранены на сервере
+      return data;
     } catch (error) {
-      // Ошибка отправки логов (silent)
-      // Возвращаем логи обратно в буфер
-      this.logs.unshift(...logsToSend);
+      this.error('Failed to send logs to server after multiple retries', error as Error);
+      // При ошибке логи остаются в массиве для следующей попытки
+      throw error; // Пробрасываем ошибку выше
     }
   }
 
   /**
-   * Синхронная отправка логов (для beforeunload)
+   * Синхронная отправка логов (для beforeunload и скрытия)
    */
-  private flushSync(): void {
+  private flushSync(closeApp: boolean = false): void {
     if (this.logs.length === 0) return;
 
     try {
+      // Сбор данных о пользователе
+      let telegramUserData: any = null;
+      if (window.Telegram?.WebApp?.initDataUnsafe) {
+        telegramUserData = window.Telegram.WebApp.initDataUnsafe.user;
+      }
+
+      let finalUsername = 'unknown_user';
+      if (telegramUserData?.username) {
+        finalUsername = telegramUserData.username;
+      } else if (telegramUserData?.first_name) {
+        finalUsername = telegramUserData.first_name;
+      } else if (telegramUserData?.id) {
+        finalUsername = `Player_${telegramUserData.id}`;
+      }
+
       const payload = safeJsonStringify({
         sessionId: this.sessionId,
         logs: this.logs,
         timestamp: new Date().toISOString(),
         userAgent: navigator.userAgent,
         appVersion: '2.0.0',
+        userData: telegramUserData,
+        username: finalUsername,
+        closeApp
       });
 
       const blob = new Blob([payload], { type: 'application/json' });
       const sent = navigator.sendBeacon(`${API_URL}/log-error`, blob);
-      
+
       if (sent) {
-        console.log(`📤 Отправлено ${this.logs.length} логов через sendBeacon`);
-        this.logs = [];
+        // Тихий успех - логи отправлены, но остаются в сессии
+      } else {
+        // Тихая ошибка - sendBeacon не удался, логи будут потеряны
       }
     } catch (error) {
-      console.error('❌ Ошибка синхронной отправки логов:', error);
+      // Тихая обработка ошибок при отправке логов
     }
   }
 
@@ -500,47 +771,66 @@ class TgStyleLogger implements Logger {
    */
   async manualSave(): Promise<void> {
     try {
-      this.info('Manual Save Started');
+      // Silent mode - не логируем начало сохранения
 
       if (window.Telegram?.WebApp) {
         const tg = window.Telegram.WebApp;
 
-        // Показываем прогресс
+        // Показываем индикатор загрузки
         tg.MainButton.setText('💾 Сохранение...');
         tg.MainButton.showProgress();
 
-        // Сохраняем логи
-        await this.flush();
+        // Принудительно сохраняем все логи
+        await this.flush().catch(err => {
+          this.originalConsoleError('Ошибка flushLogs в manualSave:', err);
+          throw err;
+        });
 
         // Показываем успех
         tg.MainButton.setText('✅ Логи сохранены');
         tg.MainButton.hideProgress();
-        // Логи сохранены успешно (silent)
+        tg.MainButton.color = '#4CAF50'; // Зеленый цвет
+        tg.showAlert('Логи успешно сохранены на сервере!');
 
-        // Возвращаем кнопку в исходное состояние
+        // Возвращаем кнопку в исходное состояние через 3 секунды
         setTimeout(() => {
           tg.MainButton.setText('💾 Сохранить логи');
+          tg.MainButton.color = '#FF6B6B';
         }, 3000);
 
       } else {
-        // Для браузера
-        await this.flush();
+        // Для браузера просто сохраняем
+        await this.flush().catch(err => {
+          this.originalConsoleError('Ошибка flushLogs в браузере:', err);
+          throw err;
+        });
+        alert('Логи сохранены!');
       }
 
-      this.info('Manual Save Completed Successfully');
+      // Silent mode - не логируем успешное завершение
 
     } catch (error) {
-      console.error('Manual Save Error:', error);
+      this.originalConsoleError('Manual Save Error:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.error('Manual Save Failed', { error: errorMessage });
+      this.error('Manual Save Failed', {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      });
 
       if (window.Telegram?.WebApp) {
         const tg = window.Telegram.WebApp;
         tg.MainButton.setText('❌ Ошибка сохранения');
         tg.MainButton.hideProgress();
-        // Ошибка сохранения логов (silent)
+        tg.MainButton.color = '#F44336'; // Красный цвет для ошибки
+        tg.showAlert('Ошибка сохранения логов: ' + errorMessage);
+
+        // Возвращаем кнопку в исходное состояние через 3 секунды
+        setTimeout(() => {
+          tg.MainButton.setText('💾 Сохранить логи');
+          tg.MainButton.color = '#FF6B6B';
+        }, 3000);
       } else {
-        // Ошибка сохранения логов (silent)
+        alert('Ошибка сохранения логов: ' + errorMessage);
       }
     }
   }
@@ -549,9 +839,17 @@ class TgStyleLogger implements Logger {
 // Создаем глобальный экземпляр логгера
 export const logger = new TgStyleLogger();
 
-// Совместимость с старым API
-export function appLogger(message: string, level: LogLevel = 'info', data?: any): void {
-  logger[level](message, data);
+// Основной API логгера
+export const appLogger = {
+  info: (message: string, data?: any) => logger.info(message, data),
+  debug: (message: string, data?: any) => logger.debug(message, data),
+  warn: (message: string, data?: any) => logger.warn(message, data),
+  error: (message: string, data?: any) => logger.error(message, data),
+};
+
+// Совместимость с LoggerService API
+export function sendLogsToServer(): Promise<any> {
+  return logger.manualSave();
 }
 
 // Устаревший объект Logger для совместимости
@@ -576,18 +874,16 @@ const LegacyLogger = {
   },
   formatLogsForExport() {
     return logger.formatLogsForExport();
+  },
+  getLogs() {
+    return logger.getLogs();
+  },
+  getStats() {
+    return logger.getStats();
   }
 };
 
-// Экспортируем в глобальную область для совместимости
-declare global {
-  interface Window {
-    appLogger: typeof appLogger;
-    clientLogger: TgStyleLogger;
-    Logger: typeof LegacyLogger;
-  }
-}
-
+// Экспортируем в глобальную область
 window.appLogger = appLogger;
 window.clientLogger = logger;
 window.Logger = LegacyLogger;
