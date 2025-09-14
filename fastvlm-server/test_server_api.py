@@ -13,7 +13,7 @@ import requests
 from pathlib import Path
 
 # Configuration
-TEST_IMAGE_PATH = "6.jpg"
+TEST_IMAGE_PATH = "12.jpg"
 SERVER_URL = "http://127.0.0.1:3001"
 
 def load_image_as_base64(image_path):
