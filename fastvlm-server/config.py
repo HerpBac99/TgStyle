@@ -51,7 +51,7 @@ class Config:
     TORCH_DTYPE = torch.float16
 
     # === Настройки генерации ===
-    MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', '1024'))  # Увеличиваем для структурированных ответов
+    MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', '2048'))  # Увеличиваем для структурированных ответов
     TEMPERATURE = float(os.getenv('TEMPERATURE', '0.01'))  # Минимальная температура для строгого форматирования
     DO_SAMPLE = os.getenv('DO_SAMPLE', 'false').lower() == 'true'  # Детерминированная генерация
     TOP_P = float(os.getenv('TOP_P', '0.9'))  # Немного увеличиваем для разнообразия в рамках формата
