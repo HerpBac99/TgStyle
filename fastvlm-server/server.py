@@ -27,6 +27,9 @@ import os
 import psutil
 from contextlib import contextmanager
 
+# Импортируем waitress для многопоточного сервера
+from waitress import serve
+
 # Импортируем конфигурацию
 from config import Config
 
@@ -308,7 +311,7 @@ def load_model():
     except Exception as e:
         error_msg = f"Ошибка загрузки модели: {e}"
         app.logger.debug(f"Ошибка загрузки модели: {e}")
-        app.logger.error(error_msg, exc_debug=True)
+        app.logger.error(error_msg)
         app.logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
@@ -664,7 +667,8 @@ def analyze():
 
         update_performance_stats(total_time, success=False)
         error_msg = f"Ошибка анализа: {e}"
-        app.logger.error(error_msg, exc_debug=True)
+        app.logger.error(error_msg)
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
 
         # Собираем информацию о времени
         timing_debug = {'total_time': round(total_time, 2)}
@@ -778,21 +782,30 @@ def signal_handler(signum, frame):
     sys.exit(0)
 
 def start_server():
-    """Запуск Flask сервера"""
+    """Запуск FastVLM сервера через waitress (многопоточный режим)"""
     try:
-        app.logger.debug(f"Запускаем FastVLM сервер на {Config.HOST}:{Config.PORT}...")
+        app.logger.debug(f"Запускаем FastVLM сервер через waitress на {Config.HOST}:{Config.PORT}...")
+        app.logger.debug(f"Многопоточный режим: {Config.THREADS} потоков")
+        app.logger.debug(f"Ограничение соединений: {Config.CONNECTION_LIMIT}")
+        app.logger.debug(f"Таймаут соединений: {Config.CONNECTION_TIMEOUT}с")
         app.logger.debug(f"Server starting on {Config.HOST}:{Config.PORT}")
 
-        app.run(
+        # Запускаем сервер через waitress с многопоточным режимом
+        serve(
+            app,
             host=Config.HOST,
             port=Config.PORT,
-            debug=False,
-            use_reloader=False
+            threads=Config.THREADS,
+            # Основные настройки для производительности
+            connection_limit=Config.CONNECTION_LIMIT,
+            max_request_body_size=104857600,  # 100MB максимальный размер тела запроса
+            max_request_header_size=8192,     # 8KB максимальный размер заголовков
         )
     except Exception as e:
         error_msg = f"Ошибка запуска FastVLM сервера: {e}"
         app.logger.debug(error_msg)
-        app.logger.error(error_msg, exc_debug=True)
+        app.logger.error(error_msg)
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
 
 if __name__ == '__main__':
     # Загружаем переменные окружения

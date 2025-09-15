@@ -39,6 +39,14 @@ class Config:
     HOST = os.getenv('FASTVLM_HOST', '127.0.0.1')
     PORT = int(os.getenv('FASTVLM_PORT', '3001'))
 
+    # === Настройки многопоточности (waitress) ===
+    # Количество потоков для обработки запросов (рекомендуется 4-8 для GPU моделей)
+    THREADS = int(os.getenv('FASTVLM_THREADS', '8'))
+    # Максимальное количество соединений в очереди (backlog)
+    CONNECTION_LIMIT = int(os.getenv('FASTVLM_CONNECTION_LIMIT', '1024'))
+    # Таймаут соединения в секундах
+    CONNECTION_TIMEOUT = int(os.getenv('FASTVLM_CONNECTION_TIMEOUT', '60'))
+
     # === Настройки модели ===
     # Используем GPU если доступен
     if torch.cuda.is_available():
@@ -141,4 +149,7 @@ class Config:
         print(f"Устройство: {cls.DEVICE}")
         print(f"Тип модели: {cls.MODEL_TYPE}")
         print(f"Модель: {os.path.basename(cls.MODEL_PATH)}")
+        print(f"Потоки (threads): {cls.THREADS}")
+        print(f"Ограничение соединений: {cls.CONNECTION_LIMIT}")
+        print(f"Таймаут соединений: {cls.CONNECTION_TIMEOUT}с")
         print(f"Gemini API: {'Настроен' if cls.GEMINI_API_KEY else 'Не настроен'}")
