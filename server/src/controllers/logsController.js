@@ -115,67 +115,38 @@ const logger = winston.createLogger({
   ]
 });
 
-// Функции для удобного использования
-const logMethods = {
-  error: (message, meta = {}) => logger.error(message, meta),
-  warn: (message, meta = {}) => logger.warn(message, meta),
-  info: (message, meta = {}) => logger.info(message, meta),
-  debug: (message, meta = {}) => logger.debug(message, meta),
+/**
+ * Логирование ошибок API
+ */
+const logApiError = (error, req, res, next) => {
+  const { method, url, ip } = req;
+  const errorInfo = {
+    message: error.message,
+    stack: error.stack,
+    method,
+    url,
+    ip,
+    userAgent: req.get('User-Agent'),
+    timestamp: new Date().toISOString()
+  };
 
-
-  // Метод для логирования ошибок API
-  logApiError: (error, req, res, next) => {
-    const { method, url, ip } = req;
-    const errorInfo = {
-      message: error.message,
-      stack: error.stack,
-      method,
-      url,
-      ip,
-      userAgent: req.get('User-Agent'),
-      timestamp: new Date().toISOString()
-    };
-
-    logger.error(`API Error: ${method} ${url}`, errorInfo);
-
-    // Продолжаем обработку ошибки
-    next(error);
-  },
-
-  // Метод для логирования успешных операций
-  logSuccess: (operation, details = {}) => {
-    logger.info(`✓ ${operation}`, {
-      ...details,
-      timestamp: new Date().toISOString()
-    });
-  },
-
-  // Метод для логирования предупреждений
-  logWarning: (message, details = {}) => {
-    logger.warn(`⚠ ${message}`, {
-      ...details,
-      timestamp: new Date().toISOString()
-    });
-  },
-
-  // Получение статистики логгера
-  getStats: () => {
-    return {
-      level: logger.level,
-      transports: logger.transports.map(t => ({
-        type: t.constructor.name,
-        level: t.level,
-        filename: t.filename
-      })),
-      levels: logLevels
-    };
-  }
+  logger.error(`API Error: ${method} ${url}`, errorInfo);
+  next(error);
 };
 
-// Экспорт логгера и методов
+/**
+ * Логирование успешных операций
+ */
+const logSuccess = (operation, details = {}) => {
+  logger.info(`✓ ${operation}`, {
+    ...details,
+    timestamp: new Date().toISOString()
+  });
+};
+
+// Экспорт логгера и основных методов
 module.exports = {
   logger,
-  logSuccess: logMethods.info,
-  logWarning: logMethods.warn,
-  logApiError: logMethods.error
+  logApiError,
+  logSuccess
 };

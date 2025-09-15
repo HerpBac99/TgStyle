@@ -4,7 +4,19 @@ const { validateTelegramWebAppData } = require('../utils/telegram');
 const { logger } = require('../controllers/logsController');
 
 /**
- * Анализ изображения через FastVLM сервер
+ * Константы для FastVLM интеграции
+ */
+const FASTVLM_CONFIG = {
+    HOST: 'http://127.0.0.1',
+    PORT: 3001,
+    TIMEOUT: 30000, // 30 секунд
+    ENDPOINT: '/analyze'
+};
+
+/**
+ * Анализирует изображение через FastVLM сервер
+ * @param {Buffer} imageBuffer - Буфер изображения
+ * @returns {Promise<Object>} Результат анализа
  */
 async function analyzeImage(imageBuffer) {
     try {
@@ -12,18 +24,24 @@ async function analyzeImage(imageBuffer) {
 
         // Конвертируем изображение в base64
         const base64Image = imageBuffer.toString('base64');
+        const url = `${FASTVLM_CONFIG.HOST}:${FASTVLM_CONFIG.PORT}${FASTVLM_CONFIG.ENDPOINT}`;
+
+        // Создаем AbortController для таймаута
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+            logger.warn('FastVLM запрос прерван по таймауту');
+        }, FASTVLM_CONFIG.TIMEOUT);
 
         // Отправляем запрос в FastVLM сервер
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-        const response = await fetch('http://127.0.0.1:3001/analyze', {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                image_base64: base64Image
+                image_base64: base64Image,
+                prompt: 'Опиши одежду на фото'
             }),
             signal: controller.signal
         });
@@ -33,45 +51,89 @@ async function analyzeImage(imageBuffer) {
         if (response.ok) {
             const result = await response.json();
 
-            if (result.success) {
+            if (result.success && result.analysis) {
                 logger.info('FastVLM анализ успешен', {
-                    analysisLength: result.analysis ? result.analysis.length : 0
+                    analysisLength: result.analysis.length
                 });
 
-                let analysisText = result.analysis || '';
-
-                // Исправляем проблемы с кодировкой текста
-                if (analysisText.includes('�') || analysisText.includes('\ufffd')) {
-                    analysisText = analysisText.replace(/�/g, '').replace(/\ufffd/g, '');
-                }
-
-                if (!analysisText.trim()) {
-                    analysisText = 'Анализ выполнен, но текст описания недоступен.';
-                }
+                // Обрабатываем и очищаем текст анализа
+                let analysisText = cleanAnalysisText(result.analysis);
 
                 return {
                     success: true,
                     analysis: analysisText,
-                    fastvlm: true
+                    fastvlm: true,
+                    model: result.model_used || 'llava'
                 };
             } else {
-                logger.error('FastVLM сервер вернул ошибку', { error: result.error });
-                return { success: false, error: result.error };
+                logger.error('FastVLM сервер вернул ошибку', {
+                    error: result.error,
+                    status: response.status
+                });
+                return {
+                    success: false,
+                    error: result.error || 'FastVLM analysis failed'
+                };
             }
         } else {
-            logger.error('FastVLM сервер недоступен', {
+            logger.error('❌ FastVLM сервер недоступен', {
                 status: response.status,
-                statusText: response.statusText
+                statusText: response.statusText,
+                url
             });
-            return { success: false, error: 'FastVLM server unavailable' };
+
+            return {
+                success: false,
+                error: `FastVLM server error: ${response.status} ${response.statusText}`
+            };
         }
 
     } catch (error) {
-        logger.error('Ошибка при обращении к FastVLM серверу', {
-            error: error.message
+        // Обработка различных типов ошибок
+        if (error.name === 'AbortError') {
+            logger.error('⏰ FastVLM запрос отменен по таймауту');
+            return { success: false, error: 'FastVLM timeout' };
+        }
+
+        logger.error('💥 Ошибка при обращении к FastVLM серверу', {
+            error: error.message,
+            stack: error.stack
         });
-        return { success: false, error: error.message };
+
+        return {
+            success: false,
+            error: error.message || 'FastVLM communication error'
+        };
     }
+}
+
+/**
+ * Очищает и исправляет текст анализа от проблем с кодировкой
+ * @param {string} text - Исходный текст анализа
+ * @returns {string} Очищенный текст
+ */
+function cleanAnalysisText(text) {
+    if (!text || typeof text !== 'string') {
+        return 'Анализ выполнен, но текст описания недоступен.';
+    }
+
+    let cleanedText = text;
+
+    // Исправляем проблемы с кодировкой UTF-8
+    if (cleanedText.includes('�') || cleanedText.includes('\ufffd')) {
+        cleanedText = cleanedText.replace(/�/g, '').replace(/\ufffd/g, '');
+        logger.debug('Исправлены проблемы с кодировкой текста');
+    }
+
+    // Удаляем лишние пробелы и пустые строки
+    cleanedText = cleanedText.trim();
+
+    // Проверяем, что текст не пустой после очистки
+    if (!cleanedText) {
+        return 'Анализ выполнен, но текст описания недоступен.';
+    }
+
+    return cleanedText;
 }
 
 /**
