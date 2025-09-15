@@ -1,303 +1,300 @@
-/* 
+/*
  * Стили для экрана анализа фото
  * Новый дизайн с фото сверху и результатом снизу
  */
 .analysis-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100vh;
-    background: var(--gradient-bg) !important;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    opacity: 0;
-    transform: scale(0.95);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: fixed; /* Фиксированное позиционирование на весь экран */
+    top: 0; /* Прижимает к верхнему краю */
+    left: 0; /* Прижимает к левому краю */
+    width: 100%; /* Полная ширина экрана */
+    height: 100vh; /* Полная высота экрана */
+    background: var(--gradient-bg) !important; /* Градиентный фон из переменной */
+    z-index: 9999; /* Высокий z-индекс для отображения поверх всего */
+    display: flex; /* Включает flexbox */
+    flex-direction: column; /* Вертикальное расположение дочерних элементов */
+    gap: 0; /* Явно убираем gap между секциями */
+    opacity: 0; /* Изначально скрыт */
+    transform: scale(0.95); /* Изначально уменьшен */
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* Анимация появления */
 }
 
 .analysis-screen:not(.hidden) {
-    opacity: 1;
-    transform: scale(1);
+    opacity: 1; /* Делает экран видимым */
+    transform: scale(1); /* Возвращает нормальный размер */
 }
 
 /* Верхняя половина - контейнер для фото */
 .analysis-top-section {
-    height: 50vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
+    height: 50vh; /* Высота равна половине экрана */
+    display: flex; /* Включает flexbox */
+    align-items: center; /* Центрирует по вертикали */
+    justify-content: center; /* Центрирует по горизонтали */
+    /*padding: 5px; Внутренние отступы */
 }
 
 /* Контейнер для фото с молочной рамкой */
 .photo-container {
-    width: 250px;
-    aspect-ratio: 3 / 4;
-    max-height: 400px;
-    background: #f8f6f3;
-    border-radius: 16px;
-    padding: 1px;
-    border: 5px solid var(--card-border-color);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transform: translateY(20px);
-    opacity: 0;
-    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+    width: 300px; /* Фиксированная ширина */
+    aspect-ratio: 3 / 4; /* Соотношение сторон 3:4 */
+    max-height: 400px; /* Максимальная высота */
+    background: #f8f6f3; /* Молочный фон */
+    border-radius: 16px; /* Скругление углов */
+    border: 5px solid var(--card-border-color); /* Граница из переменной */
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15); /* Тень для объема */
+    display: flex; /* Включает flexbox */
+    align-items: center; /* Центрирует по вертикали */
+    justify-content: center; /* Центрирует по горизонтали */
+    opacity: 0; /* Изначально скрыт */
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s; /* Анимация появления */
 }
 
 .analysis-screen:not(.hidden) .photo-container {
-    transform: translateY(0);
-    opacity: 1;
+    transform: translateY(0); /* Возвращает нормальное положение */
+    opacity: 1; /* Делает контейнер видимым */
 }
 
 /* Само фото */
 .analysis-photo {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    border-radius: 12px;
+    width: 100%; /* Полная ширина контейнера */
+    height: 100%; /* Полная высота контейнера */
+    object-fit: cover; /* Масштабирует изображение сохраняя пропорции */
+    border-radius: 12px; /* Скругление углов */
 }
 
 /* Нижняя половина - результат анализа */
 .analysis-bottom-section {
-    height: 50vh;
-    display: flex;
-    flex-direction: column;
-    position: relative;
+    height: 50vh; /* Высота равна половине экрана */
+    display: flex; /* Включает flexbox */
+    flex-direction: column; /* Вертикальное расположение элементов */
+    position: relative; /* Создает контекст позиционирования */
+    justify-content: flex-start; /* Выравнивает элементы сверху */
+    align-items: stretch; /* Растягивает элементы на полную ширину */
 }
 
 /* Индикатор загрузки */
 .analysis-loading {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    opacity: 0;
-    transform: translateY(20px);
-    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.4s;
+    position: absolute; /* Абсолютное позиционирование */
+    top: 0; /* Прижимает к верхнему краю */
+    left: 0; /* Прижимает к левому краю */
+    right: 0; /* Прижимает к правому краю */
+    bottom: 0; /* Прижимает к нижнему краю */
+    display: flex; /* Включает flexbox */
+    flex-direction: column; /* Вертикальное расположение элементов */
+    align-items: center; /* Центрирует по горизонтали */
+    justify-content: center; /* Центрирует по вертикали */
+    text-align: center; /* Центрирование текста */
+    opacity: 0; /* Изначально скрыт */
+    transform: translateY(0); /* Убираем translateY для устранения возможного смещения */
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.4s; /* Анимация появления */
+    margin: 0; /* Явно убираем любые возможные маргины */
 }
 
 .analysis-screen:not(.hidden) .analysis-loading {
-    opacity: 1;
-    transform: translateY(0);
+    opacity: 1; /* Делает индикатор видимым */
+    transform: translateY(0); /* Возвращает нормальное положение */
 }
 
 .analysis-loading.hidden {
-    opacity: 0;
-    transform: translateY(-20px);
+    opacity: 0; /* Скрывает индикатор */
+    transform: translateY(-20px); /* Смещает вверх при скрытии */
 }
 
 /* Спиннер загрузки */
 .loading-spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid rgba(255,255,255,0.3);
-    border-top: 3px solid white;
-    border-radius: 50%;
-    margin: 0 auto 15px;
-    animation: spin 1s linear infinite;
+    width: 40px; /* Ширина спиннера */
+    height: 40px; /* Высота спиннера */
+    border: 3px solid rgba(255,255,255,0.3); /* Полупрозрачная граница */
+    border-top: 3px solid white; /* Белая верхняя граница для эффекта вращения */
+    border-radius: 50%; /* Скругляет углы для создания круга */
+    margin: 0 auto 15px; /* Центрирует и добавляет отступ снизу */
+    animation: spin 1s linear infinite; /* Анимация вращения */
 }
 
 /* Текст загрузки */
 .loading-text {
-    color: white;
-    font-size: 16px;
-    font-weight: 500;
-    margin: 0;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    color: white; /* Белый цвет текста */
+    font-size: 16px; /* Размер шрифта */
+    font-weight: 500; /* Жирность шрифта */
+    margin: 0; /* Убирает внешние отступы */
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3); /* Тень для лучшей видимости */
 }
 
 /* Контейнер результата анализа */
 .analysis-result-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: white;
-    border-radius: 16px 16px 0 0;
-    border: 5px solid var(--card-border-color);
-    margin: 16px 16px 0 16px;
-    box-shadow: 0 -4px 16px rgba(0,0,0,0.1);
-    opacity: 0;
-    transform: translateY(100%);
-    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex;
-    flex-direction: column;
+    position: absolute; /* Абсолютное позиционирование */
+    top: 0; /* Прижимает к верхнему краю */
+    left: 10px; /* Прижимает к левому краю */
+    right: 10px; /* Прижимает к правому краю */
+    bottom: 0; /* Прижимает к нижнему краю */
+    background: white; /* Белый фон */
+    border-radius: 16px 16px 0 0; /* Скругление верхних углов */
+    border: 5px solid var(--card-border-color); /* Граница из переменной */
+    margin: 0; /* Убираем margin, который создавал расстояние */
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.1); /* Тень снизу */
+    opacity: 0; /* Изначально скрыт */
+    transform: translateY(100%); /* Изначально смещен вниз */
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1); /* Анимация появления */
+    display: flex; /* Включает flexbox */
+    flex-direction: column; /* Вертикальное расположение элементов */
 }
 
 .analysis-result-container:not(.hidden) {
-    opacity: 1;
-    transform: translateY(0);
+    opacity: 1; /* Делает контейнер видимым */
+    transform: translateY(0); /* Возвращает нормальное положение */
 }
 
 /* Заголовок результата */
 .result-header {
-    background: #f8f6f3;
-    padding: 5px 5px;
-    border-radius: 16px 16px 0 0;
-    text-align: center;
-    border-bottom: 1px solid #e0e0e0;
+    background: #f8f6f3; /* Молочный фон */
+    padding: 5px 5px; /* Внутренние отступы */
+    border-radius: 16px 16px 0 0; /* Скругление верхних углов */
+    text-align: center; /* Центрирование текста */
+    border-bottom: 1px solid #e0e0e0; /* Граница снизу */
 }
 
 .result-header h3 {
-    margin: 0;
-    color: #333;
-    font-size: 18px;
-    font-weight: 600;
+    margin: 0; /* Убирает внешние отступы */
+    color: #333; /* Темно-серый цвет текста */
+    font-size: 18px; /* Размер шрифта */
+    font-weight: 600; /* Жирность шрифта */
 }
 
 /* Текст анализа */
 .analysis-text {
-    flex: 1;
-    padding: 8px;
-    overflow-y: auto;
-    line-height: 1.6;
-    color: #444;
-    font-size: 15px;
-    white-space: pre-wrap;
+    flex: 1; /* Занимает все доступное пространство */
+    padding: 8px; /* Внутренние отступы */
+    overflow-y: auto; /* Добавляет вертикальную прокрутку при необходимости */
+    line-height: 1.6; /* Высота строки для лучшей читаемости */
+    color: #444; /* Темно-серый цвет текста */
+    font-size: 15px; /* Размер шрифта */
+    white-space: pre-wrap; /* Сохраняет форматирование текста */
 }
 
 /* Кнопки действий */
 .result-actions {
-    padding: 20px 24px;
-    border-top: 1px solid #e0e0e0;
-    background: #fafafa;
-    display: flex;
-    gap: 12px;
-    border-radius: 0 0 16px 16px;
+    padding: 20px 24px; /* Внутренние отступы */
+    border-top: 1px solid #e0e0e0; /* Граница сверху */
+    background: #fafafa; /* Светло-серый фон */
+    display: flex; /* Включает flexbox */
+    gap: 12px; /* Расстояние между кнопками */
+    border-radius: 0 0 16px 16px; /* Скругление нижних углов */
 }
 
 /* Базовые стили для кнопок действий */
 .action-btn {
-    border: none;
-    padding: 14px 20px;
-    border-radius: 12px;
-    font-size: 16px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    outline: none;
+    border: none; /* Убирает рамку */
+    padding: 14px 20px; /* Внутренние отступы */
+    border-radius: 12px; /* Скругление углов */
+    font-size: 16px; /* Размер шрифта */
+    font-weight: 500; /* Жирность шрифта */
+    cursor: pointer; /* Курсор в виде руки */
+    transition: all 0.3s ease; /* Анимация при взаимодействии */
+    display: flex; /* Включает flexbox */
+    align-items: center; /* Центрирует по вертикали */
+    justify-content: center; /* Центрирует по горизонтали */
+    gap: 8px; /* Расстояние между элементами */
+    outline: none; /* Убирает контур при фокусе */
 }
 
 .action-btn:focus {
-    outline: none;
+    outline: none; /* Убирает контур при фокусе */
 }
 
 .action-btn:active {
-    outline: none;
+    outline: none; /* Убирает контур при нажатии */
 }
 
 /* Кнопка лайк */
 .like-btn {
-    flex: 1;
-    background: transparent !important;
-    border: none !important;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: all 0.2s ease;
-    box-shadow: none !important;
-    padding: 8px !important;
-    border-radius: 0 !important;
-    outline: none !important;
+    flex: 1; /* Занимает равную часть доступного пространства */
+    background: transparent !important; /* Прозрачный фон */
+    border: none !important; /* Убирает рамку */
+    color: white; /* Белый цвет текста */
+    display: flex; /* Включает flexbox */
+    align-items: center; /* Центрирует по вертикали */
+    justify-content: center; /* Центрирует по горизонтали */
+    gap: 8px; /* Расстояние между элементами */
+    transition: all 0.2s ease; /* Анимация при взаимодействии */
+    box-shadow: none !important; /* Убирает тень */
+    padding: 8px !important; /* Внутренние отступы */
+    border-radius: 0 !important; /* Убирает скругление углов */
+    outline: none !important; /* Убирает контур */
+
+    /* ВОТ ГЛАВНЫЙ ФИКС: Убирает серый квадрат при нажатии на iOS/WebKit */
+    -webkit-tap-highlight-color: transparent !important; 
 }
 
-.like-btn:focus {
+/* Мы ДОЛЖНЫ определить :focus и :active, чтобы переопределить стили браузера */
+.like-btn:focus,
+.like-btn:focus-visible {
     outline: none !important;
+    background: transparent !important; /* Убираем фон при фокусе */
+    box-shadow: none !important;
 }
 
 .like-btn:active {
     outline: none !important;
+    background: transparent !important; /* Убираем фон при нажатии */
     box-shadow: none !important;
-    background: transparent !important;
-    transform: scale(0.8) !important;
-}
-
-.like-btn:focus:not(:focus-visible) {
-    outline: none !important;
-}
-
-.like-btn:focus-visible {
-    outline: none !important;
+    transform: scale(0.8) !important; /* Возвращаем анимацию нажатия */
 }
 
 .like-btn svg {
-    stroke: #ff4757;
-    stroke-width: 2;
-    fill: none;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.like-btn:hover {
-    transform: scale(1.05);
+    stroke: #ff4757; /* Красный цвет обводки */
+    stroke-width: 2; /* Толщина обводки */
+    fill: none; /* Без заливки */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Анимация изменений */
 }
 
 .like-btn.liked svg {
-    fill: #ff4757;
-    stroke: #ff4757;
+    fill: #ff4757; /* Красная заливка для лайкнутого состояния */
+    stroke: #ff4757; /* Красная обводка для лайкнутого состояния */
 }
 
 /* Кнопка поделиться */
 .share-btn {
-    flex: 1;
-    background: #6dc3fc;
-    color: white;
-    box-shadow: 0 4px 12px rgba(55, 66, 250, 0.3);
+    flex: 1; /* Занимает равную часть доступного пространства */
+    background: #6dc3fc; /* Голубой фон */
+    color: white; /* Белый цвет текста */
+    box-shadow: 0 4px 12px rgba(55, 66, 250, 0.3); /* Синяя тень */
 }
 
 .share-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(55, 66, 250, 0.4);
+    transform: translateY(-2px); /* Поднимает кнопку вверх при наведении */
+    box-shadow: 0 6px 16px rgba(55, 66, 250, 0.4); /* Увеличивает тень при наведении */
 }
 
 /* Кнопка закрыть */
 .close-btn {
-    background: #79caf8;
-    color: white;
-    box-shadow: 0 4px 12px rgba(129, 216, 208, 0.3);
-    padding: 14px;
+    background: #79caf8; /* Голубой фон */
+    color: white; /* Белый цвет текста */
+    box-shadow: 0 4px 12px rgba(129, 216, 208, 0.3); /* Голубая тень */
+    padding: 14px; /* Внутренние отступы */
 }
 
 .close-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(129, 216, 208, 0.4);
+    transform: translateY(-2px); /* Поднимает кнопку вверх при наведении */
+    box-shadow: 0 6px 16px rgba(129, 216, 208, 0.4); /* Увеличивает тень при наведении */
 }
 
 /* Анимация нажатия для всех кнопок */
 .action-btn:active {
-    transform: scale(0.95);
-    outline: none;
+    transform: scale(0.95); /* Уменьшает кнопку при нажатии */
+    outline: none; /* Убирает контур при нажатии */
 }
 
 /* Переопределяем для кнопки лайк */
 .like-btn.action-btn:active {
-    transform: scale(0.8) !important;
-    background: transparent !important;
-    outline: none !important;
-    box-shadow: none !important;
+    transform: scale(0.8) !important; /* Уменьшает кнопку лайк при нажатии */
+    background: transparent !important; /* Сохраняет прозрачный фон */
+    outline: none !important; /* Убирает контур */
+    box-shadow: none !important; /* Убирает тень */
 }
 
 /* Анимация спиннера */
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% { transform: rotate(0deg); } /* Начальное положение - без поворота */
+    100% { transform: rotate(360deg); } /* Конечное положение - полный поворот */
 }
 
 /*
@@ -306,109 +303,109 @@
  */
 .analysis-text,
 .analysis-text * {
-    user-select: text; /* Разрешаем выделение текста */
-    -webkit-user-select: text; /* Для WebKit браузеров */
-    -moz-user-select: text; /* Для Firefox */
-    -ms-user-select: text; /* Для IE/Edge */
+    user-select: text; /* Разрешает выделение текста мышью */
+    -webkit-user-select: text; /* Разрешает выделение в WebKit браузерах */
+    -moz-user-select: text; /* Разрешает выделение в Firefox */
+    -ms-user-select: text; /* Разрешает выделение в IE/Edge */
 }
 
 /*
  * Стили для экрана просмотра сохраненного анализа
  */
 .saved-analysis-screen {
-    position: fixed;
-    inset: 10px;
-    width: auto;
-    height: auto;
-    z-index: 10000;
-    opacity: 0;
-    transform: scale(0.95);
-    transition: all 0.3s ease;
-    cursor: pointer;
+    position: fixed; /* Фиксированное позиционирование */
+    inset: 10px; /* Отступы от всех краев */
+    width: auto; /* Автоматическая ширина */
+    height: auto; /* Автоматическая высота */
+    z-index: 10000; /* Высокий z-индекс */
+    opacity: 0; /* Изначально скрыт */
+    transform: scale(0.95); /* Изначально уменьшен */
+    transition: all 0.3s ease; /* Анимация появления */
+    cursor: pointer; /* Курсор в виде руки */
 }
 
 .saved-analysis-screen:not(.hidden) {
-    opacity: 1;
-    transform: scale(1);
+    opacity: 1; /* Делает экран видимым */
+    transform: scale(1); /* Возвращает нормальный размер */
 }
 
 /* Основной контейнер содержимого */
 .saved-analysis-content {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: center;
-    padding: 10px;
-    gap: 10px;
+    width: 100%; /* Полная ширина */
+    height: 100%; /* Полная высота */
+    display: flex; /* Включает flexbox */
+    flex-direction: column; /* Вертикальное расположение элементов */
+    justify-content: flex-start; /* Выравнивает элементы сверху */
+    align-items: center; /* Центрирует элементы по горизонтали */
+    padding: 10px; /* Внутренние отступы */
+    gap: 10px; /* Расстояние между элементами */
 }
 
 /* Контейнер для фото */
 .saved-analysis-photo-container {
-    width: 100%;
-    max-width: 400px;
-    max-height: 60vh;
-    background: #f8f6f3;
-    border: 4px solid #f8f6f3;
-    border-radius: 16px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 0;
+    width: 100%; /* Полная ширина */
+    max-width: 400px; /* Максимальная ширина */
+    max-height: 60vh; /* Максимальная высота */
+    background: #f8f6f3; /* Молочный фон */
+    border: 4px solid #f8f6f3; /* Граница того же цвета */
+    border-radius: 16px; /* Скругление углов */
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15); /* Тень для объема */
+    display: flex; /* Включает flexbox */
+    align-items: center; /* Центрирует по вертикали */
+    justify-content: center; /* Центрирует по горизонтали */
+    margin-bottom: 0; /* Убирает нижний отступ */
 }
 
 /* Фото в сохраненном анализе */
 .saved-analysis-photo {
-    width: 100%;
-    height: 100%;
-    max-height: 60vh;
-    object-fit: contain;
-    border-radius: 12px;
+    width: 100%; /* Полная ширина */
+    height: 100%; /* Полная высота */
+    max-height: 60vh; /* Максимальная высота */
+    object-fit: contain; /* Масштабирует изображение сохраняя пропорции */
+    border-radius: 12px; /* Скругление углов */
 }
 
 /* Контейнер информации */
 .saved-analysis-info {
-    width: 100%;
-    max-width: 400px;
-    max-height: 40vh;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
+    width: 100%; /* Полная ширина */
+    max-width: 400px; /* Максимальная ширина */
+    max-height: 40vh; /* Максимальная высота */
+    display: flex; /* Включает flexbox */
+    flex-direction: column; /* Вертикальное расположение элементов */
+    gap: 5px; /* Расстояние между элементами */
 }
 
 /* Данные анализа */
 .saved-analysis-data {
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    border-radius: 12px;
-    padding: 16px;
-    font-size: 14px;
-    line-height: 1.5;
-    overflow-y: auto;
-    max-height: 35vh;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    background-color: rgba(0, 0, 0, 0.8); /* Полупрозрачный черный фон */
+    color: white; /* Белый цвет текста */
+    border-radius: 12px; /* Скругление углов */
+    padding: 16px; /* Внутренние отступы */
+    font-size: 14px; /* Размер шрифта */
+    line-height: 1.5; /* Высота строки */
+    overflow-y: auto; /* Вертикальная прокрутка при необходимости */
+    max-height: 35vh; /* Максимальная высота */
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3); /* Тень для объема */
 }
 
 /* Разрешаем выделение текста в данных анализа */
 .saved-analysis-data,
 .saved-analysis-data * {
-    user-select: text;
-    -webkit-user-select: text;
-    -moz-user-select: text;
-    -ms-user-select: text;
+    user-select: text; /* Разрешает выделение текста мышью */
+    -webkit-user-select: text; /* Разрешает выделение в WebKit браузерах */
+    -moz-user-select: text; /* Разрешает выделение в Firefox */
+    -ms-user-select: text; /* Разрешает выделение в IE/Edge */
 }
 
 /* Дата анализа */
 .saved-analysis-date {
-    background-color: rgb(78, 187, 14);
-    color: white;
-    font-size: 12px;
-    font-weight: 500;
-    padding: 8px 16px;
-    border-radius: 20px;
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(78, 187, 14, 0.3);
-    align-self: center;
+    background-color: rgb(78, 187, 14); /* Зеленый фон */
+    color: white; /* Белый цвет текста */
+    font-size: 12px; /* Размер шрифта */
+    font-weight: 500; /* Жирность шрифта */
+    padding: 8px 16px; /* Внутренние отступы */
+    border-radius: 20px; /* Скругление углов */
+    text-align: center; /* Центрирование текста */
+    box-shadow: 0 2px 8px rgba(78, 187, 14, 0.3); /* Зеленая тень */
+    align-self: center; /* Центрирует элемент относительно родителя */
 }

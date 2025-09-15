@@ -222,7 +222,7 @@ async function startServer() {
           process.exit(1);
         }
 
-        logger.info('✅ Сервер успешно остановлен');
+        logger.info('Сервер успешно остановлен');
         logSuccess('Сервер завершен', { signal, uptime: process.uptime() });
         process.exit(0);
       });
