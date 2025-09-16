@@ -52,6 +52,14 @@ except ImportError:
     GEMINI_AVAILABLE = False
     app.logger.warning("Google GenAI library not available. Install with: pip install google-genai")
 
+# Импортируем requests для Ollama API
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+    app.logger.warning("Requests library not available. Install with: pip install requests")
+
 # Промпты для многопроходного анализа
 PERSON_PROMPT = None
 CLOTHING_PROMPT = None
@@ -67,6 +75,11 @@ context_len = None
 
 # Глобальные переменные для Gemini
 gemini_client = None
+
+# Глобальные переменные для Ollama
+ollama_available = False
+ollama_url = "http://127.0.0.1:11434"
+ollama_model = "gemma3:4b"  # Лучшая модель для стилистики - баланс скорости и качества
 
 # Глобальные переменные для промптов
 default_prompt = None
@@ -387,76 +400,171 @@ def load_style_prompt():
         style_prompt = '''Ты профессиональный стилист. На основе анализа одежды {fastvlm_analysis} дай креативный совет по стилю на русском языке.'''
         app.logger.error(f"Ошибка загрузки промпта стилиста: {e}. Используется промпт по умолчанию")
 
+def check_ollama_availability():
+    """Проверяет доступность Ollama API"""
+    global ollama_available
+
+    try:
+        if not REQUESTS_AVAILABLE:
+            app.logger.warning("Requests library недоступна. Ollama функции отключены.")
+            ollama_available = False
+            return False
+
+        # Проверяем доступность Ollama API
+        response = requests.get(f"{ollama_url}/api/tags", timeout=5)
+        if response.status_code == 200:
+            models = response.json().get('models', [])
+            model_names = [model['name'] for model in models]
+            if ollama_model in model_names:
+                ollama_available = True
+                app.logger.info(f"Ollama доступен. Модель {ollama_model} найдена. Доступные модели: {model_names}")
+                return True
+            else:
+                app.logger.warning(f"Ollama доступен, но модель {ollama_model} не найдена. Доступные модели: {model_names}")
+                ollama_available = False
+                return False
+        else:
+            app.logger.warning(f"Ollama API недоступен (статус: {response.status_code})")
+            ollama_available = False
+            return False
+
+    except Exception as e:
+        app.logger.error(f"Ошибка проверки Ollama: {e}")
+        ollama_available = False
+        return False
+
+def create_stylist_response_ollama(multi_pass_analysis):
+    """Создает креативный ответ ИИ стилиста через Ollama"""
+    global ollama_available, ollama_url, ollama_model, style_prompt
+
+    if not ollama_available:
+        app.logger.warning("Ollama недоступен, используем базовый анализ FastVLM")
+        return multi_pass_analysis
+
+    try:
+        app.logger.info("Генерация креативного ответа стилиста через Ollama API")
+
+        # Используем промпт из файла style_prompt.md
+        formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis)
+
+        # Логируем отправку запроса в Ollama
+        app.logger.info(f"Отправка запроса в Ollama (промпт: {len(formatted_prompt)} символов, модель: {ollama_model})")
+
+        ollama_request_start = time.time()
+
+        # Создаем запрос к Ollama API
+        payload = {
+            "model": ollama_model,
+            "prompt": formatted_prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.5,  # Оптимальная температура для креативности стилиста
+                "top_p": 0.8,        # Более широкая выборка для разнообразия
+                "max_tokens": 1200,  # Ограничиваем до 1200 символов для краткости
+                "repeat_penalty": 1.15,  # Штраф за повторения
+                "top_k": 40          # Ограничиваем выборку лучших токенов
+            }
+        }
+
+        response = requests.post(
+            f"{ollama_url}/api/generate",
+            json=payload,
+            timeout=60
+        )
+
+        if response.status_code != 200:
+            raise Exception(f"Ollama API error: {response.status_code} - {response.text}")
+
+        result = response.json()
+        creative_response = result.get('response', '').strip()
+
+        ollama_request_time = time.time() - ollama_request_start
+
+        # Логируем успешный ответ от Ollama
+        app.logger.info(f"Ollama ответил успешно: {len(creative_response)} символов за {ollama_request_time:.2f} сек")
+
+        return creative_response
+
+    except Exception as e:
+        app.logger.error(f"Ошибка создания ответа через Ollama: {e}")
+        # Fallback на оригинальный анализ FastVLM
+        return multi_pass_analysis
+
 def initialize_gemini():
     """Инициализация Gemini API клиента"""
     global gemini_client
-    
+
     try:
         if not GEMINI_AVAILABLE:
             app.logger.warning("Google GenAI library not available. Install with: pip install google-genai")
             return False
-        
+
         if not Config.GEMINI_API_KEY:
             app.logger.warning("GEMINI_API_KEY не установлен. Gemini функции недоступны.")
             return False
-        
+
         # Создаем клиента Gemini
         gemini_client = genai.Client(api_key=Config.GEMINI_API_KEY)
         app.logger.debug(f"Gemini API клиент инициализирован (модель: {Config.GEMINI_MODEL})")
         return True
-        
+
     except Exception as e:
         app.logger.error(f"Ошибка инициализации Gemini API: {e}")
         return False
 
 def create_stylist_response(multi_pass_analysis):
-    """Создает креативный ответ ИИ стилиста на основе многопроходного анализа через Gemini"""
-    global gemini_client, style_prompt
+    """Создает креативный ответ ИИ стилиста через Ollama (приоритет) или Gemini"""
+    global ollama_available, gemini_client, style_prompt
 
-    if not gemini_client:
-        app.logger.debug("Gemini API недоступен, используем базовый анализ FastVLM")
-        app.logger.info("Gemini API недоступен, используем базовый анализ FastVLM")
-        # Возвращаем объединенный анализ как fallback
-        return multi_pass_analysis
+    # Сначала пробуем Ollama (приоритет)
+    if ollama_available:
+        app.logger.info("Используем Ollama для создания ответа стилиста")
+        response = create_stylist_response_ollama(multi_pass_analysis)
+        if response and response != multi_pass_analysis:  # Проверяем, что это не fallback
+            return response
+        app.logger.warning("Ollama не дал качественный ответ, пробуем Gemini")
 
-    try:
-        app.logger.debug("Генерация креативного ответа стилиста через Gemini API")
-        app.logger.info("Генерация креативного ответа через Gemini API")
+    # Fallback на Gemini
+    if gemini_client:
+        app.logger.info("Используем Gemini для создания ответа стилиста")
+        try:
+            app.logger.debug("Генерация креативного ответа стилиста через Gemini API")
 
-        # Используем промпт из файла style_prompt.md
-        # Экранируем специальные символы для безопасной вставки
-        safe_analysis = str(multi_pass_analysis).replace('{', '{{').replace('}', '}}')
-        formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis)
+            # Используем промпт из файла style_prompt.md
+            # Экранируем специальные символы для безопасной вставки
+            safe_analysis = str(multi_pass_analysis).replace('{', '{{').replace('}', '}}')
+            formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis)
 
-        # Логируем отправку запроса в Gemini
-        app.logger.info(f"Отправка запроса в Gemini (промпт: {len(formatted_prompt)} символов)")
+            # Логируем отправку запроса в Gemini
+            app.logger.info(f"Отправка запроса в Gemini (промпт: {len(formatted_prompt)} символов)")
 
-        gemini_request_start = time.time()
-        response = gemini_client.models.generate_content(
-            model=Config.GEMINI_MODEL,
-            contents=formatted_prompt,
-            config=genai.types.GenerateContentConfig(
-                temperature=Config.GEMINI_TEMPERATURE,
-                max_output_tokens=Config.GEMINI_MAX_TOKENS,
-                thinking_config=genai.types.ThinkingConfig(
-                    thinking_budget=Config.GEMINI_THINKING_BUDGET
-                ) if Config.GEMINI_THINKING_BUDGET > 0 else None
+            gemini_request_start = time.time()
+            response = gemini_client.models.generate_content(
+                model=Config.GEMINI_MODEL,
+                contents=formatted_prompt,
+                config=genai.types.GenerateContentConfig(
+                    temperature=Config.GEMINI_TEMPERATURE,
+                    max_output_tokens=Config.GEMINI_MAX_TOKENS,
+                    thinking_config=genai.types.ThinkingConfig(
+                        thinking_budget=Config.GEMINI_THINKING_BUDGET
+                    ) if Config.GEMINI_THINKING_BUDGET > 0 else None
+                )
             )
-        )
 
-        gemini_request_time = time.time() - gemini_request_start
-        creative_response = response.text.strip()
+            gemini_request_time = time.time() - gemini_request_start
+            creative_response = response.text.strip()
 
-        # Логируем успешный ответ от Gemini
-        app.logger.info(f"Gemini ответил успешно: {len(creative_response)} символов за {gemini_request_time:.2f} сек")
+            # Логируем успешный ответ от Gemini
+            app.logger.info(f"Gemini ответил успешно: {len(creative_response)} символов за {gemini_request_time:.2f} сек")
 
-        return creative_response
+            return creative_response
 
-    except Exception as e:
-        app.logger.error(f"Ошибка создания креативного ответа: {e}")
-        app.logger.error(f"Ошибка Gemini API: {str(e)}")
-        # Fallback на оригинальный анализ FastVLM
-        return multi_pass_analysis
+        except Exception as e:
+            app.logger.error(f"Ошибка создания ответа через Gemini: {e}")
+
+    # Если ничего не сработало, возвращаем базовый анализ
+    app.logger.warning("Ни Ollama, ни Gemini недоступны, используем базовый анализ FastVLM")
+    return multi_pass_analysis
 
 def load_model():
     """Загружает FastVLM модель в память с оптимизацией для GPU/CPU"""
@@ -1084,6 +1192,9 @@ if __name__ == '__main__':
     if not load_multi_pass_prompts():
         app.logger.error("Не удалось загрузить многопроходные промпты")
         sys.exit(1)
+
+    # Проверяем доступность Ollama
+    check_ollama_availability()
 
     # Инициализируем Gemini API
     initialize_gemini()
