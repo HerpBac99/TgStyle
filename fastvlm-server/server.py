@@ -52,6 +52,11 @@ except ImportError:
     GEMINI_AVAILABLE = False
     app.logger.warning("Google GenAI library not available. Install with: pip install google-genai")
 
+# Промпты для многопроходного анализа
+PERSON_PROMPT = None
+CLOTHING_PROMPT = None
+ACCESSORIES_PROMPT = None
+
 app = Flask(__name__)
 
 # Глобальные переменные для модели
@@ -63,9 +68,12 @@ context_len = None
 # Глобальные переменные для Gemini
 gemini_client = None
 
-# Глобальная переменная для промпта
+# Глобальные переменные для промптов
 default_prompt = None
 style_prompt = None
+person_prompt = None
+clothing_prompt = None
+accessories_prompt = None
 
 # Директория для сохранения результатов FastVLM
 FASTVLM_RESULTS_DIR = os.path.join(os.path.dirname(__file__), 'results')
@@ -168,6 +176,182 @@ def load_prompt():
         default_prompt = 'Опиши подробно какие предметы одежды ты видишь на этом изображении. Какой тип, цвет, стиль и материал? Пожалуйста, отвечай на русском языке, используя точные термины моды.'
         app.logger.error(f"Ошибка загрузки промпта: {e}. Используется промпт по умолчанию")
 
+def load_multi_pass_prompts():
+    """Загружает промпты для многопроходного анализа"""
+    global person_prompt, clothing_prompt, accessories_prompt
+
+    prompt_dir = os.path.join(os.path.dirname(__file__), 'prompt')
+
+    try:
+        # Загружаем PERSON_PROMPT
+        person_file = os.path.join(prompt_dir, 'PERSON_PROMPT.md')
+        with open(person_file, 'r', encoding='utf-8') as f:
+            person_prompt = f.read().strip()
+        app.logger.debug(f"PERSON промпт загружен из файла: {person_file}")
+
+        # Загружаем CLOTHING_PROMPT
+        clothing_file = os.path.join(prompt_dir, 'CLOTHING_PROMPT.md')
+        with open(clothing_file, 'r', encoding='utf-8') as f:
+            clothing_prompt = f.read().strip()
+        app.logger.debug(f"CLOTHING промпт загружен из файла: {clothing_file}")
+
+        # Загружаем ACCESSORIES_PROMPT
+        accessories_file = os.path.join(prompt_dir, 'ACCESSORIES_PROMPT.md')
+        with open(accessories_file, 'r', encoding='utf-8') as f:
+            accessories_prompt = f.read().strip()
+        app.logger.debug(f"ACCESSORIES промпт загружен из файла: {accessories_file}")
+
+    except FileNotFoundError as e:
+        app.logger.error(f"Файл промпта не найден: {e}")
+        return False
+    except Exception as e:
+        app.logger.error(f"Ошибка загрузки многопроходных промптов: {e}")
+        return False
+
+    return True
+
+def extract_text(result: dict) -> str:
+    return (
+        (result or {}).get("technical_analysis")
+        or (result or {}).get("analysis")
+        or ""
+    )
+
+def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
+    """Выполняет многопроходный анализ изображения через FastVLM"""
+    global person_prompt, clothing_prompt, accessories_prompt
+
+    app.logger.info(f"Начинаем многопроходный анализ для пользователя {nickname}")
+
+    # Временные переменные для результатов
+    person_result = ""
+    clothing_result = ""
+    accessories_result = ""
+    timing = {"person": 0, "clothing": 0, "accessories": 0, "total": 0}
+
+    total_start_time = time.time()
+
+    try:
+        # Pass 1: Person analysis
+        if person_prompt:
+            app.logger.debug("Выполняем анализ человека")
+            pass1_start = time.time()
+            person_response = post_analyze_to_fastvlm(person_prompt, image_base64)
+            person_result = extract_text(person_response)
+            timing["person"] = time.time() - pass1_start
+            app.logger.debug(f"Анализ человека завершен за {timing['person']:.2f}с")
+
+        # Pass 2: Clothing analysis
+        if clothing_prompt:
+            app.logger.debug("Выполняем анализ одежды")
+            pass2_start = time.time()
+            clothing_response = post_analyze_to_fastvlm(clothing_prompt, image_base64)
+            clothing_result = extract_text(clothing_response)
+            timing["clothing"] = time.time() - pass2_start
+            app.logger.debug(f"Анализ одежды завершен за {timing['clothing']:.2f}с")
+
+        # Pass 3: Accessories analysis
+        if accessories_prompt:
+            app.logger.debug("Выполняем анализ аксессуаров")
+            pass3_start = time.time()
+            accessories_response = post_analyze_to_fastvlm(accessories_prompt, image_base64)
+            accessories_result = extract_text(accessories_response)
+            timing["accessories"] = time.time() - pass3_start
+            app.logger.debug(f"Анализ аксессуаров завершен за {timing['accessories']:.2f}с")
+
+        timing["total"] = time.time() - total_start_time
+
+        app.logger.info(f"Многопроходный анализ завершен за {timing['total']:.2f}с")
+
+        return {
+            "person": person_result,
+            "clothing": clothing_result,
+            "accessories": accessories_result,
+            "timing": timing,
+            "success": True
+        }
+
+    except Exception as e:
+        app.logger.error(f"Ошибка в многопроходном анализе: {e}")
+        timing["total"] = time.time() - total_start_time
+        return {
+            "person": "",
+            "clothing": "",
+            "accessories": "",
+            "timing": timing,
+            "success": False,
+            "error": str(e)
+        }
+
+def post_analyze_to_fastvlm(prompt: str, image_base64: str) -> dict:
+    """Отправляет запрос на анализ в FastVLM модель"""
+    try:
+        # Создаем промпт для модели
+        qs = prompt
+        if model.config.mm_use_im_start_end:
+            qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
+        else:
+            qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
+
+        conv = conv_templates["qwen_2"].copy()
+        conv.append_message(conv.roles[0], qs)
+        conv.append_message(conv.roles[1], None)
+        prompt_full = conv.get_prompt()
+
+        # Декодируем изображение
+        image_data = base64.b64decode(image_base64)
+        image = Image.open(io.BytesIO(image_data))
+
+        # Обрабатываем изображение
+        image_tensor = process_images([image], image_processor, model.config)[0]
+
+        # Выполняем анализ с управлением памятью
+        with gpu_memory_manager():
+            # Токенизируем промпт
+            input_ids = tokenizer_image_token(prompt_full, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
+
+            # Установка seed для детерминизма
+            torch.manual_seed(42)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(42)
+
+            # Выполняем анализ
+            with torch.no_grad():
+                attention_mask = torch.ones_like(input_ids)
+
+                output_ids = model.generate(
+                    input_ids,
+                    attention_mask=attention_mask,
+                    images=image_tensor.unsqueeze(0).to(model.device).half(),
+                    image_sizes=[image.size],
+                    do_sample=Config.DO_SAMPLE,
+                    temperature=Config.TEMPERATURE,
+                    top_p=Config.TOP_P if Config.DO_SAMPLE else None,
+                    repetition_penalty=Config.REPETITION_PENALTY,
+                    max_new_tokens=Config.MAX_NEW_TOKENS,
+                    use_cache=True,
+                    pad_token_id=tokenizer.eos_token_id,
+                    eos_token_id=tokenizer.eos_token_id
+                )
+
+        # Декодируем результат
+        result_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
+
+        return {
+            "success": True,
+            "technical_analysis": result_text,
+            "analysis": result_text
+        }
+
+    except Exception as e:
+        app.logger.error(f"Ошибка анализа FastVLM: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "technical_analysis": "",
+            "analysis": ""
+        }
+
 def load_style_prompt():
     """Загружает промпт стилиста из файла style_prompt.md"""
     global style_prompt
@@ -225,23 +409,24 @@ def initialize_gemini():
         app.logger.error(f"Ошибка инициализации Gemini API: {e}")
         return False
 
-def create_stylist_response(fastvlm_analysis):
-    """Создает креативный ответ ИИ стилиста на основе анализа FastVLM через Gemini"""
+def create_stylist_response(multi_pass_analysis):
+    """Создает креативный ответ ИИ стилиста на основе многопроходного анализа через Gemini"""
     global gemini_client, style_prompt
 
     if not gemini_client:
         app.logger.debug("Gemini API недоступен, используем базовый анализ FastVLM")
         app.logger.info("Gemini API недоступен, используем базовый анализ FastVLM")
-        return fastvlm_analysis
+        # Возвращаем объединенный анализ как fallback
+        return multi_pass_analysis
 
     try:
         app.logger.debug("Генерация креативного ответа стилиста через Gemini API")
         app.logger.info("Генерация креативного ответа через Gemini API")
 
         # Используем промпт из файла style_prompt.md
-        # Экранируем JSON для безопасной вставки в промпт
-        safe_analysis = str(fastvlm_analysis).replace('{', '{{').replace('}', '}}')
-        formatted_prompt = style_prompt.replace('{fastvlm_analysis}', fastvlm_analysis)
+        # Экранируем специальные символы для безопасной вставки
+        safe_analysis = str(multi_pass_analysis).replace('{', '{{').replace('}', '}}')
+        formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis)
 
         # Логируем отправку запроса в Gemini
         app.logger.info(f"Отправка запроса в Gemini (промпт: {len(formatted_prompt)} символов)")
@@ -271,7 +456,7 @@ def create_stylist_response(fastvlm_analysis):
         app.logger.error(f"Ошибка создания креативного ответа: {e}")
         app.logger.error(f"Ошибка Gemini API: {str(e)}")
         # Fallback на оригинальный анализ FastVLM
-        return fastvlm_analysis
+        return multi_pass_analysis
 
 def load_model():
     """Загружает FastVLM модель в память с оптимизацией для GPU/CPU"""
@@ -630,69 +815,28 @@ def analyze():
         app.logger.info(f"Сохранил изображение с качеством 100%: {image.size[0]}x{image.size[1]}")
 
         try:
-            # Логируем запуск FastVLM анализа
-            app.logger.info(f"Запустил первый анализ FastVLM для пользователя {nickname}")
+            # Выполняем многопроходный анализ
+            app.logger.info(f"Запускаем многопроходный анализ FastVLM для пользователя {nickname}")
 
-            inference_start_time = time.time()
-            
-            # Создаем промпт для модели
-            qs = prompt
-            if model.config.mm_use_im_start_end:
-                qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
-            else:
-                qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
+            multi_pass_result = perform_multi_pass_analysis(image_base64, nickname)
 
-            conv = conv_templates["qwen_2"].copy()
-            conv.append_message(conv.roles[0], qs)
-            conv.append_message(conv.roles[1], None)
-            prompt_full = conv.get_prompt()
+            if not multi_pass_result["success"]:
+                update_performance_stats(time.time() - analysis_start_time, success=False)
+                return jsonify({
+                    'success': False,
+                    'error': multi_pass_result.get("error", "Ошибка многопроходного анализа"),
+                    'multi_pass_result': multi_pass_result
+                }), 500
 
-            # Выполняем анализ с управлением памятью
-            with gpu_memory_manager():
-                # Токенизируем промпт
-                input_ids = tokenizer_image_token(prompt_full, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
+            # Объединяем результаты всех проходов
+            combined_analysis = f"""PERSON: {multi_pass_result['person']}
 
-                # Обрабатываем изображение
-                app.logger.info(f"Оригинальный размер изображения перед обработкой: {image.size[0]}x{image.size[1]}")
-                image_tensor = process_images([image], image_processor, model.config)[0]
-                app.logger.info(f"Размер тензора после process_images: {image_tensor.shape}")
+CLOTHING: {multi_pass_result['clothing']}
 
-                # Установка seed для детерминизма
-                torch.manual_seed(42)
-                if torch.cuda.is_available():
-                    torch.cuda.manual_seed_all(42)
-                
-                # Выполняем анализ с оптимизированными параметрами
-                with torch.no_grad():
-                    # Создаем attention_mask
-                    attention_mask = torch.ones_like(input_ids)
+ACCESSORIES: {multi_pass_result['accessories']}"""
 
-                    output_ids = model.generate(
-                        input_ids,
-                        attention_mask=attention_mask,
-                        images=image_tensor.unsqueeze(0).to(model.device).half(),
-                        image_sizes=[image.size],
-                        do_sample=Config.DO_SAMPLE,
-                        temperature=Config.TEMPERATURE,
-                        top_p=Config.TOP_P if Config.DO_SAMPLE else None,
-                        repetition_penalty=Config.REPETITION_PENALTY,
-                        max_new_tokens=Config.MAX_NEW_TOKENS,
-                        use_cache=True,
-                        pad_token_id=tokenizer.eos_token_id,
-                        eos_token_id=tokenizer.eos_token_id
-                    )
-
-            # Декодируем результат
-            result_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
-            # Извлекаем чистый анализ
-            # clean_analysis = extract_analysis_from_output(result_text)
-            clean_analysis = (result_text)
-
-            # Рассчитываем время инференса
-            inference_time = time.time() - inference_start_time
-
-            # Логируем ответ FastVLM
-            app.logger.info(f"Ответ LLM: длина {len(clean_analysis)} символов, время: {inference_time:.2f} сек")
+            # Логируем объединенный анализ
+            app.logger.info(f"Объединенный анализ: длина {len(combined_analysis)} символов")
 
             # Сохраняем результат FastVLM для отладки
             image_debug = {
@@ -700,12 +844,12 @@ def analyze():
                 'mode': image.mode,
                 'filename': temp_image_path.split('\\')[-1] if temp_image_path else 'unknown'
             }
-            save_fastvlm_result(clean_analysis, result_text, image_debug)
+            save_fastvlm_result(combined_analysis, combined_analysis, image_debug)
 
             # Создаем креативный ответ стилиста через Gemini API
-            app.logger.info(f"Отправляем в Gemini для пользователя {nickname}")
+            app.logger.info(f"Отправляем объединенный анализ в Gemini для пользователя {nickname}")
             gemini_start_time = time.time()
-            stylist_response = create_stylist_response(clean_analysis)
+            stylist_response = create_stylist_response(combined_analysis)
             gemini_time = time.time() - gemini_start_time
             app.logger.info(f"Ответ от GEMINI получен: длина {len(stylist_response)} символов, время: {gemini_time:.2f} сек")
 
@@ -714,32 +858,40 @@ def analyze():
 
             # Сохраняем результаты анализа с nickname
             save_analysis_with_nickname(
-                clean_analysis,
+                combined_analysis,
                 stylist_response,
                 nickname,
                 f"{image.size[0]}x{image.size[1]}",
-                inference_time,
+                multi_pass_result['timing']['total'],
                 gemini_time
             )
 
             # Обновляем статистику
             update_performance_stats(total_time, success=True)
 
-            app.logger.debug(f"Анализ успешно завершен за {total_time:.2f}с (инференс: {inference_time:.2f}с)")
+            app.logger.info(f"Многопроходный анализ успешно завершен за {total_time:.2f}с")
 
             response_data = {
                 'success': True,
-                'technical_analysis': clean_analysis,
+                'technical_analysis': combined_analysis,
                 'analysis': stylist_response,  # Только креативный ответ стилиста
                 'model_used': model.config.model_type,
                 'device': str(model.device),
                 'timing': {
                     'total_time': round(total_time, 2),
-                    'inference_time': round(inference_time, 2),
-                    'preprocessing_time': round(inference_start_time - analysis_start_time, 2)
+                    'multi_pass_time': round(multi_pass_result['timing']['total'], 2),
+                    'gemini_time': round(gemini_time, 2),
+                    'person_time': round(multi_pass_result['timing']['person'], 2),
+                    'clothing_time': round(multi_pass_result['timing']['clothing'], 2),
+                    'accessories_time': round(multi_pass_result['timing']['accessories'], 2)
+                },
+                'multi_pass_results': {
+                    'person': multi_pass_result['person'],
+                    'clothing': multi_pass_result['clothing'],
+                    'accessories': multi_pass_result['accessories']
                 }
             }
-            
+
             # Добавляем информацию о GPU если используется
             if torch.cuda.is_available() and 'cuda' in str(model.device):
                 response_data['gpu_memory_used'] = round(torch.cuda.memory_allocated() / 1024**2, 1)  # MB
@@ -924,9 +1076,14 @@ if __name__ == '__main__':
 
     # Загружаем промпт
     load_prompt()
-    
-    # Загружаем промпт стилиста 
+
+    # Загружаем промпт стилиста
     load_style_prompt()
+
+    # Загружаем многопроходные промпты
+    if not load_multi_pass_prompts():
+        app.logger.error("Не удалось загрузить многопроходные промпты")
+        sys.exit(1)
 
     # Инициализируем Gemini API
     initialize_gemini()

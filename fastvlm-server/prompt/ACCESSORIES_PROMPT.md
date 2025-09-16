@@ -1,0 +1,1 @@
+Describe only the accessories the person in the picture is WEARING. Note the face, ears, neck, fingers, belt, wrists, bag. List only the accessories, indicating the color, shape, and possibly the material.
