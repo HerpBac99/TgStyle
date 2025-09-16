@@ -152,8 +152,11 @@ class CameraManager {
 
     // Сжатие если необходимо
     if (this.needsCompression(imageData)) {
+      logger.info('Сжимаю изображение для отправки');
       imageData.compressed = await this.compressImage(imageData);
       imageData.compressedSize = Math.ceil((imageData.compressed.length - imageData.compressed.indexOf(',') - 1) * 0.75);
+    } else {
+      logger.info('Изображение не требует сжатия');
     }
 
     return imageData;
@@ -304,6 +307,8 @@ class CameraManager {
 
           // Получаем сжатое изображение
           let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+
+          logger.info(`Сжатие: ${img.naturalWidth}x${img.naturalHeight} → ${width}x${height}, качество: ${quality}, размер: ${(this.getBase64Size(compressedBase64) / 1024 / 1024).toFixed(2)}MB`);
 
           // Проверяем размер и при необходимости уменьшаем качество
           let currentQuality = quality;

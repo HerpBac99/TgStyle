@@ -228,19 +228,25 @@ def initialize_gemini():
 def create_stylist_response(fastvlm_analysis):
     """Создает креативный ответ ИИ стилиста на основе анализа FastVLM через Gemini"""
     global gemini_client, style_prompt
-    
+
     if not gemini_client:
         app.logger.debug("Gemini API недоступен, используем базовый анализ FastVLM")
+        app.logger.info("Gemini API недоступен, используем базовый анализ FastVLM")
         return fastvlm_analysis
-    
+
     try:
         app.logger.debug("Генерация креативного ответа стилиста через Gemini API")
-        
+        app.logger.info("Генерация креативного ответа через Gemini API")
+
         # Используем промпт из файла style_prompt.md
         # Экранируем JSON для безопасной вставки в промпт
         safe_analysis = str(fastvlm_analysis).replace('{', '{{').replace('}', '}}')
         formatted_prompt = style_prompt.replace('{fastvlm_analysis}', fastvlm_analysis)
 
+        # Логируем отправку запроса в Gemini
+        app.logger.info(f"Отправка запроса в Gemini (промпт: {len(formatted_prompt)} символов)")
+
+        gemini_request_start = time.time()
         response = gemini_client.models.generate_content(
             model=Config.GEMINI_MODEL,
             contents=formatted_prompt,
@@ -252,11 +258,18 @@ def create_stylist_response(fastvlm_analysis):
                 ) if Config.GEMINI_THINKING_BUDGET > 0 else None
             )
         )
+
+        gemini_request_time = time.time() - gemini_request_start
         creative_response = response.text.strip()
+
+        # Логируем успешный ответ от Gemini
+        app.logger.info(f"Gemini ответил успешно: {len(creative_response)} символов за {gemini_request_time:.2f} сек")
+
         return creative_response
-        
+
     except Exception as e:
         app.logger.error(f"Ошибка создания креативного ответа: {e}")
+        app.logger.error(f"Ошибка Gemini API: {str(e)}")
         # Fallback на оригинальный анализ FastVLM
         return fastvlm_analysis
 
@@ -344,6 +357,54 @@ def save_fastvlm_result(clean_analysis, raw_output, image_debug):
 
     except Exception as e:
         app.logger.error(f"Ошибка сохранения результата FastVLM: {e}")
+        return None
+
+def save_analysis_with_nickname(clean_analysis, gemini_response, nickname, image_size, fastvlm_time, gemini_time):
+    """Сохраняет результаты анализа FastVLM и Gemini с nickname в LOGS_DIR"""
+    try:
+        # Создаем директорию logs если не существует
+        logs_dir = os.path.join(os.path.dirname(__file__), 'logs')
+        os.makedirs(logs_dir, exist_ok=True)
+
+        # Форматируем время для имени файла
+        from datetime import datetime
+        timestamp_str = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+        # Создаем имя файла: nickname_YYYY-MM-DD_HH-MM-SS
+        safe_nickname = nickname.replace('/', '_').replace('\\', '_')[:50]  # Ограничиваем длину
+        filename = f"{safe_nickname}_{timestamp_str}.json"
+        filepath = os.path.join(logs_dir, filename)
+
+        # Создаем структуру данных для сохранения
+        result_data = {
+            "timestamp": timestamp_str,
+            "nickname": nickname,
+            "image_info": {
+                "size": image_size,
+                "size_mb": round(len(image_size) / (1024 * 1024), 2) if image_size else 0
+            },
+            "fastvlm_analysis": {
+                "response": clean_analysis,
+                "processing_time_seconds": round(fastvlm_time, 2),
+                "response_length": len(clean_analysis) if clean_analysis else 0
+            },
+            "gemini_analysis": {
+                "response": gemini_response,
+                "processing_time_seconds": round(gemini_time, 2) if gemini_time else 0,
+                "response_length": len(gemini_response) if gemini_response else 0
+            },
+            "total_processing_time": round(fastvlm_time + (gemini_time or 0), 2)
+        }
+
+        # Сохраняем в JSON файл
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(result_data, f, ensure_ascii=False, indent=2)
+
+        app.logger.info(f"Результаты анализа сохранены: {filepath}")
+        return filepath
+
+    except Exception as e:
+        app.logger.error(f"Ошибка сохранения результатов анализа: {e}")
         return None
 
 def extract_analysis_from_output(output):
@@ -538,6 +599,7 @@ def analyze():
         image_base64 = data['image_base64']
         prompt = data.get('prompt', default_prompt)
         use_gpu = data.get('force_gpu', torch.cuda.is_available())
+        nickname = data.get('nickname', 'unknown_user')  # Получаем nickname из запроса
 
         app.logger.debug(f"Начало анализа изображения (устройство: {model.device})")
 
@@ -545,7 +607,11 @@ def analyze():
         try:
             image_data = base64.b64decode(image_base64)
             image = Image.open(io.BytesIO(image_data))
-            
+
+            # Логируем информацию о полученном изображении
+            image_size_mb = len(image_data) / (1024 * 1024)
+            app.logger.info(f"Пришла фотография: {image.size[0]}x{image.size[1]} пикселей, вес: {image_size_mb:.2f} MB, пользователь: {nickname}")
+
         except Exception as e:
             update_performance_stats(time.time() - analysis_start_time, success=False)
             app.logger.error(f"Ошибка декодирования изображения: {e}")
@@ -554,12 +620,19 @@ def analyze():
                 'error': f'Invalid image data: {e}'
             }), 400
 
-        # Сохраняем во временный файл
+        # Сохраняем во временный файл с максимальным качеством
         with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
-            image.save(temp_file, 'JPEG')
+            # Сохраняем с качеством 100% для сохранения деталей
+            image.save(temp_file, 'JPEG', quality=100, optimize=False, subsampling=0)
             temp_image_path = temp_file.name
 
+        # Логируем качество сохранения
+        app.logger.info(f"Сохранил изображение с качеством 100%: {image.size[0]}x{image.size[1]}")
+
         try:
+            # Логируем запуск FastVLM анализа
+            app.logger.info(f"Запустил первый анализ FastVLM для пользователя {nickname}")
+
             inference_start_time = time.time()
             
             # Создаем промпт для модели
@@ -580,7 +653,9 @@ def analyze():
                 input_ids = tokenizer_image_token(prompt_full, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
 
                 # Обрабатываем изображение
+                app.logger.info(f"Оригинальный размер изображения перед обработкой: {image.size[0]}x{image.size[1]}")
                 image_tensor = process_images([image], image_processor, model.config)[0]
+                app.logger.info(f"Размер тензора после process_images: {image_tensor.shape}")
 
                 # Установка seed для детерминизма
                 torch.manual_seed(42)
@@ -589,19 +664,19 @@ def analyze():
                 
                 # Выполняем анализ с оптимизированными параметрами
                 with torch.no_grad():
+                    # Создаем attention_mask
+                    attention_mask = torch.ones_like(input_ids)
+
                     output_ids = model.generate(
                         input_ids,
+                        attention_mask=attention_mask,
                         images=image_tensor.unsqueeze(0).to(model.device).half(),
                         image_sizes=[image.size],
                         do_sample=Config.DO_SAMPLE,
                         temperature=Config.TEMPERATURE,
                         top_p=Config.TOP_P if Config.DO_SAMPLE else None,
                         repetition_penalty=Config.REPETITION_PENALTY,
-                        num_beams=Config.NUM_BEAMS,  # Используем настроенное значение beam search
                         max_new_tokens=Config.MAX_NEW_TOKENS,
-                        length_penalty=Config.LENGTH_PENALTY,
-                        early_stopping=Config.EARLY_STOPPING,
-                        no_repeat_ngram_size=Config.NO_REPEAT_NGRAM_SIZE,
                         use_cache=True,
                         pad_token_id=tokenizer.eos_token_id,
                         eos_token_id=tokenizer.eos_token_id
@@ -616,6 +691,9 @@ def analyze():
             # Рассчитываем время инференса
             inference_time = time.time() - inference_start_time
 
+            # Логируем ответ FastVLM
+            app.logger.info(f"Ответ LLM: длина {len(clean_analysis)} символов, время: {inference_time:.2f} сек")
+
             # Сохраняем результат FastVLM для отладки
             image_debug = {
                 'size': image.size,
@@ -625,10 +703,24 @@ def analyze():
             save_fastvlm_result(clean_analysis, result_text, image_debug)
 
             # Создаем креативный ответ стилиста через Gemini API
+            app.logger.info(f"Отправляем в Gemini для пользователя {nickname}")
+            gemini_start_time = time.time()
             stylist_response = create_stylist_response(clean_analysis)
+            gemini_time = time.time() - gemini_start_time
+            app.logger.info(f"Ответ от GEMINI получен: длина {len(stylist_response)} символов, время: {gemini_time:.2f} сек")
 
             # Рассчитываем общее время
             total_time = time.time() - analysis_start_time
+
+            # Сохраняем результаты анализа с nickname
+            save_analysis_with_nickname(
+                clean_analysis,
+                stylist_response,
+                nickname,
+                f"{image.size[0]}x{image.size[1]}",
+                inference_time,
+                gemini_time
+            )
 
             # Обновляем статистику
             update_performance_stats(total_time, success=True)

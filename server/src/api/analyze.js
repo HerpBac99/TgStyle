@@ -16,9 +16,10 @@ const FASTVLM_CONFIG = {
 /**
  * Анализирует изображение через FastVLM сервер
  * @param {Buffer} imageBuffer - Буфер изображения
+ * @param {string} nickname - Никнейм пользователя для логирования
  * @returns {Promise<Object>} Результат анализа
  */
-async function analyzeImage(imageBuffer) {
+async function analyzeImage(imageBuffer, nickname) {
     try {
         logger.info('Отправка запроса в FastVLM сервер');
 
@@ -41,7 +42,8 @@ async function analyzeImage(imageBuffer) {
             },
             body: JSON.stringify({
                 image_base64: base64Image,
-                prompt: 'Опиши одежду на фото'
+                prompt: 'Опиши одежду на фото',
+                nickname: nickname
             }),
             signal: controller.signal
         });
@@ -76,7 +78,7 @@ async function analyzeImage(imageBuffer) {
                 };
             }
         } else {
-            logger.error('❌ FastVLM сервер недоступен', {
+            logger.error('FastVLM сервер недоступен', {
                 status: response.status,
                 statusText: response.statusText,
                 url
@@ -91,11 +93,11 @@ async function analyzeImage(imageBuffer) {
     } catch (error) {
         // Обработка различных типов ошибок
         if (error.name === 'AbortError') {
-            logger.error('⏰ FastVLM запрос отменен по таймауту');
+            logger.error('FastVLM запрос отменен по таймауту');
             return { success: false, error: 'FastVLM timeout' };
         }
 
-        logger.error('💥 Ошибка при обращении к FastVLM серверу', {
+        logger.error(' Ошибка при обращении к FastVLM серверу', {
             error: error.message,
             stack: error.stack
         });
@@ -142,7 +144,6 @@ function cleanAnalysisText(text) {
  */
 router.post('/', async (req, res) => {
     try {
-        logger.info('Получен запрос на анализ изображения');
 
         const { photo, initData } = req.body;
 
@@ -198,8 +199,23 @@ router.post('/', async (req, res) => {
             });
         }
 
+        // Получаем информацию о пользователе для логирования
+        const userInfo = validationResult.data.user;
+        logger.info('Данные пользователя Telegram', {
+            userId: userInfo?.id,
+            username: userInfo?.username,
+            firstName: userInfo?.first_name,
+            lastName: userInfo?.last_name
+        });
+
+        const nickname = userInfo?.username ||
+                        `${userInfo?.first_name || ''}${userInfo?.last_name || ''}`.trim() ||
+                        `user_${userInfo?.id || 'unknown'}`;
+
+        logger.info(`Используемый nickname для анализа: ${nickname}`);
+
         // Отправляем на анализ в FastVLM
-        const result = await analyzeImage(imageBuffer);
+        const result = await analyzeImage(imageBuffer, nickname);
 
         if (result.success) {
             logger.info('Анализ завершен успешно');

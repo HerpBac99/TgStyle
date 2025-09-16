@@ -62,10 +62,10 @@ export const IMAGE_CONSTRAINTS = {
 
 // Настройки сжатия изображений
 export const IMAGE_COMPRESSION = {
-  MAX_SIZE_MB: 1.5,
-  MAX_WIDTH: 1280,
-  MAX_HEIGHT: 1280,
-  QUALITY: 0.9,
+  MAX_SIZE_MB: 3.0,  // Увеличиваем для лучшего качества (было 1.5)
+  MAX_WIDTH: 2048,   // Увеличиваем разрешение (было 1280)
+  MAX_HEIGHT: 2048,  // Увеличиваем разрешение (было 1280)
+  QUALITY: 0.95,     // Увеличиваем качество JPEG (было 0.9)
   FORMAT: 'jpeg' as const,
 } as const;
 

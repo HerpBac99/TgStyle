@@ -213,7 +213,6 @@
     display: flex; /* Включает flexbox */
     align-items: center; /* Центрирует по вертикали */
     justify-content: center; /* Центрирует по горизонтали */
-    gap: 8px; /* Расстояние между элементами */
     transition: all 0.2s ease; /* Анимация при взаимодействии */
     box-shadow: none !important; /* Убирает тень */
     padding: 8px !important; /* Внутренние отступы */
@@ -237,6 +236,7 @@
     background: transparent !important; /* Убираем фон при нажатии */
     box-shadow: none !important;
     transform: scale(0.8) !important; /* Возвращаем анимацию нажатия */
+    -webkit-tap-highlight-color: transparent !important;
 }
 
 .like-btn svg {

@@ -58,21 +58,21 @@ class Config:
 
     TORCH_DTYPE = torch.float16
 
-    # === Настройки генерации ===
-    MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', '2048'))  # Увеличиваем для структурированных ответов
-    TEMPERATURE = float(os.getenv('TEMPERATURE', '0.01'))  # Минимальная температура для строгого форматирования
-    DO_SAMPLE = os.getenv('DO_SAMPLE', 'false').lower() == 'true'  # Детерминированная генерация
-    TOP_P = float(os.getenv('TOP_P', '0.9'))  # Немного увеличиваем для разнообразия в рамках формата
-    REPETITION_PENALTY = float(os.getenv('REPETITION_PENALTY', '1.1'))  # Умеренный штраф за повторения
-    
-    # === Дополнительные параметры для структурированного анализа ===
-    NUM_BEAMS = int(os.getenv('NUM_BEAMS', '1'))  # Отключаем beam search для детерминизма
-    EARLY_STOPPING = os.getenv('EARLY_STOPPING', 'false').lower() == 'true'  # Позволяем полную генерацию
-    LENGTH_PENALTY = float(os.getenv('LENGTH_PENALTY', '0.8'))  # Небольшой штраф за длину
-    NO_REPEAT_NGRAM_SIZE = int(os.getenv('NO_REPEAT_NGRAM_SIZE', '2'))  # Предотвращаем повторение 2-грамм
+    # === Настройки генерации для FastVLM ===
+    MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', '4096'))  # Уменьшаем для стабильности FastVLM
+    TEMPERATURE = float(os.getenv('TEMPERATURE', '0.2'))  # Оптимально для FastVLM
+    DO_SAMPLE = os.getenv('DO_SAMPLE', 'true').lower() == 'true'  # Sampling для естественности
+    TOP_P = float(os.getenv('TOP_P', '0.9'))  # Оптимально для FastVLM
+    REPETITION_PENALTY = float(os.getenv('REPETITION_PENALTY', '1.1'))  # Умеренный штраф
+
+    # === Дополнительные параметры для FastVLM ===
+    NUM_BEAMS = int(os.getenv('NUM_BEAMS', '1'))  # Отключаем beam search - FastVLM не поддерживает его
+    EARLY_STOPPING = os.getenv('EARLY_STOPPING', 'false').lower() == 'true'  # Раннее завершение при хорошем результате
+    LENGTH_PENALTY = float(os.getenv('LENGTH_PENALTY', '1.0'))  # Нейтральный штраф за длину (было 0.8)
+    NO_REPEAT_NGRAM_SIZE = int(os.getenv('NO_REPEAT_NGRAM_SIZE', '3'))  # Предотвращаем повторение 3-грамм (было 2)
 
     # === Настройки производительности ===
-    MAX_IMAGE_SIZE = int(os.getenv('MAX_IMAGE_SIZE', '2048'))
+    MAX_IMAGE_SIZE = int(os.getenv('MAX_IMAGE_SIZE', '4096'))  # Максимальный размер для сохранения качества (было 4096)
     BATCH_SIZE = int(os.getenv('BATCH_SIZE', '1'))
 
     # === Настройки логирования ===
@@ -142,7 +142,7 @@ class Config:
         
         # Проверяем API ключ Gemini (предупреждение, не критическая ошибка)
         if not cls.GEMINI_API_KEY:
-            print("⚠️  GEMINI_API_KEY не установлен. Gemini функции будут недоступны.")
+            print("GEMINI_API_KEY не установлен. Gemini функции будут недоступны.")
 
         print(f"Конфигурация загружена:")
         print(f"Порт: {cls.PORT}")
