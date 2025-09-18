@@ -1,1 +1,1 @@
-Describe the outer top clothing on the person. What is the outermost layer? What type of clothing? What color? What material? How does it fit?
+Describe the outerwear the person is wearing. If not, write None. What style is it? What color is it? What material is it? How does it fit?

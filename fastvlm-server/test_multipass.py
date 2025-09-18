@@ -81,14 +81,14 @@ TOP_CLOTHING_PROMPT = (
     #"Output EXACTLY one short line: Outerwear, color, material, style, fit."
     #"Describe only the outermost TOP clothing items the person is wearing. Focus on jackets, coats, blazers, cardigans. Include: type, color, material, fit. Be brief and factual."
     #"Output EXACTLY one short line with format: [TYPE] [COLOR] [MATERIAL] [STYLE/FIT]"
-    "Describe the outer top clothing on the person. What is the outermost layer? What type of clothing? What color? What material? How does it fit?"
+    "Describe the outerwear the person is wearing. If not, write None. What style is it? What color is it? What material is it? How does it fit?"
 )
 
 INNER_TOP_CLOTHING_PROMPT = (
     #"Output EXACTLY one short line: Innerwear, color, material, style, fit."
     #"Describe only the inner TOP clothing items the person is wearing UNDERNEATH any outerwear. Focus on shirts, sweaters, turtlenecks, blouses, tops. Include: type, color, material, neckline style, fit. Be brief and factual."
     #"Output EXACTLY one short line with format: [TYPE] [COLOR] [MATERIAL] [NECKLINE/FIT]"
-    "Describe the inner top clothing under the outer layer. What type of clothing? What color? What material? What neckline?"
+    "Describe the inner top clothing under outerwear. If not, write None. What type of clothing? What color? What material? What neckline?"
 )
 
 LEG_CLOTHING_PROMPT = (
@@ -117,7 +117,7 @@ def main():
     if len(sys.argv) >= 2:
         image_path = sys.argv[1]
     else:
-        image_path = str(Path(__file__).parent.parent / "12.jpg")
+        image_path = str(Path(__file__).parent.parent / "6.jpg")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")
