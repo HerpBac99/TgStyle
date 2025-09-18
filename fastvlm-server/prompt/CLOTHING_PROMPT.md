@@ -1,1 +1,1 @@
-Describe only the clothing and shoes the person in the image is WEARING. Ignore items on the furniture, floor, or background. List the clothing items, including colors, materials, and fit details.
+Describe the outer top clothing on the person. What is the outermost layer? What type of clothing? What color? What material? How does it fit?

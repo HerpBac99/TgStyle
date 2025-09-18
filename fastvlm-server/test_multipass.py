@@ -28,13 +28,40 @@ def to_base64(img: Image.Image) -> str:
     return base64.b64encode(buf.getvalue()).decode('utf-8')
 
 def post_analyze(prompt: str, image_b64: str):
-    resp = requests.post(
-        f"{SERVER_URL}/analyze",
-        json={"prompt": prompt, "image_base64": image_b64},
-        timeout=60,
-    )
-    resp.raise_for_status()
-    return resp.json()
+    """Send analysis request to FastVLM server analyze_for_test endpoint"""
+    try:
+        resp = requests.post(
+            f"{SERVER_URL}/analyze_for_test",
+            json={
+                "image_base64": image_b64,
+                "prompt": prompt,
+                "nickname": "test_user"
+            },
+            timeout=120
+        )
+        resp.raise_for_status()
+        result = resp.json()
+
+        if result.get("success"):
+            return {
+                "success": True,
+                "analysis": result.get("analysis", ""),
+                "timing": result.get("timing", {})
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("error", "Server error"),
+                "analysis": ""
+            }
+
+    except Exception as e:
+        print(f"Error in post_analyze: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "analysis": ""
+        }
 
 def extract_text(result: dict) -> str:
     return (
@@ -50,12 +77,39 @@ PERSON_PROMPT = (
     "Output EXACTLY one short line: Woman/Man; approximate age; build; hair (length, style, color)"
 )
 
-CLOTHING_PROMPT = (
-    "Describe only the clothing and shoes the person in the image is WEARING. Ignore items on the furniture, floor, or background. List the clothing items, including colors, materials, and fit details."
+TOP_CLOTHING_PROMPT = (
+    #"Output EXACTLY one short line: Outerwear, color, material, style, fit."
+    #"Describe only the outermost TOP clothing items the person is wearing. Focus on jackets, coats, blazers, cardigans. Include: type, color, material, fit. Be brief and factual."
+    #"Output EXACTLY one short line with format: [TYPE] [COLOR] [MATERIAL] [STYLE/FIT]"
+    "Describe the outer top clothing on the person. What is the outermost layer? What type of clothing? What color? What material? How does it fit?"
+)
+
+INNER_TOP_CLOTHING_PROMPT = (
+    #"Output EXACTLY one short line: Innerwear, color, material, style, fit."
+    #"Describe only the inner TOP clothing items the person is wearing UNDERNEATH any outerwear. Focus on shirts, sweaters, turtlenecks, blouses, tops. Include: type, color, material, neckline style, fit. Be brief and factual."
+    #"Output EXACTLY one short line with format: [TYPE] [COLOR] [MATERIAL] [NECKLINE/FIT]"
+    "Describe the inner top clothing under the outer layer. What type of clothing? What color? What material? What neckline?"
+)
+
+LEG_CLOTHING_PROMPT = (
+    #"Output EXACTLY one short line: Legwear, color, material, style, fit."
+    #"Describe only the clothing items covering the LEGS the person is wearing. Focus on pants, jeans, skirts, shorts, dresses that cover the lower body. Include: type, color, material, length, fit. Be brief and factual."
+    #"Output EXACTLY one short line with format: [TYPE] [COLOR] [MATERIAL] [LENGTH/FIT]"
+    "Describe the clothing on the person's legs. What type of clothing? What color? What material? What length?"
+)
+
+SHOES_PROMPT = (
+    #"Output EXACTLY one short line: Shoes, color, material, style, fit."
+    #"Describe only the SHOES and FOOTWEAR the person is wearing. Include: type, color, material, heel height. Be brief and factual."
+    #"Output EXACTLY one short line with format: [TYPE] [COLOR] [MATERIAL] [HEEL/STYLE]"
+    "Describe the shoes on the person. What type of shoes? What color? What material? What style?"
 )
 
 ACCESSORIES_PROMPT = (
-    "Describe only the accessories the person in the picture is WEARING. Note the face, ears, neck, fingers, belt, wrists, bag. List only the accessories, indicating the color, shape, and possibly the material."
+    #"Output EXACTLY one short line: Accessories, color, material, style, fit."
+    #"List only the accessories the person is wearing. Note: face, ears, neck, fingers, belt, wrists, bag. Include: type, color, material. Be brief and factual."
+    #"Output EXACTLY one short line: List accessories with format: [TYPE] [COLOR] [MATERIAL]. Separate multiple items with semicolons."
+    "List the accessories on the person. What accessories? What color? What material?"
 )
 
 
@@ -80,34 +134,58 @@ def main():
     t1 = time.perf_counter()
     person = extract_text(r1)
 
-    # Pass 2: clothing-only
-    r2 = post_analyze(CLOTHING_PROMPT, b64_full)
+    # Pass 2: top clothing (outerwear)
+    r2 = post_analyze(TOP_CLOTHING_PROMPT, b64_full)
     t2 = time.perf_counter()
-    clothing = extract_text(r2)
+    top_clothing = extract_text(r2)
 
-    # Pass 3: accessories – full image only
-    r3_full = post_analyze(ACCESSORIES_PROMPT, b64_full)
+    # Pass 3: inner top clothing (tops, sweaters)
+    r3 = post_analyze(INNER_TOP_CLOTHING_PROMPT, b64_full)
     t3 = time.perf_counter()
-    acc_texts = extract_text(r3_full)
+    inner_top_clothing = extract_text(r3)
+
+    # Pass 4: leg clothing (pants, skirts, shorts)
+    r4 = post_analyze(LEG_CLOTHING_PROMPT, b64_full)
+    t4 = time.perf_counter()
+    leg_clothing = extract_text(r4)
+
+    # Pass 5: shoes
+    r5 = post_analyze(SHOES_PROMPT, b64_full)
+    t5 = time.perf_counter()
+    shoes = extract_text(r5)
+
+    # Pass 6: accessories
+    r6 = post_analyze(ACCESSORIES_PROMPT, b64_full)
+    t6 = time.perf_counter()
+    accessories = extract_text(r6)
 
     report = {
         "image": image_path,
         "person": person,
-        "clothing": clothing,
-        "accessories": acc_texts,
+        "top_clothing": top_clothing,
+        "inner_top_clothing": inner_top_clothing,
+        "leg_clothing": leg_clothing,
+        "shoes": shoes,
+        "accessories": accessories,
         "timings_seconds": {
             "person": round(t1 - t0, 3),
-            "clothing": round(t2 - t1, 3),
-            "accessories_full": round(t3 - t2, 3),
-            "total": round(t3 - t0, 3)
+            "top_clothing": round(t2 - t1, 3),
+            "inner_top_clothing": round(t3 - t2, 3),
+            "leg_clothing": round(t4 - t3, 3),
+            "shoes": round(t5 - t4, 3),
+            "accessories": round(t6 - t5, 3),
+            "total": round(t6 - t0, 3)
         }
     }
 
     out_path = Path(__file__).parent / "results" / "latest_multi_test_output.txt"
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("PERSON\n" + person.split("\n")[0].strip() + "\n\n")
-        f.write("CLOTHING\n" + clothing.split("\n")[0].strip() + "\n\n")
-        f.write("ACCESSORIES\n" + (acc_texts or "none") + "\n\n")
+        f.write("TOP CLOTHING\n" + (top_clothing or "none") + "\n\n")
+        f.write("INNER TOP CLOTHING\n" + (inner_top_clothing or "none") + "\n\n")
+        f.write("LEG CLOTHING\n" + (leg_clothing or "none") + "\n\n")
+        f.write("SHOES\n" + (shoes or "none") + "\n\n")
+        f.write("ACCESSORIES\n" + (accessories or "none") + "\n\n")
         f.write("TIMINGS\n" + json.dumps(report["timings_seconds"], ensure_ascii=False, indent=2) + "\n")
 
     print("\n=== MULTI-PASS RESULT ===")

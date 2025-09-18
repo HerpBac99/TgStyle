@@ -85,7 +85,10 @@ ollama_model = "gemma3:4b"  # Лучшая модель для стилисти�
 default_prompt = None
 style_prompt = None
 person_prompt = None
-clothing_prompt = None
+top_clothing_prompt = None
+inner_top_clothing_prompt = None
+leg_clothing_prompt = None
+shoes_prompt = None
 accessories_prompt = None
 
 # Директория для сохранения результатов FastVLM
@@ -191,7 +194,7 @@ def load_prompt():
 
 def load_multi_pass_prompts():
     """Загружает промпты для многопроходного анализа"""
-    global person_prompt, clothing_prompt, accessories_prompt
+    global person_prompt, top_clothing_prompt, inner_top_clothing_prompt, leg_clothing_prompt, shoes_prompt, accessories_prompt
 
     prompt_dir = os.path.join(os.path.dirname(__file__), 'prompt')
 
@@ -202,11 +205,36 @@ def load_multi_pass_prompts():
             person_prompt = f.read().strip()
         app.logger.debug(f"PERSON промпт загружен из файла: {person_file}")
 
-        # Загружаем CLOTHING_PROMPT
-        clothing_file = os.path.join(prompt_dir, 'CLOTHING_PROMPT.md')
-        with open(clothing_file, 'r', encoding='utf-8') as f:
-            clothing_prompt = f.read().strip()
-        app.logger.debug(f"CLOTHING промпт загружен из файла: {clothing_file}")
+        # Загружаем TOP_CLOTHING_PROMPT
+        top_clothing_file = os.path.join(prompt_dir, 'CLOTHING_PROMPT.md')
+        with open(top_clothing_file, 'r', encoding='utf-8') as f:
+            top_clothing_prompt = f.read().strip()
+        app.logger.debug(f"TOP_CLOTHING промпт загружен из файла: {top_clothing_file}")
+
+        # Загружаем INNER_TOP_CLOTHING_PROMPT
+        inner_top_clothing_file = os.path.join(prompt_dir, 'INNER_TOP_CLOTHING_PROMPT.md')
+        with open(inner_top_clothing_file, 'r', encoding='utf-8') as f:
+            inner_top_clothing_prompt = f.read().strip()
+        app.logger.debug(f"INNER_TOP_CLOTHING промпт загружен из файла: {inner_top_clothing_file}")
+
+        # Загружаем LEG_CLOTHING_PROMPT
+        leg_clothing_file = os.path.join(prompt_dir, 'LEG_CLOTHING_PROMPT.md')
+        with open(leg_clothing_file, 'r', encoding='utf-8') as f:
+            leg_clothing_prompt = f.read().strip()
+        app.logger.debug(f"LEG_CLOTHING промпт загружен из файла: {leg_clothing_file}")
+
+        # Загружаем SHOES_PROMPT (создадим новый файл)
+        shoes_file = os.path.join(prompt_dir, 'SHOES_PROMPT.md')
+        try:
+            with open(shoes_file, 'r', encoding='utf-8') as f:
+                shoes_prompt = f.read().strip()
+            app.logger.debug(f"SHOES промпт загружен из файла: {shoes_file}")
+        except FileNotFoundError:
+            # Создаем файл с промптом для обуви
+            shoes_prompt = "Describe the shoes on the person. What type of shoes? What color? What material? What style?"
+            with open(shoes_file, 'w', encoding='utf-8') as f:
+                f.write(shoes_prompt)
+            app.logger.debug(f"SHOES промпт создан и загружен: {shoes_file}")
 
         # Загружаем ACCESSORIES_PROMPT
         accessories_file = os.path.join(prompt_dir, 'ACCESSORIES_PROMPT.md')
@@ -232,15 +260,18 @@ def extract_text(result: dict) -> str:
 
 def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
     """Выполняет многопроходный анализ изображения через FastVLM"""
-    global person_prompt, clothing_prompt, accessories_prompt
+    global person_prompt, top_clothing_prompt, inner_top_clothing_prompt, leg_clothing_prompt, shoes_prompt, accessories_prompt
 
     app.logger.info(f"Начинаем многопроходный анализ для пользователя {nickname}")
 
     # Временные переменные для результатов
     person_result = ""
-    clothing_result = ""
+    top_clothing_result = ""
+    inner_top_clothing_result = ""
+    leg_clothing_result = ""
+    shoes_result = ""
     accessories_result = ""
-    timing = {"person": 0, "clothing": 0, "accessories": 0, "total": 0}
+    timing = {"person": 0, "top_clothing": 0, "inner_top_clothing": 0, "leg_clothing": 0, "shoes": 0, "accessories": 0, "total": 0}
 
     total_start_time = time.time()
 
@@ -254,22 +285,49 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
             timing["person"] = time.time() - pass1_start
             app.logger.debug(f"Анализ человека завершен за {timing['person']:.2f}с")
 
-        # Pass 2: Clothing analysis
-        if clothing_prompt:
-            app.logger.debug("Выполняем анализ одежды")
+        # Pass 2: Top clothing analysis
+        if top_clothing_prompt:
+            app.logger.debug("Выполняем анализ верхней одежды")
             pass2_start = time.time()
-            clothing_response = post_analyze_to_fastvlm(clothing_prompt, image_base64)
-            clothing_result = extract_text(clothing_response)
-            timing["clothing"] = time.time() - pass2_start
-            app.logger.debug(f"Анализ одежды завершен за {timing['clothing']:.2f}с")
+            top_clothing_response = post_analyze_to_fastvlm(top_clothing_prompt, image_base64)
+            top_clothing_result = extract_text(top_clothing_response)
+            timing["top_clothing"] = time.time() - pass2_start
+            app.logger.debug(f"Анализ верхней одежды завершен за {timing['top_clothing']:.2f}с")
 
-        # Pass 3: Accessories analysis
+        # Pass 3: Inner top clothing analysis
+        if inner_top_clothing_prompt:
+            app.logger.debug("Выполняем анализ внутренней верхней одежды")
+            pass3_start = time.time()
+            inner_top_clothing_response = post_analyze_to_fastvlm(inner_top_clothing_prompt, image_base64)
+            inner_top_clothing_result = extract_text(inner_top_clothing_response)
+            timing["inner_top_clothing"] = time.time() - pass3_start
+            app.logger.debug(f"Анализ внутренней верхней одежды завершен за {timing['inner_top_clothing']:.2f}с")
+
+        # Pass 4: Leg clothing analysis
+        if leg_clothing_prompt:
+            app.logger.debug("Выполняем анализ одежды на ногах")
+            pass4_start = time.time()
+            leg_clothing_response = post_analyze_to_fastvlm(leg_clothing_prompt, image_base64)
+            leg_clothing_result = extract_text(leg_clothing_response)
+            timing["leg_clothing"] = time.time() - pass4_start
+            app.logger.debug(f"Анализ одежды на ногах завершен за {timing['leg_clothing']:.2f}с")
+
+        # Pass 5: Shoes analysis
+        if shoes_prompt:
+            app.logger.debug("Выполняем анализ обуви")
+            pass5_start = time.time()
+            shoes_response = post_analyze_to_fastvlm(shoes_prompt, image_base64)
+            shoes_result = extract_text(shoes_response)
+            timing["shoes"] = time.time() - pass5_start
+            app.logger.debug(f"Анализ обуви завершен за {timing['shoes']:.2f}с")
+
+        # Pass 6: Accessories analysis
         if accessories_prompt:
             app.logger.debug("Выполняем анализ аксессуаров")
-            pass3_start = time.time()
+            pass6_start = time.time()
             accessories_response = post_analyze_to_fastvlm(accessories_prompt, image_base64)
             accessories_result = extract_text(accessories_response)
-            timing["accessories"] = time.time() - pass3_start
+            timing["accessories"] = time.time() - pass6_start
             app.logger.debug(f"Анализ аксессуаров завершен за {timing['accessories']:.2f}с")
 
         timing["total"] = time.time() - total_start_time
@@ -278,7 +336,10 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
 
         return {
             "person": person_result,
-            "clothing": clothing_result,
+            "top_clothing": top_clothing_result,
+            "inner_top_clothing": inner_top_clothing_result,
+            "leg_clothing": leg_clothing_result,
+            "shoes": shoes_result,
             "accessories": accessories_result,
             "timing": timing,
             "success": True
@@ -289,7 +350,10 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
         timing["total"] = time.time() - total_start_time
         return {
             "person": "",
-            "clothing": "",
+            "top_clothing": "",
+            "inner_top_clothing": "",
+            "leg_clothing": "",
+            "shoes": "",
             "accessories": "",
             "timing": timing,
             "success": False,
@@ -939,7 +1003,13 @@ def analyze():
             # Объединяем результаты всех проходов
             combined_analysis = f"""PERSON: {multi_pass_result['person']}
 
-CLOTHING: {multi_pass_result['clothing']}
+TOP_CLOTHING: {multi_pass_result['top_clothing']}
+
+INNER_TOP_CLOTHING: {multi_pass_result['inner_top_clothing']}
+
+LEG_CLOTHING: {multi_pass_result['leg_clothing']}
+
+SHOES: {multi_pass_result['shoes']}
 
 ACCESSORIES: {multi_pass_result['accessories']}"""
 
@@ -990,12 +1060,18 @@ ACCESSORIES: {multi_pass_result['accessories']}"""
                     'multi_pass_time': round(multi_pass_result['timing']['total'], 2),
                     'gemini_time': round(gemini_time, 2),
                     'person_time': round(multi_pass_result['timing']['person'], 2),
-                    'clothing_time': round(multi_pass_result['timing']['clothing'], 2),
+                    'top_clothing_time': round(multi_pass_result['timing']['top_clothing'], 2),
+                    'inner_top_clothing_time': round(multi_pass_result['timing']['inner_top_clothing'], 2),
+                    'leg_clothing_time': round(multi_pass_result['timing']['leg_clothing'], 2),
+                    'shoes_time': round(multi_pass_result['timing']['shoes'], 2),
                     'accessories_time': round(multi_pass_result['timing']['accessories'], 2)
                 },
                 'multi_pass_results': {
                     'person': multi_pass_result['person'],
-                    'clothing': multi_pass_result['clothing'],
+                    'top_clothing': multi_pass_result['top_clothing'],
+                    'inner_top_clothing': multi_pass_result['inner_top_clothing'],
+                    'leg_clothing': multi_pass_result['leg_clothing'],
+                    'shoes': multi_pass_result['shoes'],
                     'accessories': multi_pass_result['accessories']
                 }
             }
@@ -1034,6 +1110,122 @@ ACCESSORIES: {multi_pass_result['accessories']}"""
             'success': False,
             'error': str(e),
             'timing': timing_debug
+        }), 500
+
+@app.route('/analyze_for_test', methods=['POST'])
+def analyze_for_test():
+    """Анализ изображения для тестирования (один проход с кастомным промптом)"""
+    analysis_start_time = time.time()
+
+    try:
+        if model is None:
+            return jsonify({
+                'success': False,
+                'error': 'Model not loaded'
+            }), 500
+
+        # Получаем данные
+        data = request.get_json()
+        if not data or 'image_base64' not in data or 'prompt' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'No image or prompt provided'
+            }), 400
+
+        image_base64 = data['image_base64']
+        prompt = data['prompt']
+        nickname = data.get('nickname', 'test_user')
+
+        # Декодируем изображение
+        try:
+            image_data = base64.b64decode(image_base64)
+            image = Image.open(io.BytesIO(image_data))
+        except Exception as e:
+            app.logger.error(f"Ошибка декодирования изображения: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Invalid image data: {e}'
+            }), 400
+
+        # Сохраняем во временный файл
+        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
+            image.save(temp_file, 'JPEG', quality=100, optimize=False, subsampling=0)
+            temp_image_path = temp_file.name
+
+        try:
+            # Создаем промпт для модели
+            qs = prompt
+            if model.config.mm_use_im_start_end:
+                qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
+            else:
+                qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
+
+            conv = conv_templates["qwen_2"].copy()
+            conv.append_message(conv.roles[0], qs)
+            conv.append_message(conv.roles[1], None)
+            prompt_full = conv.get_prompt()
+
+            # Обрабатываем изображение
+            image_tensor = process_images([image], image_processor, model.config)[0]
+
+            # Выполняем анализ с управлением памятью
+            with gpu_memory_manager():
+                # Токенизируем промпт
+                input_ids = tokenizer_image_token(prompt_full, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
+
+                # Установка seed для детерминизма
+                torch.manual_seed(42)
+                if torch.cuda.is_available():
+                    torch.cuda.manual_seed_all(42)
+
+                # Выполняем анализ
+                with torch.no_grad():
+                    attention_mask = torch.ones_like(input_ids)
+
+                    output_ids = model.generate(
+                        input_ids,
+                        attention_mask=attention_mask,
+                        images=image_tensor.unsqueeze(0).to(model.device).half(),
+                        image_sizes=[image.size],
+                        do_sample=Config.DO_SAMPLE,
+                        temperature=Config.TEMPERATURE,
+                        top_p=Config.TOP_P if Config.DO_SAMPLE else None,
+                        repetition_penalty=Config.REPETITION_PENALTY,
+                        max_new_tokens=Config.MAX_NEW_TOKENS,
+                        use_cache=True,
+                        pad_token_id=tokenizer.eos_token_id,
+                        eos_token_id=tokenizer.eos_token_id
+                    )
+
+            # Декодируем результат
+            result_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
+
+            # Рассчитываем время
+            total_time = time.time() - analysis_start_time
+
+            return jsonify({
+                'success': True,
+                'analysis': result_text,
+                'timing': {'total_time': round(total_time, 2)}
+            })
+
+        finally:
+            # Удаляем временный файл
+            try:
+                os.unlink(temp_image_path)
+            except:
+                pass
+
+    except Exception as e:
+        total_time = time.time() - analysis_start_time
+        error_msg = f"Ошибка анализа: {e}"
+        app.logger.error(error_msg)
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timing': {'total_time': round(total_time, 2)}
         }), 500
 
 @app.route('/load', methods=['GET'])
