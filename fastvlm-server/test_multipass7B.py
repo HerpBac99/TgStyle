@@ -80,21 +80,21 @@ PERSON_PROMPT = (
 )
 
 TORSO_CLOTHING_PROMPT = (
-    "Describe all clothing items worn on the person's torso/upper body. What type of clothing? What color? What material? What length?"
+    "Describe all clothing items worn on the person's torso/upper body."
 )
 
 LEG_CLOTHING_PROMPT = (
     #"Output EXACTLY one short line: Legwear, color, material, style, fit."
     #"Describe only the clothing items covering the LEGS the person is wearing. Focus on pants, jeans, skirts, shorts, dresses that cover the lower body. Include: type, color, material, length, fit. Be brief and factual."
     #"Output EXACTLY one short line with format: [TYPE] [COLOR] [MATERIAL] [LENGTH/FIT]"
-    "Describe the clothing on the person's legs. What type of clothing? What color? What material? What length?"
+    "Describe the clothing on the person's legs."
 )
 
 SHOES_PROMPT = (
     #"Output EXACTLY one short line: Shoes, color, material, style, fit."
     #"Describe only the SHOES and FOOTWEAR the person is wearing. Include: type, color, material, heel height. Be brief and factual."
     #"Output EXACTLY one short line with format: [TYPE] [COLOR] [MATERIAL] [HEEL/STYLE]"
-    "Describe the shoes on the person. What type of shoes? What color? What material? What style?"
+    "Describe the shoes on the person."
 )
 
 ACCESSORIES_PROMPT = (
@@ -109,7 +109,7 @@ def main():
     if len(sys.argv) >= 2:
         image_path = sys.argv[1]
     else:
-        image_path = str(Path(__file__).parent.parent / "12.jpg")
+        image_path = str(Path(__file__).parent.parent / "15.jpg")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")

@@ -102,36 +102,45 @@ performance_stats = {
 
 
 def setup_logging():
-    """Настройка системы логирования для 7B сервера"""
+    """Настройка логирования для 7B сервера"""
     Config.ensure_directories()
-    
-    # Основной лог файл
     log_file = os.path.join(Config.LOG_DIR, 'fastvlm7b.log')
-    
-    # Создаем форматтер для логов
+
+    # Создаем форматтер
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
-    # Настраиваем ротацию логов
+
+    # Создаем ротирующий обработчик
     handler = RotatingFileHandler(
-        log_file, 
-        maxBytes=Config.LOG_MAX_BYTES, 
+        log_file,
+        maxBytes=Config.LOG_MAX_BYTES,
         backupCount=Config.LOG_BACKUP_COUNT,
         encoding='utf-8'
     )
     handler.setFormatter(formatter)
-    
-    # Настраиваем логгер приложения
-    app.logger.setLevel(getattr(logging, Config.LOG_LEVEL))
-    app.logger.addHandler(handler)
-    
-    # Настраиваем консольный вывод
+
+    # Отключаем Flask's default handlers
+    app.logger.handlers.clear()
+
+    # Создаем консольный handler только для вывода в терминал (без дублирования в файл)
+    console_formatter = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
     console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
+    console_handler.setFormatter(console_formatter)
+    console_handler.setLevel(logging.INFO)
+
+    # Настраиваем логгер приложения с файловым и консольным handler'ами
+    app.logger.addHandler(handler)
     app.logger.addHandler(console_handler)
-    
-    app.logger.info("Система логирования FastVLM 7B инициализирована")
+    app.logger.setLevel(getattr(logging, Config.LOG_LEVEL))
+
+    # Настраиваем корневой логгер только с файловым handler'ом
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(getattr(logging, Config.LOG_LEVEL))
+
+    app.logger.debug(f"Логирование FastVLM 7B настроено: {log_file}")
 
 
 @contextmanager
@@ -317,11 +326,213 @@ def analyze_image_fastvlm(image_base64, prompt_text=None):
         
         app.logger.info(f"FastVLM 7B анализ завершен, длина ответа: {len(outputs)} символов")
         return outputs, None
-        
+
     except Exception as e:
         app.logger.error(f"Ошибка анализа изображения: {e}")
         app.logger.error(traceback.format_exc())
         return None, str(e)
+
+def load_style_prompt():
+    """Загружает промпт стилиста из файла style_prompt.md"""
+    global style_prompt
+    prompt_file = os.path.join(os.path.dirname(__file__), 'style_prompt.md')
+
+    try:
+        with open(prompt_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Ищем промпт между ``` блоками
+        import re
+        prompt_match = re.search(r'```\s*(.*?)\s*```', content, re.DOTALL)
+        if prompt_match:
+            style_prompt = prompt_match.group(1).strip()
+        else:
+            # Если нет ``` блоков, берем весь контент
+            style_prompt = content.strip()
+
+        app.logger.debug(f"Промпт стилиста загружен из файла: {prompt_file}")
+
+    except FileNotFoundError:
+        style_prompt = '''Ты профессиональный ИИ стилист и консультант по моде.
+
+На основе технического анализа одежды ниже, создай креативный, дружелюбный и экспертный ответ от лица стилиста.
+
+ТЕХНИЧЕСКЙ АНАЛИЗ:
+{fastvlm_analysis}
+
+Преобразуй анализ в живой совет стилиста с рекомендациями по сочетаниям и стилю. Используй эмодзи и пиши на русском языке максимум 800 символов.'''
+        app.logger.info(f"Файл промпта стилиста не найден: {prompt_file}. Используется промпт по умолчанию")
+
+    except Exception as e:
+        style_prompt = '''Ты профессиональный стилист. На основе анализа одежды {fastvlm_analysis} дай креативный совет по стилю на русском языке.'''
+        app.logger.error(f"Ошибка загрузки промпта стилиста: {e}. Используется промпт по умолчанию")
+
+def check_ollama_availability():
+    """Проверяет доступность Ollama API"""
+    global ollama_available
+
+    try:
+        if not REQUESTS_AVAILABLE:
+            app.logger.warning("Requests library недоступна. Ollama функции отключены.")
+            ollama_available = False
+            return False
+
+        # Проверяем доступность Ollama API
+        response = requests.get(f"{ollama_url}/api/tags", timeout=5)
+        if response.status_code == 200:
+            models = response.json().get('models', [])
+            model_names = [model['name'] for model in models]
+            if ollama_model in model_names:
+                ollama_available = True
+                app.logger.info(f"Ollama доступен. Модель {ollama_model} найдена. Доступные модели: {model_names}")
+                return True
+            else:
+                app.logger.warning(f"Ollama доступен, но модель {ollama_model} не найдена. Доступные модели: {model_names}")
+                ollama_available = False
+                return False
+        else:
+            app.logger.warning(f"Ollama API недоступен (статус: {response.status_code})")
+            ollama_available = False
+            return False
+
+    except Exception as e:
+        app.logger.error(f"Ошибка проверки Ollama: {e}")
+        ollama_available = False
+        return False
+
+def create_stylist_response_ollama(multi_pass_analysis):
+    """Создает креативный ответ ИИ стилиста через Ollama"""
+    global ollama_available, ollama_url, ollama_model, style_prompt
+
+    if not ollama_available:
+        app.logger.warning("Ollama недоступен, используем базовый анализ FastVLM")
+        return multi_pass_analysis
+
+    try:
+        app.logger.info("Генерация креативного ответа стилиста через Ollama API")
+
+        # Используем промпт из файла style_prompt.md
+        formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis)
+
+        # Логируем отправку запроса в Ollama
+        app.logger.info(f"Отправка запроса в Ollama (промпт: {len(formatted_prompt)} символов, модель: {ollama_model})")
+
+        ollama_request_start = time.time()
+
+        # Создаем запрос к Ollama API
+        payload = {
+            "model": ollama_model,
+            "prompt": formatted_prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.3,  # Низкая температура для более быстрого и детерминированного ответа
+                "top_p": 0.9,        # Более высокое top_p для разнообразия при низкой температуре
+                "max_tokens": 500,   # Уменьшаем до 500 токенов для 5 предложений
+                "repeat_penalty": 1.1,  # Меньший штраф за повторения
+                "top_k": 50,         # Увеличиваем для более быстрого выбора
+                "num_predict": 300   # Ограничиваем до 300 токенов для скорости
+            }
+        }
+
+        response = requests.post(
+            f"{ollama_url}/api/generate",
+            json=payload,
+            timeout=25  # Уменьшаем таймаут до 25 секунд для скорости
+        )
+
+        if response.status_code != 200:
+            raise Exception(f"Ollama API error: {response.status_code} - {response.text}")
+
+        result = response.json()
+        creative_response = result.get('response', '').strip()
+
+        ollama_request_time = time.time() - ollama_request_start
+
+        # Логируем успешный ответ от Ollama
+        app.logger.info(f"Ollama ответил успешно: {len(creative_response)} символов за {ollama_request_time:.2f} сек")
+
+        return creative_response
+
+    except Exception as e:
+        app.logger.error(f"Ошибка создания ответа через Ollama: {e}")
+        # Fallback на оригинальный анализ FastVLM
+        return multi_pass_analysis
+
+def initialize_gemini():
+    """Инициализация Gemini API клиента"""
+    global gemini_client
+
+    try:
+        if not GEMINI_AVAILABLE:
+            app.logger.warning("Google GenAI library not available. Install with: pip install google-genai")
+            return False
+
+        if not Config.GEMINI_API_KEY:
+            app.logger.warning("GEMINI_API_KEY не установлен. Gemini функции недоступны.")
+            return False
+
+        # Создаем клиента Gemini
+        gemini_client = genai.Client(api_key=Config.GEMINI_API_KEY)
+        app.logger.debug(f"Gemini API клиент инициализирован (модель: {Config.GEMINI_MODEL})")
+        return True
+
+    except Exception as e:
+        app.logger.error(f"Ошибка инициализации Gemini API: {e}")
+        return False
+
+def create_stylist_response(multi_pass_analysis):
+    """Создает креативный ответ ИИ стилиста через Ollama (приоритет) или Gemini"""
+    global ollama_available, gemini_client, style_prompt
+
+    # Сначала пробуем Ollama (приоритет)
+    if ollama_available:
+        app.logger.info("Используем Ollama для создания ответа стилиста")
+        response = create_stylist_response_ollama(multi_pass_analysis)
+        if response and response != multi_pass_analysis:  # Проверяем, что это не fallback
+            return response
+        app.logger.warning("Ollama не дал качественный ответ, пробуем Gemini")
+
+    # Fallback на Gemini
+    if gemini_client:
+        app.logger.info("Используем Gemini для создания ответа стилиста")
+        try:
+            app.logger.debug("Генерация креативного ответа стилиста через Gemini API")
+
+            # Используем промпт из файла style_prompt.md
+            # Экранируем специальные символы для безопасной вставки
+            safe_analysis = str(multi_pass_analysis).replace('{', '{{').replace('}', '}}')
+            formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis)
+
+            # Логируем отправку запроса в Gemini
+            app.logger.info(f"Отправка запроса в Gemini (промпт: {len(formatted_prompt)} символов)")
+
+            gemini_request_start = time.time()
+            response = gemini_client.models.generate_content(
+                model=Config.GEMINI_MODEL,
+                contents=formatted_prompt,
+                config=genai.types.GenerateContentConfig(
+                    temperature=Config.GEMINI_TEMPERATURE,
+                    max_output_tokens=Config.GEMINI_MAX_TOKENS,
+                    thinking_config=genai.types.ThinkingConfig(
+                        thinking_budget=Config.GEMINI_THINKING_BUDGET
+                    ) if Config.GEMINI_THINKING_BUDGET > 0 else None
+                )
+            )
+
+            gemini_request_time = time.time() - gemini_request_start
+            creative_response = response.text.strip()
+
+            # Логируем успешный ответ от Gemini
+            app.logger.info(f"Gemini ответил успешно: {len(creative_response)} символов за {gemini_request_time:.2f} сек")
+
+            return creative_response
+
+        except Exception as e:
+            app.logger.error(f"Ошибка создания ответа через Gemini: {e}")
+
+    # Если ничего не сработало, возвращаем базовый анализ
+    app.logger.warning("Ни Ollama, ни Gemini недоступны, используем базовый анализ FastVLM")
+    return multi_pass_analysis
 
 
 # === API Эндпоинты ===
@@ -358,50 +569,64 @@ def health_check():
 
 @app.route('/analyze', methods=['POST'])
 def analyze_endpoint():
-    """Анализ изображения с помощью FastVLM 7B"""
+    """Анализ изображения с помощью FastVLM 7B с ответом стилиста"""
     start_time = time.time()
     performance_stats['total_requests'] += 1
-    
+
     try:
         data = request.get_json()
         if not data or 'image_base64' not in data:
             return jsonify({'success': False, 'error': 'Отсутствует image_base64'}), 400
-        
+
         image_base64 = data['image_base64']
         prompt_text = data.get('prompt', None)
-        
-        # Анализируем изображение
-        analysis, error = analyze_image_fastvlm(image_base64, prompt_text)
-        
-        response_time = time.time() - start_time
-        
+        nickname = data.get('nickname', 'unknown_user')
+
+        # Анализируем изображение (технический анализ)
+        technical_analysis, error = analyze_image_fastvlm(image_base64, prompt_text)
+
+        fastvlm_time = time.time() - start_time
+
         if error:
             performance_stats['failed_requests'] += 1
             app.logger.error(f"Ошибка анализа: {error}")
             return jsonify({
                 'success': False,
                 'error': error,
-                'response_time': response_time
+                'response_time': fastvlm_time
             }), 500
-        
+
+        # Создаем креативный ответ стилиста
+        app.logger.info(f"Создаем ответ стилиста для пользователя {nickname}")
+        gemini_start_time = time.time()
+        stylist_response = create_stylist_response(technical_analysis)
+        gemini_time = time.time() - gemini_start_time
+
+        total_time = time.time() - start_time
+
         performance_stats['successful_requests'] += 1
         # Обновляем среднее время ответа
         performance_stats['avg_response_time'] = (
-            (performance_stats['avg_response_time'] * (performance_stats['successful_requests'] - 1) + response_time) 
+            (performance_stats['avg_response_time'] * (performance_stats['successful_requests'] - 1) + total_time)
             / performance_stats['successful_requests']
         )
-        
-        app.logger.info(f"Анализ завершен за {response_time:.2f}с")
-        
+
+        app.logger.info(f"Полный анализ завершен за {total_time:.2f}с (FastVLM: {fastvlm_time:.2f}с, стилист: {gemini_time:.2f}с)")
+
         return jsonify({
             'success': True,
-            'analysis': analysis,
+            'technical_analysis': technical_analysis,  # Технический анализ FastVLM
+            'analysis': stylist_response,  # Креативный ответ стилиста
             'model_used': 'fastvlm_7b',
             'device': Config.DEVICE,
-            'response_time': response_time,
+            'timing': {
+                'total_time': round(total_time, 2),
+                'fastvlm_time': round(fastvlm_time, 2),
+                'stylist_time': round(gemini_time, 2)
+            },
             'model_type': '7B'
         })
-        
+
     except Exception as e:
         performance_stats['failed_requests'] += 1
         app.logger.error(f"Ошибка в analyze_endpoint: {e}")
@@ -535,7 +760,16 @@ if __name__ == '__main__':
         
         # Загрузка промптов
         load_prompts()
-        
+
+        # Загрузка промпта стилиста
+        load_style_prompt()
+
+        # Проверяем доступность Ollama
+        check_ollama_availability()
+
+        # Инициализируем Gemini API
+        initialize_gemini()
+
         # Загрузка модели
         app.logger.info("Запуск FastVLM 7B сервера...")
         if not load_model():
