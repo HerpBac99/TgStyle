@@ -22,7 +22,7 @@ import requests
 from PIL import Image
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-SERVER_URL = os.environ.get("FASTVLM_URL", "http://127.0.0.1:3001")
+SERVER_URL = os.environ.get("FASTVLM_URL", "http://127.0.0.1:3002")
 
 def to_base64(img: Image.Image) -> str:
     buf = io.BytesIO()
@@ -33,7 +33,7 @@ def post_analyze(prompt: str, image_b64: str):
     """Send analysis request to FastVLM server analyze_for_test endpoint"""
     try:
         resp = requests.post(
-            f"{SERVER_URL}/analyze_for_test",
+            f"{SERVER_URL}/analyze",
             json={
                 "image_base64": image_b64,
                 "prompt": prompt,
@@ -109,7 +109,7 @@ def main():
     if len(sys.argv) >= 2:
         image_path = sys.argv[1]
     else:
-        image_path = str(Path(__file__).parent.parent / "5.jpg")
+        image_path = str(Path(__file__).parent.parent / "12.jpg")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")
