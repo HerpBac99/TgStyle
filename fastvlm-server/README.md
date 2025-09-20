@@ -8,6 +8,7 @@
 ```bash
 cd fastvlm-server
 python -m venv venv
+python start_fastvlm.py
 ```
 
 **Активация окружения:**

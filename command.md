@@ -3,6 +3,8 @@ npm run build; npm run start;
 docker-compose up -d db - только базу
 netstat -aon | findstr :8080
 
+nvidia-smi - видео память 
+
 taskkill /F /IM node.exe
 
 

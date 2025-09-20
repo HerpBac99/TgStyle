@@ -19,6 +19,7 @@ import time
 import logging
 import traceback
 import uuid
+import gc
 from logging.handlers import RotatingFileHandler
 from flask import Flask, request, jsonify
 from PIL import Image
@@ -136,7 +137,8 @@ def update_performance_stats(processing_time, success=True):
         performance_stats['failed_requests'] += 1
 
 def setup_logging():
-    """Настройка логирования"""
+    """Настройка логирования для FastVLM сервера (унифицированная версия)"""
+    Config.ensure_directories()
     log_file = os.path.join(Config.LOG_DIR, 'fastvlm.log')
 
     # Создаем форматтер
@@ -153,44 +155,57 @@ def setup_logging():
     )
     handler.setFormatter(formatter)
 
-    # Настраиваем логгер приложения
+    # Отключаем Flask's default handlers
+    app.logger.handlers.clear()
+
+    # Создаем консольный handler только для вывода в терминал (без дублирования в файл)
+    console_formatter = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(console_formatter)
+    console_handler.setLevel(logging.INFO)
+
+    # Настраиваем логгер приложения с файловым и консольным handler'ами
     app.logger.addHandler(handler)
+    app.logger.addHandler(console_handler)
     app.logger.setLevel(getattr(logging, Config.LOG_LEVEL))
 
-    # Настраиваем корневой логгер
+    # Настраиваем корневой логгер только с файловым handler'ом
     root_logger = logging.getLogger()
+    root_logger.handlers.clear()
     root_logger.addHandler(handler)
     root_logger.setLevel(getattr(logging, Config.LOG_LEVEL))
 
-    app.logger.debug(f"Логирование настроено: {log_file}")
+    app.logger.debug(f"Логирование FastVLM настроено: {log_file}")
 
-def load_prompt():
-    """Загружает промпт из файла prompt.md"""
-    global default_prompt
-    prompt_file = os.path.join(os.path.dirname(__file__), 'prompt.md')
+def load_prompts():
+    """Загрузка промптов для анализа"""
+    global default_prompt, style_prompt
 
     try:
-        with open(prompt_file, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        # Ищем основной промпт между ``` блоками
-        import re
-        prompt_match = re.search(r'```\s*(.*?)\s*```', content, re.DOTALL)
-        if prompt_match:
-            default_prompt = prompt_match.group(1).strip()
+        # Основной промпт
+        prompt_file = os.path.join(os.path.dirname(__file__), 'prompt.md')
+        if os.path.exists(prompt_file):
+            with open(prompt_file, 'r', encoding='utf-8') as f:
+                default_prompt = f.read().strip()
         else:
-            # Если нет ``` блоков, берем весь контент
-            default_prompt = content.strip()
+            default_prompt = "Describe the clothing in this image in detail."
+            app.logger.warning(f"Файл промпта не найден: {prompt_file}. Используется промпт по умолчанию")
 
-        app.logger.debug(f"Промпт загружен из файла: {prompt_file}")
+        # Стилевой промпт
+        style_prompt_file = os.path.join(os.path.dirname(__file__), 'style_prompt.md')
+        if os.path.exists(style_prompt_file):
+            with open(style_prompt_file, 'r', encoding='utf-8') as f:
+                style_prompt = f.read().strip()
+        else:
+            style_prompt = default_prompt
+            app.logger.warning(f"Файл стиля промпта не найден: {style_prompt_file}. Используется основной промпт")
 
-    except FileNotFoundError:
-        default_prompt = 'Describe in detail the clothing items you see in this image. What type, color, style, and material? Please answer in Russian, using precise fashion terminology.'
-        app.logger.warning(f"Файл промпта не найден: {prompt_file}. Используется промпт по умолчанию")
+        app.logger.info("Промпты загружены успешно")
 
     except Exception as e:
-        default_prompt = 'Опиши подробно какие предметы одежды ты видишь на этом изображении. Какой тип, цвет, стиль и материал? Пожалуйста, отвечай на русском языке, используя точные термины моды.'
-        app.logger.error(f"Ошибка загрузки промпта: {e}. Используется промпт по умолчанию")
+        app.logger.error(f"Ошибка загрузки промптов: {e}")
+        default_prompt = "Describe the clothing in this image."
+        style_prompt = default_prompt
 
 def load_multi_pass_prompts():
     """Загружает промпты для многопроходного анализа"""
@@ -360,74 +375,82 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
             "error": str(e)
         }
 
-def post_analyze_to_fastvlm(prompt: str, image_base64: str) -> dict:
-    """Отправляет запрос на анализ в FastVLM модель"""
+def analyze_image_fastvlm(image_base64, prompt_text=None):
+    """Анализ изображения с помощью FastVLM модели (унифицированная версия)"""
     try:
-        # Создаем промпт для модели
-        qs = prompt
+        if not all([model, tokenizer, image_processor]):
+            return None, "Модель не загружена"
+
+        # Используем промпт или дефолтный
+        if not prompt_text:
+            prompt_text = style_prompt if style_prompt else default_prompt
+
+        # Декодируем изображение
+        image_data = base64.b64decode(image_base64)
+        image = Image.open(io.BytesIO(image_data)).convert('RGB')
+
+        # Подготавливаем промпт
+        qs = prompt_text
         if model.config.mm_use_im_start_end:
             qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
         else:
             qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
 
-        conv = conv_templates["qwen_2"].copy()
+        # Создаем диалог
+        conv = conv_templates[Config.FASHION_ANALYSIS_CONFIG['conv_mode']].copy()
         conv.append_message(conv.roles[0], qs)
         conv.append_message(conv.roles[1], None)
-        prompt_full = conv.get_prompt()
+        prompt = conv.get_prompt()
 
-        # Декодируем изображение
-        image_data = base64.b64decode(image_base64)
-        image = Image.open(io.BytesIO(image_data))
+        # Токенизация
+        input_ids = tokenizer_image_token(
+            prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt'
+        ).unsqueeze(0).to(Config.DEVICE)
 
-        # Обрабатываем изображение
+        # Обработка изображения
         image_tensor = process_images([image], image_processor, model.config)[0]
 
-        # Выполняем анализ с управлением памятью
+        # Генерация с оптимизациями
         with gpu_memory_manager():
-            # Токенизируем промпт
-            input_ids = tokenizer_image_token(prompt_full, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
-
-            # Установка seed для детерминизма
-            torch.manual_seed(42)
-            if torch.cuda.is_available():
-                torch.cuda.manual_seed_all(42)
-
-            # Выполняем анализ
-            with torch.no_grad():
-                attention_mask = torch.ones_like(input_ids)
-
+            with torch.inference_mode():
                 output_ids = model.generate(
                     input_ids,
-                    attention_mask=attention_mask,
-                    images=image_tensor.unsqueeze(0).to(model.device).half(),
+                    images=image_tensor.unsqueeze(0).to(dtype=Config.TORCH_DTYPE, device=Config.DEVICE),
                     image_sizes=[image.size],
-                    do_sample=Config.DO_SAMPLE,
-                    temperature=Config.TEMPERATURE,
-                    top_p=Config.TOP_P if Config.DO_SAMPLE else None,
-                    repetition_penalty=Config.REPETITION_PENALTY,
-                    max_new_tokens=Config.MAX_NEW_TOKENS,
+                    do_sample=Config.FASHION_ANALYSIS_CONFIG['do_sample'],
+                    temperature=Config.FASHION_ANALYSIS_CONFIG['temperature'],
+                    top_p=Config.FASHION_ANALYSIS_CONFIG['top_p'],
+                    top_k=Config.FASHION_ANALYSIS_CONFIG['top_k'],
+                    num_beams=Config.FASHION_ANALYSIS_CONFIG['num_beams'],
+                    max_new_tokens=Config.FASHION_ANALYSIS_CONFIG['max_new_tokens'],
+                    repetition_penalty=Config.FASHION_ANALYSIS_CONFIG['repetition_penalty'],
+                    length_penalty=Config.FASHION_ANALYSIS_CONFIG['length_penalty'],
+                    no_repeat_ngram_size=Config.FASHION_ANALYSIS_CONFIG['no_repeat_ngram_size'],
+                    early_stopping=Config.FASHION_ANALYSIS_CONFIG['early_stopping'],
                     use_cache=True,
-                    pad_token_id=tokenizer.eos_token_id,
+                    pad_token_id=tokenizer.pad_token_id,
                     eos_token_id=tokenizer.eos_token_id
                 )
 
         # Декодируем результат
-        result_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
+        outputs = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
 
-        return {
-            "success": True,
-            "technical_analysis": result_text,
-            "analysis": result_text
-        }
+        # Очищаем результат от исходного промпта
+        if prompt in outputs:
+            outputs = outputs.replace(prompt, "").strip()
+
+        # Удаляем стоп-последовательности
+        for stop_seq in Config.STOP_SEQUENCES:
+            if stop_seq in outputs:
+                outputs = outputs.split(stop_seq)[0].strip()
+
+        app.logger.info(f"FastVLM анализ завершен, длина ответа: {len(outputs)} символов")
+        return outputs, None
 
     except Exception as e:
-        app.logger.error(f"Ошибка анализа FastVLM: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "technical_analysis": "",
-            "analysis": ""
-        }
+        app.logger.error(f"Ошибка анализа изображения: {e}")
+        app.logger.error(traceback.format_exc())
+        return None, str(e)
 
 def load_style_prompt():
     """Загружает промпт стилиста из файла style_prompt.md"""
@@ -631,58 +654,65 @@ def create_stylist_response(multi_pass_analysis):
     return multi_pass_analysis
 
 def load_model():
-    """Загружает FastVLM модель в память с оптимизацией для GPU/CPU"""
-    global model, tokenizer, image_processor, context_len, performance_stats
+    """Загрузка FastVLM модели с оптимизациями (унифицированная версия)"""
+    global model, tokenizer, image_processor, context_len
 
     try:
-        app.logger.debug("Загружаем FastVLM модель в память...")
-        app.logger.debug("Начало загрузки модели")
+        app.logger.info("Начинаем загрузку FastVLM модели...")
         start_time = time.time()
 
-        # Проверяем существование модели
-        if not os.path.exists(Config.MODEL_PATH):
-            raise FileNotFoundError(f"Модель не найдена: {Config.MODEL_PATH}")
-
-        # Проверяем доступность GPU
-        gpu_available = torch.cuda.is_available()
-        device = 'cuda' if gpu_available else 'cpu'
-        
-        app.logger.debug(f"Загрузка на устройство: {device}")
-        if gpu_available:
-            app.logger.debug(f"GPU: {torch.cuda.get_device_name(0)}")
-            app.logger.debug(f"Память GPU: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
-        
-        # Загружаем модель
+        # Отключаем инициализацию torch
         disable_torch_init()
+
+        # Получаем имя модели
         model_name = get_model_name_from_path(Config.MODEL_PATH)
-        
+        app.logger.info(f"Загружаем модель: {model_name}")
+
+        # Загружаем модель с автоматической квантизацией для 8GB GPU
+        app.logger.info(f"4-bit квантизация: {getattr(Config, 'USE_4BIT', False)}")
+        app.logger.info(f"8-bit квантизация: {getattr(Config, 'USE_8BIT', False)}")
+
         with gpu_memory_manager():
             tokenizer, model, image_processor, context_len = load_pretrained_model(
-                Config.MODEL_PATH, None, model_name,
-                device=device,
-                torch_dtype=Config.TORCH_DTYPE
+                model_path=Config.MODEL_PATH,
+                model_base=None,
+                model_name=model_name,
+                device=Config.DEVICE,
+                load_4bit=getattr(Config, 'USE_4BIT', False),  # Автоматически для GPU < 12GB
+                load_8bit=getattr(Config, 'USE_8BIT', False)
             )
 
-        load_time = time.time() - start_time
-        performance_stats['gpu_enabled'] = gpu_available
-        performance_stats['model_loaded_at'] = time.time()
-        
-        app.logger.debug(f"FastVLM модель загружена: {model_name} на {device} за {load_time:.1f}с")
-        app.logger.debug(f"FastVLM модель загружена и готова к работе! (загрузка: {load_time:.1f}с)")
-        
-        # Выводим информацию о памяти GPU
-        if gpu_available:
-            allocated = torch.cuda.memory_allocated() / 1024**3
-            reserved = torch.cuda.memory_reserved() / 1024**3
-            app.logger.debug(f"Память GPU: выделено {allocated:.1f}GB, зарезервировано {reserved:.1f}GB")
-        
+        # Настройки модели для оптимизации
+        if hasattr(model.config, 'use_cache'):
+            model.config.use_cache = True
+
+        # Устанавливаем pad_token_id для генерации
+        if hasattr(model, 'generation_config') and model.generation_config:
+            model.generation_config.pad_token_id = tokenizer.pad_token_id
+
+        # Переводим модель в режим inference
+        model.eval()
+
+        # Flash Attention если доступен
+        if hasattr(model.config, 'attn_implementation'):
+            model.config.attn_implementation = Config.ATTENTION_IMPLEMENTATION
+            app.logger.info(f"Использование Flash Attention: {Config.ATTENTION_IMPLEMENTATION}")
+
+        loading_time = time.time() - start_time
+        performance_stats['model_loading_time'] = loading_time
+
+        app.logger.info(f"FastVLM модель загружена успешно за {loading_time:.2f}с")
+        app.logger.info(f"Контекстная длина: {context_len}")
+
+        if torch.cuda.is_available():
+            memory_mb = torch.cuda.memory_allocated() / 1024 / 1024
+            app.logger.info(f"GPU память занята: {memory_mb:.1f} MB")
+
         return True
 
     except Exception as e:
-        error_msg = f"Ошибка загрузки модели: {e}"
-        app.logger.debug(f"Ошибка загрузки модели: {e}")
-        app.logger.error(error_msg)
-        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        app.logger.error(f"Ошибка загрузки FastVLM модели: {e}")
+        app.logger.error(traceback.format_exc())
         return False
 
 def save_fastvlm_result(clean_analysis, raw_output, image_debug):
@@ -987,100 +1017,55 @@ def analyze():
         app.logger.info(f"Сохранил изображение с качеством 100%: {image.size[0]}x{image.size[1]}")
 
         try:
-            # Выполняем многопроходный анализ
-            app.logger.info(f"Запускаем многопроходный анализ FastVLM для пользователя {nickname}")
+            # Выполняем анализ с помощью унифицированной функции
+            app.logger.info(f"Выполняем анализ изображения с помощью FastVLM для пользователя {nickname}")
 
-            multi_pass_result = perform_multi_pass_analysis(image_base64, nickname)
+            # Анализируем изображение (технический анализ)
+            technical_analysis, error = analyze_image_fastvlm(image_base64, prompt)
 
-            if not multi_pass_result["success"]:
-                update_performance_stats(time.time() - analysis_start_time, success=False)
+            fastvlm_time = time.time() - analysis_start_time
+
+            if error:
+                update_performance_stats(fastvlm_time, success=False)
+                app.logger.error(f"Ошибка анализа: {error}")
                 return jsonify({
                     'success': False,
-                    'error': multi_pass_result.get("error", "Ошибка многопроходного анализа"),
-                    'multi_pass_result': multi_pass_result
+                    'error': error,
+                    'response_time': fastvlm_time
                 }), 500
 
-            # Объединяем результаты всех проходов
-            combined_analysis = f"""PERSON: {multi_pass_result['person']}
+            combined_analysis = technical_analysis
 
-TOP_CLOTHING: {multi_pass_result['top_clothing']}
-
-INNER_TOP_CLOTHING: {multi_pass_result['inner_top_clothing']}
-
-LEG_CLOTHING: {multi_pass_result['leg_clothing']}
-
-SHOES: {multi_pass_result['shoes']}
-
-ACCESSORIES: {multi_pass_result['accessories']}"""
-
-            # Логируем объединенный анализ
-            app.logger.info(f"Объединенный анализ: длина {len(combined_analysis)} символов")
-
-            # Сохраняем результат FastVLM для отладки
-            image_debug = {
-                'size': image.size,
-                'mode': image.mode,
-                'filename': temp_image_path.split('\\')[-1] if temp_image_path else 'unknown'
-            }
-            save_fastvlm_result(combined_analysis, combined_analysis, image_debug)
-
-            # Создаем креативный ответ стилиста через Gemini API
-            app.logger.info(f"Отправляем объединенный анализ в Gemini для пользователя {nickname}")
+            # Создаем креативный ответ стилиста
+            app.logger.info(f"Создаем ответ стилиста для пользователя {nickname}")
             gemini_start_time = time.time()
             stylist_response = create_stylist_response(combined_analysis)
             gemini_time = time.time() - gemini_start_time
-            app.logger.info(f"Ответ от GEMINI получен: длина {len(stylist_response)} символов, время: {gemini_time:.2f} сек")
 
-            # Рассчитываем общее время
             total_time = time.time() - analysis_start_time
 
-            # Сохраняем результаты анализа с nickname
-            save_analysis_with_nickname(
-                combined_analysis,
-                stylist_response,
-                nickname,
-                f"{image.size[0]}x{image.size[1]}",
-                multi_pass_result['timing']['total'],
-                gemini_time
+            performance_stats['successful_requests'] += 1
+            # Обновляем среднее время ответа
+            performance_stats['average_processing_time'] = (
+                (performance_stats['average_processing_time'] * (performance_stats['successful_requests'] - 1) + total_time)
+                / performance_stats['successful_requests']
             )
 
-            # Обновляем статистику
-            update_performance_stats(total_time, success=True)
+            app.logger.info(f"Полный анализ завершен за {total_time:.2f}с (FastVLM: {fastvlm_time:.2f}с, стилист: {gemini_time:.2f}с)")
 
-            app.logger.info(f"Многопроходный анализ успешно завершен за {total_time:.2f}с")
-
-            response_data = {
+            return jsonify({
                 'success': True,
-                'technical_analysis': combined_analysis,
-                'analysis': stylist_response,  # Только креативный ответ стилиста
-                'model_used': model.config.model_type,
-                'device': str(model.device),
+                'technical_analysis': combined_analysis,  # Технический анализ FastVLM
+                'analysis': stylist_response,  # Креативный ответ стилиста
+                'model_used': 'fastvlm',
+                'model_type': Config.MODEL_TYPE,
+                'device': Config.DEVICE,
                 'timing': {
                     'total_time': round(total_time, 2),
-                    'multi_pass_time': round(multi_pass_result['timing']['total'], 2),
-                    'gemini_time': round(gemini_time, 2),
-                    'person_time': round(multi_pass_result['timing']['person'], 2),
-                    'top_clothing_time': round(multi_pass_result['timing']['top_clothing'], 2),
-                    'inner_top_clothing_time': round(multi_pass_result['timing']['inner_top_clothing'], 2),
-                    'leg_clothing_time': round(multi_pass_result['timing']['leg_clothing'], 2),
-                    'shoes_time': round(multi_pass_result['timing']['shoes'], 2),
-                    'accessories_time': round(multi_pass_result['timing']['accessories'], 2)
-                },
-                'multi_pass_results': {
-                    'person': multi_pass_result['person'],
-                    'top_clothing': multi_pass_result['top_clothing'],
-                    'inner_top_clothing': multi_pass_result['inner_top_clothing'],
-                    'leg_clothing': multi_pass_result['leg_clothing'],
-                    'shoes': multi_pass_result['shoes'],
-                    'accessories': multi_pass_result['accessories']
+                    'fastvlm_time': round(fastvlm_time, 2),
+                    'stylist_time': round(gemini_time, 2)
                 }
-            }
-
-            # Добавляем информацию о GPU если используется
-            if torch.cuda.is_available() and 'cuda' in str(model.device):
-                response_data['gpu_memory_used'] = round(torch.cuda.memory_allocated() / 1024**2, 1)  # MB
-
-            return jsonify(response_data)
+            })
 
         finally:
             # Удаляем временный файл
@@ -1153,59 +1138,22 @@ def analyze_for_test():
             temp_image_path = temp_file.name
 
         try:
-            # Создаем промпт для модели
-            qs = prompt
-            if model.config.mm_use_im_start_end:
-                qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
-            else:
-                qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
+            # Используем унифицированную функцию анализа
+            analysis_result, error = analyze_image_fastvlm(image_base64, prompt)
 
-            conv = conv_templates["qwen_2"].copy()
-            conv.append_message(conv.roles[0], qs)
-            conv.append_message(conv.roles[1], None)
-            prompt_full = conv.get_prompt()
-
-            # Обрабатываем изображение
-            image_tensor = process_images([image], image_processor, model.config)[0]
-
-            # Выполняем анализ с управлением памятью
-            with gpu_memory_manager():
-                # Токенизируем промпт
-                input_ids = tokenizer_image_token(prompt_full, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(model.device)
-
-                # Установка seed для детерминизма
-                torch.manual_seed(42)
-                if torch.cuda.is_available():
-                    torch.cuda.manual_seed_all(42)
-
-                # Выполняем анализ
-                with torch.no_grad():
-                    attention_mask = torch.ones_like(input_ids)
-
-                    output_ids = model.generate(
-                        input_ids,
-                        attention_mask=attention_mask,
-                        images=image_tensor.unsqueeze(0).to(model.device).half(),
-                        image_sizes=[image.size],
-                        do_sample=Config.DO_SAMPLE,
-                        temperature=Config.TEMPERATURE,
-                        top_p=Config.TOP_P if Config.DO_SAMPLE else None,
-                        repetition_penalty=Config.REPETITION_PENALTY,
-                        max_new_tokens=Config.MAX_NEW_TOKENS,
-                        use_cache=True,
-                        pad_token_id=tokenizer.eos_token_id,
-                        eos_token_id=tokenizer.eos_token_id
-                    )
-
-            # Декодируем результат
-            result_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
+            if error:
+                return jsonify({
+                    'success': False,
+                    'error': error,
+                    'timing': {'total_time': round(time.time() - analysis_start_time, 2)}
+                }), 500
 
             # Рассчитываем время
             total_time = time.time() - analysis_start_time
 
             return jsonify({
                 'success': True,
-                'analysis': result_text,
+                'analysis': analysis_result,
                 'timing': {'total_time': round(total_time, 2)}
             })
 
@@ -1313,16 +1261,44 @@ def get_model_debug():
             'error': str(e)
         }), 500
 
+def cleanup_resources():
+    """Очистка ресурсов при завершении"""
+    global model, tokenizer, image_processor
+
+    try:
+        app.logger.info("Начинаем очистку ресурсов...")
+
+        # Очищаем модель
+        if model is not None:
+            del model
+            model = None
+
+        if tokenizer is not None:
+            del tokenizer
+            tokenizer = None
+
+        if image_processor is not None:
+            del image_processor
+            image_processor = None
+
+        # Очищаем GPU память
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+
+        # Принудительная сборка мусора
+        gc.collect()
+
+        app.logger.info("Ресурсы успешно очищены")
+
+    except Exception as e:
+        app.logger.error(f"Ошибка при очистке ресурсов: {e}")
+
+
 def signal_handler(signum, frame):
-    """Обработка сигналов завершения"""
-    app.logger.debug("Получен сигнал завершения, останавливаем сервер...")
-    app.logger.debug("Server shutdown initiated")
-
-    if model and torch.cuda.is_available():
-        # Очистка GPU памяти
-        torch.cuda.empty_cache()
-        app.logger.debug("GPU memory cleared")
-
+    """Обработчик сигналов для graceful shutdown"""
+    app.logger.info(f"Получен сигнал {signum}, завершаем работу...")
+    cleanup_resources()
     sys.exit(0)
 
 def start_server():
@@ -1352,49 +1328,59 @@ def start_server():
         app.logger.error(f"Traceback: {traceback.format_exc()}")
 
 if __name__ == '__main__':
-    # Загружаем переменные окружения
-    Config.load_env()
-
-    # Создаем необходимые директории
-    Config.ensure_directories()
-
-    # Настраиваем логирование
-    setup_logging()
-
-    app.logger.debug("FastVLM Server starting...")
-
-    # Валидируем конфигурацию
-    try:
-        Config.validate_config()
-    except Exception as e:
-        app.logger.debug(f"Ошибка конфигурации: {e}")
-        sys.exit(1)
-
-    # Устанавливаем обработчики сигналов
+    # Регистрируем обработчики сигналов
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # Загружаем промпт
-    load_prompt()
+    try:
+        # Валидация конфигурации
+        Config.validate_config()
 
-    # Загружаем промпт стилиста
-    load_style_prompt()
+        # Настройка логирования
+        setup_logging()
 
-    # Загружаем многопроходные промпты
-    if not load_multi_pass_prompts():
-        app.logger.error("Не удалось загрузить многопроходные промпты")
-        sys.exit(1)
+        # Создание директорий
+        os.makedirs(FASTVLM_RESULTS_DIR, exist_ok=True)
 
-    # Проверяем доступность Ollama
-    check_ollama_availability()
+        # Загрузка промптов
+        load_prompts()
+        load_style_prompt()
 
-    # Инициализируем Gemini API
-    initialize_gemini()
+        # Загружаем многопроходные промпты
+        if not load_multi_pass_prompts():
+            app.logger.error("Не удалось загрузить многопроходные промпты")
+            sys.exit(1)
 
-    # Загружаем модель
-    if load_model():
-        # Запускаем сервер
-        start_server()
-    else:
-        app.logger.debug("Не удалось загрузить модель, сервер не запущен")
-        sys.exit(1)
+        # Проверяем доступность Ollama
+        check_ollama_availability()
+
+        # Инициализируем Gemini API
+        initialize_gemini()
+
+        # Загрузка модели
+        app.logger.info("Запуск FastVLM сервера...")
+        if not load_model():
+            app.logger.error("Не удалось загрузить модель, выходим")
+            sys.exit(1)
+
+        app.logger.info(f"FastVLM сервер запускается на {Config.HOST}:{Config.PORT}")
+        app.logger.info(f"Конфигурация: {Config.THREADS} потоков, {Config.CONNECTION_LIMIT} соединений")
+
+        # Запуск сервера с помощью waitress
+        serve(
+            app,
+            host=Config.HOST,
+            port=Config.PORT,
+            threads=Config.THREADS,
+            connection_limit=Config.CONNECTION_LIMIT,
+            cleanup_interval=30,
+            channel_timeout=Config.CONNECTION_TIMEOUT
+        )
+
+    except KeyboardInterrupt:
+        app.logger.info("Получен сигнал прерывания")
+    except Exception as e:
+        app.logger.error(f"Критическая ошибка: {e}")
+        app.logger.error(traceback.format_exc())
+    finally:
+        cleanup_resources()

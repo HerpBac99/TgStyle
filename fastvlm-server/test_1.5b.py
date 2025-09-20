@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Простой тест FastVLM 7B сервера с промптом TORSO_CLOTHING_PROMPT
+Простой тест FastVLM 1.5B сервера с промптом TORSO_CLOTHING_PROMPT
 """
 
 import os
@@ -74,16 +74,25 @@ def extract_stylist(result: dict) -> str:
 def load_image(path: str) -> Image.Image:
     return Image.open(path).convert('RGB')
 
-# Промпт из PROMT
-PROMPT = """Describe the person in the photograph, including their gender and age. 
-Describe in detail all the clothing they are wearing, including its type, color, and material. 
-Describe in detail all the accessories they wear, whether they are wearing them on their neck, fingers, or ears."""
+# Промпт из PROMPT
+PROMPT = """Describe the person in this image following this example format:
+
+Example: "Female, approximately 25 years old, slim build. Wearing: red sweater (cotton, loose fit), blue jeans (denim, straight leg), white sneakers (canvas, low-top), silver watch on left wrist."
+
+Now analyze this image and provide:
+1. Person basics (age, gender, build)
+2. Upper body clothing (type, color, fit)
+3. Lower body clothing (type, color, fit) 
+4. Footwear (type, color, style)
+5. Accessories (jewelry, bags, etc.)
+
+Use fashion terminology where appropriate."""
 
 def main():
     if len(sys.argv) >= 2:
         image_path = sys.argv[1]
     else:
-        image_path = str(Path(__file__).parent.parent / "12.jpg")
+        image_path = str(Path(__file__).parent.parent / "10.jpg")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")
@@ -92,12 +101,12 @@ def main():
     img = load_image(image_path)
     b64_image = to_base64(img)
 
-    print(f"Testing FastVLM 7B with PROMPT")
+    print(f"Testing FastVLM 1.5B with PROMPT")
     print(f"Image: {image_path}")
 
     # Single analysis request
     start_time = time.perf_counter()
-    result = post_analyze(PROMPT, b64_image, "test_7b_user")
+    result = post_analyze(PROMPT, b64_image, "test_1.5b_user")
     elapsed = time.perf_counter() - start_time
 
     technical_analysis = extract_technical(result)
@@ -115,11 +124,11 @@ def main():
         "success": result.get("success", False)
     }
 
-    print("\n=== FASTVLM 7B PROMPT RESULT ===")
+    print("\n=== FASTVLM 1.5B PROMPT RESULT ===")
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
     # Save result
-    out_path = Path(__file__).parent / "results" / "latest_7b_test_output.txt"
+    out_path = Path(__file__).parent / "results" / "latest_1.5b_test_output.txt"
     out_path.parent.mkdir(exist_ok=True)
 
     with open(out_path, "w", encoding="utf-8") as f:

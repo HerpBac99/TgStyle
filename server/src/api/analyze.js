@@ -8,7 +8,7 @@ const { logger } = require('../controllers/logsController');
  */
 const FASTVLM_CONFIG = {
     HOST: 'http://127.0.0.1',
-    PORT: 3002,
+    PORT: 3001,
     TIMEOUT: 30000, // 30 секунд
     ENDPOINT: '/analyze'
 };
