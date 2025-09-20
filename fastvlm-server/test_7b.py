@@ -74,16 +74,29 @@ def extract_stylist(result: dict) -> str:
 def load_image(path: str) -> Image.Image:
     return Image.open(path).convert('RGB')
 
-# Промпт из PROMT
-PROMPT = """Describe the person in the photograph, including their gender and age. 
-Describe in detail all the clothing they are wearing, including its type, color, and material. 
-Describe in detail all the accessories they wear, whether they are wearing them on their neck, fingers, or ears."""
+# Оптимизированный промпт на основе исследований prompt7bAnal.md и promt_research.md
+PROMPT = """Analyze the person in the image.
+
+1. Thinking Steps (Internal Monologue):
+First, identify these details for yourself, step-by-step:
+-Person: Gender, age, hair.
+-Upper: All items (e.g., cardigan, top), their exact colors, and fit.
+-Lower: Item type, exact color, and fit.
+-Footwear: Item type, exact colors, and style.
+-Accessories: All visible items.
+
+2. Final Output Format:
+After you have all the details, present your answer ONLY in this single-line format. Do not write anything else.
+[Gender], [Age range] years old, [Hair description]. Wearing: [Upper clothing (type, color, fit)], [Lower clothing (type, color, fit)]. Footwear: [Footwear (type, color, style)]. Accessories: [List of accessories].
+
+EXAMPLE:
+Female, 25 years old, shoulder-length brown hair. Wearing: cream wool cardigan (oversized fit), dark turtleneck sweater, light blue jeans (straight leg), brown ankle boots (pointed toe). Accessories: gold chain necklace."""
 
 def main():
     if len(sys.argv) >= 2:
         image_path = sys.argv[1]
     else:
-        image_path = str(Path(__file__).parent.parent / "12.jpg")
+        image_path = str(Path(__file__).parent.parent / "10.jpg")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")

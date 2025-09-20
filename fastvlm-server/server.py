@@ -48,18 +48,23 @@ from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_S
 # Импортируем Gemini API
 try:
     from google import genai
+    from google.genai import types
     GEMINI_AVAILABLE = True
-except ImportError:
+    print("✅ Google GenAI library loaded successfully")
+except ImportError as e:
     GEMINI_AVAILABLE = False
-    app.logger.warning("Google GenAI library not available. Install with: pip install google-genai")
+    print(f"⚠️  Google GenAI library not available: {e}")
+    print("Install with: pip install google-genai")
 
 # Импортируем requests для Ollama API
 try:
     import requests
     REQUESTS_AVAILABLE = True
-except ImportError:
+    print("✅ Requests library loaded successfully")
+except ImportError as e:
     REQUESTS_AVAILABLE = False
-    app.logger.warning("Requests library not available. Install with: pip install requests")
+    print(f"⚠️  Requests library not available: {e}")
+    print("Install with: pip install requests")
 
 # Промпты для многопроходного анализа
 PERSON_PROMPT = None
@@ -383,7 +388,7 @@ def analyze_image_fastvlm(image_base64, prompt_text=None):
 
         # Используем промпт или дефолтный
         if not prompt_text:
-            prompt_text = style_prompt if style_prompt else default_prompt
+            prompt_text = default_prompt
 
         # Декодируем изображение
         image_data = base64.b64decode(image_base64)
@@ -545,11 +550,11 @@ def create_stylist_response_ollama(multi_pass_analysis):
             "prompt": formatted_prompt,
             "stream": False,
             "options": {
-                "temperature": 0.5,  # Оптимальная температура для креативности стилиста
-                "top_p": 0.8,        # Более широкая выборка для разнообразия
-                "max_tokens": 1200,  # Ограничиваем до 1200 символов для краткости
-                "repeat_penalty": 1.15,  # Штраф за повторения
-                "top_k": 40          # Ограничиваем выборку лучших токенов
+                "temperature": Config.STYLIST_OLLAMA_TEMPERATURE,
+                "top_p": Config.STYLIST_OLLAMA_TOP_P,
+                "max_tokens": Config.STYLIST_OLLAMA_MAX_TOKENS,
+                "repeat_penalty": Config.STYLIST_OLLAMA_REPEAT_PENALTY,
+                "top_k": Config.STYLIST_OLLAMA_TOP_K
             }
         }
 
@@ -599,55 +604,90 @@ def initialize_gemini():
         app.logger.error(f"Ошибка инициализации Gemini API: {e}")
         return False
 
+def create_stylist_response_gemini(multi_pass_analysis):
+    """Создает креативный ответ ИИ стилиста через Gemini API"""
+    global gemini_client, style_prompt
+
+    if not gemini_client:
+        app.logger.warning("Gemini клиент недоступен, используем базовый анализ FastVLM")
+        return multi_pass_analysis
+
+    try:
+        app.logger.info("Генерация креативного ответа стилиста через Gemini API")
+
+        # Используем промпт из файла style_prompt.md
+        formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis)
+
+        # Логируем отправку запроса в Gemini
+        app.logger.info(f"Отправка запроса в Gemini (промпт: {len(formatted_prompt)} символов, модель: {Config.GEMINI_MODEL})")
+
+        gemini_request_start = time.time()
+
+        # Создаем запрос к Gemini API
+        response = gemini_client.models.generate_content(
+            model=Config.GEMINI_MODEL,
+            contents=[{
+                "parts": [
+                    {"text": formatted_prompt}
+                ]
+            }],
+            config=types.GenerateContentConfig(
+                temperature=Config.STYLIST_GEMINI_TEMPERATURE,
+                max_output_tokens=Config.STYLIST_GEMINI_MAX_TOKENS,
+                thinking_config=types.ThinkingConfig(
+                    thinking_budget=Config.STYLIST_GEMINI_THINKING_BUDGET
+                )
+            )
+        )
+
+        if not response or not hasattr(response, 'text') or not response.text:
+            raise Exception("Gemini API вернул пустой ответ")
+
+        creative_response = response.text.strip()
+
+        gemini_request_time = time.time() - gemini_request_start
+
+        # Логируем успешный ответ от Gemini
+        app.logger.info(f"Gemini ответил успешно: {len(creative_response)} символов за {gemini_request_time:.2f} сек")
+
+        return creative_response
+
+    except Exception as e:
+        app.logger.error(f"Ошибка создания ответа через Gemini: {e}")
+        # Fallback на оригинальный анализ FastVLM
+        return multi_pass_analysis
+
 def create_stylist_response(multi_pass_analysis):
-    """Создает креативный ответ ИИ стилиста через Ollama (приоритет) или Gemini"""
+    """Создает креативный ответ ИИ стилиста в зависимости от выбранного типа"""
     global ollama_available, gemini_client, style_prompt
 
-    # Сначала пробуем Ollama (приоритет)
-    if ollama_available:
-        app.logger.info("Используем Ollama для создания ответа стилиста")
+    app.logger.info(f"Создание ответа стилиста. Выбран тип: {Config.STYLIST_TYPE}")
+
+    # Выбираем стилиста в зависимости от конфигурации
+    if Config.STYLIST_TYPE == 'ollama' and ollama_available:
+        app.logger.info(f"Используем Ollama для создания ответа стилиста (выбранный тип: {Config.STYLIST_TYPE})")
         response = create_stylist_response_ollama(multi_pass_analysis)
         if response and response != multi_pass_analysis:  # Проверяем, что это не fallback
             return response
-        app.logger.warning("Ollama не дал качественный ответ, пробуем Gemini")
+        app.logger.warning("Ollama не дал качественный ответ")
 
-    # Fallback на Gemini
+    elif Config.STYLIST_TYPE == 'gemini' and gemini_client:
+        app.logger.info(f"Используем Gemini для создания ответа стилиста (выбранный тип: {Config.STYLIST_TYPE})")
+        return create_stylist_response_gemini(multi_pass_analysis)
+
+
+    # Fallback логика - пробуем все доступные варианты
+    app.logger.warning(f"Выбранный стилист {Config.STYLIST_TYPE} недоступен, пробуем альтернативы")
+
+    if ollama_available:
+        app.logger.info("Fallback на Ollama")
+        response = create_stylist_response_ollama(multi_pass_analysis)
+        if response and response != multi_pass_analysis:
+            return response
+
     if gemini_client:
-        app.logger.info("Используем Gemini для создания ответа стилиста")
-        try:
-            app.logger.debug("Генерация креативного ответа стилиста через Gemini API")
-
-            # Используем промпт из файла style_prompt.md
-            # Экранируем специальные символы для безопасной вставки
-            safe_analysis = str(multi_pass_analysis).replace('{', '{{').replace('}', '}}')
-            formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis)
-
-            # Логируем отправку запроса в Gemini
-            app.logger.info(f"Отправка запроса в Gemini (промпт: {len(formatted_prompt)} символов)")
-
-            gemini_request_start = time.time()
-            response = gemini_client.models.generate_content(
-                model=Config.GEMINI_MODEL,
-                contents=formatted_prompt,
-                config=genai.types.GenerateContentConfig(
-                    temperature=Config.GEMINI_TEMPERATURE,
-                    max_output_tokens=Config.GEMINI_MAX_TOKENS,
-                    thinking_config=genai.types.ThinkingConfig(
-                        thinking_budget=Config.GEMINI_THINKING_BUDGET
-                    ) if Config.GEMINI_THINKING_BUDGET > 0 else None
-                )
-            )
-
-            gemini_request_time = time.time() - gemini_request_start
-            creative_response = response.text.strip()
-
-            # Логируем успешный ответ от Gemini
-            app.logger.info(f"Gemini ответил успешно: {len(creative_response)} символов за {gemini_request_time:.2f} сек")
-
-            return creative_response
-
-        except Exception as e:
-            app.logger.error(f"Ошибка создания ответа через Gemini: {e}")
+        app.logger.info("Fallback на Gemini")
+        return create_stylist_response_gemini(multi_pass_analysis)
 
     # Если ничего не сработало, возвращаем базовый анализ
     app.logger.warning("Ни Ollama, ни Gemini недоступны, используем базовый анализ FastVLM")
@@ -706,7 +746,7 @@ def load_model():
 
         if torch.cuda.is_available():
             memory_mb = torch.cuda.memory_allocated() / 1024 / 1024
-            app.logger.info(f"GPU память занята: {memory_mb:.1f} MB")
+            app.logger.debug(f"GPU память занята: {memory_mb:.1f} MB")
 
         return True
 
@@ -1099,7 +1139,7 @@ def analyze():
 
 @app.route('/analyze_for_test', methods=['POST'])
 def analyze_for_test():
-    """Анализ изображения для тестирования (один проход с кастомным промптом)"""
+    """Анализ изображения для тестирования (только технический анализ FastVLM)"""
     analysis_start_time = time.time()
 
     try:
@@ -1138,23 +1178,42 @@ def analyze_for_test():
             temp_image_path = temp_file.name
 
         try:
-            # Используем унифицированную функцию анализа
-            analysis_result, error = analyze_image_fastvlm(image_base64, prompt)
+            # Выполняем только технический анализ FastVLM
+            app.logger.info(f"Выполняем технический анализ изображения для пользователя {nickname}")
+
+            fastvlm_start_time = time.time()
+            technical_analysis, error = analyze_image_fastvlm(image_base64, prompt)
+            fastvlm_time = time.time() - fastvlm_start_time
 
             if error:
                 return jsonify({
                     'success': False,
                     'error': error,
-                    'timing': {'total_time': round(time.time() - analysis_start_time, 2)}
+                    'technical_analysis': '',
+                    'analysis': '',
+                    'timing': {
+                        'total_time': round(time.time() - analysis_start_time, 2),
+                        'fastvlm_time': round(fastvlm_time, 2),
+                        'stylist_time': 0
+                    }
                 }), 500
 
-            # Рассчитываем время
             total_time = time.time() - analysis_start_time
+
+            app.logger.info(f"Технический анализ завершен за {fastvlm_time:.2f}с")
 
             return jsonify({
                 'success': True,
-                'analysis': analysis_result,
-                'timing': {'total_time': round(total_time, 2)}
+                'technical_analysis': technical_analysis,  # Результат FastVLM анализа
+                'analysis': '',  # Пустая строка, так как стилист не вызывается
+                'model_used': 'fastvlm',
+                'model_type': Config.MODEL_TYPE,
+                'device': Config.DEVICE,
+                'timing': {
+                    'total_time': round(total_time, 2),
+                    'fastvlm_time': round(fastvlm_time, 2),
+                    'stylist_time': 0  # Время стилиста = 0, так как он не вызывается
+                }
             })
 
         finally:
@@ -1173,7 +1232,13 @@ def analyze_for_test():
         return jsonify({
             'success': False,
             'error': str(e),
-            'timing': {'total_time': round(total_time, 2)}
+            'technical_analysis': '',
+            'analysis': '',
+            'timing': {
+                'total_time': round(total_time, 2),
+                'fastvlm_time': 0,
+                'stylist_time': 0
+            }
         }), 500
 
 @app.route('/load', methods=['GET'])

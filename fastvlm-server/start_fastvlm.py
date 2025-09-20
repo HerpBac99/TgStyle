@@ -39,8 +39,7 @@ def check_gpu():
         print(f"   Память: {gpu_memory:.1f} GB")
 
         if gpu_memory < 12:
-            print("⚠️  Предупреждение: Для 7B модели рекомендуется минимум 12GB GPU памяти")
-            print("   Возможны ошибки Out of Memory (OOM)")
+            print("⚠️  GPU память < 12GB, возможны проблемы с 7B моделью")
 
         return True
 
@@ -185,16 +184,6 @@ def main():
     model_type, model_path, is_7b = get_model_info()
 
     print(f"🎯 Выбранная модель: FastVLM {model_type.upper()}")
-    if is_7b:
-        print("   💪 Большая модель (высокое качество, медленнее)")
-    else:
-        print("   ⚡ Малая модель (быстрее, оптимизированные параметры)")
-
-    # Системная информация
-    print(f"\n💻 Система: {platform.system()} {platform.release()}")
-    print(f"🏗️  Архитектура: {platform.machine()}")
-    print()
-
     # Проверки системы
     print("🔍 Проверяю систему...")
 

@@ -34,9 +34,23 @@ class Config:
         '7b-int4': os.path.join(BASE_DIR, 'models/llava-fastvithd_7b_int4')
     }
 
-    # Выбор модели через переменную окружения или по умолчанию
-    MODEL_TYPE = os.getenv('FASTVLM_MODEL', '1.5b')  # По умолчанию используем 1.5B
-    MODEL_PATH = AVAILABLE_MODELS.get(MODEL_TYPE, AVAILABLE_MODELS['1.5b'])
+    # Выбор модели через переменную окружения или автоматическое определение
+    model_type_env = os.getenv('FASTVLM_MODEL')
+
+    if model_type_env and model_type_env in AVAILABLE_MODELS:
+        # Используем модель из переменной окружения
+        MODEL_TYPE = model_type_env
+        MODEL_PATH = AVAILABLE_MODELS[MODEL_TYPE]
+    else:
+        # Автоматическое определение модели на основе наличия файлов
+        if os.path.exists(AVAILABLE_MODELS['7b']):
+            MODEL_TYPE = '7b'
+            MODEL_PATH = AVAILABLE_MODELS['7b']
+            print(f"Автоматически выбрана 7B модель (найдена по пути: {MODEL_PATH})")
+        else:
+            MODEL_TYPE = '1.5b'
+            MODEL_PATH = AVAILABLE_MODELS['1.5b']
+            print(f"Автоматически выбрана 1.5B модель (7B не найдена)")
 
     # Определяем тип модели для оптимизаций
     IS_7B_MODEL = MODEL_TYPE.startswith('7b')
@@ -73,13 +87,8 @@ class Config:
         gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3  # GB
         print(f"GPU доступен: {torch.cuda.get_device_name(0)}")
         print(f"GPU память: {gpu_memory:.1f} GB")
-
-        if IS_7B_MODEL and gpu_memory < 12:
-            print("⚠️  ВНИМАНИЕ: Для 7B модели рекомендуется минимум 12GB GPU памяти")
-            print(f"   Доступно: {gpu_memory:.1f} GB. Возможны проблемы с OOM.")
     else:
         print("GPU не найден, используем CPU")
-        print("⚠️  ВНИМАНИЕ: CPU режим очень медленный для больших моделей")
         DEVICE = 'cpu'
 
     # Оптимизированный dtype в зависимости от модели и GPU
@@ -184,6 +193,23 @@ class Config:
     GEMINI_MAX_TOKENS = int(os.getenv('GEMINI_MAX_TOKENS', '4096'))
     GEMINI_THINKING_BUDGET = int(os.getenv('GEMINI_THINKING_BUDGET', '0'))
 
+    # === Настройки ИИ стилиста ===
+    # Выбор типа стилиста: ollama, gemini
+    stylist_type_env = os.getenv('FASTVLM_STYLIST_TYPE', 'ollama')
+    STYLIST_TYPE = stylist_type_env.lower()
+
+    # Параметры для стилиста Ollama
+    STYLIST_OLLAMA_TEMPERATURE = float(os.getenv('FASTVLM_STYLIST_OLLAMA_TEMPERATURE', '0.5'))
+    STYLIST_OLLAMA_TOP_P = float(os.getenv('FASTVLM_STYLIST_OLLAMA_TOP_P', '0.8'))
+    STYLIST_OLLAMA_MAX_TOKENS = int(os.getenv('FASTVLM_STYLIST_OLLAMA_MAX_TOKENS', '1200'))
+    STYLIST_OLLAMA_REPEAT_PENALTY = float(os.getenv('FASTVLM_STYLIST_OLLAMA_REPEAT_PENALTY', '1.15'))
+    STYLIST_OLLAMA_TOP_K = int(os.getenv('FASTVLM_STYLIST_OLLAMA_TOP_K', '40'))
+
+    # Параметры для стилиста Gemini
+    STYLIST_GEMINI_TEMPERATURE = float(os.getenv('FASTVLM_STYLIST_GEMINI_TEMPERATURE', '0.6'))
+    STYLIST_GEMINI_MAX_TOKENS = int(os.getenv('FASTVLM_STYLIST_GEMINI_MAX_TOKENS', '1000'))
+    STYLIST_GEMINI_THINKING_BUDGET = int(os.getenv('FASTVLM_STYLIST_GEMINI_THINKING_BUDGET', '1024'))
+
     # === Настройки памяти для моделей ===
     TORCH_COMPILE = os.getenv('TORCH_COMPILE', 'false').lower() == 'true'  # Отключено по умолчанию
     GRADIENT_CHECKPOINTING = IS_7B_MODEL  # Включено только для 7B модели
@@ -211,6 +237,10 @@ class Config:
         if not os.path.exists(cls.MODEL_PATH):
             raise FileNotFoundError(f"Модель не найдена: {cls.MODEL_PATH}")
 
+        # Выводим информацию о выбранной модели
+        print(f"Модель: {os.path.basename(cls.MODEL_PATH)}")
+        print(f"Тип модели: {cls.MODEL_TYPE}")
+
         if cls.IS_7B_MODEL:
             # Проверяем наличие всех файлов модели для 7B
             required_files = [
@@ -235,25 +265,36 @@ class Config:
         if not cls.GEMINI_API_KEY:
             print("GEMINI_API_KEY не установлен. Gemini функции будут недоступны.")
 
-        print(f"Конфигурация FastVLM загружена:")
-        print(f"Порт: {cls.PORT}")
-        print(f"Устройство: {cls.DEVICE}")
-        print(f"Тип модели: {cls.MODEL_TYPE}")
-        print(f"Модель: {os.path.basename(cls.MODEL_PATH)}")
-        print(f"Потоки (threads): {cls.THREADS}")
-        print(f"Ограничение соединений: {cls.CONNECTION_LIMIT}")
-        print(f"Таймаут соединений: {cls.CONNECTION_TIMEOUT}с")
-        print(f"Максимальные токены: {cls.MAX_NEW_TOKENS}")
-        print(f"Температура: {cls.TEMPERATURE}")
-        print(f"Gemini API: {'Настроен' if cls.GEMINI_API_KEY else 'Не настроен'}")
+        # Проверяем настройки стилиста
+        if cls.STYLIST_TYPE not in ['ollama', 'gemini']:
+            raise ValueError(f"Некорректный тип стилиста: {cls.STYLIST_TYPE}. Допустимые значения: ollama, gemini")
 
-        # Дополнительные предупреждения для 7B
-        if cls.IS_7B_MODEL:
-            print(f"\n🚀 FastVLM 7B оптимизации:")
-            print(f"   - Flash Attention: {cls.ATTENTION_IMPLEMENTATION}")
-            print(f"   - Gradient Checkpointing: {cls.GRADIENT_CHECKPOINTING}")
-            print(f"   - Torch Compile: {cls.TORCH_COMPILE}")
-            print(f"   - Max Image Size: {cls.MAX_IMAGE_SIZE}")
+        # Валидация параметров Ollama стилиста
+        if not (0.0 <= cls.STYLIST_OLLAMA_TEMPERATURE <= 2.0):
+            raise ValueError(f"Некорректная температура Ollama стилиста: {cls.STYLIST_OLLAMA_TEMPERATURE}")
+        if not (0.0 <= cls.STYLIST_OLLAMA_TOP_P <= 1.0):
+            raise ValueError(f"Некорректный top_p Ollama стилиста: {cls.STYLIST_OLLAMA_TOP_P}")
+        if not (1 <= cls.STYLIST_OLLAMA_MAX_TOKENS <= 5000):
+            raise ValueError(f"Некорректное максимальное количество токенов Ollama: {cls.STYLIST_OLLAMA_MAX_TOKENS}")
+        if not (0.8 <= cls.STYLIST_OLLAMA_REPEAT_PENALTY <= 2.0):
+            raise ValueError(f"Некорректный repeat_penalty Ollama: {cls.STYLIST_OLLAMA_REPEAT_PENALTY}")
+        if not (1 <= cls.STYLIST_OLLAMA_TOP_K <= 100):
+            raise ValueError(f"Некорректный top_k Ollama: {cls.STYLIST_OLLAMA_TOP_K}")
+
+        # Валидация параметров Gemini стилиста
+        if not (0.0 <= cls.STYLIST_GEMINI_TEMPERATURE <= 2.0):
+            raise ValueError(f"Некорректная температура Gemini стилиста: {cls.STYLIST_GEMINI_TEMPERATURE}")
+        if not (1 <= cls.STYLIST_GEMINI_MAX_TOKENS <= 5000):
+            raise ValueError(f"Некорректное максимальное количество токенов Gemini: {cls.STYLIST_GEMINI_MAX_TOKENS}")
+        if not (0 <= cls.STYLIST_GEMINI_THINKING_BUDGET <= 4096):
+            raise ValueError(f"Некорректный thinking_budget Gemini: {cls.STYLIST_GEMINI_THINKING_BUDGET}")
+
+        print("FastVLM сервер запускается:")
+        print(f"  Модель: {os.path.basename(cls.MODEL_PATH)}")
+        print(f"  Порт: {cls.PORT}")
+        print(f"  Потоки (threads): {cls.THREADS}")
+        print(f"  Ограничение соединений: {cls.CONNECTION_LIMIT}")
+        print(f"  Таймаут соединений: {cls.CONNECTION_TIMEOUT}с")
 
         # Параметры генерации для текущей модели
         print(f"\n⚙️  Параметры генерации ({cls.MODEL_TYPE}):")
