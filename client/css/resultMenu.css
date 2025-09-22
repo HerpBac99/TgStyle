@@ -215,7 +215,6 @@
     justify-content: center; /* Центрирует по горизонтали */
     transition: all 0.2s ease; /* Анимация при взаимодействии */
     box-shadow: none !important; /* Убирает тень */
-    padding: 8px !important; /* Внутренние отступы */
     border-radius: 0 !important; /* Убирает скругление углов */
     outline: none !important; /* Убирает контур */
 
@@ -241,7 +240,7 @@
 
 .like-btn svg {
     stroke: #ff4757; /* Красный цвет обводки */
-    stroke-width: 2; /* Толщина обводки */
+    stroke-width: 3; /* Толщина обводки */
     fill: none; /* Без заливки */
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Анимация изменений */
 }
@@ -254,22 +253,49 @@
 /* Кнопка поделиться */
 .share-btn {
     flex: 1; /* Занимает равную часть доступного пространства */
-    background: #6dc3fc; /* Голубой фон */
+    background: transparent !important; /* Прозрачный фон */
+    border: none !important; /* Убирает рамку */
     color: white; /* Белый цвет текста */
-    box-shadow: 0 4px 12px rgba(55, 66, 250, 0.3); /* Синяя тень */
+    display: flex; /* Включает flexbox */
+    align-items: center; /* Центрирует по вертикали */
+    justify-content: center; /* Центрирует по горизонтали */
+    transition: all 0.2s ease; /* Анимация при взаимодействии */
+    box-shadow: none !important; /* Убирает тень */
+    border-radius: 0 !important; /* Убирает скругление углов */
+    outline: none !important; /* Убирает контур */
+
+    /* ВОТ ГЛАВНЫЙ ФИКС: Убирает серый квадрат при нажатии на iOS/WebKit */
+    -webkit-tap-highlight-color: transparent !important;
 }
 
-.share-btn:hover {
-    transform: translateY(-2px); /* Поднимает кнопку вверх при наведении */
-    box-shadow: 0 6px 16px rgba(55, 66, 250, 0.4); /* Увеличивает тень при наведении */
+.share-btn svg path {
+    stroke: #2481cc; /* Синий цвет обводки (цвет Telegram) */
+    stroke-width: 2; /* Толщина обводки */
+    fill: none; /* Без заливки по умолчанию */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Анимация изменений */
+}
+
+.share-btn.shared svg path {
+    fill: #2481cc; /* Синяя заливка для состояния "поделился" */
+    stroke: #2481cc; /* Синяя обводка для состояния "поделился" */
 }
 
 /* Кнопка закрыть */
 .close-btn {
-    background: #79caf8; /* Голубой фон */
+    flex: 1; /* Занимает равную часть доступного пространства */
+    background: transparent !important; /* Прозрачный фон */
+    border: none !important; /* Убирает рамку */
     color: white; /* Белый цвет текста */
-    box-shadow: 0 4px 12px rgba(129, 216, 208, 0.3); /* Голубая тень */
-    padding: 14px; /* Внутренние отступы */
+    display: flex; /* Включает flexbox */
+    align-items: center; /* Центрирует по вертикали */
+    justify-content: center; /* Центрирует по горизонтали */
+    transition: all 0.2s ease; /* Анимация при взаимодействии */
+    box-shadow: none !important; /* Убирает тень */
+    border-radius: 0 !important; /* Убирает скругление углов */
+    outline: none !important; /* Убирает контур */
+
+    /* ВОТ ГЛАВНЫЙ ФИКС: Убирает серый квадрат при нажатии на iOS/WebKit */
+    -webkit-tap-highlight-color: transparent !important;
 }
 
 .close-btn:hover {

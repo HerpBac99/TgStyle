@@ -363,21 +363,44 @@ class UIManager {
   private handleShareClick(): void {
     logger.info('Share button clicked');
 
-    try {
-      // Используем Telegram WebApp API для поделиться
-      if (window.Telegram?.WebApp?.openTelegramLink) {
-        const shareText = 'Попробуй TgStyle - анализ стиля одежды с помощью ИИ!';
-        const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(shareText)}`;
-        window.Telegram.WebApp.openTelegramLink(shareUrl);
+    const shareBtn = getElement('#share-btn');
+    if (shareBtn) {
+      // Переключаем состояние поделиться
+      const isShared = shareBtn.classList.contains('shared');
+
+      if (isShared) {
+        // Убираем состояние "поделился"
+        shareBtn.classList.remove('shared');
+        logger.info('Share state removed');
       } else {
-        // Fallback - копируем в буфер обмена
-        const shareText = 'Попробуй TgStyle - анализ стиля одежды с помощью ИИ!';
-        navigator.clipboard.writeText(shareText).then(() => {
-        }).catch(() => {
-        });
+        // Добавляем состояние "поделился"
+        shareBtn.classList.add('shared');
+        logger.info('Share state added');
+
+        // Выполняем действие поделиться
+        try {
+          // Используем Telegram WebApp API для поделиться
+          if (window.Telegram?.WebApp?.openTelegramLink) {
+            const shareText = 'Попробуй TgStyle - анализ стиля одежды с помощью ИИ!';
+            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(shareText)}`;
+            window.Telegram.WebApp.openTelegramLink(shareUrl);
+          } else {
+            // Fallback - копируем в буфер обмена
+            const shareText = 'Попробуй TgStyle - анализ стиля одежды с помощью ИИ!';
+            navigator.clipboard.writeText(shareText).then(() => {
+            }).catch(() => {
+            });
+          }
+        } catch (error) {
+          logger.warn('Failed to share', error);
+        }
+
+        // Анимация нажатия
+        shareBtn.style.transform = 'scale(0.8)';
+        setTimeout(() => {
+          shareBtn.style.transform = 'scale(1)';
+        }, 150);
       }
-    } catch (error) {
-      logger.warn('Failed to share', error);
     }
 
     // Тактильная обратная связь
