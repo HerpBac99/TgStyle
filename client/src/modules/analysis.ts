@@ -149,6 +149,11 @@ class AnalysisManager {
         historyItem.classification = response.classification;
       }
 
+      // Сохраняем детальные результаты многопроходного анализа
+      if (response.multi_pass_results) {
+        historyItem.multi_pass_results = response.multi_pass_results;
+      }
+
       const saved = historyManager.addItem(historyItem);
       
       if (saved) {

@@ -1,1 +1,1 @@
-Describe the shoes on the person. What type of shoes? What color? What material? What style?
+Output EXACTLY one short line: Describe the shoes on the person. What type of shoes? What color? What material? What style?

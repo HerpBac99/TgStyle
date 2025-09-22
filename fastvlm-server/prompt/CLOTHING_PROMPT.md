@@ -1,1 +1,1 @@
-Describe the outerwear the person is wearing. If not, write None. What style is it? What color is it? What material is it? How does it fit?
+Output EXACTLY one short line: Describe All clothing on person. What type? What color? What material? What length?

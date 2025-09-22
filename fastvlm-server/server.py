@@ -91,9 +91,7 @@ ollama_model = "gemma3:4b"  # Лучшая модель для стилисти�
 default_prompt = None
 style_prompt = None
 person_prompt = None
-top_clothing_prompt = None
-inner_top_clothing_prompt = None
-leg_clothing_prompt = None
+clothing_prompt = None
 shoes_prompt = None
 accessories_prompt = None
 
@@ -184,17 +182,50 @@ def setup_logging():
 
 def load_prompts():
     """Загрузка промптов для анализа"""
-    global default_prompt, style_prompt
+    global default_prompt, style_prompt, person_prompt, clothing_prompt, shoes_prompt, accessories_prompt
 
     try:
-        # Основной промпт
-        prompt_file = os.path.join(os.path.dirname(__file__), 'prompt.md')
-        if os.path.exists(prompt_file):
-            with open(prompt_file, 'r', encoding='utf-8') as f:
-                default_prompt = f.read().strip()
+        # Загружаем три основных промпта для многопроходного анализа
+        prompt_dir = os.path.join(os.path.dirname(__file__), 'prompt')
+
+        # PERSON промпт
+        person_file = os.path.join(prompt_dir, 'PERSON_PROMPT.md')
+        if os.path.exists(person_file):
+            with open(person_file, 'r', encoding='utf-8') as f:
+                person_prompt = f.read().strip()
         else:
-            default_prompt = "Describe the clothing in this image in detail."
-            app.logger.warning(f"Файл промпта не найден: {prompt_file}. Используется промпт по умолчанию")
+            person_prompt = "Describe the person in the photograph. Provide the person's approximate age and gender."
+            app.logger.warning(f"PERSON промпт не найден: {person_file}")
+
+        # CLOTHING промпт
+        clothing_file = os.path.join(prompt_dir, 'CLOTHING_PROMPT.md')
+        if os.path.exists(clothing_file):
+            with open(clothing_file, 'r', encoding='utf-8') as f:
+                clothing_prompt = f.read().strip()
+        else:
+            clothing_prompt = "Describe the clothing on the person."
+            app.logger.warning(f"CLOTHING промпт не найден: {clothing_file}")
+
+        # SHOES промпт
+        shoes_file = os.path.join(prompt_dir, 'SHOES_PROMPT.md')
+        if os.path.exists(shoes_file):
+            with open(shoes_file, 'r', encoding='utf-8') as f:
+                shoes_prompt = f.read().strip()
+        else:
+            shoes_prompt = "Describe the shoes on the person."
+            app.logger.warning(f"SHOES промпт не найден: {shoes_file}")
+
+        # ACCESSORIES промпт
+        accessories_file = os.path.join(prompt_dir, 'ACCESSORIES_PROMPT.md')
+        if os.path.exists(accessories_file):
+            with open(accessories_file, 'r', encoding='utf-8') as f:
+                accessories_prompt = f.read().strip()
+        else:
+            accessories_prompt = "Describe the accessories on the person."
+            app.logger.warning(f"ACCESSORIES промпт не найден: {accessories_file}")
+
+        # Основной промпт (для обратной совместимости)
+        default_prompt = "Analyze the clothing and style in this image."
 
         # Стилевой промпт
         style_prompt_file = os.path.join(os.path.dirname(__file__), 'style_prompt.md')
@@ -209,89 +240,39 @@ def load_prompts():
 
     except Exception as e:
         app.logger.error(f"Ошибка загрузки промптов: {e}")
-        default_prompt = "Describe the clothing in this image."
+        default_prompt = "Describe the clothing in this image." 
+        clothing_prompt = "Describe the clothing on the person."
+        shoes_prompt = "Describe the shoes on the person."
+        accessories_prompt = "Describe the accessories on the person."
         style_prompt = default_prompt
+        person_prompt = "Describe the person."
 
-def load_multi_pass_prompts():
-    """Загружает промпты для многопроходного анализа"""
-    global person_prompt, top_clothing_prompt, inner_top_clothing_prompt, leg_clothing_prompt, shoes_prompt, accessories_prompt
 
-    prompt_dir = os.path.join(os.path.dirname(__file__), 'prompt')
-
-    try:
-        # Загружаем PERSON_PROMPT
-        person_file = os.path.join(prompt_dir, 'PERSON_PROMPT.md')
-        with open(person_file, 'r', encoding='utf-8') as f:
-            person_prompt = f.read().strip()
-        app.logger.debug(f"PERSON промпт загружен из файла: {person_file}")
-
-        # Загружаем TOP_CLOTHING_PROMPT
-        top_clothing_file = os.path.join(prompt_dir, 'CLOTHING_PROMPT.md')
-        with open(top_clothing_file, 'r', encoding='utf-8') as f:
-            top_clothing_prompt = f.read().strip()
-        app.logger.debug(f"TOP_CLOTHING промпт загружен из файла: {top_clothing_file}")
-
-        # Загружаем INNER_TOP_CLOTHING_PROMPT
-        inner_top_clothing_file = os.path.join(prompt_dir, 'INNER_TOP_CLOTHING_PROMPT.md')
-        with open(inner_top_clothing_file, 'r', encoding='utf-8') as f:
-            inner_top_clothing_prompt = f.read().strip()
-        app.logger.debug(f"INNER_TOP_CLOTHING промпт загружен из файла: {inner_top_clothing_file}")
-
-        # Загружаем LEG_CLOTHING_PROMPT
-        leg_clothing_file = os.path.join(prompt_dir, 'LEG_CLOTHING_PROMPT.md')
-        with open(leg_clothing_file, 'r', encoding='utf-8') as f:
-            leg_clothing_prompt = f.read().strip()
-        app.logger.debug(f"LEG_CLOTHING промпт загружен из файла: {leg_clothing_file}")
-
-        # Загружаем SHOES_PROMPT (создадим новый файл)
-        shoes_file = os.path.join(prompt_dir, 'SHOES_PROMPT.md')
-        try:
-            with open(shoes_file, 'r', encoding='utf-8') as f:
-                shoes_prompt = f.read().strip()
-            app.logger.debug(f"SHOES промпт загружен из файла: {shoes_file}")
-        except FileNotFoundError:
-            # Создаем файл с промптом для обуви
-            shoes_prompt = "Describe the shoes on the person. What type of shoes? What color? What material? What style?"
-            with open(shoes_file, 'w', encoding='utf-8') as f:
-                f.write(shoes_prompt)
-            app.logger.debug(f"SHOES промпт создан и загружен: {shoes_file}")
-
-        # Загружаем ACCESSORIES_PROMPT
-        accessories_file = os.path.join(prompt_dir, 'ACCESSORIES_PROMPT.md')
-        with open(accessories_file, 'r', encoding='utf-8') as f:
-            accessories_prompt = f.read().strip()
-        app.logger.debug(f"ACCESSORIES промпт загружен из файла: {accessories_file}")
-
-    except FileNotFoundError as e:
-        app.logger.error(f"Файл промпта не найден: {e}")
-        return False
-    except Exception as e:
-        app.logger.error(f"Ошибка загрузки многопроходных промптов: {e}")
-        return False
-
-    return True
-
-def extract_text(result: dict) -> str:
-    return (
-        (result or {}).get("technical_analysis")
-        or (result or {}).get("analysis")
-        or ""
-    )
+def extract_text(result) -> str:
+    """Извлекает текст из результата анализа"""
+    if isinstance(result, dict):
+        return (
+            result.get("technical_analysis")
+            or result.get("analysis")
+            or ""
+        )
+    elif isinstance(result, str):
+        return result
+    else:
+        return ""
 
 def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
     """Выполняет многопроходный анализ изображения через FastVLM"""
-    global person_prompt, top_clothing_prompt, inner_top_clothing_prompt, leg_clothing_prompt, shoes_prompt, accessories_prompt
+    global person_prompt, clothing_prompt, shoes_prompt, accessories_prompt
 
     app.logger.info(f"Начинаем многопроходный анализ для пользователя {nickname}")
 
     # Временные переменные для результатов
     person_result = ""
-    top_clothing_result = ""
-    inner_top_clothing_result = ""
-    leg_clothing_result = ""
+    clothing_result = ""
     shoes_result = ""
     accessories_result = ""
-    timing = {"person": 0, "top_clothing": 0, "inner_top_clothing": 0, "leg_clothing": 0, "shoes": 0, "accessories": 0, "total": 0}
+    timing = {"person": 0, "clothing": 0, "accessories": 0, "total": 0}
 
     total_start_time = time.time()
 
@@ -300,52 +281,42 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
         if person_prompt:
             app.logger.debug("Выполняем анализ человека")
             pass1_start = time.time()
-            person_response = post_analyze_to_fastvlm(person_prompt, image_base64)
+            person_response, error = analyze_image_fastvlm(image_base64, person_prompt)
+            if error:
+                person_response = "Не удалось определить информацию о человеке"
             person_result = extract_text(person_response)
             timing["person"] = time.time() - pass1_start
             app.logger.debug(f"Анализ человека завершен за {timing['person']:.2f}с")
 
         # Pass 2: Top clothing analysis
-        if top_clothing_prompt:
+        if clothing_prompt:
             app.logger.debug("Выполняем анализ верхней одежды")
             pass2_start = time.time()
-            top_clothing_response = post_analyze_to_fastvlm(top_clothing_prompt, image_base64)
-            top_clothing_result = extract_text(top_clothing_response)
-            timing["top_clothing"] = time.time() - pass2_start
-            app.logger.debug(f"Анализ верхней одежды завершен за {timing['top_clothing']:.2f}с")
+            clothing_response, error = analyze_image_fastvlm(image_base64, clothing_prompt)
+            if error:
+                clothing_response = "Не удалось определить верхнюю одежду"
+            clothing_result = extract_text(clothing_response)
+            timing["clothing"] = time.time() - pass2_start
+            app.logger.debug(f"Анализ верхней одежды завершен за {timing['clothing']:.2f}с")
 
-        # Pass 3: Inner top clothing analysis
-        if inner_top_clothing_prompt:
-            app.logger.debug("Выполняем анализ внутренней верхней одежды")
-            pass3_start = time.time()
-            inner_top_clothing_response = post_analyze_to_fastvlm(inner_top_clothing_prompt, image_base64)
-            inner_top_clothing_result = extract_text(inner_top_clothing_response)
-            timing["inner_top_clothing"] = time.time() - pass3_start
-            app.logger.debug(f"Анализ внутренней верхней одежды завершен за {timing['inner_top_clothing']:.2f}с")
-
-        # Pass 4: Leg clothing analysis
-        if leg_clothing_prompt:
-            app.logger.debug("Выполняем анализ одежды на ногах")
-            pass4_start = time.time()
-            leg_clothing_response = post_analyze_to_fastvlm(leg_clothing_prompt, image_base64)
-            leg_clothing_result = extract_text(leg_clothing_response)
-            timing["leg_clothing"] = time.time() - pass4_start
-            app.logger.debug(f"Анализ одежды на ногах завершен за {timing['leg_clothing']:.2f}с")
-
-        # Pass 5: Shoes analysis
+        # Pass 3: Shoes analysis
         if shoes_prompt:
             app.logger.debug("Выполняем анализ обуви")
-            pass5_start = time.time()
-            shoes_response = post_analyze_to_fastvlm(shoes_prompt, image_base64)
+            pass3_start = time.time()
+            shoes_response, error = analyze_image_fastvlm(image_base64, shoes_prompt)
+            if error:
+                shoes_response = "Не удалось определить обувь"
             shoes_result = extract_text(shoes_response)
-            timing["shoes"] = time.time() - pass5_start
+            timing["shoes"] = time.time() - pass3_start
             app.logger.debug(f"Анализ обуви завершен за {timing['shoes']:.2f}с")
 
-        # Pass 6: Accessories analysis
+        # Pass 4: Inner top clothing analysis
         if accessories_prompt:
             app.logger.debug("Выполняем анализ аксессуаров")
             pass6_start = time.time()
-            accessories_response = post_analyze_to_fastvlm(accessories_prompt, image_base64)
+            accessories_response, error = analyze_image_fastvlm(image_base64, accessories_prompt)
+            if error:
+                accessories_response = "Не удалось определить аксессуары"
             accessories_result = extract_text(accessories_response)
             timing["accessories"] = time.time() - pass6_start
             app.logger.debug(f"Анализ аксессуаров завершен за {timing['accessories']:.2f}с")
@@ -356,9 +327,7 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
 
         return {
             "person": person_result,
-            "top_clothing": top_clothing_result,
-            "inner_top_clothing": inner_top_clothing_result,
-            "leg_clothing": leg_clothing_result,
+            "clothing": clothing_result,
             "shoes": shoes_result,
             "accessories": accessories_result,
             "timing": timing,
@@ -370,9 +339,7 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
         timing["total"] = time.time() - total_start_time
         return {
             "person": "",
-            "top_clothing": "",
-            "inner_top_clothing": "",
-            "leg_clothing": "",
+            "clothing": "",
             "shoes": "",
             "accessories": "",
             "timing": timing,
@@ -456,41 +423,6 @@ def analyze_image_fastvlm(image_base64, prompt_text=None):
         app.logger.error(f"Ошибка анализа изображения: {e}")
         app.logger.error(traceback.format_exc())
         return None, str(e)
-
-def load_style_prompt():
-    """Загружает промпт стилиста из файла style_prompt.md"""
-    global style_prompt
-    prompt_file = os.path.join(os.path.dirname(__file__), 'style_prompt.md')
-
-    try:
-        with open(prompt_file, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        # Ищем промпт между ``` блоками
-        import re
-        prompt_match = re.search(r'```\s*(.*?)\s*```', content, re.DOTALL)
-        if prompt_match:
-            style_prompt = prompt_match.group(1).strip()
-        else:
-            # Если нет ``` блоков, берем весь контент
-            style_prompt = content.strip()
-
-        app.logger.debug(f"Промпт стилиста загружен из файла: {prompt_file}")
-
-    except FileNotFoundError:
-        style_prompt = '''Ты профессиональный ИИ стилист и консультант по моде.
-
-На основе технического анализа одежды ниже, создай креативный, дружелюбный и экспертный ответ от лица стилиста.
-
-ТЕХНИЧЕСКЙ АНАЛИЗ:
-{fastvlm_analysis}
-
-Преобразуй анализ в живой совет стилиста с рекомендациями по сочетаниям и стилю. Используй эмодзи и пиши на русском языке максимум 800 символов.'''
-        app.logger.warning(f"Файл промпта стилиста не найден: {prompt_file}. Используется промпт по умолчанию")
-
-    except Exception as e:
-        style_prompt = '''Ты профессиональный стилист. На основе анализа одежды {fastvlm_analysis} дай креативный совет по стилю на русском языке.'''
-        app.logger.error(f"Ошибка загрузки промпта стилиста: {e}. Используется промпт по умолчанию")
 
 def check_ollama_availability():
     """Проверяет доступность Ollama API"""
@@ -834,99 +766,6 @@ def save_analysis_with_nickname(clean_analysis, gemini_response, nickname, image
         app.logger.error(f"Ошибка сохранения результатов анализа: {e}")
         return None
 
-def extract_analysis_from_output(output):
-    """Извлекает структурированный анализ из вывода FastVLM (обновлено для английского промпта)"""
-    try:
-        lines = output.strip().split('\n')
-        
-        # Английские маркеры для нового промпта
-        start_markers = [
-            '### main debugrmation',
-            '**gender:**',
-            '**age:**', 
-            '### head',
-            '**hair length:**',
-            '**hair:**',
-            '### torso',
-            '### legs'
-        ]
-        
-        # Стоп-маркеры для завершения анализа
-        stop_markers = [
-            'end analysis',
-            'analysis complete',
-            '<|endoftext|>',
-            '<|im_end|>',
-            'the analysis shows',
-            'in conclusion',
-            'overall,',
-            'the clothing'
-        ]
-        
-        start_idx = 0
-        end_idx = len(lines)
-        
-        # Находим начало структурированного анализа
-        for i, line in enumerate(lines):
-            line_lower = line.lower().strip()
-            if any(marker in line_lower for marker in start_markers):
-                start_idx = i
-                break
-            # Альтернативно: пропускаем строки с промптом
-            if line.strip() and not any(skip in line_lower for skip in [
-                'user:', 'system:', '<|im_start|>user', 'analyze the clothing', 
-                'you are a fashion', 'assistant:'
-            ]):
-                start_idx = i
-                break
-        
-        # Находим конец анализа
-        for i, line in enumerate(lines[start_idx:], start_idx):
-            line_lower = line.lower().strip()
-            if any(marker in line_lower for marker in stop_markers):
-                end_idx = i
-                break
-        
-        # Извлекаем только структурированную часть
-        analysis_lines = lines[start_idx:end_idx]
-        
-        # Очищаем от мусора и служебных токенов
-        cleaned_lines = []
-        for line in analysis_lines:
-            line = line.strip()
-            
-            # Пропускаем служебные токены
-            if any(skip in line for skip in [
-                '<|im_end|>', '<|im_start|>', '`torch_dtype`', 'The following',
-                '<|endoftext|>'
-            ]):
-                continue
-            
-            # Пропускаем пустые строки и строки с промптом
-            if line and not any(skip in line.lower() for skip in [
-                'user:', 'assistant:', 'system:', 'analyze the image',
-                'you are a fashion'
-            ]):
-                # Очищаем кодировку
-                clean_line = line.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
-                clean_line = ' '.join(clean_line.split())  # Нормализуем пробелы
-                cleaned_lines.append(clean_line)
-        
-        # Объединяем очищенные строки
-        result_text = '\n'.join(cleaned_lines)
-        
-        # Если результат пустой, возвращаем исходный вывод
-        if not result_text.strip():
-            app.logger.warning("Не удалось извлечь структурированный анализ, возвращаем исходный текст")
-            result_text = output.strip()
-        
-        app.logger.debug(f"Извлечен анализ длиной {len(result_text)} символов")
-        return result_text
-
-    except Exception as e:
-        app.logger.error(f"Ошибка при извлечении анализа: {e}")
-        return output.strip()  # Возвращаем исходный текст при ошибке
-
 @app.route('/health', methods=['GET'])
 def health():
     """Проверка здоровья сервера"""
@@ -1057,24 +896,37 @@ def analyze():
         app.logger.info(f"Сохранил изображение с качеством 100%: {image.size[0]}x{image.size[1]}")
 
         try:
-            # Выполняем анализ с помощью унифицированной функции
-            app.logger.info(f"Выполняем анализ изображения с помощью FastVLM для пользователя {nickname}")
+            # Выполняем многопроходный анализ изображения
+            app.logger.info(f"Выполняем многопроходный анализ изображения для пользователя {nickname}")
 
-            # Анализируем изображение (технический анализ)
-            technical_analysis, error = analyze_image_fastvlm(image_base64, prompt)
+            # Выполняем анализ по 3 промптам для детального разбора
+            multi_pass_result = perform_multi_pass_analysis(image_base64, nickname)
 
-            fastvlm_time = time.time() - analysis_start_time
-
-            if error:
-                update_performance_stats(fastvlm_time, success=False)
-                app.logger.error(f"Ошибка анализа: {error}")
+            # Проверяем, что результат является словарем
+            if not isinstance(multi_pass_result, dict):
+                update_performance_stats(time.time() - analysis_start_time, success=False)
+                app.logger.error(f"Multi-pass analysis returned invalid result: {type(multi_pass_result)}")
                 return jsonify({
                     'success': False,
-                    'error': error,
-                    'response_time': fastvlm_time
+                    'error': 'Invalid multi-pass analysis result'
                 }), 500
 
-            combined_analysis = technical_analysis
+            if not multi_pass_result.get('success', False):
+                update_performance_stats(time.time() - analysis_start_time, success=False)
+                return jsonify({
+                    'success': False,
+                    'error': multi_pass_result.get('error', 'Multi-pass analysis failed')
+                }), 500
+
+            # Объединяем результаты анализа
+            combined_analysis = f"""
+ЧЕЛОВЕК: {multi_pass_result.get('person', 'Не определено')}
+ОДЕЖДА: {multi_pass_result.get('clothing', 'Не определено')}
+ОБУВЬ: {multi_pass_result.get('shoes', 'Не определено')}
+АКСЕССУАРЫ: {multi_pass_result.get('accessories', 'Не определено')}
+"""
+
+            fastvlm_time = multi_pass_result.get('timing', {}).get('total', 0)
 
             # Создаем креативный ответ стилиста
             app.logger.info(f"Создаем ответ стилиста для пользователя {nickname}")
@@ -1093,6 +945,8 @@ def analyze():
 
             app.logger.info(f"Полный анализ завершен за {total_time:.2f}с (FastVLM: {fastvlm_time:.2f}с, стилист: {gemini_time:.2f}с)")
 
+            save_analysis_with_nickname(combined_analysis, stylist_response, nickname, image.size, fastvlm_time, gemini_time)
+
             return jsonify({
                 'success': True,
                 'technical_analysis': combined_analysis,  # Технический анализ FastVLM
@@ -1104,7 +958,14 @@ def analyze():
                     'total_time': round(total_time, 2),
                     'fastvlm_time': round(fastvlm_time, 2),
                     'stylist_time': round(gemini_time, 2)
-                }
+                },
+                'multi_pass_results': {
+                    'person': multi_pass_result.get('person', ''),
+                    'clothing': multi_pass_result.get('clothing', ''),
+                    'shoes': multi_pass_result.get('shoes', ''),
+                    'accessories': multi_pass_result.get('accessories', ''),
+                },
+                'detailed_timings': multi_pass_result.get('timing', {})
             })
 
         finally:
@@ -1409,12 +1270,6 @@ if __name__ == '__main__':
 
         # Загрузка промптов
         load_prompts()
-        load_style_prompt()
-
-        # Загружаем многопроходные промпты
-        if not load_multi_pass_prompts():
-            app.logger.error("Не удалось загрузить многопроходные промпты")
-            sys.exit(1)
 
         # Проверяем доступность Ollama
         check_ollama_availability()

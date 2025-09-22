@@ -48,6 +48,17 @@ export interface AnalysisResponse {
   analysis?: string;
   comments?: string[];
   error?: string;
+  multi_pass_results?: {
+    person: string;
+    accessories: string;
+    clothing: string;
+  };
+  detailed_timings?: {
+    person: number;
+    accessories: number;
+    clothing: number;
+    total: number;
+  };
 }
 
 // Типы для логирования
@@ -68,6 +79,10 @@ export interface LogRequest {
   timestamp: string;
   userAgent?: string;
   appVersion?: string;
+  userData?: any;
+  userId?: string | number;
+  username?: string;
+  isTelegramMiniApp?: boolean;
 }
 
 export interface LogResponse {

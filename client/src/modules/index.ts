@@ -31,7 +31,6 @@ export {
   APP_CONFIG,
   STORAGE_KEYS,
   HISTORY_CONSTRAINTS,
-  IMAGE_COMPRESSION,
   APP_EVENTS,
 } from '@/utils/constants.js';
 

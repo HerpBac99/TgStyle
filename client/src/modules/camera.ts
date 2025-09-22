@@ -5,12 +5,10 @@
 import type {
   ImageData,
   PhotoCaptureResult,
-  CompressionOptions,
   CameraOptions,
 } from '@/types/index.js';
-import { 
-  IMAGE_CONSTRAINTS,
-  IMAGE_COMPRESSION 
+import {
+  IMAGE_CONSTRAINTS
 } from '@/utils/constants.js';
 import { 
   validateImageData
@@ -48,7 +46,6 @@ class CameraManager {
         height: imageData.height,
         format: imageData.format,
         originalSize: Math.round(imageData.originalSize / 1024) + 'KB',
-        compressedSize: imageData.compressedSize ? Math.round(imageData.compressedSize / 1024) + 'KB' : 'N/A',
       });
 
       // Автоматически запускаем анализ фото
@@ -150,14 +147,8 @@ class CameraManager {
       throw new Error(validation.errors.join('; '));
     }
 
-    // Сжатие если необходимо
-    if (this.needsCompression(imageData)) {
-      logger.info('Сжимаю изображение для отправки');
-      imageData.compressed = await this.compressImage(imageData);
-      imageData.compressedSize = Math.ceil((imageData.compressed.length - imageData.compressed.indexOf(',') - 1) * 0.75);
-    } else {
-      logger.info('Изображение не требует сжатия');
-    }
+    // Сжатие отключено для сохранения качества изображений
+    logger.info('Сжатие изображений отключено для сохранения качества');
 
     return imageData;
   }
@@ -252,108 +243,7 @@ class CameraManager {
     return 'jpeg'; // По умолчанию
   }
 
-  /**
-   * Проверка необходимости сжатия
-   */
-  private needsCompression(imageData: ImageData): boolean {
-    const sizeInMB = imageData.originalSize / (1024 * 1024);
-    return (
-      sizeInMB > IMAGE_COMPRESSION.MAX_SIZE_MB ||
-      imageData.width > IMAGE_COMPRESSION.MAX_WIDTH ||
-      imageData.height > IMAGE_COMPRESSION.MAX_WIDTH
-    );
-  }
 
-  /**
-   * Сжатие изображения
-   */
-  private async compressImage(
-    imageData: ImageData, 
-    options: Partial<CompressionOptions> = {}
-  ): Promise<string> {
-    const {
-      maxSizeMB = IMAGE_COMPRESSION.MAX_SIZE_MB,
-      maxWidth = IMAGE_COMPRESSION.MAX_WIDTH,
-      quality = IMAGE_COMPRESSION.QUALITY,
-    } = options;
-
-    return new Promise((resolve, reject) => {
-      try {
-        const img = new Image();
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) {
-          reject(new Error('Canvas не поддерживается'));
-          return;
-        }
-
-        img.onload = () => {
-          let { width, height } = img;
-
-          // Вычисляем новые размеры с сохранением пропорций
-          if (width > maxWidth || height > maxWidth) {
-            const ratio = Math.min(maxWidth / width, maxWidth / height);
-            width = Math.floor(width * ratio);
-            height = Math.floor(height * ratio);
-          }
-
-          // Устанавливаем размеры canvas
-          canvas.width = width;
-          canvas.height = height;
-
-          // Отрисовываем изображение
-          ctx.drawImage(img, 0, 0, width, height);
-
-          // Получаем сжатое изображение
-          let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
-
-          logger.info(`Сжатие: ${img.naturalWidth}x${img.naturalHeight} → ${width}x${height}, качество: ${quality}, размер: ${(this.getBase64Size(compressedBase64) / 1024 / 1024).toFixed(2)}MB`);
-
-          // Проверяем размер и при необходимости уменьшаем качество
-          let currentQuality = quality;
-          const maxSizeBytes = maxSizeMB * 1024 * 1024;
-          
-          while (this.getBase64Size(compressedBase64) > maxSizeBytes && currentQuality > 0.1) {
-            currentQuality -= 0.05;
-            compressedBase64 = canvas.toDataURL('image/jpeg', currentQuality);
-          }
-
-          logger.info('Image compressed', {
-            originalSize: Math.round(imageData.originalSize / 1024) + 'KB',
-            compressedSize: Math.round(this.getBase64Size(compressedBase64) / 1024) + 'KB',
-            originalDimensions: `${imageData.width}x${imageData.height}`,
-            compressedDimensions: `${width}x${height}`,
-            quality: currentQuality.toFixed(2),
-          });
-
-          const result = compressedBase64.split(',')[1];
-          if (!result) {
-            reject(new Error('Не удалось получить сжатые данные'));
-            return;
-          }
-          resolve(result); // Убираем data: prefix
-        };
-
-        img.onerror = () => {
-          reject(new Error('Не удалось загрузить изображение для сжатия'));
-        };
-
-        img.src = `data:image/${imageData.format};base64,${imageData.base64}`;
-      } catch (error) {
-        logger.error('Image compression failed', error);
-        reject(new Error('Ошибка при сжатии изображения'));
-      }
-    });
-  }
-
-  /**
-   * Вычисление размера base64 строки в байтах
-   */
-  private getBase64Size(base64: string): number {
-    const padding = (base64.match(/=/g) || []).length;
-    return Math.ceil((base64.length - padding) * 0.75);
-  }
 
   /**
    * Получение текущего изображения
@@ -370,12 +260,12 @@ class CameraManager {
   }
 
   /**
-   * Получение изображения для анализа (сжатое если доступно)
+   * Получение изображения для анализа (только оригинальное, без сжатия)
    */
   getImageForAnalysis(): string | null {
     if (!this.currentImageData) return null;
-    
-    return this.currentImageData.compressed || this.currentImageData.base64;
+
+    return this.currentImageData.base64; // Всегда возвращаем оригинал для лучшего качества анализа
   }
 
   /**
@@ -388,8 +278,6 @@ class CameraManager {
         format: this.currentImageData.format,
         dimensions: `${this.currentImageData.width}x${this.currentImageData.height}`,
         originalSize: Math.round(this.currentImageData.originalSize / 1024) + 'KB',
-        compressedSize: this.currentImageData.compressedSize ? 
-          Math.round(this.currentImageData.compressedSize / 1024) + 'KB' : null,
       } : null,
     };
   }

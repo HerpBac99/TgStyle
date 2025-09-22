@@ -43,7 +43,7 @@ export const LOGGING_CONFIG = {
 // Таймауты для различных операций
 export const TIMEOUTS = {
   AUTH_REQUEST: 10000, // 10 секунд
-  ANALYSIS_REQUEST: 30000, // 30 секунд
+  ANALYSIS_REQUEST: 60000, // 60 секунд (увеличено для больших файлов)
   LOG_REQUEST: 5000, // 5 секунд
   HEALTH_CHECK: 3000, // 3 секунды
 } as const;
@@ -51,23 +51,14 @@ export const TIMEOUTS = {
 
 // Ограничения изображений
 export const IMAGE_CONSTRAINTS = {
-  MAX_SIZE_MB: 5,
-  MAX_WIDTH: 2048,
-  MAX_HEIGHT: 2048,
+  MAX_SIZE_MB: 25, // Увеличиваем до 25MB для качественных изображений
+  MAX_WIDTH: 4096, // Увеличиваем максимальное разрешение
+  MAX_HEIGHT: 4096,
   MIN_WIDTH: 100,
   MIN_HEIGHT: 100,
   ALLOWED_FORMATS: ['image/jpeg', 'image/png', 'image/webp'] as const,
-  COMPRESSION_QUALITY: 0.8,
 } as const;
 
-// Настройки сжатия изображений
-export const IMAGE_COMPRESSION = {
-  MAX_SIZE_MB: 3.0,  // Увеличиваем для лучшего качества (было 1.5)
-  MAX_WIDTH: 2048,   // Увеличиваем разрешение (было 1280)
-  MAX_HEIGHT: 2048,  // Увеличиваем разрешение (было 1280)
-  QUALITY: 0.95,     // Увеличиваем качество JPEG (было 0.9)
-  FORMAT: 'jpeg' as const,
-} as const;
 
 // Коды ошибок
 export const ERROR_CODES = {
@@ -86,7 +77,7 @@ export const ERROR_MESSAGES = {
   [ERROR_CODES.NETWORK_ERROR]: 'Ошибка сети. Проверьте подключение к интернету.',
   [ERROR_CODES.AUTH_FAILED]: 'Ошибка авторизации. Попробуйте перезапустить приложение.',
   [ERROR_CODES.ANALYSIS_FAILED]: 'Ошибка анализа изображения. Попробуйте другое фото.',
-  [ERROR_CODES.IMAGE_TOO_LARGE]: 'Размер изображения слишком большой. Выберите фото меньшего размера.',
+  [ERROR_CODES.IMAGE_TOO_LARGE]: `Размер изображения слишком большой. Максимальный размер: ${IMAGE_CONSTRAINTS.MAX_SIZE_MB}MB для качественного анализа.`,
   [ERROR_CODES.UNSUPPORTED_FORMAT]: 'Неподдерживаемый формат изображения. Используйте JPEG, PNG или WebP.',
   [ERROR_CODES.SERVER_ERROR]: 'Ошибка сервера. Попробуйте позже.',
   [ERROR_CODES.TELEGRAM_ERROR]: 'Ошибка Telegram WebApp. Перезапустите приложение.',

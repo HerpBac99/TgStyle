@@ -1,1 +1,0 @@
-Describe the inner top clothing under outerwear. If not, write None. What type of clothing? What color? What material? What neckline?

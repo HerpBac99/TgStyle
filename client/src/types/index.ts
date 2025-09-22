@@ -34,7 +34,6 @@ export { HTTP_STATUS } from './api.js';
 export type {
   ImageFile,
   ImageData,
-  CompressionOptions,
   StyleAnalysis,
   CameraOptions,
   PhotoCaptureResult,

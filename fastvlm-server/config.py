@@ -27,30 +27,41 @@ class Config:
     # === Пути ===
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    # Доступные модели с корректными путями
-    AVAILABLE_MODELS = {
-        '1.5b': os.path.join(BASE_DIR, 'models/llava-fastvithd_1.5b_stage3'),
-        '7b': os.path.join(BASE_DIR, 'models/llava-fastvithd_7b_stage3/llava-fastvithd_7b_stage3'),
-        '7b-int4': os.path.join(BASE_DIR, 'models/llava-fastvithd_7b_int4')
-    }
+    # Читаем модель из .env файла
+    model_type = '1.5b'  # по умолчанию
 
-    # Выбор модели через переменную окружения или автоматическое определение
-    model_type_env = os.getenv('FASTVLM_MODEL')
+    env_file = os.path.join(BASE_DIR, '.env')
+    if os.path.exists(env_file):
+        try:
+            with open(env_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('FASTVLM_MODEL='):
+                        model_type = line.split('=')[1].strip()
+                        print(f"🎯 Загружена модель из .env файла: {model_type}")
+                        break
+        except UnicodeDecodeError:
+            # Если проблемы с кодировкой, пробуем cp1251
+            try:
+                with open(env_file, 'r', encoding='cp1251') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith('FASTVLM_MODEL='):
+                            model_type = line.split('=')[1].strip()
+                            print(f"🎯 Загружена модель из .env файла (cp1251): {model_type}")
+                            break
+            except Exception as e:
+                print(f"⚠️  Не удалось прочитать .env файл: {e}")
 
-    if model_type_env and model_type_env in AVAILABLE_MODELS:
-        # Используем модель из переменной окружения
-        MODEL_TYPE = model_type_env
-        MODEL_PATH = AVAILABLE_MODELS[MODEL_TYPE]
+    # Определяем путь к модели
+    if model_type.lower() == '7b':
+        MODEL_PATH = os.path.join(BASE_DIR, 'models/llava-fastvithd_7b_stage3/llava-fastvithd_7b_stage3')
+        MODEL_TYPE = '7b'
     else:
-        # Автоматическое определение модели на основе наличия файлов
-        if os.path.exists(AVAILABLE_MODELS['7b']):
-            MODEL_TYPE = '7b'
-            MODEL_PATH = AVAILABLE_MODELS['7b']
-            print(f"Автоматически выбрана 7B модель (найдена по пути: {MODEL_PATH})")
-        else:
-            MODEL_TYPE = '1.5b'
-            MODEL_PATH = AVAILABLE_MODELS['1.5b']
-            print(f"Автоматически выбрана 1.5B модель (7B не найдена)")
+        MODEL_PATH = os.path.join(BASE_DIR, 'models/llava-fastvithd_1.5b_stage3')
+        MODEL_TYPE = '1.5b'  # По умолчанию 1.5b
+
+    print(f"✅ Используется модель: {MODEL_TYPE.upper()} ({MODEL_PATH})")
 
     # Определяем тип модели для оптимизаций
     IS_7B_MODEL = MODEL_TYPE.startswith('7b')

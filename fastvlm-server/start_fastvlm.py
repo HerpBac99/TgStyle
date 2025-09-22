@@ -103,6 +103,7 @@ def get_model_info():
                     line = line.strip()
                     if line.startswith('FASTVLM_MODEL='):
                         model_type = line.split('=')[1].strip()
+                        print(f"🎯 Загружена модель из .env файла: {model_type}")
                         break
         except UnicodeDecodeError:
             # Если проблемы с кодировкой, пробуем cp1251
@@ -112,16 +113,20 @@ def get_model_info():
                         line = line.strip()
                         if line.startswith('FASTVLM_MODEL='):
                             model_type = line.split('=')[1].strip()
+                            print(f"🎯 Загружена модель из .env файла (cp1251): {model_type}")
                             break
-            except:
-                print("⚠️  Не удалось прочитать .env файл, используется модель по умолчанию")
+            except Exception as e:
+                print(f"⚠️  Не удалось прочитать .env файл: {e}, используется модель по умолчанию")
 
     # Определяем путь к модели
-    model_path = os.path.join(os.path.dirname(__file__), f'models/llava-fastvithd_{model_type}_stage3')
-    if model_type.startswith('7b'):
-        model_path = os.path.join(model_path, f'llava-fastvithd_{model_type}_stage3')
+    if model_type.lower() == '7b':
+        model_path = os.path.join(os.path.dirname(__file__), 'models/llava-fastvithd_7b_stage3/llava-fastvithd_7b_stage3')
+    else:
+        # По умолчанию используем 1.5b модель
+        model_path = os.path.join(os.path.dirname(__file__), 'models/llava-fastvithd_1.5b_stage3')
 
-    is_7b = model_type.startswith('7b')
+    is_7b = model_type.lower() == '7b'
+    print(f"✅ Используется модель: {model_type.upper()} ({model_path})")
 
     return model_type, model_path, is_7b
 
@@ -156,7 +161,8 @@ def check_model(model_path, model_type, is_7b):
             print(f"❌ Отсутствуют файлы модели: {missing_files}")
             return False
 
-    print(f"✅ FastVLM {model_type.upper()} модель найдена")
+    # Проверка уже была сделана в get_model_info(), просто подтверждаем
+    print(f"✅ FastVLM {model_type.upper()} модель проверена")
     return True
 
 def check_port(port):
@@ -182,8 +188,6 @@ def main():
 
     # Получаем информацию о модели
     model_type, model_path, is_7b = get_model_info()
-
-    print(f"🎯 Выбранная модель: FastVLM {model_type.upper()}")
     # Проверки системы
     print("🔍 Проверяю систему...")
 

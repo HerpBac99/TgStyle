@@ -15,21 +15,12 @@ export interface ImageFile {
 
 export interface ImageData {
   base64: string;
-  compressed?: string;
   originalSize: number;
-  compressedSize?: number;
   width: number;
   height: number;
   format: 'jpeg' | 'png' | 'webp' | 'gif';
 }
 
-export interface CompressionOptions {
-  maxSizeMB: number;
-  maxWidth: number;
-  maxHeight?: number;
-  quality: number;
-  format?: 'jpeg' | 'png' | 'webp';
-}
 
 // Типы для анализа стиля
 export interface StyleAnalysis {

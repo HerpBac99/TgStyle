@@ -24,7 +24,7 @@ def post_analyze(prompt: str, image_b64: str, nickname: str = "test_user"):
     """Send analysis request to FastVLM server"""
     try:
         resp = requests.post(
-            f"{SERVER_URL}/analyze",
+            f"{SERVER_URL}/analyze_for_test",
             json={
                 "image_base64": image_b64,
                 "prompt": prompt,
@@ -75,24 +75,21 @@ def load_image(path: str) -> Image.Image:
     return Image.open(path).convert('RGB')
 
 # Промпт из PROMPT
-PROMPT = """Describe the person in this image following this example format:
+#Опиши человека на фотографии. 
+#Output EXACTLY one short line: Woman/Man; approximate age; build; hair (length, style, color)
+#Output EXACTLY one short line: Describe the accessories on your head, neck, hand and bag
+#Output EXACTLY one short line: Describe All clothing on torso. What type? What color? What material? What length?
+PROMPT_person = """Output EXACTLY one short line: Describe the person in the photograph. Provide ONLY the person's approximate age and gender."""
+PROMPT_cloth = """Output EXACTLY one short line: Describe All clothing on person. What type? What color? What material? What length?"""
+PROMPT_shoes = """Output EXACTLY one short line: Describe the shoes on the person. What type of shoes? What color? What material? What style?"""
+PROMPT_accessories = """Output EXACTLY one short line: Describe the ALL accessories on your head, neck, hand and bag."""
 
-Example: "Female, approximately 25 years old, slim build. Wearing: red sweater (cotton, loose fit), blue jeans (denim, straight leg), white sneakers (canvas, low-top), silver watch on left wrist."
-
-Now analyze this image and provide:
-1. Person basics (age, gender, build)
-2. Upper body clothing (type, color, fit)
-3. Lower body clothing (type, color, fit) 
-4. Footwear (type, color, style)
-5. Accessories (jewelry, bags, etc.)
-
-Use fashion terminology where appropriate."""
 
 def main():
     if len(sys.argv) >= 2:
         image_path = sys.argv[1]
     else:
-        image_path = str(Path(__file__).parent.parent / "10.jpg")
+        image_path = str(Path(__file__).parent.parent / "16.jpg")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")
@@ -104,43 +101,64 @@ def main():
     print(f"Testing FastVLM 1.5B with PROMPT")
     print(f"Image: {image_path}")
 
-    # Single analysis request
-    start_time = time.perf_counter()
-    result = post_analyze(PROMPT, b64_image, "test_1.5b_user")
-    elapsed = time.perf_counter() - start_time
+    # Последовательные вызовы 3 промптов
+    total_start_time = time.perf_counter()
 
-    technical_analysis = extract_technical(result)
-    stylist_analysis = extract_stylist(result)
+    # Промпт 1: PERSON
+    person_start_time = time.perf_counter()
+    person_result = post_analyze(PROMPT_person, b64_image, "test_1.5b_user")
+    person_time = time.perf_counter() - person_start_time
+
+    cloth_start_time = time.perf_counter()
+    cloth_result = post_analyze(PROMPT_cloth, b64_image, "test_1.5b_user")
+    cloth_time = time.perf_counter() - cloth_start_time
+
+    shoes_start_time = time.perf_counter()
+    shoes_result = post_analyze(PROMPT_shoes, b64_image, "test_1.5b_user")
+    shoes_time = time.perf_counter() - shoes_start_time
+
+    accessories_start_time = time.perf_counter()
+    accessories_result = post_analyze(PROMPT_accessories, b64_image, "test_1.5b_user")
+    accessories_time = time.perf_counter() - accessories_start_time
+
+    total_time = time.perf_counter() - total_start_time
+
+    # Собираем результаты
+    results = {
+        "person": {
+            "technical_analysis": extract_technical(person_result),
+            "time": round(person_time, 3),
+            "success": person_result.get("success", False)
+        },
+        "clothing": {
+            "technical_analysis": extract_technical(cloth_result),
+            "time": round(cloth_time, 3),
+            "success": cloth_result.get("success", False)
+        },
+        "shoes": {
+            "technical_analysis": extract_technical(shoes_result),
+            "time": round(shoes_time, 3),
+            "success": shoes_result.get("success", False)
+        },
+        "accessories": {
+            "technical_analysis": extract_technical(accessories_result),
+            "time": round(accessories_time, 3),
+            "success": accessories_result.get("success", False)
+        }
+    }
 
     report = {
         "image": image_path,
-        "technical_analysis": technical_analysis,
-        "stylist_analysis": stylist_analysis,
-        "timings_seconds": {
-            "total": round(elapsed, 3),
-            "fastvlm_time": result.get("timing", {}).get("fastvlm_time", 0),
-            "stylist_time": result.get("timing", {}).get("stylist_time", 0)
-        },
-        "success": result.get("success", False)
+        "results": results
+        
     }
 
-    print("\n=== FASTVLM 1.5B PROMPT RESULT ===")
-    print(json.dumps(report, ensure_ascii=False, indent=2))
-
-    # Save result
-    out_path = Path(__file__).parent / "results" / "latest_1.5b_test_output.txt"
-    out_path.parent.mkdir(exist_ok=True)
-
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write("TECHNICAL ANALYSIS (FastVLM)\n")
-        f.write(technical_analysis or "No technical analysis")
-        f.write("\n\n")
-        f.write("STYLIST ANALYSIS (AI)\n")
-        f.write(stylist_analysis or "No stylist analysis")
-        f.write("\n\n")
-        f.write("TIMINGS\n" + json.dumps(report["timings_seconds"], ensure_ascii=False, indent=2) + "\n")
-
-    print(f"Saved: {out_path}")
+    # Выводим результат
+    print("\n" + "="*50)
+    print("📊 ОТЧЕТ ТЕСТИРОВАНИЯ FASTVLM 1.5B")
+    print("="*50)
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    print("="*50)
 
 if __name__ == "__main__":
     main()

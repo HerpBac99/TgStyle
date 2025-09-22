@@ -452,12 +452,14 @@ class TgStyleLogger implements Logger {
       userAgent: navigator.userAgent,
       appVersion: '2.0.0',
       userData: telegramUserData,
-      username: finalUsername
+      userId: telegramUserData?.id,
+      username: telegramUserData?.username || finalUsername,
+      isTelegramMiniApp: !!window.Telegram?.WebApp
     };
 
     // Тихая отправка - без логирования
     try {
-      const data = await this.sendWithRetry(`${API_URL}/log-error`, logsData, 3);
+      const data = await this.sendWithRetry(`${API_URL}/log-client`, logsData, 3);
       // Тихий успех - логи уже сохранены на сервере
       return data;
     } catch (error) {
@@ -496,12 +498,13 @@ class TgStyleLogger implements Logger {
         userAgent: navigator.userAgent,
         appVersion: '2.0.0',
         userData: telegramUserData,
-        username: finalUsername,
+        userId: telegramUserData?.id,
+        username: telegramUserData?.username || finalUsername,
         closeApp
       });
 
       const blob = new Blob([payload], { type: 'application/json' });
-      const sent = navigator.sendBeacon(`${API_URL}/log-error`, blob);
+      const sent = navigator.sendBeacon(`${API_URL}/log-client`, blob);
 
       if (sent) {
         // Тихий успех - логи отправлены, но остаются в сессии

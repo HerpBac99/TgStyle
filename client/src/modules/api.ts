@@ -261,7 +261,7 @@ class TgStyleApi extends ApiClient {
    * Отправка логов на сервер
    */
   async sendLogs(request: LogRequest): Promise<LogResponse> {
-    return this.post<LogResponse>('/log-error', request, TIMEOUTS.LOG_REQUEST);
+    return this.post<LogResponse>('/log-client', request, TIMEOUTS.LOG_REQUEST);
   }
 
   /**
