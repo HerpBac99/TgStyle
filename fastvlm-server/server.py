@@ -279,47 +279,47 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
     try:
         # Pass 1: Person analysis
         if person_prompt:
-            app.logger.debug("Выполняем анализ человека")
+            app.logger.info(f"person_prompt : {person_prompt}")
             pass1_start = time.time()
             person_response, error = analyze_image_fastvlm(image_base64, person_prompt)
             if error:
                 person_response = "Не удалось определить информацию о человеке"
             person_result = extract_text(person_response)
             timing["person"] = time.time() - pass1_start
-            app.logger.debug(f"Анализ человека завершен за {timing['person']:.2f}с")
+            app.logger.info(f"person_response : {person_response}")
 
         # Pass 2: Top clothing analysis
         if clothing_prompt:
-            app.logger.debug("Выполняем анализ верхней одежды")
+            app.logger.info(f"clothing_prompt : {clothing_prompt}")
             pass2_start = time.time()
             clothing_response, error = analyze_image_fastvlm(image_base64, clothing_prompt)
             if error:
                 clothing_response = "Не удалось определить верхнюю одежду"
             clothing_result = extract_text(clothing_response)
             timing["clothing"] = time.time() - pass2_start
-            app.logger.debug(f"Анализ верхней одежды завершен за {timing['clothing']:.2f}с")
+            app.logger.info(f"clothing_response : {clothing_response}")
 
         # Pass 3: Shoes analysis
         if shoes_prompt:
-            app.logger.debug("Выполняем анализ обуви")
+            app.logger.info(f"shoes_prompt : {shoes_prompt}")
             pass3_start = time.time()
             shoes_response, error = analyze_image_fastvlm(image_base64, shoes_prompt)
             if error:
                 shoes_response = "Не удалось определить обувь"
             shoes_result = extract_text(shoes_response)
             timing["shoes"] = time.time() - pass3_start
-            app.logger.debug(f"Анализ обуви завершен за {timing['shoes']:.2f}с")
+            app.logger.info(f"shoes_response : {shoes_response}")
 
         # Pass 4: Inner top clothing analysis
         if accessories_prompt:
-            app.logger.debug("Выполняем анализ аксессуаров")
+            app.logger.info(f"accessories_prompt : {accessories_prompt}")
             pass6_start = time.time()
             accessories_response, error = analyze_image_fastvlm(image_base64, accessories_prompt)
             if error:
                 accessories_response = "Не удалось определить аксессуары"
             accessories_result = extract_text(accessories_response)
             timing["accessories"] = time.time() - pass6_start
-            app.logger.debug(f"Анализ аксессуаров завершен за {timing['accessories']:.2f}с")
+            app.logger.info(f"accessories_response : {accessories_response}")
 
         timing["total"] = time.time() - total_start_time
 
@@ -416,7 +416,6 @@ def analyze_image_fastvlm(image_base64, prompt_text=None):
             if stop_seq in outputs:
                 outputs = outputs.split(stop_seq)[0].strip()
 
-        app.logger.info(f"FastVLM анализ завершен, длина ответа: {len(outputs)} символов")
         return outputs, None
 
     except Exception as e:

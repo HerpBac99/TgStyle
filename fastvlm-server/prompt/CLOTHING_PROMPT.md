@@ -1,1 +1,1 @@
-Output EXACTLY one short line: Describe All clothing on person. What type? What color? What material? What length?
+Output EXACTLY one short line: Describe all VISIBLE clothing on the person. If no clothing is visible, state that clearly. What type? What color? What material? What length?

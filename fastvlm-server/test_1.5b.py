@@ -1,6 +1,32 @@
 #!/usr/bin/env python3
 """
-Простой тест FastVLM 1.5B сервера с промптом TORSO_CLOTHING_PROMPT
+Тест FastVLM 1.5B сервера с выбором режима анализа
+
+ПЕРЕМЕННАЯ TECH_ANALYZE:
+Управляет режимом работы теста:
+
+- TECH_ANALYZE=true (или не установлена):
+  Многопроходный анализ с отдельными промптами для разных частей
+  Использует endpoint /analyze_for_test с промптами
+  Анализирует: человек, одежда, обувь, аксессуары отдельно
+  Выводит только технический анализ (без стилистического)
+
+- TECH_ANALYZE=false:
+  Реальный режим сервера - как работает в продакшене
+  Использует endpoint /analyze без промпта
+  Один вызов для полного анализа изображения
+  Выводит и технический, и стилистический анализ
+
+Примеры использования:
+  python test_1.5b.py                    # многопроходный режим (по умолчанию)
+  TECH_ANALYZE=false python test_1.5b.py # реальный режим сервера
+  TECH_ANALYZE=true python test_1.5b.py  # многопроходный режим
+
+ВЫВОД:
+- Режим и endpoint
+- Время анализа
+- Технический анализ (всегда)
+- Стилистический анализ (только в реальном режиме)
 """
 
 import os
@@ -14,6 +40,8 @@ import requests
 from PIL import Image
 
 SERVER_URL = os.environ.get("FASTVLM_URL", "http://127.0.0.1:3001")
+# Режим анализа: True = многопроходный, False = реальный режим сервера
+TECH_ANALYZE = os.environ.get("TECH_ANALYZE", "false").lower() == "true"
 
 def to_base64(img: Image.Image) -> str:
     buf = io.BytesIO()
@@ -21,7 +49,7 @@ def to_base64(img: Image.Image) -> str:
     return base64.b64encode(buf.getvalue()).decode('utf-8')
 
 def post_analyze(prompt: str, image_b64: str, nickname: str = "test_user"):
-    """Send analysis request to FastVLM server"""
+    """Send analysis request to FastVLM server (multipass mode)"""
     try:
         resp = requests.post(
             f"{SERVER_URL}/analyze_for_test",
@@ -52,6 +80,46 @@ def post_analyze(prompt: str, image_b64: str, nickname: str = "test_user"):
 
     except Exception as e:
         print(f"Error in post_analyze: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "technical_analysis": "",
+            "analysis": ""
+        }
+
+def post_analyze_real(image_b64: str, nickname: str = "test_user"):
+    """Send analysis request to real FastVLM server (single call mode)"""
+    try:
+        # В реальном режиме вызываем /analyze без промпта
+        resp = requests.post(
+            f"{SERVER_URL}/analyze",
+            json={
+                "image_base64": image_b64,
+                "nickname": nickname
+            },
+            timeout=120
+        )
+        resp.raise_for_status()
+        result = resp.json()
+
+        if result.get("success"):
+            # В реальном режиме сервер возвращает technical_analysis и analysis (стилистический)
+            return {
+                "success": True,
+                "technical_analysis": result.get("technical_analysis", ""),
+                "analysis": result.get("analysis", ""),  # Это стилистический анализ
+                "timing": result.get("timing", {})
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("error", "Server error"),
+                "technical_analysis": "",
+                "analysis": ""
+            }
+
+    except Exception as e:
+        print(f"Error in post_analyze_real: {e}")
         return {
             "success": False,
             "error": str(e),
@@ -98,30 +166,62 @@ def main():
     img = load_image(image_path)
     b64_image = to_base64(img)
 
-    print(f"Testing FastVLM 1.5B with PROMPT")
+    print(f"Testing FastVLM 1.5B with TECH_ANALYZE={TECH_ANALYZE}")
     print(f"Image: {image_path}")
+    print(f"Mode: {'Multipass analysis (tech_analyze=True)' if TECH_ANALYZE else 'Real server mode (tech_analyze=False)'}")
+    print("-" * 50)
 
-    # Последовательные вызовы 3 промптов
+    # Выбор режима анализа
     total_start_time = time.perf_counter()
 
-    # Промпт 1: PERSON
-    person_start_time = time.perf_counter()
-    person_result = post_analyze(PROMPT_person, b64_image, "test_1.5b_user")
-    person_time = time.perf_counter() - person_start_time
+    if TECH_ANALYZE:
+        # Многопроходный режим анализа (tech_analyze = True)
+        print("Running multipass analysis...")
 
-    cloth_start_time = time.perf_counter()
-    cloth_result = post_analyze(PROMPT_cloth, b64_image, "test_1.5b_user")
-    cloth_time = time.perf_counter() - cloth_start_time
+        # Промпт 1: PERSON
+        person_start_time = time.perf_counter()
+        person_result = post_analyze(PROMPT_person, b64_image, "test_1.5b_user")
+        person_time = time.perf_counter() - person_start_time
 
-    shoes_start_time = time.perf_counter()
-    shoes_result = post_analyze(PROMPT_shoes, b64_image, "test_1.5b_user")
-    shoes_time = time.perf_counter() - shoes_start_time
+        cloth_start_time = time.perf_counter()
+        cloth_result = post_analyze(PROMPT_cloth, b64_image, "test_1.5b_user")
+        cloth_time = time.perf_counter() - cloth_start_time
 
-    accessories_start_time = time.perf_counter()
-    accessories_result = post_analyze(PROMPT_accessories, b64_image, "test_1.5b_user")
-    accessories_time = time.perf_counter() - accessories_start_time
+        shoes_start_time = time.perf_counter()
+        shoes_result = post_analyze(PROMPT_shoes, b64_image, "test_1.5b_user")
+        shoes_time = time.perf_counter() - shoes_start_time
 
-    total_time = time.perf_counter() - total_start_time
+        accessories_start_time = time.perf_counter()
+        accessories_result = post_analyze(PROMPT_accessories, b64_image, "test_1.5b_user")
+        accessories_time = time.perf_counter() - accessories_start_time
+
+        total_time = time.perf_counter() - total_start_time
+
+        print(f"Multipass analysis completed in {total_time:.2f}s")
+    else:
+        # Реальный режим сервера (tech_analyze = False)
+        print("Running real server mode...")
+
+        # Один вызов /analyze без промпта
+        server_start_time = time.perf_counter()
+        server_result = post_analyze_real(b64_image, "test_1.5b_user")
+        server_time = time.perf_counter() - server_start_time
+
+        total_time = time.perf_counter() - total_start_time
+
+        print(f"Real server analysis completed in {server_time:.2f}s")
+
+        # В реальном режиме сервер возвращает единый результат
+        # Заполняем все поля одинаковыми значениями для совместимости
+        person_result = server_result
+        cloth_result = server_result
+        shoes_result = server_result
+        accessories_result = server_result
+
+        person_time = server_time
+        cloth_time = server_time
+        shoes_time = server_time
+        accessories_time = server_time
 
     # Собираем результаты
     results = {
@@ -149,16 +249,44 @@ def main():
 
     report = {
         "image": image_path,
-        "results": results
-        
+        "tech_analyze_mode": TECH_ANALYZE,
+        "mode_description": "multipass" if TECH_ANALYZE else "real_server",
+        "results": results,
+        "total_time": round(total_time, 3)
     }
 
     # Выводим результат
-    print("\n" + "="*50)
-    print("📊 ОТЧЕТ ТЕСТИРОВАНИЯ FASTVLM 1.5B")
-    print("="*50)
-    print(json.dumps(report, indent=2, ensure_ascii=False))
-    print("="*50)
+    print("\n" + "="*60)
+    print("РЕЗУЛЬТАТ АНАЛИЗА FASTVLM")
+    print("="*60)
+
+    # Выводим информацию о режиме
+    mode_name = "МНОГОПРОХОДНЫЙ" if TECH_ANALYZE else "РЕАЛЬНЫЙ РЕЖИМ"
+    endpoint_name = "/analyze_for_test" if TECH_ANALYZE else "/analyze"
+    print(f"Режим: {mode_name}")
+    print(f"Endpoint: {endpoint_name}")
+    print(f"Время: {total_time:.2f}с")
+    print()
+
+    # Получаем ответ стилиста
+    stylist_response = extract_stylist(server_result if not TECH_ANALYZE else person_result)
+
+    if not TECH_ANALYZE:
+        # В реальном режиме сервер возвращает и технический и стилистический анализ
+        technical_response = extract_technical(server_result)
+        print("ТЕХНИЧЕСКИЙ АНАЛИЗ:")
+        print("-" * 30)
+        print(technical_response)
+        print()
+
+    if stylist_response:
+        print("СТИЛИСТИЧЕСКИЙ АНАЛИЗ:")
+        print("-" * 30)
+        print(stylist_response)
+    else:
+        print("СТИЛИСТИЧЕСКИЙ АНАЛИЗ: не получен")
+
+    print("\n" + "="*60)
 
 if __name__ == "__main__":
     main()
