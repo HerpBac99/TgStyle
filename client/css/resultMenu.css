@@ -172,7 +172,7 @@
 
 /* Кнопки действий */
 .result-actions {
-    padding: 20px 24px; /* Внутренние отступы */
+    padding: 2px 2px; /* Внутренние отступы */
     border-top: 1px solid #e0e0e0; /* Граница сверху */
     background: #fafafa; /* Светло-серый фон */
     display: flex; /* Включает flexbox */
@@ -285,7 +285,7 @@
     flex: 1; /* Занимает равную часть доступного пространства */
     background: transparent !important; /* Прозрачный фон */
     border: none !important; /* Убирает рамку */
-    color: white; /* Белый цвет текста */
+    color: #2481cc; /* Белый цвет текста */
     display: flex; /* Включает flexbox */
     align-items: center; /* Центрирует по вертикали */
     justify-content: center; /* Центрирует по горизонтали */
