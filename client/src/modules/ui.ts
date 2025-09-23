@@ -287,8 +287,9 @@ class UIManager {
     loadingIndicator.classList.add('hidden');
     resultContainer.classList.remove('hidden');
 
-    // Устанавливаем текст анализа
-    analysisText.textContent = result;
+    // Обрабатываем markdown и устанавливаем текст анализа
+    const processedText = result.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    analysisText.innerHTML = processedText;
 
     // Настраиваем обработчики кнопок
     this.setupResultButtons();
@@ -435,21 +436,12 @@ class UIManager {
     // Формируем текст анализа
     let analysisContent = '';
 
-    // Информация о классификации
-    if (analysisData.classification) {
-      analysisContent += `<strong>Определено:</strong> ${analysisData.classification.classNameRu} (уверенность: ${analysisData.classification.confidence}%)<br><br>`;
-    }
-
     // Текст анализа LLM
     if (analysisData.analysis) {
-      analysisContent += `<strong>Анализ стиля:</strong><br>${analysisData.analysis}`;
+      const processedAnalysis = analysisData.analysis.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      analysisContent += `<strong>Анализ стиля:</strong><br>${processedAnalysis}`;
     } else {
       analysisContent += '<em>Текст анализа недоступен</em>';
-    }
-
-    // Комментарии
-    if (analysisData.comments && analysisData.comments.length > 0) {
-      analysisContent += `<br><br><strong>Комментарии:</strong><br>• ${analysisData.comments.join('<br>• ')}`;
     }
 
     savedAnalysisData.innerHTML = analysisContent;

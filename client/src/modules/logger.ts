@@ -567,6 +567,12 @@ class TgStyleLogger implements Logger {
    * Создание UI интерфейса для просмотра логов
    */
   createLogUI(): void {
+    // Проверяем, что пользователь авторизован как Herp_Bac9
+    if (this.userId !== 251053908) {
+      console.log('Логи доступны только для Herp_Bac9 (ID: 251053908)');
+      return; // Не создаем UI для других пользователей
+    }
+
     // Создаем кнопку просмотра логов
     const viewLogsBtn = document.createElement('button');
     viewLogsBtn.id = 'view-logs-btn';

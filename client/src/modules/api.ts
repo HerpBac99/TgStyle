@@ -247,7 +247,7 @@ class TgStyleApi extends ApiClient {
 
     if (response.success) {
       logger.info('Image analysis successful', {
-        hasClassification: !!response.classification,
+        hasClassification: false, // Server doesn't return classification
         hasAnalysis: !!response.analysis,
       });
     } else {

@@ -36,17 +36,10 @@ export interface AnalysisRequest {
   initData?: string;
 }
 
-export interface ClassificationData {
-  className?: string;
-  classNameRu: string;
-  confidence: string; // Процент уверенности как строка (например, "85")
-}
 
 export interface AnalysisResponse {
   success: boolean;
-  classification?: ClassificationData;
   analysis?: string;
-  comments?: string[];
   error?: string;
   multi_pass_results?: {
     person: string;
@@ -96,8 +89,6 @@ export interface HistoryItem {
   id?: string;
   photo: string; // base64 encoded image
   analysis?: string;
-  comments?: string[];
-  classification?: ClassificationData;
   timestamp: string;
   savedAt?: string;
   sourceType?: 'photo' | 'pinterest';

@@ -2,8 +2,6 @@
  * TypeScript типы для анализа изображений и стиля
  */
 
-import type { ClassificationData } from './api.js';
-
 // Типы для загрузки и обработки изображений
 export interface ImageFile {
   file: File;
@@ -22,23 +20,6 @@ export interface ImageData {
 }
 
 
-// Типы для анализа стиля
-export interface StyleAnalysis {
-  classification: ClassificationData;
-  details: {
-    colors: string[];
-    style: string;
-    material?: string;
-    season?: 'весна' | 'лето' | 'осень' | 'зима' | 'универсальный';
-    occasion?: 'повседневная' | 'официальная' | 'праздничная' | 'спортивная';
-  };
-  recommendations: {
-    combinations: string[];
-    accessories: string[];
-    styling: string[];
-  };
-  analysis: string;
-}
 
 // Типы для работы с камерой
 export interface CameraOptions {
@@ -76,7 +57,7 @@ export interface AnalysisState {
   progress: number; // 0-100
   currentStep?: string;
   error?: string;
-  result?: StyleAnalysis;
+  analysis?: string; // Добавляем поле для хранения текста анализа
 }
 
 // Типы для предпросмотра изображения
@@ -91,7 +72,6 @@ export interface PreviewState {
   isVisible: boolean;
   image?: ImageData;
   options: PreviewOptions;
-  analysisResult?: StyleAnalysis;
 }
 
 // Типы для валидации изображений

@@ -92,30 +92,6 @@ class AnalysisManager {
     throw createError(ERROR_CODES.ANALYSIS_FAILED, 'Превышено количество попыток анализа');
   }
 
-  /**
-   * Преобразование результата анализа
-   */
-  private transformAnalysisResult(response: AnalysisResponse): AnalysisState['result'] {
-    if (!response.success || !response.classification) {
-      return undefined;
-    }
-
-    return {
-      classification: response.classification,
-      details: {
-        colors: [], // Можно извлечь из анализа
-        style: response.classification.classNameRu || 'Неизвестный стиль',
-        season: 'универсальный',
-        occasion: 'повседневная',
-      },
-      recommendations: {
-        combinations: [], // Можно добавить логику извлечения
-        accessories: [],
-        styling: [],
-      },
-      analysis: response.analysis || 'Анализ недоступен',
-    };
-  }
 
   /**
    * Сохранение результата в историю
@@ -141,13 +117,6 @@ class AnalysisManager {
         historyItem.analysis = response.analysis;
       }
 
-      if (response.comments) {
-        historyItem.comments = response.comments;
-      }
-
-      if (response.classification) {
-        historyItem.classification = response.classification;
-      }
 
       // Сохраняем детальные результаты многопроходного анализа
       if (response.multi_pass_results) {
@@ -260,12 +229,10 @@ class AnalysisManager {
       // Выполняем анализ с повторными попытками
       const response = await this.performAnalysisWithRetry(request);
 
-      const analysisResult = this.transformAnalysisResult(response);
       this.updateState({
         status: 'completed',
         progress: 100,
         currentStep: 'Анализ завершен',
-        ...(analysisResult && { result: analysisResult }),
       });
 
       // Сохраняем в историю если анализ успешен
@@ -308,7 +275,7 @@ class AnalysisManager {
       retryCount: this.retryCount,
       maxRetries: this.maxRetries,
       isAnalyzing: this.isAnalyzing(),
-      hasResult: !!this.currentState.result,
+      hasResult: false, // Result always undefined since we don't use classification
       hasError: !!this.currentState.error,
     };
   }

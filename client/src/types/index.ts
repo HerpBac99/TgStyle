@@ -17,7 +17,6 @@ export type {
   AuthResponse,
   AnalysisRequest,
   AnalysisResponse,
-  ClassificationData,
   LogEntry,
   LogRequest,
   LogResponse,
@@ -34,7 +33,6 @@ export { HTTP_STATUS } from './api.js';
 export type {
   ImageFile,
   ImageData,
-  StyleAnalysis,
   CameraOptions,
   PhotoCaptureResult,
   ImageSource,
