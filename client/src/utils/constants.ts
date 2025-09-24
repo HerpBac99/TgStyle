@@ -2,7 +2,7 @@
  * Константы приложения TgStyle
  */
 
-import type { AppConfig } from '@/types/index.js';
+import type { AppConfig } from '@/types/index';
 
 // URL API сервера (для Telegram Mini App всегда production)
 export const API_URL = 'https://tgstyle.flappy.crazedns.ru/api';

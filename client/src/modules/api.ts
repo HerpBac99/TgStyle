@@ -10,16 +10,16 @@ import type {
   LogRequest,
   LogResponse,
   HttpStatusCode,
-} from '@/types/index.js';
-import { 
+} from '@/types/index';
+import {
   API_URL,
   TIMEOUTS,
-  ERROR_CODES 
-} from '@/utils/constants.js';
-import { 
+  ERROR_CODES
+} from '@/utils/constants';
+import {
   createError,
   isOnline
-} from '@/utils/helpers.js';
+} from '@/utils/helpers';
 import { logger } from './logger';
 
 /**

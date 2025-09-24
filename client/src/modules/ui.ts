@@ -2,27 +2,27 @@
  * Модуль для управления пользовательским интерфейсом
  */
 
-import type { 
-  DOMElements, 
-  HistoryItem, 
+import type {
+  DOMElements,
+  HistoryItem,
   TelegramWebApp
-} from '@/types/index.js';
+} from '@/types/index';
 import {
   DOM_SELECTORS,
   CSS_CLASSES,
   CAROUSEL_CONFIG
-} from '@/utils/constants.js';
-import { 
+} from '@/utils/constants';
+import {
   getElement,
   getElements,
   createElement,
   addEventListenerWithCleanup,
-  formatHistoryDate 
-} from '@/utils/helpers.js';
+  formatHistoryDate
+} from '@/utils/helpers';
 import { logger } from './logger';
-import { authManager } from './auth.js';
-import { cameraManager } from './camera.js';
-import { historyManager } from './history.js';
+import { authManager } from './auth';
+import { cameraManager } from './camera';
+import { historyManager } from './history';
 
 // Объявляем глобальную переменную Telegram
 declare global {

@@ -2,8 +2,8 @@
  * Вспомогательные функции общего назначения
  */
 
-import type { ValidationResult } from '@/types/index.js';
-import { ERROR_CODES, ERROR_MESSAGES } from './constants.js';
+import type { ValidationResult } from '@/types/index';
+import { ERROR_CODES, ERROR_MESSAGES } from './constants';
 
 // Реэкспорт для использования в других модулях
 export { ERROR_CODES, ERROR_MESSAGES };

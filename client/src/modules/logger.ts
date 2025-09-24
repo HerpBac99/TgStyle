@@ -3,17 +3,17 @@
  * Вдохновлено LoggerService и ClientLogger примерами
  */
 
-import type { Logger, LogEntry, LogLevel } from '@/types/index.js';
+import type { Logger, LogEntry, LogLevel } from '@/types/index';
 import {
   API_URL,
   LOGGING_CONFIG,
   TIMEOUTS
-} from '@/utils/constants.js';
+} from '@/utils/constants';
 import {
   generateSessionId,
   formatTimestamp,
   safeJsonStringify
-} from '@/utils/helpers.js';
+} from '@/utils/helpers';
 
 // Глобальные декларации для лучшей интеграции
 declare global {

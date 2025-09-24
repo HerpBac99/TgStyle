@@ -2,21 +2,21 @@
  * Модуль для управления историей анализов
  */
 
-import type { HistoryItem } from '@/types/index.js';
-import { 
+import type { HistoryItem } from '@/types/index';
+import {
   STORAGE_KEYS,
-  HISTORY_CONSTRAINTS 
-} from '@/utils/constants.js';
+  HISTORY_CONSTRAINTS
+} from '@/utils/constants';
 import {
   validateHistory,
   validateHistoryItem
-} from '@/utils/validation.js';
+} from '@/utils/validation';
 import {
   safeJsonParse,
   safeJsonStringify,
   createError,
   ERROR_CODES
-} from '@/utils/helpers.js';
+} from '@/utils/helpers';
 import { logger } from './logger';
 
 /**

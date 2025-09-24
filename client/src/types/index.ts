@@ -8,7 +8,7 @@ export type {
   TelegramChat,
   TelegramWebAppInitData,
   TelegramWebApp,
-} from './telegram.js';
+} from './telegram';
 
 // Экспорт типов API
 export type {
@@ -25,9 +25,9 @@ export type {
   PaginatedResponse,
   ApiError,
   HttpStatusCode,
-} from './api.js';
+} from './api';
 
-export { HTTP_STATUS } from './api.js';
+export { HTTP_STATUS } from './api';
 
 // Экспорт типов анализа
 export type {
@@ -46,7 +46,7 @@ export type {
   FastVLMRequest,
   FastVLMResponse,
   FastVLMHealthCheck,
-} from './analysis.js';
+} from './analysis';
 
 
 // Общие типы приложения

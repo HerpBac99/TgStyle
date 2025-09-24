@@ -6,11 +6,11 @@ import type {
   TelegramWebApp, 
   TelegramUser,
   AuthResponse 
-} from '@/types/index.js';
-import { validateTelegramInitData } from '@/utils/validation.js';
-import { createError, ERROR_CODES } from '@/utils/helpers.js';
+} from '@/types/index';
+import { validateTelegramInitData } from '@/utils/validation';
+import { createError, ERROR_CODES } from '@/utils/helpers';
 import { logger } from './logger';
-import { api } from './api.js';
+import { api } from './api';
 
 /**
  * Класс для управления авторизацией

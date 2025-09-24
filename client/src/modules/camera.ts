@@ -6,17 +6,17 @@ import type {
   ImageData,
   PhotoCaptureResult,
   CameraOptions,
-} from '@/types/index.js';
+} from '@/types/index';
 import {
   IMAGE_CONSTRAINTS
-} from '@/utils/constants.js';
-import { 
+} from '@/utils/constants';
+import {
   validateImageData
-} from '@/utils/validation.js';
-import { 
+} from '@/utils/validation';
+import {
   isImageFile,
-  getFileExtension 
-} from '@/utils/helpers.js';
+  getFileExtension
+} from '@/utils/helpers';
 import { logger } from './logger';
 import { analysisManager } from './analysis';
 

@@ -4,15 +4,15 @@
 
 // Экспорт основных модулей
 export { logger, appLogger } from './logger';
-export { api } from './api.js';
-export { authManager } from './auth.js';
-export { cameraManager } from './camera.js';
-export { historyManager } from './history.js';
-export { analysisManager } from './analysis.js';
-export { uiManager } from './ui.js';
+export { api } from './api';
+export { authManager } from './auth';
+export { cameraManager } from './camera';
+export { historyManager } from './history';
+export { analysisManager } from './analysis';
+export { uiManager } from './ui';
 
 // Экспорт типов
-export type * from '@/types/index.js';
+export type * from '@/types/index';
 
 // Реэкспорт утилит для удобства
 export {
@@ -24,7 +24,7 @@ export {
   createError,
   ERROR_CODES,
   getErrorMessage,
-} from '@/utils/helpers.js';
+} from '@/utils/helpers';
 
 export {
   API_URL,
@@ -32,7 +32,7 @@ export {
   STORAGE_KEYS,
   HISTORY_CONSTRAINTS,
   APP_EVENTS,
-} from '@/utils/constants.js';
+} from '@/utils/constants';
 
 // Объявляем глобальные типы для Window
 declare global {

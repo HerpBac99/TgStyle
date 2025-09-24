@@ -6,14 +6,14 @@ import type {
   AnalysisRequest,
   AnalysisResponse,
   AnalysisState,
-} from '@/types/index.js';
-import { FASTVLM_CONFIG } from '@/utils/constants.js';
-import { createError, ERROR_CODES } from '@/utils/helpers.js';
+} from '@/types/index';
+import { FASTVLM_CONFIG } from '@/utils/constants';
+import { createError, ERROR_CODES } from '@/utils/helpers';
 import { logger } from './logger';
-import { api } from './api.js';
-import { authManager } from './auth.js';
-import { cameraManager } from './camera.js';
-import { historyManager } from './history.js';
+import { api } from './api';
+import { authManager } from './auth';
+import { cameraManager } from './camera';
+import { historyManager } from './history';
 
 /**
  * Класс для управления анализом изображений

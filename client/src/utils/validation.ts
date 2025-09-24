@@ -7,15 +7,15 @@ import type {
   ImageData, 
   TelegramWebAppInitData,
   HistoryItem 
-} from '@/types/index.js';
+} from '@/types/index';
 import { 
   IMAGE_CONSTRAINTS,
   HISTORY_CONSTRAINTS 
-} from '@/utils/constants.js';
-import { 
-  isValidBase64, 
+} from '@/utils/constants';
+import {
+  isValidBase64,
   getBase64Size
-} from './helpers.js';
+} from './helpers';
 
 /**
  * Валидирует данные изображения
