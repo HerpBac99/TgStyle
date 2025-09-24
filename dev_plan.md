@@ -1,5 +1,50 @@
 # 🚀 План Развития Проекта TgStyle
 
+## 🗺️ ДОРОЖНАЯ КАРТА РАЗВИТИЯ TGSTYLE (2025-2026)
+
+### 📊 **Текущий статус: Фаза 1 - Основы**
+- ✅ Telegram Mini App с AI анализом одежды
+- ✅ FastVLM интеграция для анализа изображений
+- 🚧 PostgreSQL база данных + комментарии/оценки (в разработке)
+
+### 🎯 **Фаза 2: Социальная сеть моды (Май 2025)**
+**Цель**: Превращение в сообщество fashion энтузиастов**
+- Публичная лента чужих анализов
+- Система подписок на пользователей
+- Уведомления о взаимодействиях
+- Fashion challenges и конкурсы
+
+### 💰 **Фаза 3: Монетизация (Июнь-Август 2025)**
+**Цель**: Устойчивая бизнес-модель**
+- Freemium подписки ($2.99/месяц)
+- Интеграция с fashion брендами
+- Affiliate маркетинг
+- Telegram Payments
+
+### 🤖 **Фаза 4: AI Revolution (Сентябрь-Ноябрь 2025)**
+**Цель**: Лучший fashion AI в мире**
+- Генерация образов одежды (text-to-image)
+- Virtual try-on технологии
+- Pinterest/Instagram интеграции
+- Персональный AI стилист
+
+### 🌍 **Фаза 5: Глобальный рост (Декабрь 2025 - Февраль 2026)**
+**Цель**: Международная экспансия**
+- Локализация на 10+ языков
+- Партнерства с Zara, H&M, Uniqlo
+- Выход на США/Европу/Азию
+- 100k+ MAU
+
+### 🚀 **Фаза 6: Экосистема и инновации (Март 2026+)**
+**Цель**: Доминирование в fashion AI**
+- Telegram Fashion Ecosystem
+- AR shopping experience
+- IoT интеграции (умные зеркала)
+- NFT fashion коллекции
+- B2B решения для ритейлеров
+
+---
+
 ## 🔥 НОВАЯ ФУНКЦИОНАЛЬНОСТЬ: Система Оценок и Комментариев
 
 ### 🎯 Цель проекта
@@ -30,7 +75,13 @@ CREATE TABLE users (
   avatar_url TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  is_active BOOLEAN DEFAULT true
+  is_active BOOLEAN DEFAULT true,
+  -- Поля для системы подписок
+  analyses_count INTEGER DEFAULT 3, -- доступно анализов в неделю
+  subscription_type VARCHAR(10) DEFAULT 'free', -- 'free' | 'premium'
+  subscription_end_date TIMESTAMP NULL, -- NULL если нет активной подписки
+  total_analyses INTEGER DEFAULT 0, -- общее количество сделанных анализов
+  weekly_reset_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- дата следующего сброса счетчика
 );
 ```
 
@@ -40,15 +91,11 @@ CREATE TABLE history_items (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   photo_data TEXT NOT NULL, -- base64 encoded image
-  analysis_text TEXT,
-  source_type VARCHAR(50) DEFAULT 'photo', -- 'photo' | 'pinterest'
+  analysis_text TEXT, -- пользовательское описание стиля
+  technical_analysis TEXT, -- техническое описание ИИ (тип одежды, цвет, материал и т.д.)
   is_public BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  classification_class VARCHAR(255),
-  classification_confidence VARCHAR(50),
-  ai_model_used VARCHAR(100),
-  fastvlm_used BOOLEAN DEFAULT false
 );
 ```
 
@@ -115,6 +162,16 @@ CREATE TABLE notifications (
 **Уведомления:**
 - `GET /api/notifications` - Получить уведомления пользователя
 - `POST /api/notifications/:id/read` - Отметить уведомление прочитанным
+
+**Подписки и лимиты:**
+- `GET /api/user/limits` - Проверить лимиты пользователя на анализ
+- `POST /api/user/buy-subscription` - Купить подписку (premium)
+
+**Логика подписок:**
+- **Free**: 3 анализа в неделю, сбрасывается каждые 7 дней
+- **Premium**: безлимит анализов, подписка на месяц
+- Проверка лимитов перед каждым анализом
+- Если лимит исчерпан - показать экран покупки подписки
 
 #### План реализации по этапам
 
@@ -427,6 +484,175 @@ CREATE TABLE notifications (
 - **Trend Prediction** - Предсказание будущих трендов
 - **Sustainable Fashion** - Эко-рекомендации и анализ
 - **Cultural Style Adaptation** - Адаптация под культурные предпочтения
+
+---
+
+## 💡 ИННОВАЦИОННЫЕ ИДЕИ ДЛЯ РАЗВИТИЯ TGSTYLE
+
+### 🎨 **AI-POWERED FASHION IDEAS**
+
+#### 1. **Style DNA & Personalization**
+- **AI анализ персонального стиля** пользователя на основе всех загрузок
+- **Стилевой профиль**: "Твой стиль - минимализм с элементами уличной моды"
+- **Эволюция стиля**: Графики как менялся твой вкус за год
+- **Стилевые близнецы**: Поиск пользователей с похожим вкусом
+
+#### 2. **Virtual Fashion Assistant**
+- **AI чат-бот стилист** в Telegram: "Что надеть на свидание?"
+- **Ежедневные рекомендации**: "Сегодня прохладно - вот что из твоего гардероба подойдет"
+- **Сезонные трансформации**: "Твой гардероб готов к осени - вот что добавить"
+- **Budget styling**: "На 5000₽ можно обновить гардероб вот так"
+
+#### 3. **Advanced AI Features**
+- **Outfit completion**: Загрузи одну вещь, AI предложит полный образ
+- **Color harmony analysis**: Анализ сочетаемости цветов в гардеробе
+- **Sustainability scoring**: Оценка экологичности одежды
+- **Cultural style adaptation**: "Как одеться для поездки в Японию"
+
+### 🌐 **SOCIAL & COMMUNITY FEATURES**
+
+#### 4. **Fashion Social Network**
+- **Style tribes**: Создание сообществ по стилевым предпочтениям
+- **Fashion influencers platform**: Встроенная платформа для fashion блогеров
+- **Collaborative styling**: "Создай образ вместе с другом"
+- **Style duets**: Совместный анализ образов
+
+#### 5. **Gamification & Challenges**
+- **Daily style quests**: "Сегодняшний челлендж: монохромный образ"
+- **Style streaks**: "5 дней подряд публикуешь аутфиты"
+- **Fashion badges**: "Мастер casual стиля", "Цветовой гуру"
+- **Leaderboards**: Топ стилистов по категориям
+
+#### 6. **Marketplace Integration**
+- **Virtual closet**: Цифровой гардероб с возможностью продажи/обмена вещей
+- **Fashion rental**: Аренда одежды через партнеров
+- **Personal shoppers**: AI-рекомендации покупок в онлайн-магазинах
+- **Price tracking**: Отслеживание цен на желаемые вещи
+
+### 📱 **TELEGRAM ECOSYSTEM EXPANSION**
+
+#### 7. **Advanced Telegram Features**
+- **Fashion channels**: Автоматизированные каналы с трендами от AI
+- **Group styling sessions**: Анализ стилей в групповых чатах
+- **Telegram Payments**: Покупка одежды прямо из бота
+- **Mini Apps для ритейлеров**: Zara, H&M интегрируют TgStyle
+
+#### 8. **Cross-Platform Integration**
+- **Instagram Shopping**: Автоматический анализ постов
+- **TikTok fashion trends**: Анализ вирусных трендов
+- **Pinterest boards**: Синхронизация досок пользователя
+- **Web version**: Полноценная веб-версия для десктопа
+
+### 🎯 **BUSINESS & MONETIZATION IDEAS**
+
+#### 9. **Premium Features**
+- **AI Personal Stylist**: Ежемесячные персональные рекомендации ($9.99)
+- **Unlimited wardrobe analysis**: Безлимитный анализ гардероба
+- **Priority processing**: Быстрее всех анализируем твои фото
+- **Advanced insights**: Детальная аналитика стиля
+
+#### 10. **Brand Partnerships**
+- **Sponsored styling**: Бренды платят за упоминания в рекомендациях
+- **Exclusive drops**: Эксклюзивные коллекции через TgStyle
+- **Brand collaborations**: Совместные челленджи с fashion брендами
+- **White-label solutions**: TgStyle для других ритейлеров
+
+#### 11. **B2B Solutions**
+- **Fashion retail AI**: Для магазинов - анализ спроса на стили
+- **Personal styling services**: Для стилистов - AI помощник
+- **Fashion education**: Курсы по стилю с AI поддержкой
+- **Market research**: Аналитика fashion трендов для брендов
+
+### 🚀 **FUTURE TECH INTEGRATIONS**
+
+#### 12. **AR/VR Fashion**
+- **Virtual try-on**: Надевай одежду в AR перед покупкой
+- **3D wardrobe**: Виртуальный 3D гардероб
+- **Style visualization**: "Как будет выглядеть эта блузка на мне"
+- **Size prediction**: AI определяет твой размер
+
+#### 13. **IoT & Smart Fashion**
+- **Smart mirrors**: Зеркало с TgStyle интеграцией
+- **Wearable tech**: Синхронизация с умной одеждой
+- **Climate-adaptive clothing**: Рекомендации по погоде
+- **Health-connected styling**: Учет здоровья в рекомендациях
+
+#### 14. **Blockchain & NFTs**
+- **Fashion NFTs**: Цифровые коллекции одежды
+- **Authenticity verification**: Blockchain верификация оригинальности
+- **Digital fashion marketplace**: Торговля виртуальной одеждой
+- **Style ownership**: NFT подтверждают уникальность стиля
+
+### 📈 **DATA & ANALYTICS IDEAS**
+
+#### 15. **Advanced Analytics**
+- **Fashion trend prediction**: AI предсказывает будущие тренды
+- **Personal style evolution**: Как менялся твой вкус со временем
+- **Seasonal preferences**: Анализ сезонных предпочтений
+- **Cultural insights**: Сравнение стилей по странам/городам
+
+#### 16. **Community Insights**
+- **Style demographics**: Статистика по предпочтениям аудитории
+- **Trend adoption speed**: Как быстро распространяются тренды
+- **User engagement patterns**: Когда пользователи наиболее активны
+- **Fashion psychology**: Анализ психологических аспектов моды
+
+### 🎭 **FUN & ENTERTAINMENT FEATURES**
+
+#### 17. **Fashion Games**
+- **Style matchmaker**: "Найди свой стиль" игра
+- **Fashion trivia**: Викторины по моде
+- **Style challenges**: "Преобразуй этот образ за 5 шагов"
+- **Fashion memory**: Игра на запоминание трендов
+
+#### 18. **Creative Tools**
+- **Style mood board**: Создание коллажей идей
+- **Color palette generator**: Подбор палитр для образов
+- **Outfit planner**: Планировщик образов на неделю
+- **Style inspiration board**: Коллекция вдохновляющих образов
+
+### 🌱 **SUSTAINABILITY & ETHICS**
+
+#### 19. **Eco-Fashion Focus**
+- **Sustainable recommendations**: Эко-альтернативы
+- **Carbon footprint**: Расчет углеродного следа гардероба
+- **Ethical brands database**: База этичных производителей
+- **Circular fashion**: Рекомендации по переработке одежды
+
+#### 20. **Social Impact**
+- **Charity integrations**: Пожертвования через fashion choices
+- **Body positivity campaigns**: Продвижение инклюзивности
+- **Cultural preservation**: Сохранение традиционных стилей
+- **Fashion education**: Обучение устойчивому потреблению
+
+---
+
+## 🎯 ПРИОРИТЕТЫ РАЗВИТИЯ ПО ВРЕМЕНИ
+
+### **Q2 2025: Social Features**
+1. Публичная лента и подписки
+2. Уведомления
+3. Fashion challenges
+
+### **Q3 2025: Monetization**
+1. Freemium модель
+2. Brand partnerships
+3. Premium features
+
+### **Q4 2025: AI Enhancement**
+1. Virtual try-on
+2. Personal stylist bot
+3. Advanced recommendations
+
+### **Q1 2026: Global Expansion**
+1. International markets
+2. Localization
+3. Cross-platform features
+
+### **Q2 2026+: Innovation**
+1. AR/VR features
+2. IoT integrations
+3. NFT marketplace
 
 ---
 

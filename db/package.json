@@ -1,0 +1,24 @@
+{
+  "name": "telegramstyle-db",
+  "version": "1.0.0",
+  "description": "Database setup for Telegram Style App",
+  "main": "index.js",
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.7.0",
+    "prisma": "^5.7.0",
+    "redis": "^4.6.13"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}

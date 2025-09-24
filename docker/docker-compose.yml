@@ -1,6 +1,34 @@
 version: '3'
 
 services:
+  # База данных - PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: telegramstyle-postgres
+    restart: always
+    environment:
+      - POSTGRES_DB=telegramstyle
+      - POSTGRES_USER=telegramstyle_user
+      - POSTGRES_PASSWORD=telegramstyle_password_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - telegramstyle-network
+
+  # Кэш - Redis
+  redis:
+    image: redis:7-alpine
+    container_name: telegramstyle-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - telegramstyle-network
+
   nginx:
     image: nginx:alpine
     container_name: telegramstyle-nginx
@@ -43,4 +71,6 @@ networks:
     driver: bridge
 
 volumes:
+  postgres_data:
+  redis_data:
   mongodb_data: 

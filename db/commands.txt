@@ -1,0 +1,20 @@
+# PostgreSQL команды для создания пользователя TgStyle_Admin
+
+# 1. Подключаемся к PostgreSQL
+docker exec -it telegramstyle-postgres psql -U postgres -d telegramstyle
+
+# 2. Создаем пользователя
+CREATE USER TgStyle_Admin WITH PASSWORD 'pass2025';
+
+# 3. Даем права на базу данных
+GRANT ALL PRIVILEGES ON DATABASE telegramstyle TO TgStyle_Admin;
+GRANT ALL PRIVILEGES ON SCHEMA public TO TgStyle_Admin;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO TgStyle_Admin;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO TgStyle_Admin;
+ALTER USER TgStyle_Admin CREATEDB;
+
+# 4. Проверяем что пользователь создан
+SELECT usename FROM pg_user WHERE usename = 'TgStyle_Admin';
+
+# 5. Выходим
+\q

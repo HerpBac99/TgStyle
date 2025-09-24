@@ -1,0 +1,119 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  Int      @id @default(autoincrement())
+  telegramId          BigInt   @unique
+  firstName           String
+  lastName            String?
+  username            String?
+  avatarUrl           String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  isActive            Boolean  @default(true)
+
+  // Поля для системы подписок
+  analysesCount       Int      @default(3) // доступно анализов в неделю
+  subscriptionType    String   @default("free") // 'free' | 'premium'
+  subscriptionEndDate DateTime? // NULL если нет активной подписки
+  totalAnalyses       Int      @default(0) // общее количество сделанных анализов
+  weeklyResetDate     DateTime @default(now()) // дата следующего сброса счетчика
+
+  // Связи
+  historyItems        HistoryItem[]
+  ratings             Rating[]
+  comments            Comment[]
+  notifications       Notification[]
+  relatedNotifications Notification[] @relation("NotificationRelatedUser")
+
+  @@map("users")
+}
+
+model HistoryItem {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  photoData        String   // base64 encoded image
+  analysisText     String?  // пользовательское описание стиля
+  technicalAnalysis String? // техническое описание ИИ
+
+  isPublic         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Связи
+  ratings          Rating[]
+  comments         Comment[]
+  notifications    Notification[]
+
+  @@map("history_items")
+}
+
+model Rating {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  historyItemId Int
+  historyItem   HistoryItem @relation(fields: [historyItemId], references: [id], onDelete: Cascade)
+
+  ratingType    String   // 'like' | 'dislike'
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, historyItemId])
+  @@map("ratings")
+}
+
+model Comment {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  historyItemId Int
+  historyItem   HistoryItem @relation(fields: [historyItemId], references: [id], onDelete: Cascade)
+
+  content       String
+  parentCommentId Int?   // вложенные комментарии
+  parentComment Comment? @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies       Comment[] @relation("CommentReplies")
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  isDeleted     Boolean  @default(false)
+
+  // Связи
+  notifications Notification[]
+
+  @@map("comments")
+}
+
+model Notification {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type          String   // 'comment' | 'rating' | 'reply'
+  message       String
+  relatedUserId Int?    // кто сделал действие
+  relatedUser   User?    @relation("NotificationRelatedUser", fields: [relatedUserId], references: [id])
+  historyItemId Int?
+  historyItem   HistoryItem? @relation(fields: [historyItemId], references: [id])
+  commentId     Int?
+  comment       Comment? @relation(fields: [commentId], references: [id])
+
+  isRead        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@map("notifications")
+}

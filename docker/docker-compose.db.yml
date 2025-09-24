@@ -1,0 +1,50 @@
+version: '3'
+
+services:
+  # База данных - PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: telegramstyle-postgres
+    restart: always
+    env_file:
+      - ./docker.env  # Все переменные окружения загружаются из файла
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - telegramstyle-network
+
+  # Кэш - Redis
+  redis:
+    image: redis:7-alpine
+    container_name: telegramstyle-redis
+    restart: always
+    env_file:
+      - ./docker.env  # Загружаем переменные из файла
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - telegramstyle-network
+
+  # Adminer для управления БД через веб-интерфейс
+  adminer:
+    image: adminer:latest
+    container_name: telegramstyle-adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    networks:
+      - telegramstyle-network
+    depends_on:
+      - postgres
+
+networks:
+  telegramstyle-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
