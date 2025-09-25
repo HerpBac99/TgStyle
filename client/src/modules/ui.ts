@@ -218,7 +218,19 @@ class UIManager {
       logger.info('History cell clicked', { index });
       this.showSavedAnalysis(historyItem);
     } else {
-      logger.info('Empty history cell clicked, opening camera', { index });
+      logger.info('Empty history cell clicked, checking limits', { index });
+
+      // Проверяем лимиты перед открытием камеры
+      if (!authManager.canAnalyze()) {
+        logger.info('Analysis limit reached, showing subscription modal', {
+          analysesLeft: authManager.getAnalysesLeft(),
+          isPremium: authManager.isPremium()
+        });
+        this.showSubscriptionModal();
+        return;
+      }
+
+      logger.info('Limits check passed, opening camera', { index });
       this.handleCameraButtonClick(new Event('click'));
     }
   }
@@ -1425,6 +1437,196 @@ class UIManager {
 
     // Сбрасываем состояние
     this.resetLongPressState();
+  }
+
+  /**
+   * Показать модальное окно покупки подписки
+   */
+  showSubscriptionModal(): void {
+    logger.info('Showing subscription modal');
+
+    const modal = getElement('#subscription-modal');
+    if (!modal) {
+      logger.error('Subscription modal not found');
+      return;
+    }
+
+    // Обновляем дату сброса лимитов
+    this.updateWeeklyResetDate();
+
+    // Показываем модальное окно
+    modal.classList.remove('hidden');
+
+    // Настраиваем обработчики событий
+    this.setupSubscriptionModalHandlers();
+
+    // Вибрация при открытии модального окна
+    authManager.vibrate('medium');
+
+    logger.info('Subscription modal shown');
+  }
+
+  /**
+   * Скрыть модальное окно покупки подписки
+   */
+  hideSubscriptionModal(): void {
+    logger.info('Hiding subscription modal');
+
+    const modal = getElement('#subscription-modal');
+    if (!modal) return;
+
+    // Скрываем модальное окно
+    modal.classList.add('hidden');
+
+    // Очищаем обработчики событий (если они были установлены)
+    this.cleanupSubscriptionModalHandlers();
+
+    logger.info('Subscription modal hidden');
+  }
+
+  /**
+   * Обновить дату еженедельного сброса лимитов
+   */
+  private updateWeeklyResetDate(): void {
+    const resetDateElement = getElement('#weekly-reset-date');
+    if (!resetDateElement) return;
+
+    // Вычисляем следующий понедельник
+    const now = new Date();
+    const nextMonday = new Date(now);
+    const daysUntilMonday = (8 - now.getDay()) % 7 || 7; // Если сегодня понедельник, то через 7 дней
+    nextMonday.setDate(now.getDate() + daysUntilMonday);
+    nextMonday.setHours(0, 0, 0, 0); // Устанавливаем начало дня
+
+    // Форматируем дату
+    const formattedDate = nextMonday.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long'
+    });
+
+    resetDateElement.textContent = formattedDate;
+  }
+
+  /**
+   * Настроить обработчики событий для модального окна подписки
+   */
+  private setupSubscriptionModalHandlers(): void {
+    // Обработчик закрытия модального окна
+    const closeBtn = getElement('#close-subscription-modal');
+    if (closeBtn) {
+      const closeHandler = () => this.hideSubscriptionModal();
+      closeBtn.addEventListener('click', closeHandler);
+
+      // Сохраняем обработчик для очистки
+      this.cleanupFunctions.push(() => {
+        closeBtn.removeEventListener('click', closeHandler);
+      });
+    }
+
+    // Обработчик клика по оверлею для закрытия
+    const modal = getElement('#subscription-modal');
+    if (modal) {
+      const overlayHandler = (event: Event) => {
+        if (event.target === modal || (event.target as HTMLElement).classList.contains('subscription-modal-overlay')) {
+          this.hideSubscriptionModal();
+        }
+      };
+      modal.addEventListener('click', overlayHandler);
+
+      // Сохраняем обработчик для очистки
+      this.cleanupFunctions.push(() => {
+        modal.removeEventListener('click', overlayHandler);
+      });
+    }
+
+    // Обработчик кнопки "Оформить Premium"
+    const upgradeBtn = getElement('#upgrade-premium-btn');
+    if (upgradeBtn) {
+      const upgradeHandler = () => this.handleUpgradePremium();
+      upgradeBtn.addEventListener('click', upgradeHandler);
+
+      // Сохраняем обработчик для очистки
+      this.cleanupFunctions.push(() => {
+        upgradeBtn.removeEventListener('click', upgradeHandler);
+      });
+    }
+  }
+
+  /**
+   * Очистить обработчики событий модального окна подписки
+   */
+  private cleanupSubscriptionModalHandlers(): void {
+    // Обработчики очищаются автоматически через cleanupFunctions
+    // Этот метод оставлен для потенциального расширения
+  }
+
+  /**
+   * Обработчик кнопки "Оформить Premium"
+   */
+  private handleUpgradePremium(): void {
+    logger.info('Upgrade Premium button clicked');
+
+    // Здесь будет логика покупки подписки
+    // Пока показываем уведомление
+
+    // Скрываем модальное окно
+    this.hideSubscriptionModal();
+
+    // Показываем уведомление о том, что функция в разработке
+    this.showToast('Функция покупки подписки скоро будет доступна!', 'info');
+
+    // Вибрация
+    authManager.vibrate('light');
+  }
+
+  /**
+   * Показать toast уведомление
+   */
+  private showToast(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
+    // Создаем toast элемент
+    const toast = createElement('div', {
+      class: `toast toast-${type}`,
+    });
+
+    toast.textContent = message;
+
+    // Стили для toast
+    Object.assign(toast.style, {
+      position: 'fixed',
+      top: '20px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      background: type === 'success' ? '#4CAF50' : type === 'error' ? '#F44336' : '#2196F3',
+      color: 'white',
+      padding: '12px 24px',
+      borderRadius: '8px',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+      zIndex: '10001',
+      fontSize: '14px',
+      fontWeight: '500',
+      opacity: '0',
+      transition: 'opacity 0.3s ease',
+    });
+
+    // Добавляем в body
+    document.body.appendChild(toast);
+
+    // Показываем с анимацией
+    setTimeout(() => {
+      toast.style.opacity = '1';
+    }, 100);
+
+    // Скрываем через 3 секунды
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 300);
+    }, 3000);
+
+    logger.info('Toast shown', { message, type });
   }
 
   /**

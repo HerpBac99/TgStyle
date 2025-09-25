@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" crossorigin src="/assets/main-Duf9J2w3.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main--y-wJy3x.css">
+  <script type="module" crossorigin src="/assets/main-BKXDVATw.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-DJXpllfU.css">
 </head>
 <body>
     <div class="app-container">
@@ -24,9 +24,6 @@
                 <div id="subscription-status" class="subscription-status free">Free</div>
                 <div class="analyses-info">
                     <span id="analyses-left" class="analyses-left">3</span>
-                </div>
-                <div id="subscription-badge" class="subscription-badge premium-badge" style="display: none;">
-                    Premium
                 </div>
             </div>
             <!-- <span id="user-name"></span> -->
@@ -128,6 +125,63 @@
                 <!-- Дата анализа -->
                 <div id="saved-analysis-date" class="saved-analysis-date">
                     <!-- Сюда будет вставлена дата -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно покупки подписки -->
+    <div id="subscription-modal" class="subscription-modal hidden">
+        <div class="subscription-modal-overlay"></div>
+        <div class="subscription-modal-content">
+            <div class="subscription-modal-header">
+                <h2>Анализы закончились</h2>
+                <button id="close-subscription-modal" class="subscription-modal-close" aria-label="Закрыть">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="subscription-modal-body">
+                <div class="subscription-limit-info">
+                    <div class="limit-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 6v6l4 2"></path>
+                        </svg>
+                    </div>
+                    <p class="limit-message">Вы использовали все бесплатные анализы одежды на этой неделе</p>
+                    <p class="limit-description">Новые анализы станут доступны через 7 дней или оформите подписку Premium для безлимитного доступа</p>
+                </div>
+
+                <div class="subscription-plans">
+                    <div class="subscription-plan premium-plan">
+                        <div class="plan-header">
+                            <h3>Premium подписка</h3>
+                            <div class="plan-price">
+                                <span class="price-amount">299₽</span>
+                                <span class="price-period">/месяц</span>
+                            </div>
+                        </div>
+                        <ul class="plan-features">
+                            <li>✅ Безлимитные анализы одежды</li>
+                            <li>✅ Детальный анализ стиля</li>
+                            <li>✅ Рекомендации по сочетанию</li>
+                            <li>✅ Приоритетная поддержка</li>
+                            <li>✅ Ранний доступ к новым функциям</li>
+                        </ul>
+                        <button id="upgrade-premium-btn" class="upgrade-btn premium-btn">
+                            Оформить Premium
+                        </button>
+                    </div>
+                </div>
+
+                <div class="subscription-footer">
+                    <p class="wait-message">
+                        Или подождите до <span id="weekly-reset-date" class="reset-date">следующей недели</span> для бесплатных анализов
+                    </p>
                 </div>
             </div>
         </div>
