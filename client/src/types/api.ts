@@ -23,6 +23,14 @@ export interface AuthResponse {
     firstName: string;
     lastName?: string;
     username?: string;
+    avatarUrl?: string;
+    subscription?: {
+      type: 'free' | 'premium';
+      analysesLeft: number;
+      totalAnalyses: number;
+      weeklyResetDate: string;
+      subscriptionEndDate?: string | null;
+    };
   };
   error?: string;
 }

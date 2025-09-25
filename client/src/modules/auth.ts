@@ -19,6 +19,13 @@ class AuthManager {
   private tg: TelegramWebApp | null = null;
   private user: TelegramUser | null = null;
   private isAuthenticated = false;
+  private userSubscription: {
+    type: 'free' | 'premium';
+    analysesLeft: number;
+    totalAnalyses: number;
+    weeklyResetDate: string;
+    subscriptionEndDate?: string | null;
+  } | null = null;
 
   constructor() {
     this.initializeTelegram();
@@ -111,9 +118,53 @@ class AuthManager {
         (userPhoto as HTMLElement).style.backgroundImage = `url(${this.user.photo_url})`;
       }
 
+      // Отображение информации о подписке
+      this.displaySubscriptionInfo();
+
       logger.info('User profile displayed');
     } catch (error) {
       logger.error('Error displaying user profile', error);
+    }
+  }
+
+  /**
+   * Отображение информации о подписке в UI
+   */
+  private displaySubscriptionInfo(): void {
+    if (!this.userSubscription) return;
+
+    try {
+      // Ищем элементы для отображения подписки
+      const subscriptionStatus = document.getElementById('subscription-status');
+      const analysesLeft = document.getElementById('analyses-left');
+
+      // Отображение статуса подписки
+      if (subscriptionStatus) {
+        const isPremium = this.userSubscription.type === 'premium';
+        subscriptionStatus.textContent = isPremium ? 'Premium' : 'Free';
+        subscriptionStatus.className = `subscription-status ${isPremium ? 'premium' : 'free'}`;
+      }
+
+      // Отображение оставшихся анализов
+      if (analysesLeft) {
+        const isUnlimited = this.userSubscription.type === 'premium';
+        const leftCount = this.userSubscription.analysesLeft;
+        
+        if (isUnlimited) {
+          analysesLeft.textContent = 'Unlimited';
+          analysesLeft.className = 'analyses-left unlimited';
+        } else {
+          analysesLeft.textContent = leftCount.toString();
+          analysesLeft.className = `analyses-left ${leftCount <= 1 ? 'low' : leftCount <= 3 ? 'medium' : 'high'}`;
+        }
+      }
+
+      logger.info('Subscription info displayed', {
+        type: this.userSubscription.type,
+        analysesLeft: this.userSubscription.analysesLeft
+      });
+    } catch (error) {
+      logger.error('Error displaying subscription info', error);
     }
   }
 
@@ -133,6 +184,15 @@ class AuthManager {
       
       if (!initData) {
         logger.warn('InitData not available, continuing without server authentication');
+        
+        // Создаем базовую подписку для локального режима
+        this.userSubscription = {
+          type: 'free',
+          analysesLeft: 3,
+          totalAnalyses: 0,
+          weeklyResetDate: new Date().toISOString()
+        };
+        
         // В режиме разработки можем продолжить без авторизации
         const authResponse: AuthResponse = {
           success: true,
@@ -145,8 +205,12 @@ class AuthManager {
             firstName: this.user.first_name,
             ...(this.user.last_name && { lastName: this.user.last_name }),
             ...(this.user.username && { username: this.user.username }),
+            subscription: this.userSubscription
           };
         }
+
+        // Обновляем отображение профиля
+        this.displayUserProfile();
 
         return authResponse;
       }
@@ -168,6 +232,29 @@ class AuthManager {
 
       if (response.success) {
         this.isAuthenticated = true;
+        
+        // Сохраняем информацию о подписке если доступна
+        if (response.user?.subscription) {
+          this.userSubscription = response.user.subscription;
+          logger.info('Subscription info received', {
+            type: this.userSubscription.type,
+            analysesLeft: this.userSubscription.analysesLeft,
+            totalAnalyses: this.userSubscription.totalAnalyses
+          });
+        } else {
+          // Graceful fallback - создаем базовую подписку для совместимости
+          this.userSubscription = {
+            type: 'free',
+            analysesLeft: 3,
+            totalAnalyses: 0,
+            weeklyResetDate: new Date().toISOString()
+          };
+          logger.warn('No subscription info from server, using fallback');
+        }
+
+        // Обновляем отображение профиля с новой информацией
+        this.displayUserProfile();
+        
         logger.info('Authentication successful');
       } else {
         logger.error('Server authentication failed', { error: response.error });
@@ -259,6 +346,49 @@ class AuthManager {
   }
 
   /**
+   * Получение информации о подписке
+   */
+  getSubscription() {
+    return this.userSubscription;
+  }
+
+  /**
+   * Проверка Premium статуса
+   */
+  isPremium(): boolean {
+    return this.userSubscription?.type === 'premium';
+  }
+
+  /**
+   * Получение количества оставшихся анализов
+   */
+  getAnalysesLeft(): number {
+    return this.userSubscription?.analysesLeft || 0;
+  }
+
+  /**
+   * Может ли пользователь выполнить анализ
+   */
+  canAnalyze(): boolean {
+    if (!this.userSubscription) return false;
+    return this.userSubscription.type === 'premium' || this.userSubscription.analysesLeft > 0;
+  }
+
+  /**
+   * Обновление информации о подписке (после анализа или покупки)
+   */
+  updateSubscription(subscription: typeof this.userSubscription): void {
+    if (subscription) {
+      this.userSubscription = subscription;
+      this.displaySubscriptionInfo();
+      logger.info('Subscription updated', {
+        type: subscription.type,
+        analysesLeft: subscription.analysesLeft
+      });
+    }
+  }
+
+  /**
    * Получение статистики авторизации
    */
   getAuthStats() {
@@ -266,6 +396,9 @@ class AuthManager {
       isAuthenticated: this.isAuthenticated,
       hasTelegram: !!this.tg,
       hasUser: !!this.user,
+      hasSubscription: !!this.userSubscription,
+      subscriptionType: this.userSubscription?.type,
+      analysesLeft: this.userSubscription?.analysesLeft,
       telegramVersion: this.tg?.version,
       platform: this.tg?.platform,
       colorScheme: this.tg?.colorScheme,

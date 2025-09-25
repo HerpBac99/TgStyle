@@ -26,6 +26,16 @@ winston.addColors(logColors);
 const logsDir = path.join(__dirname, '../../../logs/server');
 require('fs').mkdirSync(logsDir, { recursive: true });
 
+// Функция для безопасной сериализации объектов с BigInt
+const safeStringify = (obj) => {
+  return JSON.stringify(obj, (key, value) => {
+    if (typeof value === 'bigint') {
+      return value.toString();
+    }
+    return value;
+  });
+};
+
 // Настройка формата логов
 const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
@@ -36,7 +46,7 @@ const logFormat = winston.format.combine(
 
     // Добавляем метаданные если они есть
     if (Object.keys(meta).length > 0) {
-      logMessage += ` | ${JSON.stringify(meta)}`;
+      logMessage += ` | ${safeStringify(meta)}`;
     }
 
     // Добавляем стек ошибки если есть
@@ -57,7 +67,7 @@ const consoleFormat = winston.format.combine(
 
     // Добавляем метаданные если они есть
     if (Object.keys(meta).length > 0) {
-      logMessage += ` | ${JSON.stringify(meta)}`;
+      logMessage += ` | ${safeStringify(meta)}`;
     }
 
     return logMessage;

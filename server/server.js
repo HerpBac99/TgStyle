@@ -12,9 +12,14 @@ const cors = require('cors');
 // Загрузка переменных окружения
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
+// Инициализация Prisma клиента
+const prisma = require('./src/lib/prisma');
+
 // Импорт API маршрутов
 const authRoutes = require('./src/api/auth');
 const analyzeRoutes = require('./src/api/analyze');
+const historyRoutes = require('./src/api/history');
+const subscriptionRoutes = require('./src/api/subscription');
 const apiRoutes = require('./routes/api');
 
 // Импорт логгера
@@ -34,6 +39,8 @@ app.use(express.static(path.join(__dirname, '..', 'dist')));
 // API роуты
 app.use('/api/auth', authRoutes);
 app.use('/api/analyze', analyzeRoutes);
+app.use('/api/history', historyRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 app.use('/api', apiRoutes);
 
 // Роут для главной страницы
@@ -187,6 +194,11 @@ async function startServer() {
   });
 
   try {
+    // Проверяем подключение к базе данных
+    logger.info('Проверка подключения к PostgreSQL...');
+    await prisma.$connect();
+    logger.info('Подключение к PostgreSQL успешно');
+
     // Создаем HTTPS сервер
     const server = createHttpsServer();
 
@@ -206,6 +218,8 @@ async function startServer() {
       logger.debug('Доступные маршруты:', {
         auth: '/api/auth',
         analyze: '/api/analyze',
+        history: '/api/history',
+        subscription: '/api/subscription',
         logClient: '/api/log-client',
         ping: '/api/ping',
         health: '/api/health'
@@ -213,8 +227,16 @@ async function startServer() {
     });
 
     // Обработка сигналов graceful завершения
-    const gracefulShutdown = (signal) => {
+    const gracefulShutdown = async (signal) => {
       logger.warn(`Получен сигнал ${signal}, завершение работы сервера...`);
+
+      // Отключаемся от базы данных
+      try {
+        await prisma.$disconnect();
+        logger.info('Отключение от PostgreSQL успешно');
+      } catch (error) {
+        logger.error('Ошибка отключения от PostgreSQL', { error: error.message });
+      }
 
       server.close((err) => {
         if (err) {
@@ -235,24 +257,24 @@ async function startServer() {
     };
 
     // Регистрируем обработчики сигналов
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', async () => await gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', async () => await gracefulShutdown('SIGINT'));
 
     // Обработка необработанных исключений
-    process.on('uncaughtException', (error) => {
+    process.on('uncaughtException', async (error) => {
       logger.error('Необработанное исключение', {
         message: error.message,
         stack: error.stack
       });
-      gracefulShutdown('uncaughtException');
+      await gracefulShutdown('uncaughtException');
     });
 
-    process.on('unhandledRejection', (reason, promise) => {
+    process.on('unhandledRejection', async (reason, promise) => {
       logger.error('Необработанное отклонение промиса', {
         reason: reason,
         promise: promise
       });
-      gracefulShutdown('unhandledRejection');
+      await gracefulShutdown('unhandledRejection');
     });
 
   } catch (error) {
@@ -269,4 +291,5 @@ if (require.main === module) {
   startServer();
 }
 
-module.exports = app; 
+// Экспортируем приложение и Prisma клиент для использования в тестах и других модулях
+module.exports = { app, prisma }; 
