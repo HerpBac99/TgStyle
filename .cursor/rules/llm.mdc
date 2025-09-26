@@ -8,67 +8,52 @@ alwaysApply: true
 
 ## Обзор
 
-**FastVLM Server** - это специализированный микросервис для анализа изображений одежды с использованием передовой модели искусственного интеллекта FastVLM (Large Vision Model). Сервер работает как отдельный процесс от основного приложения и предоставляет высокопроизводительный анализ одежды через REST API.
+**FastVLM Server** - это специализированный микросервис для анализа изображений одежды с использованием модели LLaVA (Large Vision Model). Сервер работает как отдельный Python процесс и предоставляет высокопроизводительный анализ через REST API с поддержкой GPU acceleration.
 
 ## Архитектура FastVLM
 
 ### Технологический стек
 
-- **Модель ИИ**: FastVLM (LLaVA-based Vision-Language Model)
-- **Framework**: PyTorch с CUDA acceleration
-- **Сервер**: Flask (Python)
-- **Интеграция**: HTTP REST API
-- **Обработка изображений**: PIL (Python Imaging Library)
+- **Модель ИИ**: LLaVA (Vision-Language Transformer)
+- **Framework**: PyTorch с CUDA/CPU поддержкой
+- **Сервер**: Flask + Waitress (multithreaded)
+- **Обработка изображений**: PIL, OpenCV
 - **Логирование**: Python logging с ротацией
+- **API**: Gemini API (Google AI) как fallback
 
 ### Структура файлов
 
 ```
 fastvlm-server/
 ├── server.py              # Основной Flask сервер
-├── config.py              # Конфигурация сервера
-├── prompt.md              # Промпты для анализа
-├── test_server_api.py    # Скрипт тестирования
-├── requirements.txt       # Python зависимости
-├── logs/                  # Логи сервера
-│   └── fastvlm.log       # Основной лог файл
-└── __init__.py           # Python модуль
+├── config.py              # Конфигурация и настройки
+├── prompt.md              # Промпты для анализа одежды
+├── prompt7bAnal.md        # Промпты для 7B модели
+├── style_prompt.md        # Промпты для анализа стиля
+├── test_1.5b.py           # Тестирование 1.5B модели
+├── test_7b.py             # Тестирование 7B модели
+├── test_multipass.py      # Многопроходный анализ
+├── requirements1.5b.txt   # Зависимости для 1.5B модели
+├── requirements7b.txt     # Зависимости для 7B модели
+├── models/                # Директория с моделями
+│   └── llava-fastvithd_1.5b_stage3/  # Модель 1.5B
+└── logs/                  # Логи сервера
 ```
 
 ## 🚀 Быстрый запуск
 
-### 1. Активация виртуального окружения
+### Запуск сервера
 
 ```bash
-# Переход в директорию сервера
 cd fastvlm-server
-
-# Активация окружения
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
-```
-
-### 2. Установка зависимостей
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Запуск сервера
-
-```bash
 python server.py
 ```
 
-Сервер запускается на `http://127.0.0.1:3001`
+Сервер запускается на `http://127.0.0.1:3001` с автоматическим определением GPU/CPU.
 
 ## 📋 API Эндпоинты
 
-### `GET /health` - Проверка здоровья сервера
-
-**Описание**: Возвращает статус сервера и информацию о загруженной модели
+### `GET /health` - Проверка здоровья
 
 **Ответ**:
 ```json
@@ -81,9 +66,7 @@ python server.py
 }
 ```
 
-### `POST /analyze` - Анализ изображения одежды
-
-**Описание**: Выполняет анализ изображения с использованием FastVLM модели
+### `POST /analyze` - Анализ изображения
 
 **Запрос**:
 ```json
@@ -97,15 +80,13 @@ python server.py
 ```json
 {
   "success": true,
-  "analysis": "На фото изображена синяя футболка из хлопка в casual стиле...",
+  "analysis": "На фото изображена синяя футболка из хлопка...",
   "model_used": "llava",
   "device": "cuda"
 }
 ```
 
-### `GET /load` - Информация о нагрузке сервера
-
-**Описание**: Возвращает текущую нагрузку на CPU и память
+### `GET /load` - Нагрузка сервера
 
 **Ответ**:
 ```json
@@ -113,14 +94,11 @@ python server.py
   "cpu_percent": 45.2,
   "memory_percent": 67.8,
   "memory_used_gb": 8.5,
-  "memory_total_gb": 16.0,
-  "timestamp": 1725623456.789
+  "memory_total_gb": 16.0
 }
 ```
 
 ### `GET /gpu` - Информация о GPU
-
-**Описание**: Возвращает информацию о GPU и использовании памяти
 
 **Ответ**:
 ```json
@@ -128,148 +106,83 @@ python server.py
   "gpu_available": true,
   "gpu_name": "NVIDIA GeForce RTX 3080",
   "gpu_memory_allocated_mb": 2048,
-  "gpu_memory_reserved_mb": 3072,
-  "gpu_memory_total_mb": 10240,
-  "device": "cuda"
+  "gpu_memory_total_mb": 10240
 }
 ```
 
 ### `GET /model` - Информация о модели
 
-**Описание**: Возвращает информацию о загруженной модели ИИ
-
 **Ответ**:
 ```json
 {
-  "loaded": true,
+  "model_loaded": true,
   "model_name": "llava",
   "device": "cuda",
-  "context_length": 2048,
-  "torch_dtype": "torch.float16",
-  "model_path": "/path/to/model"
+  "context_length": 2048
 }
 ```
 
-## ⚙️ Конфигурация
-
-### Переменные окружения (.env)
-
-```bash
-# Настройки сервера
-FASTVLM_HOST=127.0.0.1
-FASTVLM_PORT=3001
-
-# Настройки модели
-MAX_NEW_TOKENS=256
-TEMPERATURE=0.2
-DO_SAMPLE=true
-
-# Настройки производительности
-MAX_IMAGE_SIZE=2048
-BATCH_SIZE=1
-
-# Настройки логирования
-LOG_LEVEL=INFO
-LOG_MAX_BYTES=10485760
-LOG_BACKUP_COUNT=5
-```
-
-### Автоматическая конфигурация
-
-- **GPU Detection**: Автоматическое определение и использование GPU
-- **Memory Management**: Оптимизация использования памяти
-- **Model Loading**: Автоматическая загрузка модели при запуске
-- **Logging Setup**: Настройка логирования с ротацией
-
-## 🧠 Модель FastVLM
+## 🧠 Модель LLaVA
 
 ### Технические характеристики
 
 - **Архитектура**: Vision-Language Transformer
-- **Размер модели**: 1.5B параметров
+- **Размеры**: 1.5B и 7B параметров
 - **Точность**: FP16 (half precision)
 - **Контекст**: 2048 токенов
 - **Язык**: Многоязычная поддержка
 
-### Особенности модели
+### Особенности
 
-1. **Vision Understanding**: Анализ визуального контента изображений
-2. **Fashion Expertise**: Специализация на одежде и моде
-3. **Russian Language**: Поддержка русского языка для ответов
-4. **Detailed Analysis**: Детальное описание характеристик одежды
+1. **Vision Understanding**: Анализ визуального контента
+2. **Fashion Analysis**: Специализация на одежде
+3. **Russian Prompts**: Промпты на русском языке
+4. **Fallback**: Gemini API при недоступности LLaVA
 
 ### Промпты для анализа
 
-Основной промпт загружается из файла `prompt.md`:
-
+**Основной промпт** (`prompt.md`):
 ```markdown
-You are a fashion and clothing style expert. Analyze the image and provide a detailed description of the clothing items you see.
+Ты - эксперт по моде и стилю одежды. Проанализируй изображение и предоставь детальное описание предметов одежды.
 
-Please describe:
-1. Main clothing items (type, color, style, material)
-2. Details and accessories (fastenings, necklines, pockets)
-3. Overall style of the look (color scheme, compatibility, seasonality)
-4. Style recommendations (pairing suggestions, variations)
+Опиши:
+1. Основные предметы одежды (тип, цвет, стиль, материал)
+2. Детали и аксессуары (застежки, вырезы, карманы)
+3. Общий стиль образа (цветовая гамма, совместимость, сезонность)
+4. Рекомендации по стилю (предложения по сочетанию, варианты)
 ```
 
 ## 🔧 Работа с сервером
 
-### Запуск в фоне
+### Автоматическая конфигурация
 
-```bash
-# Запуск в фоне
-python server.py &
+```python
+# config.py
+class Config:
+    # Автоопределение устройства
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Или через nohup
-nohup python server.py &
+    # Пути к моделям
+    MODEL_1_5B_PATH = "models/llava-fastvithd_1.5b_stage3"
+    MODEL_7B_PATH = "models/llava-fastvithd_7b_stage3"
+
+    # Настройки генерации
+    MAX_NEW_TOKENS = 256
+    TEMPERATURE = 0.2
+    DO_SAMPLE = True
 ```
 
-### Проверка статуса
+### Graceful shutdown
 
-```bash
-# Health check
-curl http://127.0.0.1:3001/health
-
-# GPU status
-curl http://127.0.0.1:3001/gpu
-
-# Model info
-curl http://127.0.0.1:3001/model
-```
-
-### Логирование
-
-```bash
-# Просмотр логов
-tail -f fastvlm-server/logs/fastvlm.log
-
-# Поиск ошибок
-grep ERROR fastvlm-server/logs/fastvlm.log
-```
-
-## 🧪 Тестирование
-
-### Автоматическое тестирование
-
-```bash
-cd fastvlm-server
-python test_server_api.py
-```
-
-### Ручное тестирование
-
-```bash
-# Health check
-curl http://127.0.0.1:3001/health
-
-# Load check
-curl http://127.0.0.1:3001/load
-
-# GPU check
-curl http://127.0.0.1:3001/gpu
-
-# Model check
-curl http://127.0.0.1:3001/model
+```python
+# server.py
+def signal_handler(signum, frame):
+    logger.info("Получен сигнал завершения, очистка ресурсов...")
+    # Очистка GPU памяти
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    # Закрытие соединений
+    sys.exit(0)
 ```
 
 ## 🔄 Интеграция с основным приложением
@@ -277,214 +190,130 @@ curl http://127.0.0.1:3001/model
 ### Архитектура микросервисов
 
 ```
-Основное приложение (Node.js:8443)
-    ↓ HTTP POST /api/analyze
-FastVLM сервер (Python:3001)
-    ↓ FastVLM модель
-Результаты анализа
-    ↑ JSON response
-Клиент (Telegram Mini App)
+Клиент → Node.js сервер → FastVLM сервер → LLaVA/Gemini
+    ↑         ↑              ↑             ↑
+Результаты ← Анализ ← Детальный анализ ← Обработка изображения
 ```
 
-### Клиент для Node.js
+### Обработка запросов
 
-```javascript
-async function analyzeImage(imageBuffer) {
-    try {
-        // Конвертация изображения в base64
-        const base64Image = imageBuffer.toString('base64');
-
-        // Отправка в FastVLM сервер
-        const response = await fetch('http://127.0.0.1:3001/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                image_base64: base64Image,
-                prompt: 'Опиши одежду на фото'
-            })
-        });
-
-        if (response.ok) {
-            const result = await response.json();
-            return result.analysis;
-        } else {
-            throw new Error('FastVLM сервер недоступен');
-        }
-    } catch (error) {
-        console.error('Ошибка анализа:', error);
-        return null;
-    }
-}
-```
+1. **Валидация**: Проверка формата изображения
+2. **Предобработка**: Конвертация base64 в PIL Image
+3. **Анализ**: Отправка в LLaVA модель
+4. **Fallback**: Переключение на Gemini API при ошибках
+5. **Постобработка**: Форматирование ответа
 
 ## 📊 Мониторинг производительности
 
-### Метрики сервера
+### Метрики
 
-- **Response Time**: Среднее время ответа (обычно 2-5 сек)
-- **GPU Memory**: Использование видеопамяти
-- **CPU Usage**: Нагрузка на процессор
-- **Memory Usage**: Использование оперативной памяти
-- **Error Rate**: Процент ошибок
+- **Response Time**: 2-5 секунд на изображение
+- **GPU Memory**: ~2-4GB при обработке
+- **CPU Usage**: 10-30% при активной работе
+- **Throughput**: 10-15 изображений в минуту
 
 ### Оптимизации
 
-1. **GPU Acceleration**: Использование CUDA для ускорения
-2. **Memory Management**: Автоматическая очистка GPU памяти
-3. **Batch Processing**: Поддержка пакетной обработки
-4. **Caching**: Кэширование результатов анализа
-
-### Системные требования
-
-- **GPU**: Минимум 4GB видеопамяти (рекомендуется 8GB+)
-- **RAM**: Минимум 8GB оперативной памяти
-- **Disk**: Минимум 10GB для модели и логов
-- **OS**: Linux/Windows/Mac с поддержкой CUDA
+1. **GPU Acceleration**: CUDA для ускорения
+2. **Memory Management**: Автоматическая очистка памяти
+3. **Multithreading**: Waitress для одновременных запросов
+4. **Error Recovery**: Graceful degradation
 
 ## 🚨 Обработка ошибок
 
 ### Типичные ошибки
 
-- **Model not loaded**: Модель не загружена в память
-- **CUDA out of memory**: Недостаточно видеопамяти
-- **Invalid image**: Некорректное изображение
-- **Network timeout**: Таймаут при обработке больших изображений
+- **CUDA out of memory**: Переключение на CPU
+- **Model loading failed**: Fallback на Gemini API
+- **Invalid image**: Валидация входных данных
+- **Network timeout**: Таймауты и повторные попытки
 
-### Fallback механизм
+### Fallback система
 
-При недоступности FastVLM сервера система автоматически переключается на симуляцию анализа:
-
-```javascript
-// В server/src/api/analyze.js
-if (!isHealthy) {
-    console.log('FastVLM сервер недоступен, используем симуляцию');
-    return simulateClassification();
-}
+```python
+# server.py
+async def analyze_with_fallback(image_base64, prompt):
+    try:
+        # Попытка LLaVA анализа
+        return await analyze_with_llava(image_base64, prompt)
+    except Exception as e:
+        logger.warning(f"LLaVA failed, trying Gemini: {e}")
+        try:
+            # Fallback на Gemini API
+            return await analyze_with_gemini(image_base64, prompt)
+        except Exception as e2:
+            logger.error(f"Both models failed: {e2}")
+            raise
 ```
-
-## 🔄 Перезапуск и обслуживание
-
-### Graceful shutdown
-
-Сервер корректно завершается по сигналам:
-- **SIGINT** (Ctrl+C)
-- **SIGTERM** (kill команда)
-
-### Автоматическая очистка
-
-- **GPU Memory**: Освобождение видеопамяти при завершении
-- **Temp Files**: Удаление временных файлов
-- **Connections**: Закрытие открытых соединений
-
-### Мониторинг состояния
-
-```bash
-# Проверка процесса
-ps aux | grep fastvlm
-
-# Проверка порта
-netstat -tlnp | grep 3001
-
-# Проверка логов
-tail -f logs/fastvlm.log
-```
-
-## 🐛 Troubleshooting
-
-### Модель не загружается
-
-```bash
-# Проверить путь к модели
-python -c "from config import Config; print(Config.MODEL_PATH)"
-
-# Проверить существование файла
-ls -la ml-fastvlm/checkpoints/llava-fastvithd_1.5b_stage3/
-```
-
-### CUDA ошибка
-
-```bash
-# Проверить CUDA
-python -c "import torch; print(torch.cuda.is_available())"
-
-# Проверить версию CUDA
-nvidia-smi
-```
-
-### Порт занят
-
-```bash
-# Изменить порт в .env
-echo "FASTVLM_PORT=3002" >> .env
-
-# Перезапустить сервер
-python server.py
-```
-
-## 📈 Производительность
-
-### Бенчмарки
-
-- **Время анализа**: 2-5 секунд на изображение
-- **Память GPU**: ~2-4GB при обработке
-- **CPU Usage**: 10-30% при активной работе
-- **Пропускная способность**: 10-15 изображений в минуту
-
-### Оптимизации производительности
-
-1. **Half Precision**: Использование FP16 для экономии памяти
-2. **GPU Batching**: Пакетная обработка изображений
-3. **Memory Pooling**: Переиспользование GPU памяти
-4. **Async Processing**: Асинхронная обработка запросов
 
 ## 🔗 Связанные компоненты
 
 ### Интеграция с клиентом
 
-FastVLM сервер интегрирован с клиентским приложением через:
-
-1. **API Gateway**: Основной Node.js сервер
-2. **Image Processing**: Сжатие изображений на клиенте
-3. **Fallback System**: Симуляция при недоступности ИИ
-4. **Error Handling**: Graceful degradation
+1. **Image Compression**: Сжатие на клиенте перед отправкой
+2. **Base64 Encoding**: Передача изображений в base64
+3. **Error Handling**: Graceful degradation на клиенте
+4. **Caching**: Кэширование результатов анализа
 
 ### Работа с базой данных
 
-- **User History**: Сохранение результатов анализа
-- **Analytics**: Статистика использования
-- **Caching**: Кэширование частых запросов
+- **History Storage**: Сохранение результатов в PostgreSQL
+- **User Management**: Управление подписками и лимитами
+- **Analytics**: Статистика использования AI
 
-## 🎯 Будущие улучшения
+## 🎯 Производственные особенности
 
-### Планируемые функции
+### Масштабируемость
 
-1. **Model Updates**: Обновление до новейших версий FastVLM
-2. **Multi-language**: Расширенная поддержка языков
-3. **Batch Analysis**: Анализ нескольких изображений одновременно
-4. **Style Recommendations**: Персонализированные рекомендации
-5. **Fashion Trends**: Анализ модных тенденций
+- **Multiprocessing**: Поддержка нескольких процессов
+- **Load Balancing**: Распределение нагрузки
+- **Resource Limits**: Ограничение использования ресурсов
 
-### Технические улучшения
+### Безопасность
 
-1. **Model Optimization**: Квантизация для меньшего размера
-2. **API Improvements**: GraphQL API для гибких запросов
-3. **Monitoring**: Расширенная система мониторинга
-4. **Scalability**: Горизонтальное масштабирование
+- **Input Validation**: Проверка входных данных
+- **Rate Limiting**: Защита от перегрузки
+- **Error Isolation**: Изоляция ошибок между запросами
 
-## 📚 Документация
+## 📈 Производительность
 
-### API Documentation
+### Бенчмарки
 
-- **Swagger/OpenAPI**: Автоматическая генерация документации
-- **Postman Collection**: Коллекция для тестирования
-- **Integration Guide**: Руководство по интеграции
+- **1.5B модель**: ~3 секунды на изображение (GPU)
+- **7B модель**: ~5 секунд на изображение (GPU)
+- **CPU fallback**: ~10-15 секунд на изображение
+- **Gemini API**: ~2-3 секунды на изображение
 
-### Мониторинг
+### Оптимизации
 
-- **Health Checks**: Автоматические проверки здоровья
-- **Metrics Export**: Экспорт метрик в Prometheus
-- **Alerting**: Система оповещений о проблемах
+1. **Batch Processing**: Групповая обработка изображений
+2. **Memory Pooling**: Переиспользование GPU памяти
+3. **Async Processing**: Асинхронная обработка запросов
+4. **Model Caching**: Кэширование загруженных моделей
 
----
+## 🐛 Troubleshooting
 
-*FastVLM Server обеспечивает высокопроизводительный анализ изображений одежды с использованием передовых технологий ИИ, обеспечивая точные и детальные описания модных предметов.*
+### Диагностика проблем
+
+```bash
+# Проверка здоровья
+curl http://127.0.0.1:3001/health
+
+# Проверка GPU
+curl http://127.0.0.1:3001/gpu
+
+# Просмотр логов
+tail -f logs/fastvlm.log
+```
+
+### Решение проблем
+
+- **GPU не доступна**: Переключение на CPU режим
+- **Модель не загружается**: Проверка путей к файлам
+- **Память переполнена**: Очистка GPU памяти
+- **Сеть недоступна**: Использование локальных моделей
+
+## 📚 Заключение
+
+FastVLM Server представляет собой высокопроизводительный AI-сервис для анализа изображений одежды с поддержкой GPU acceleration, graceful fallback и комплексным мониторингом производительности.
+
