@@ -78,10 +78,13 @@ class HistoryManager {
   }
 
   /**
-   * Сохранение истории в localStorage
+   * Сохранение истории в localStorage с проверкой размера
    */
   private saveToStorage(): void {
     try {
+      // Проверяем и очищаем localStorage если необходимо
+      this.ensureStorageSpace();
+
       // Сохраняем историю как есть, без оптимизации размера
       const historyJson = safeJsonStringify(this.history);
       localStorage.setItem(STORAGE_KEYS.HISTORY, historyJson);
@@ -90,6 +93,118 @@ class HistoryManager {
     } catch (error) {
       logger.error('Error saving history to storage', error);
       throw createError(ERROR_CODES.STORAGE_ERROR, 'Не удалось сохранить историю');
+    }
+  }
+
+  /**
+   * Проверяет и обеспечивает свободное место в localStorage
+   */
+  private ensureStorageSpace(): void {
+    try {
+      // Рассчитываем размер текущей истории
+      const currentHistorySize = this.calculateHistorySize();
+
+      // Получаем размер других данных в localStorage
+      const otherDataSize = this.getOtherStorageSize();
+
+      // Общий размер после добавления новой истории
+      const totalEstimatedSize = otherDataSize + currentHistorySize;
+
+      // Лимит localStorage (примерно 5MB)
+      const storageLimit = 4.5 * 1024 * 1024; // 4.5MB для безопасности
+
+      if (totalEstimatedSize > storageLimit) {
+        logger.warn('localStorage limit approaching, cleaning up old items', {
+          currentHistorySize: Math.round(currentHistorySize / 1024) + 'KB',
+          otherDataSize: Math.round(otherDataSize / 1024) + 'KB',
+          totalEstimatedSize: Math.round(totalEstimatedSize / 1024) + 'KB',
+          storageLimit: Math.round(storageLimit / 1024) + 'KB'
+        });
+
+        // Удаляем старые элементы, оставляя место для одного элемента (1MB)
+        this.cleanupOldItems(storageLimit - otherDataSize - 1024 * 1024);
+      }
+    } catch (error) {
+      logger.warn('Error checking storage space', error);
+    }
+  }
+
+  /**
+   * Рассчитывает размер текущей истории в байтах
+   */
+  private calculateHistorySize(): number {
+    try {
+      const historyJson = safeJsonStringify(this.history);
+      // Примерный размер в байтах (base64 примерно в 1.37 раза больше JSON)
+      return historyJson.length * 1.37;
+    } catch (error) {
+      logger.warn('Error calculating history size', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Получает размер других данных в localStorage (кроме истории)
+   */
+  private getOtherStorageSize(): number {
+    let totalSize = 0;
+    try {
+      for (let key in localStorage) {
+        if (key !== STORAGE_KEYS.HISTORY && localStorage.hasOwnProperty(key)) {
+          const value = localStorage.getItem(key);
+          if (value) {
+            totalSize += value.length * 1.37; // Примерный размер в байтах
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn('Error calculating other storage size', error);
+    }
+    return totalSize;
+  }
+
+  /**
+   * Удаляет старые элементы истории чтобы уложиться в лимит
+   */
+  private cleanupOldItems(maxAllowedSize: number): void {
+    try {
+      const filledItems = this.getFilledItems();
+      if (filledItems.length <= 1) {
+        logger.warn('Cannot cleanup: only one item left');
+        return;
+      }
+
+      // Сортируем по времени (старые первые)
+      filledItems.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+      // Удаляем старые элементы пока не уложимся в лимит
+      let currentSize = this.calculateHistorySize();
+      let removedCount = 0;
+
+      while (currentSize > maxAllowedSize && filledItems.length > 1) {
+        const oldestItem = filledItems.shift();
+        if (oldestItem) {
+          // Находим индекс этого элемента в основной истории
+          const index = this.history.findIndex(item =>
+            item && !item.isEmpty && item.timestamp === oldestItem.timestamp
+          );
+          if (index >= 0) {
+            this.history[index] = { isEmpty: true } as HistoryItem;
+            removedCount++;
+            currentSize = this.calculateHistorySize();
+          }
+        }
+      }
+
+      if (removedCount > 0) {
+        logger.info('Cleaned up old history items', {
+          removedCount,
+          remainingItems: filledItems.length,
+          newSize: Math.round(currentSize / 1024) + 'KB'
+        });
+      }
+    } catch (error) {
+      logger.warn('Error cleaning up old items', error);
     }
   }
 

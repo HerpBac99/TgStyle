@@ -94,12 +94,12 @@ class AnalysisManager {
 
 
   /**
-   * Сохранение результата в историю
+   * Сохранение результата в историю с оптимизацией размера
    */
   private async saveToHistory(response: AnalysisResponse, imageBase64: string): Promise<void> {
     try {
-      // Используем сжатое изображение для истории (если доступно)
-      const imageForHistory = cameraManager.getImageForAnalysis() || imageBase64;
+      // Получаем изображение для истории
+      let imageForHistory = cameraManager.getImageForAnalysis() || imageBase64;
 
       // Проверяем валидность base64 перед сохранением
       if (!imageForHistory || imageForHistory.length < 100) {
@@ -107,6 +107,57 @@ class AnalysisManager {
         return;
       }
 
+      // РАСЧЕТ РАЗМЕРА И ОПТИМИЗАЦИЯ
+      const analysisText = response.analysis || '';
+      const currentSizeMB = cameraManager.calculateHistoryItemSize(imageForHistory, analysisText);
+
+      logger.info('History item size check', {
+        currentSizeMB: Math.round(currentSizeMB * 100) / 100,
+        resizeThreshold: 0.5,
+        needsResize: currentSizeMB > 0.5
+      });
+
+      // Всегда делаем resize до 800x800 пикселей для экономии места
+      if (currentSizeMB > 0.5) {
+        try {
+          logger.info('Resizing image for history storage', {
+            currentSizeMB: Math.round(currentSizeMB * 100) / 100,
+            maxAllowedMB: 2.0
+          });
+
+          // Делаем resize изображения до 800x800 пикселей
+          const resizedImage = await cameraManager.resizeImageForStorage(imageForHistory);
+
+          // Проверяем размер после resize
+          const resizedSizeMB = cameraManager.calculateHistoryItemSize(resizedImage, analysisText);
+
+          logger.info('Resize completed', {
+            originalSizeMB: Math.round(currentSizeMB * 100) / 100,
+            resizedSizeMB: Math.round(resizedSizeMB * 100) / 100,
+            sizeReduction: Math.round((currentSizeMB - resizedSizeMB) / currentSizeMB * 100) + '%'
+          });
+
+          // Если после resize размер все еще > 1MB, не сохраняем
+          if (resizedSizeMB > 1.0) {
+            logger.warn('Image too large even after resize, skipping localStorage save', {
+              resizedSizeMB: Math.round(resizedSizeMB * 100) / 100
+            });
+            return;
+          }
+
+          // Используем resized изображение
+          imageForHistory = resizedImage;
+          logger.info('Using resized image for storage', {
+            finalSizeMB: Math.round(resizedSizeMB * 100) / 100
+          });
+
+        } catch (resizeError) {
+          logger.error('Image resize failed, skipping localStorage save', resizeError);
+          return;
+        }
+      }
+
+      // Создаем элемент истории
       const historyItem: any = {
         photo: imageForHistory,
         timestamp: new Date().toISOString(),
@@ -117,16 +168,15 @@ class AnalysisManager {
         historyItem.analysis = response.analysis;
       }
 
-
       // Сохраняем детальные результаты многопроходного анализа
       if (response.multi_pass_results) {
         historyItem.multi_pass_results = response.multi_pass_results;
       }
 
       const saved = historyManager.addItem(historyItem);
-      
+
       if (saved) {
-        logger.info('Analysis result saved to history');
+        logger.info('Analysis result saved to history successfully');
       } else {
         logger.warn('Failed to save analysis result to history');
       }
@@ -238,6 +288,18 @@ class AnalysisManager {
       // Сохраняем в историю если анализ успешен
       if (response.success) {
         await this.saveToHistory(response, imageBase64);
+
+        // ОБНОВЛЯЕМ UI ПОСЛЕ СОХРАНЕНИЯ
+        const { uiManager } = await import('./ui.js');
+        const { authManager } = await import('./auth.js');
+
+        // Обновляем карусель истории
+        uiManager.updateHistoryDisplay();
+
+        // Обновляем информацию о подписке (если вернулся новый статус)
+        if (response.subscription) {
+          authManager.updateSubscription(response.subscription);
+        }
       }
 
       // Показываем результат в UI

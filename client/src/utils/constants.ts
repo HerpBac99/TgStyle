@@ -35,7 +35,7 @@ export const HISTORY_CONSTRAINTS = {
 
 // Настройки логирования
 export const LOGGING_CONFIG = {
-  MAX_LOGS_IN_MEMORY: 50,
+  MAX_LOGS_IN_MEMORY: 500,
   LOG_FLUSH_TIMEOUT: 5000, // 5 секунд
   SESSION_ID_LENGTH: 16,
 } as const;

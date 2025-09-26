@@ -269,6 +269,186 @@ class CameraManager {
   }
 
   /**
+   * Resize изображения до максимального размера 800x800 пикселей для localStorage
+   */
+  async resizeImageForStorage(base64Image: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      try {
+        logger.info('Starting image resize for storage');
+
+        // Создаем изображение из base64
+        const img = new Image();
+
+        img.onload = () => {
+          try {
+            // Вычисляем новые размеры (макс 800x800 с сохранением пропорций)
+            const maxSize = 800;
+            let { width, height } = img;
+
+            if (width > height) {
+              if (width > maxSize) {
+                height = (height * maxSize) / width;
+                width = maxSize;
+              }
+            } else {
+              if (height > maxSize) {
+                width = (width * maxSize) / height;
+                height = maxSize;
+              }
+            }
+
+            // Создаем canvas для resize
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            if (!ctx) {
+              throw new Error('Canvas context not available');
+            }
+
+            // Устанавливаем размеры canvas
+            canvas.width = Math.round(width);
+            canvas.height = Math.round(height);
+
+            // Рисуем изображение с новыми размерами
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            // Получаем resized изображение в формате JPEG с высоким качеством
+            const resizedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+            // Убираем префикс data:image/jpeg;base64,
+            const resizedData = resizedBase64.split(',')[1];
+
+            if (!resizedData) {
+              throw new Error('Failed to resize image');
+            }
+
+            const originalSize = (base64Image.length * 3) / 4 / 1024; // KB
+            const resizedSize = (resizedData.length * 3) / 4 / 1024; // KB
+            const compressionRatio = ((originalSize - resizedSize) / originalSize * 100);
+
+            logger.info('Image resize completed', {
+              originalSize: Math.round(originalSize) + 'KB',
+              resizedSize: Math.round(resizedSize) + 'KB',
+              originalDimensions: `${img.width}x${img.height}`,
+              resizedDimensions: `${canvas.width}x${canvas.height}`,
+              compressionRatio: Math.round(compressionRatio) + '%'
+            });
+
+            resolve(resizedData);
+          } catch (error) {
+            logger.error('Error during image resize', error);
+            reject(error);
+          }
+        };
+
+        img.onerror = () => {
+          logger.error('Failed to load image for resize');
+          reject(new Error('Failed to load image for resize'));
+        };
+
+        // Устанавливаем src с полным data URL
+        img.src = `data:image/jpeg;base64,${base64Image}`;
+      } catch (error) {
+        logger.error('Error in resizeImageForStorage', error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Сжатие изображения до указанного качества (устаревшая функция, используется только для совместимости)
+   */
+  async compressImage(base64Image: string, quality: number = 0.8): Promise<string> {
+    return new Promise((resolve, reject) => {
+      try {
+        logger.info('Starting image compression', { quality });
+
+        // Создаем изображение из base64
+        const img = new Image();
+
+        img.onload = () => {
+          try {
+            // Создаем canvas для сжатия
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            if (!ctx) {
+              throw new Error('Canvas context not available');
+            }
+
+            // Сохраняем оригинальные пропорции
+            canvas.width = img.width;
+            canvas.height = img.height;
+
+            // Рисуем изображение на canvas
+            ctx.drawImage(img, 0, 0);
+
+            // Получаем сжатое изображение в формате JPEG
+            const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+
+            // Убираем префикс data:image/jpeg;base64,
+            const compressedData = compressedBase64.split(',')[1];
+
+            if (!compressedData) {
+              throw new Error('Failed to compress image');
+            }
+
+            const originalSize = (base64Image.length * 3) / 4 / 1024; // KB
+            const compressedSize = (compressedData.length * 3) / 4 / 1024; // KB
+            const compressionRatio = ((originalSize - compressedSize) / originalSize * 100);
+
+            logger.info('Image compression completed', {
+              originalSize: Math.round(originalSize) + 'KB',
+              compressedSize: Math.round(compressedSize) + 'KB',
+              compressionRatio: Math.round(compressionRatio) + '%',
+              quality: quality
+            });
+
+            resolve(compressedData);
+          } catch (error) {
+            logger.error('Error during image compression', error);
+            reject(error);
+          }
+        };
+
+        img.onerror = () => {
+          logger.error('Failed to load image for compression');
+          reject(new Error('Failed to load image for compression'));
+        };
+
+        // Загружаем изображение
+        img.src = `data:image/jpeg;base64,${base64Image}`;
+
+      } catch (error) {
+        logger.error('Error starting image compression', error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Расчет размера элемента истории (фото + текст)
+   */
+  calculateHistoryItemSize(imageBase64: string, analysisText?: string): number {
+    // Размер изображения (base64 → bytes)
+    const imageSizeBytes = (imageBase64.length * 3) / 4;
+
+    // Размер текста (UTF-8, примерно 2 байта на символ)
+    const textSizeBytes = analysisText ? analysisText.length * 2 : 0;
+
+    // Общий размер в MB
+    const totalSizeMB = (imageSizeBytes + textSizeBytes) / (1024 * 1024);
+
+    logger.debug('Calculated history item size', {
+      imageSizeKB: Math.round(imageSizeBytes / 1024),
+      textSizeKB: Math.round(textSizeBytes / 1024),
+      totalSizeMB: Math.round(totalSizeMB * 100) / 100
+    });
+
+    return totalSizeMB;
+  }
+
+  /**
    * Получение статистики менеджера камеры
    */
   getStats() {

@@ -49,6 +49,13 @@ export interface AnalysisResponse {
   success: boolean;
   analysis?: string;
   error?: string;
+  subscription?: {
+    type: 'free' | 'premium';
+    analysesLeft: number;
+    totalAnalyses: number;
+    weeklyResetDate: string;
+    subscriptionEndDate?: string | null;
+  };
   multi_pass_results?: {
     person: string;
     accessories: string;
