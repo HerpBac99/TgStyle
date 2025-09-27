@@ -1,1 +1,1 @@
-Output EXACTLY one short line: Describe the shoes on the person if VISIBLE. If no shoes are visible in the image, state that clearly. What type of shoes? What color? What material? What style?
+Focus on the person's feet area. Describe the VISIBLE shoes on the person's feet. If no shoes are visible, state that clearly.

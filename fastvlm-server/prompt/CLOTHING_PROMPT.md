@@ -1,1 +1,1 @@
-Output EXACTLY one short line: Describe all VISIBLE clothing on the person. If no clothing is visible, state that clearly. What type? What color? What material? What length?
+Focus on the person's torso area. Describe all VISIBLE Outerwear and Innerwear clothing on the person's torso. If no torso is visible, state that clearly.

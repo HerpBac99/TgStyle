@@ -66,11 +66,6 @@ except ImportError as e:
     print(f"⚠️  Requests library not available: {e}")
     print("Install with: pip install requests")
 
-# Промпты для многопроходного анализа
-PERSON_PROMPT = None
-CLOTHING_PROMPT = None
-ACCESSORIES_PROMPT = None
-
 app = Flask(__name__)
 
 # Глобальные переменные для модели
@@ -92,6 +87,7 @@ default_prompt = None
 style_prompt = None
 person_prompt = None
 clothing_prompt = None
+legs_prompt = None
 shoes_prompt = None
 accessories_prompt = None
 
@@ -182,7 +178,7 @@ def setup_logging():
 
 def load_prompts():
     """Загрузка промптов для анализа"""
-    global default_prompt, style_prompt, person_prompt, clothing_prompt, shoes_prompt, accessories_prompt
+    global default_prompt, style_prompt, person_prompt, clothing_prompt, legs_prompt, shoes_prompt, accessories_prompt
 
     try:
         # Загружаем три основных промпта для многопроходного анализа
@@ -205,6 +201,15 @@ def load_prompts():
         else:
             clothing_prompt = "Describe the clothing on the person."
             app.logger.warning(f"CLOTHING промпт не найден: {clothing_file}")
+
+        # LEG промпт
+        leg_file = os.path.join(prompt_dir, 'LEG_PROMPT.md')
+        if os.path.exists(leg_file):
+            with open(leg_file, 'r', encoding='utf-8') as f:
+                legs_prompt = f.read().strip()
+        else:
+            legs_prompt = "Describe the clothing on the person's legs."
+            app.logger.warning(f"LEG промпт не найден: {leg_file}")
 
         # SHOES промпт
         shoes_file = os.path.join(prompt_dir, 'SHOES_PROMPT.md')
@@ -263,63 +268,67 @@ def extract_text(result) -> str:
 
 def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
     """Выполняет многопроходный анализ изображения через FastVLM"""
-    global person_prompt, clothing_prompt, shoes_prompt, accessories_prompt
+    global person_prompt, clothing_prompt, legs_prompt, shoes_prompt, accessories_prompt
 
     app.logger.info(f"Начинаем многопроходный анализ для пользователя {nickname}")
 
     # Временные переменные для результатов
     person_result = ""
     clothing_result = ""
+    legs_result = ""
     shoes_result = ""
     accessories_result = ""
-    timing = {"person": 0, "clothing": 0, "accessories": 0, "total": 0}
+    timing = {"person": 0, "clothing": 0, "legs": 0, "shoes": 0, "accessories": 0, "total": 0}
 
     total_start_time = time.time()
 
     try:
         # Pass 1: Person analysis
         if person_prompt:
-            app.logger.info(f"person_prompt : {person_prompt}")
             pass1_start = time.time()
             person_response, error = analyze_image_fastvlm(image_base64, person_prompt)
             if error:
                 person_response = "Не удалось определить информацию о человеке"
             person_result = extract_text(person_response)
             timing["person"] = time.time() - pass1_start
-            app.logger.info(f"person_response : {person_response}")
 
         # Pass 2: Top clothing analysis
         if clothing_prompt:
-            app.logger.info(f"clothing_prompt : {clothing_prompt}")
             pass2_start = time.time()
             clothing_response, error = analyze_image_fastvlm(image_base64, clothing_prompt)
             if error:
                 clothing_response = "Не удалось определить верхнюю одежду"
             clothing_result = extract_text(clothing_response)
             timing["clothing"] = time.time() - pass2_start
-            app.logger.info(f"clothing_response : {clothing_response}")
 
-        # Pass 3: Shoes analysis
-        if shoes_prompt:
-            app.logger.info(f"shoes_prompt : {shoes_prompt}")
+        # Pass 3: Legs clothing analysis
+        if legs_prompt:
             pass3_start = time.time()
+            legs_response, error = analyze_image_fastvlm(image_base64, legs_prompt)
+            if error:
+                legs_response = "Не удалось определить одежду на ногах"
+            legs_result = extract_text(legs_response)
+            timing["legs"] = time.time() - pass3_start
+        else:
+            app.logger.warning(f"legs_prompt is falsy: '{legs_prompt}' (type: {type(legs_prompt)})")
+
+        # Pass 4: Shoes analysis
+        if shoes_prompt:
+            pass4_start = time.time()
             shoes_response, error = analyze_image_fastvlm(image_base64, shoes_prompt)
             if error:
                 shoes_response = "Не удалось определить обувь"
             shoes_result = extract_text(shoes_response)
-            timing["shoes"] = time.time() - pass3_start
-            app.logger.info(f"shoes_response : {shoes_response}")
+            timing["shoes"] = time.time() - pass4_start
 
-        # Pass 4: Inner top clothing analysis
+        # Pass 5: Accessories analysis
         if accessories_prompt:
-            app.logger.info(f"accessories_prompt : {accessories_prompt}")
-            pass6_start = time.time()
+            pass5_start = time.time()
             accessories_response, error = analyze_image_fastvlm(image_base64, accessories_prompt)
             if error:
                 accessories_response = "Не удалось определить аксессуары"
             accessories_result = extract_text(accessories_response)
-            timing["accessories"] = time.time() - pass6_start
-            app.logger.info(f"accessories_response : {accessories_response}")
+            timing["accessories"] = time.time() - pass5_start
 
         timing["total"] = time.time() - total_start_time
 
@@ -328,6 +337,7 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
         return {
             "person": person_result,
             "clothing": clothing_result,
+            "legs": legs_result,
             "shoes": shoes_result,
             "accessories": accessories_result,
             "timing": timing,
@@ -340,6 +350,7 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
         return {
             "person": "",
             "clothing": "",
+            "legs": "",
             "shoes": "",
             "accessories": "",
             "timing": timing,
@@ -522,13 +533,13 @@ def initialize_gemini():
             app.logger.warning("Google GenAI library not available. Install with: pip install google-genai")
             return False
 
-        if not Config.GEMINI_API_KEY:
-            app.logger.warning("GEMINI_API_KEY не установлен. Gemini функции недоступны.")
+        if not Config.STYLIST_GEMINI_API_KEY:
+            app.logger.warning("FASTVLM_STYLIST_GEMINI_API_KEY не установлен. Gemini функции недоступны.")
             return False
 
         # Создаем клиента Gemini
-        gemini_client = genai.Client(api_key=Config.GEMINI_API_KEY)
-        app.logger.debug(f"Gemini API клиент инициализирован (модель: {Config.GEMINI_MODEL})")
+        gemini_client = genai.Client(api_key=Config.STYLIST_GEMINI_API_KEY)
+        app.logger.debug(f"Gemini API клиент инициализирован (модель: {Config.STYLIST_GEMINI_MODEL})")
         return True
 
     except Exception as e:
@@ -550,13 +561,13 @@ def create_stylist_response_gemini(multi_pass_analysis):
         formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis)
 
         # Логируем отправку запроса в Gemini
-        app.logger.info(f"Отправка запроса в Gemini (промпт: {len(formatted_prompt)} символов, модель: {Config.GEMINI_MODEL})")
+        app.logger.info(f"Отправка запроса в Gemini (промпт: {formatted_prompt}, модель: {Config.STYLIST_GEMINI_MODEL})")
 
         gemini_request_start = time.time()
 
         # Создаем запрос к Gemini API
         response = gemini_client.models.generate_content(
-            model=Config.GEMINI_MODEL,
+            model=Config.STYLIST_GEMINI_MODEL,
             contents=[{
                 "parts": [
                     {"text": formatted_prompt}
@@ -575,6 +586,8 @@ def create_stylist_response_gemini(multi_pass_analysis):
             raise Exception("Gemini API вернул пустой ответ")
 
         creative_response = response.text.strip()
+
+        app.logger.info(f"Ответ от Gemini: {creative_response}")
 
         gemini_request_time = time.time() - gemini_request_start
 
@@ -921,6 +934,7 @@ def analyze():
             combined_analysis = f"""
 ЧЕЛОВЕК: {multi_pass_result.get('person', 'Не определено')}
 ОДЕЖДА: {multi_pass_result.get('clothing', 'Не определено')}
+НОГИ: {multi_pass_result.get('legs', 'Не определено')}
 ОБУВЬ: {multi_pass_result.get('shoes', 'Не определено')}
 АКСЕССУАРЫ: {multi_pass_result.get('accessories', 'Не определено')}
 """
@@ -928,7 +942,6 @@ def analyze():
             fastvlm_time = multi_pass_result.get('timing', {}).get('total', 0)
 
             # Создаем креативный ответ стилиста
-            app.logger.info(f"Создаем ответ стилиста для пользователя {nickname}")
             gemini_start_time = time.time()
             stylist_response = create_stylist_response(combined_analysis)
             gemini_time = time.time() - gemini_start_time
@@ -961,6 +974,7 @@ def analyze():
                 'multi_pass_results': {
                     'person': multi_pass_result.get('person', ''),
                     'clothing': multi_pass_result.get('clothing', ''),
+                    'legs': multi_pass_result.get('legs', ''),
                     'shoes': multi_pass_result.get('shoes', ''),
                     'accessories': multi_pass_result.get('accessories', ''),
                 },

@@ -41,7 +41,7 @@ from PIL import Image
 
 SERVER_URL = os.environ.get("FASTVLM_URL", "http://127.0.0.1:3001")
 # Режим анализа: True = многопроходный, False = реальный режим сервера
-TECH_ANALYZE = os.environ.get("TECH_ANALYZE", "false").lower() == "true"
+TECH_ANALYZE = False
 
 def to_base64(img: Image.Image) -> str:
     buf = io.BytesIO()
@@ -143,21 +143,29 @@ def load_image(path: str) -> Image.Image:
     return Image.open(path).convert('RGB')
 
 # Промпт из PROMPT
-#Опиши человека на фотографии. 
-#Output EXACTLY one short line: Woman/Man; approximate age; build; hair (length, style, color)
-#Output EXACTLY one short line: Describe the accessories on your head, neck, hand and bag
-#Output EXACTLY one short line: Describe All clothing on torso. What type? What color? What material? What length?
-PROMPT_person = """Output EXACTLY one short line: Describe the person in the photograph. Provide ONLY the person's approximate age and gender."""
-PROMPT_cloth = """Output EXACTLY one short line: Describe All clothing on person. What type? What color? What material? What length?"""
-PROMPT_shoes = """Output EXACTLY one short line: Describe the shoes on the person. What type of shoes? What color? What material? What style?"""
-PROMPT_accessories = """Output EXACTLY one short line: Describe the ALL accessories on your head, neck, hand and bag."""
+#PROMPT_person = """Describe the person gender and age in the photograph.""" 
+#PROMPT_cloth = """Output EXACTLY one short line: Describe all VISIBLE Outerwear and Innerwear clothing on the person's torso."""
+#PROMPT_leg = """Output EXACTLY one short line: Describe all VISIBLE clothing on the person's legs."""
+#PROMPT_shoes = """Output EXACTLY one short line: Describe the VISIBLE shoes on the person's feet. If no shoes are visible, state that clearly."""
+#PROMPT_accessories = """Output EXACTLY one short line: Describe the ALL VISIBLE accessories on your head, neck, hand and bag. If no accessories are visible, state that clearly."""
+#describe in one sentence
+PROMPT_person = """Describe the person gender and age in the photograph.""" 
+PROMPT_cloth = """Focus on the person's torso area. Describe all VISIBLE Outerwear and Innerwear clothing on the person's torso. 
+**Strictly classify items using the following types:**
+**Outerwear:** Puffer/Down Jacket, Parka, Coat, Trench Coat/Raincoat, Windbreaker, Anorak, Bomber Jacket, Leather Jacket, Fleece Jacket.
+**Mid-Layers:** Sweater, Jumper, Pullover, Hoodie, Cardigan, Hoodie (Zip-up), Vest/Gilet, Sweatshirt.
+**Innerwear:** T-shirt shirt, Longsleeve T-shirt, Polo Shirt, Turtleneck/Rollneck, Shirt, Blouse, Tunic, Tank Top/Undershirt 
+If no torso is visible, state that clearly."""
+PROMPT_leg = """Focus on the person's legs area. Describe all VISIBLE clothing on the person's legs. If no legs are visible, state that clearly."""
+PROMPT_shoes = """Focus on the person's feet area. Describe the VISIBLE shoes on the person's feet. If no shoes are visible, state that clearly."""
+PROMPT_accessories = """Focus on the person's head, neck, hand and bag area. Describe the ALL VISIBLE accessories on your head, neck, hand and bag. If no accessories are visible, state that clearly."""
 
 
 def main():
     if len(sys.argv) >= 2:
         image_path = sys.argv[1]
     else:
-        image_path = str(Path(__file__).parent.parent / "16.jpg")
+        image_path = str(Path(__file__).parent.parent / "19.jpg")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")
@@ -187,6 +195,10 @@ def main():
         cloth_result = post_analyze(PROMPT_cloth, b64_image, "test_1.5b_user")
         cloth_time = time.perf_counter() - cloth_start_time
 
+        leg_start_time = time.perf_counter()
+        leg_result = post_analyze(PROMPT_leg, b64_image, "test_1.5b_user")
+        leg_time = time.perf_counter() - leg_start_time
+
         shoes_start_time = time.perf_counter()
         shoes_result = post_analyze(PROMPT_shoes, b64_image, "test_1.5b_user")
         shoes_time = time.perf_counter() - shoes_start_time
@@ -215,11 +227,13 @@ def main():
         # Заполняем все поля одинаковыми значениями для совместимости
         person_result = server_result
         cloth_result = server_result
+        leg_result = server_result
         shoes_result = server_result
         accessories_result = server_result
 
         person_time = server_time
         cloth_time = server_time
+        leg_time = server_time
         shoes_time = server_time
         accessories_time = server_time
 
@@ -234,6 +248,11 @@ def main():
             "technical_analysis": extract_technical(cloth_result),
             "time": round(cloth_time, 3),
             "success": cloth_result.get("success", False)
+        },
+        "leg": {
+            "technical_analysis": extract_technical(leg_result),
+            "time": round(leg_time, 3),
+            "success": leg_result.get("success", False)
         },
         "shoes": {
             "technical_analysis": extract_technical(shoes_result),
@@ -268,23 +287,57 @@ def main():
     print(f"Время: {total_time:.2f}с")
     print()
 
-    # Получаем ответ стилиста
-    stylist_response = extract_stylist(server_result if not TECH_ANALYZE else person_result)
+    if TECH_ANALYZE:
+        # Режим TECH_ANALYZE=true: выводим ВСЕ технические анализы отдельно
+        print("ТЕХНИЧЕСКИЙ АНАЛИЗ:")
+        print("-" * 30)
 
-    if not TECH_ANALYZE:
-        # В реальном режиме сервер возвращает и технический и стилистический анализ
+        # Выводим результаты всех проходов
+        if results['person']['technical_analysis']:
+            print(f"ЧЕЛОВЕК: ({results['person']['time']:.3f}с)")
+            print(f"  {results['person']['technical_analysis']}")
+            print()
+
+        if results['clothing']['technical_analysis']:
+            print(f"ОДЕЖДА: ({results['clothing']['time']:.3f}с)")
+            print(f"  {results['clothing']['technical_analysis']}")
+            print()
+
+        if results['leg']['technical_analysis']:
+            print(f"НОГИ: ({results['leg']['time']:.3f}с)")
+            print(f"  {results['leg']['technical_analysis']}")
+            print()
+
+        if results['shoes']['technical_analysis']:
+            print(f"ОБУВЬ: ({results['shoes']['time']:.3f}с)")
+            print(f"  {results['shoes']['technical_analysis']}")
+            print()
+
+        if results['accessories']['technical_analysis']:
+            print(f"АКСЕССУАРЫ: ({results['accessories']['time']:.3f}с)")
+            print(f"  {results['accessories']['technical_analysis']}")
+            print()
+
+        # В режиме TECH_ANALYZE стилистический анализ не выводится
+        print("СТИЛИСТИЧЕСКИЙ АНАЛИЗ: не выводится (TECH_ANALYZE=true)")
+
+    else:
+        # Режим TECH_ANALYZE=false: реальный режим сервера
+        # Выводим объединенный технический анализ и стилистический анализ
         technical_response = extract_technical(server_result)
+        stylist_response = extract_stylist(server_result)
+
         print("ТЕХНИЧЕСКИЙ АНАЛИЗ:")
         print("-" * 30)
         print(technical_response)
         print()
 
-    if stylist_response:
-        print("СТИЛИСТИЧЕСКИЙ АНАЛИЗ:")
-        print("-" * 30)
-        print(stylist_response)
-    else:
-        print("СТИЛИСТИЧЕСКИЙ АНАЛИЗ: не получен")
+        if stylist_response:
+            print("СТИЛИСТИЧЕСКИЙ АНАЛИЗ:")
+            print("-" * 30)
+            print(stylist_response)
+        else:
+            print("СТИЛИСТИЧЕСКИЙ АНАЛИЗ: не получен")
 
     print("\n" + "="*60)
 

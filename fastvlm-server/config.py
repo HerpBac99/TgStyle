@@ -143,12 +143,7 @@ class Config:
         NO_REPEAT_NGRAM_SIZE = int(os.getenv('NO_REPEAT_NGRAM_SIZE', '3'))
 
     # === Настройки производительности ===
-    if IS_7B_MODEL:
-        MAX_IMAGE_SIZE = int(os.getenv('MAX_IMAGE_SIZE', '2048'))  # Уменьшено для экономии памяти 7B
-        BATCH_SIZE = int(os.getenv('BATCH_SIZE', '1'))  # Только по одному изображению для 7B
-    else:
-        MAX_IMAGE_SIZE = int(os.getenv('MAX_IMAGE_SIZE', '2048'))  # Для 1.5B тоже уменьшаем
-        BATCH_SIZE = int(os.getenv('BATCH_SIZE', '1'))
+    # MAX_IMAGE_SIZE и BATCH_SIZE зарезервированы для будущих оптимизаций
 
     # === Настройки квантизации для 8GB GPU ===
     # Автоматически включаем 4-bit квантизацию для GPU с памятью < 12GB
@@ -197,13 +192,6 @@ class Config:
         'no_repeat_ngram_size': NO_REPEAT_NGRAM_SIZE,
     }
 
-    # === Настройки Gemini API (те же что и для основного сервера) ===
-    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-    GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
-    GEMINI_TEMPERATURE = float(os.getenv('GEMINI_TEMPERATURE', '0.7'))
-    GEMINI_MAX_TOKENS = int(os.getenv('GEMINI_MAX_TOKENS', '4096'))
-    GEMINI_THINKING_BUDGET = int(os.getenv('GEMINI_THINKING_BUDGET', '0'))
-
     # === Настройки ИИ стилиста ===
     # Выбор типа стилиста: ollama, gemini
     stylist_type_env = os.getenv('FASTVLM_STYLIST_TYPE', 'ollama')
@@ -217,13 +205,13 @@ class Config:
     STYLIST_OLLAMA_TOP_K = int(os.getenv('FASTVLM_STYLIST_OLLAMA_TOP_K', '40'))
 
     # Параметры для стилиста Gemini
+    STYLIST_GEMINI_API_KEY = os.getenv('FASTVLM_STYLIST_GEMINI_API_KEY', os.getenv('GEMINI_API_KEY'))
+    STYLIST_GEMINI_MODEL = os.getenv('FASTVLM_STYLIST_GEMINI_MODEL', os.getenv('GEMINI_MODEL', 'gemini-2.5-flash'))
     STYLIST_GEMINI_TEMPERATURE = float(os.getenv('FASTVLM_STYLIST_GEMINI_TEMPERATURE', '0.6'))
     STYLIST_GEMINI_MAX_TOKENS = int(os.getenv('FASTVLM_STYLIST_GEMINI_MAX_TOKENS', '1000'))
     STYLIST_GEMINI_THINKING_BUDGET = int(os.getenv('FASTVLM_STYLIST_GEMINI_THINKING_BUDGET', '1024'))
 
     # === Настройки памяти для моделей ===
-    TORCH_COMPILE = os.getenv('TORCH_COMPILE', 'false').lower() == 'true'  # Отключено по умолчанию
-    GRADIENT_CHECKPOINTING = IS_7B_MODEL  # Включено только для 7B модели
     ATTENTION_IMPLEMENTATION = "flash_attention_2"  # Оптимизированное внимание для обеих моделей
 
     @classmethod
@@ -273,8 +261,8 @@ class Config:
             raise ValueError(f"Некорректный порт: {cls.PORT}")
 
         # Проверяем API ключ Gemini
-        if not cls.GEMINI_API_KEY:
-            print("GEMINI_API_KEY не установлен. Gemini функции будут недоступны.")
+        if not cls.STYLIST_GEMINI_API_KEY:
+            print("STYLIST_GEMINI_API_KEY не установлен. Gemini функции будут недоступны.")
 
         # Проверяем настройки стилиста
         if cls.STYLIST_TYPE not in ['ollama', 'gemini']:

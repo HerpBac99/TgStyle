@@ -21,6 +21,7 @@ import {
 } from '@/utils/helpers';
 import { logger } from './logger';
 import { authManager } from './auth';
+import { purchaseRecommendationManager } from './purchaseRecommendation';
 import { cameraManager } from './camera';
 import { historyManager } from './history';
 
@@ -87,6 +88,9 @@ class UIManager {
     startTime: 0,
     currentPosition: 0,
   };
+
+  // Ссылка на Lamoda для текущей рекомендации
+  private currentLamodaUrl: string | null = null;
   
   // Состояние карусели
   private carouselState = {
@@ -295,18 +299,81 @@ class UIManager {
       return;
     }
 
+    // Обрабатываем ответ и извлекаем рекомендацию для покупки
+    const extracted = purchaseRecommendationManager.extractPurchaseRecommendation(result);
+
+    // Сохраняем ссылку на Lamoda для использования в кнопках
+    this.currentLamodaUrl = extracted.lamodaUrl;
+
+    logger.info('Purchase recommendation processed', {
+      hasRecommendation: !!extracted.purchaseRecommendation,
+      hasUrl: !!extracted.lamodaUrl
+    });
+
     // Скрываем загрузку, показываем результат
     loadingIndicator.classList.add('hidden');
     resultContainer.classList.remove('hidden');
 
-    // Обрабатываем markdown и устанавливаем текст анализа
-    const processedText = result.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Обрабатываем markdown и устанавливаем очищенный текст анализа
+    const processedText = extracted.cleanAnalysis.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     analysisText.innerHTML = processedText;
 
     // Настраиваем обработчики кнопок
     this.setupResultButtons();
 
     logger.info('Analysis result displayed');
+  }
+
+  /**
+   * Показать модальное окно с рекомендацией покупки
+   */
+  private showPurchaseModal(): void {
+    const modal = getElement('#purchase-modal');
+    const lamodaLink = getElement('#lamoda-link');
+
+    if (!modal) {
+      logger.error('Purchase modal not found');
+      return;
+    }
+
+    // Устанавливаем ссылку на Lamoda если есть
+    if (lamodaLink && this.currentLamodaUrl) {
+      (lamodaLink as HTMLAnchorElement).href = this.currentLamodaUrl;
+    }
+
+    // Показываем модальное окно
+    modal.classList.remove('hidden');
+
+    // Настраиваем обработчик закрытия модального окна
+    const closeBtn = getElement('#close-purchase-modal');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        this.hidePurchaseModal();
+      });
+    }
+
+    // Закрытие по клику на оверлей
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        this.hidePurchaseModal();
+      }
+    });
+
+    logger.info('Purchase modal shown');
+  }
+
+  /**
+   * Скрыть модальное окно с рекомендацией покупки
+   */
+  private hidePurchaseModal(): void {
+    const modal = getElement('#purchase-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      logger.info('Purchase modal hidden');
+    }
+
+    // Сбрасываем ссылку на Lamoda, чтобы модальное окно не показывалось повторно
+    this.currentLamodaUrl = null;
   }
 
   /**
@@ -329,11 +396,17 @@ class UIManager {
       });
     }
 
-    // Кнопка закрыть
+    // Кнопка закрыть - теперь показывает модальное окно
     const closeBtn = getElement('#close-analysis-btn');
     if (closeBtn) {
       closeBtn.addEventListener('click', () => {
-        this.closePreview();
+        // Если есть рекомендация для покупки, показываем модальное окно
+        if (this.currentLamodaUrl) {
+          this.showPurchaseModal();
+        } else {
+          // Если нет рекомендации, просто закрываем
+          this.closePreview();
+        }
       });
     }
   }
