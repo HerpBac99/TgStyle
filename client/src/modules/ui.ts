@@ -287,6 +287,78 @@ class UIManager {
   /**
    * Показать результат анализа
    */
+  /**
+   * Парсит текст анализа на блоки для каскадной анимации
+   */
+  private parseAnalysisText(text: string): Array<{content: string, delay: number}> {
+    const blocks: Array<{content: string, delay: number}> = [];
+
+    // Разбиваем текст на блоки по двойным переносам строк (абзацам)
+    const paragraphs = text.split('\n\n').filter(p => p.trim().length > 0);
+
+    if (paragraphs.length > 1) {
+      // Если есть несколько абзацев, показываем их каскадом
+      paragraphs.forEach((paragraph, index) => {
+        blocks.push({
+          content: this.processMarkdown(paragraph.trim()),
+          delay: index * 0.8 // 0, 0.8, 1.6, 2.4, ...
+        });
+      });
+    } else {
+      // Если абзацев нет, разбиваем на предложения
+      const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+
+      if (sentences.length > 1) {
+        // Группируем предложения в блоки по 2-3 предложения
+        const blockSize = Math.max(2, Math.ceil(sentences.length / 3));
+
+        for (let i = 0; i < sentences.length; i += blockSize) {
+          const blockSentences = sentences.slice(i, i + blockSize);
+          const blockContent = blockSentences.join('. ').trim();
+
+          if (blockContent.length > 0) {
+            // Добавляем точку в конце, если её нет
+            const finalContent = blockContent + (blockContent.match(/[.!?]$/) ? '' : '.');
+
+            blocks.push({
+              content: this.processMarkdown(finalContent),
+              delay: (i / blockSize) * 0.8
+            });
+          }
+        }
+      } else {
+        // Если даже предложений нет, показываем весь текст как один блок
+        blocks.push({
+          content: this.processMarkdown(text),
+          delay: 0
+        });
+      }
+    }
+
+    logger.info('Parsed text blocks', {
+      totalBlocks: blocks.length,
+      originalParagraphs: paragraphs.length,
+      blocks: blocks.map((block, index) => ({
+        blockIndex: index + 1,
+        delay: block.delay,
+        contentLength: block.content.length,
+        contentPreview: block.content.substring(0, 80).replace(/\n/g, ' ') + '...'
+      }))
+    });
+
+    return blocks;
+  }
+
+  /**
+   * Обрабатывает markdown в тексте (жирный текст)
+   */
+  private processMarkdown(text: string): string {
+    return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  }
+
+  /**
+   * Показать результат анализа
+   */
   showAnalysisResult(result: string): void {
     logger.info('Showing analysis result');
 
@@ -314,66 +386,105 @@ class UIManager {
     loadingIndicator.classList.add('hidden');
     resultContainer.classList.remove('hidden');
 
-    // Обрабатываем markdown и устанавливаем очищенный текст анализа
-    const processedText = extracted.cleanAnalysis.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    analysisText.innerHTML = processedText;
+    // Парсим текст на блоки для каскадной анимации
+    const textBlocks = this.parseAnalysisText(extracted.cleanAnalysis);
+
+    logger.info('Parsed text blocks', {
+      totalBlocks: textBlocks.length,
+      blocks: textBlocks.map((block, index) => ({
+        blockIndex: index + 1,
+        delay: block.delay,
+        contentLength: block.content.length,
+        contentPreview: block.content.substring(0, 100) + (block.content.length > 100 ? '...' : '')
+      }))
+    });
+
+    // Создаем HTML для блоков с анимацией
+    const blocksHtml = textBlocks.map((block, index) =>
+      `<div class="analysis-block analysis-block-${index + 1}" style="animation-delay: ${block.delay}s">${block.content}</div>`
+    ).join('');
+
+    // Добавляем кнопку рекомендаций в конце
+    const recommendationButton = this.currentLamodaUrl
+      ? `<div class="recommendation-button-container">
+           <button id="find-recommendations-btn" class="recommendation-button">
+             Найти рекомендации
+           </button>
+         </div>`
+      : '';
+
+    analysisText.innerHTML = blocksHtml + recommendationButton;
 
     // Настраиваем обработчики кнопок
     this.setupResultButtons();
 
-    logger.info('Analysis result displayed');
+    logger.info('Analysis result displayed with cascade animation', {
+      blocksCount: textBlocks.length,
+      blocksHtml: blocksHtml.substring(0, 200) + '...',
+      hasRecommendationButton: !!this.currentLamodaUrl
+    });
   }
 
-  /**
-   * Показать модальное окно с рекомендацией покупки
-   */
-  private showPurchaseModal(): void {
-    const modal = getElement('#purchase-modal');
-    const lamodaLink = getElement('#lamoda-link');
 
-    if (!modal) {
-      logger.error('Purchase modal not found');
+
+  /**
+   * Обработчик клика по кнопке рекомендаций с спиннером
+   */
+  private handleRecommendationClick(): void {
+    const button = getElement('#find-recommendations-btn');
+    const buttonContainer = getElement('.recommendation-button-container');
+
+    if (!button || !buttonContainer || !this.currentLamodaUrl) {
       return;
     }
 
-    // Устанавливаем ссылку на Lamoda если есть
-    if (lamodaLink && this.currentLamodaUrl) {
-      (lamodaLink as HTMLAnchorElement).href = this.currentLamodaUrl;
-    }
+    // Меняем текст кнопки на спиннер
+    button.innerHTML = `
+      <div class="recommendation-spinner"></div>
+      <span>Ищем рекомендации...</span>
+    `;
+    (button as HTMLButtonElement).disabled = true;
 
-    // Показываем модальное окно
-    modal.classList.remove('hidden');
+    // Через 2 секунды открываем ссылку
+    setTimeout(() => {
+      this.openRecommendationsUrl();
+    }, 2000);
 
-    // Настраиваем обработчик закрытия модального окна
-    const closeBtn = getElement('#close-purchase-modal');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        this.hidePurchaseModal();
-      });
-    }
-
-    // Закрытие по клику на оверлей
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        this.hidePurchaseModal();
-      }
-    });
-
-    logger.info('Purchase modal shown');
+    logger.info('Recommendation button clicked, showing spinner');
   }
 
   /**
-   * Скрыть модальное окно с рекомендацией покупки
+   * Открыть ссылку на Lamoda в новой вкладке
    */
-  private hidePurchaseModal(): void {
-    const modal = getElement('#purchase-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-      logger.info('Purchase modal hidden');
+  private openRecommendationsUrl(): void {
+    if (this.currentLamodaUrl) {
+      // Используем Telegram WebApp API для открытия внешней ссылки
+      if (window.Telegram?.WebApp?.openLink) {
+        window.Telegram.WebApp.openLink(this.currentLamodaUrl);
+      } else {
+        // Fallback на обычное открытие в новой вкладке
+        window.open(this.currentLamodaUrl, '_blank');
+      }
+      
+      // Восстанавливаем кнопку через небольшую задержку
+      setTimeout(() => {
+        this.resetRecommendationButton();
+      }, 1000);
+      
+      logger.info('Lamoda URL opened', { url: this.currentLamodaUrl });
     }
+  }
 
-    // Сбрасываем ссылку на Lamoda, чтобы модальное окно не показывалось повторно
-    this.currentLamodaUrl = null;
+  /**
+   * Сброс кнопки рекомендаций к исходному состоянию
+   */
+  private resetRecommendationButton(): void {
+    const button = getElement('#find-recommendations-btn');
+    if (button) {
+      button.innerHTML = 'Найти рекомендации';
+      (button as HTMLButtonElement).disabled = false;
+      logger.info('Recommendation button reset to original state');
+    }
   }
 
   /**
@@ -396,17 +507,19 @@ class UIManager {
       });
     }
 
-    // Кнопка закрыть - теперь показывает модальное окно
+    // Кнопка закрыть - просто закрывает результат
     const closeBtn = getElement('#close-analysis-btn');
     if (closeBtn) {
       closeBtn.addEventListener('click', () => {
-        // Если есть рекомендация для покупки, показываем модальное окно
-        if (this.currentLamodaUrl) {
-          this.showPurchaseModal();
-        } else {
-          // Если нет рекомендации, просто закрываем
-          this.closePreview();
-        }
+        this.closePreview();
+      });
+    }
+
+    // Обработчик кнопки рекомендаций с спиннером
+    const recommendationBtn = getElement('#find-recommendations-btn');
+    if (recommendationBtn) {
+      recommendationBtn.addEventListener('click', () => {
+        this.handleRecommendationClick();
       });
     }
   }
@@ -1046,8 +1159,6 @@ class UIManager {
    * Добавляет обработчики долгого нажатия к ячейке истории
    */
   private addLongPressHandlers(element: HTMLElement, index: number): void {
-    logger.info('Adding long press handlers', { index });
-
     // Обработчики событий
     const startHandler = (e: MouseEvent | TouchEvent) => {
       this.startLongPress(e, element, index);

@@ -166,7 +166,7 @@
     overflow-y: auto; /* Добавляет вертикальную прокрутку при необходимости */
     line-height: 1.6; /* Высота строки для лучшей читаемости */
     color: #444; /* Темно-серый цвет текста */
-    font-size: 15px; /* Размер шрифта */
+    font-size: 16px; /* Размер шрифта */
     white-space: pre-wrap; /* Сохраняет форматирование текста */
 }
 
@@ -174,6 +174,67 @@
 .analysis-text strong {
     font-weight: 700; /* Жирное начертание */
     color: #2c2c30; /* Более темный цвет для выделения */
+}
+
+/* Стили для блоков анализа с каскадной анимацией */
+.analysis-block {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: fadeInUp 0.6s ease-out forwards;
+    animation-delay: 0s;
+    margin-bottom: 12px;
+    line-height: 1.6;
+    color: #444;
+    font-size: 16px;
+    text-align: left;
+    white-space: pre-wrap;
+}
+
+.analysis-block:last-child {
+    margin-bottom: 0;
+}
+
+/* Стили для выделенного текста в блоках анализа */
+.analysis-block strong {
+    font-weight: 700;
+    color: #2c2c30;
+}
+
+/* Анимация появления блоков */
+@keyframes fadeInUp {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Стили для контейнера кнопки рекомендаций */
+.recommendation-button-container {
+    display: flex; /* Включает flexbox */
+    justify-content: center; /* Выравнивает по центру */
+    align-items: center;
+    text-align: center;
+    width: 100%;
+    padding: 16px 0; /* Добавляем отступы сверху и снизу */
+    opacity: 0;
+    animation: fadeInUp 0.6s ease-out 3.2s forwards;
+    flex-shrink: 0; /* Запрещает сжатие контейнера */
+}
+
+/* Стили для спиннера в кнопке */
+.recommendation-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    flex-shrink: 0; /* Запрещает сжатие спиннера */
+    display: block; /* Для корректного позиционирования в flex-контейнере */
 }
 
 /* Кнопки действий */
@@ -315,12 +376,72 @@
     outline: none; /* Убирает контур при нажатии */
 }
 
+
+
 /* Переопределяем для кнопки лайк */
 .like-btn.action-btn:active {
     transform: scale(0.8) !important; /* Уменьшает кнопку лайк при нажатии */
     background: transparent !important; /* Сохраняет прозрачный фон */
     outline: none !important; /* Убирает контур */
     box-shadow: none !important; /* Убирает тень */
+}
+
+/* Кнопка "Найти рекомендации" */
+.recommendation-button {
+    background: linear-gradient(0deg, #ffa16b, #fc9825); /* Красивый градиент красно-оранжевый */
+    color: #ffffff; /* Белый цвет текста */
+    border: none; /* Убирает рамку */
+    border-radius: 20px; /* Более скругленные углы для современного вида */
+    padding: 12px 20px; /* Уменьшенные отступы для более компактной кнопки */
+    font-size: 15px; /* Фиксированный размер шрифт */
+    font-weight: 600; /* Жирность шрифта */
+    font-family: 'Manrope', sans-serif; /* Шрифт как у других кнопок */
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4); /* Красивая тень */
+    transition: all 0.2s ease; /* Анимация при взаимодействии */
+    display: flex; /* Flexbox для центрирования содержимого */
+    align-items: center; /* Центрирует по вертикали */
+    justify-content: center; /* Центрирует по горизонтали */
+    text-align: center; /* Центрирует текст */
+    width: fit-content; /* Ширина по содержимому */
+    min-width: fit-content; /* Минимальная ширина по содержимому */
+    max-width: 220px; /* Максимальная ширина для компактности */
+    height: 44px; /* Фиксированная высота */
+    outline: none; /* Убирает контур при фокусе */
+    -webkit-tap-highlight-color: transparent; /* Убирает серый квадрат при нажатии на iOS */
+    user-select: none; /* Запрещает выделение текста */
+    -webkit-user-select: none; /* Запрещает выделение в WebKit */
+    -webkit-touch-callout: none; /* Отключает контекстное меню на iOS */
+    flex-shrink: 0; /* Запрещает сжатие */
+    white-space: nowrap; /* Запрещает перенос текста */
+}
+
+/* Эффект нажатия - единственное интерактивное состояние для мобильных */
+.recommendation-button:active {
+    transform: scale(0.96); /* Легкое уменьшение при нажатии */
+    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.6); /* Усиливает тень при нажатии */
+    background: linear-gradient(135deg, #FF5252, #FF6B35); /* Более яркий градиент при нажатии */
+}
+
+/* Фокус для accessibility (клавиатурная навигация) */
+.recommendation-button:focus {
+    outline: none; /* Убирает стандартный контур */
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4), 0 0 0 3px rgba(255, 107, 107, 0.3); /* Кастомное кольцо фокуса */
+}
+
+/* Отключенное состояние кнопки - такие же размеры */
+.recommendation-button:disabled {
+    opacity: 0.6; /* Полупрозрачность для отключенного состояния */
+    transform: none; /* Убирает трансформации */
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.2); /* Сохраняет тень */
+    cursor: not-allowed; /* Запрещает касания */
+    /* Сохраняем все размеры и позиционирование как в нормальном состоянии */
+    background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+    width: fit-content;
+    min-width: fit-content;
+    max-width: 220px;
+    height: 44px;
+    padding: 12px 20px;
+    border-radius: 20px;
 }
 
 /* Анимация спиннера */
@@ -431,7 +552,7 @@
 
 /* Дата анализа */
 .saved-analysis-date {
-    background-color: rgb(78, 187, 14); /* Зеленый фон */
+    background-color: rgb(218, 173, 26); /* Зеленый фон */
     color: white; /* Белый цвет текста */
     font-size: 12px; /* Размер шрифта */
     font-weight: 500; /* Жирность шрифта */
@@ -440,111 +561,4 @@
     text-align: center; /* Центрирование текста */
     box-shadow: 0 2px 8px rgba(78, 187, 14, 0.3); /* Зеленая тень */
     align-self: center; /* Центрирует элемент относительно родителя */
-}
-
-/*
- * Стили для модального окна рекомендации покупки
- */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s ease;
-}
-
-.modal-overlay:not(.hidden) {
-    opacity: 1;
-    visibility: visible;
-}
-
-.modal-content {
-    background: white;
-    border-radius: 16px;
-    max-width: 400px;
-    width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    transform: scale(0.9) translateY(20px);
-    transition: all 0.3s ease;
-}
-
-.modal-overlay:not(.hidden) .modal-content {
-    transform: scale(1) translateY(0);
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.modal-header h3 {
-    margin: 0;
-    color: #333;
-    font-size: 18px;
-    font-weight: 600;
-}
-
-.modal-close-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 50%;
-    color: #666;
-    transition: all 0.2s ease;
-}
-
-.modal-close-btn:hover {
-    background: #f5f5f5;
-    color: #333;
-}
-
-.modal-body {
-    padding: 20px;
-    text-align: center;
-}
-
-.modal-text {
-    color: #666;
-    font-size: 16px;
-    line-height: 1.5;
-    margin-bottom: 20px;
-}
-
-.lamoda-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
-    color: white;
-    text-decoration: none;
-    padding: 14px 24px;
-    border-radius: 12px;
-    font-size: 16px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
-}
-
-.lamoda-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
-}
-
-.lamoda-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
 }

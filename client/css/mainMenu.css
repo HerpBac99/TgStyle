@@ -64,7 +64,7 @@
  */
 body {
     /* Основной шрифт - Montserrat, если не доступен - системные шрифты */
-    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; /* Семейство шрифтов для всего приложения */
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; /* Семейство шрифтов для всего приложения */
 
     /* Градиентный фон */
     background: var(--gradient-bg) !important; /* Устанавливает градиентный фон на весь экран */
@@ -320,7 +320,7 @@ button {
     cursor: pointer; /* Курсор в виде руки */
 
     /* Шрифт как у основного текста */
-    font-family: 'Montserrat', sans-serif; /* Шрифт кнопки */
+    font-family: 'Manrope', sans-serif; /* Шрифт кнопки */
 
     /* Средняя жирность */
     font-weight: 500; /* Жирность шрифта */
