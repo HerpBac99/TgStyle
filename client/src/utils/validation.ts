@@ -65,20 +65,29 @@ export function validateHistoryItem(item: HistoryItem): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Проверяем обязательные поля
+  // Проверяем обязательные поля, но более мягко
+  if (!item) {
+    errors.push('Элемент истории отсутствует');
+    return { isValid: false, errors, warnings };
+  }
+
+  // Для пустых элементов проверяем только базовую структуру
+  if (item.isEmpty) {
+    return { isValid: true, errors: [], warnings: [] };
+  }
+
+  // Проверяем обязательные поля для заполненных элементов
   if (!item.photo && !item.isEmpty) {
-    errors.push('Отсутствует изображение');
+    warnings.push('Отсутствует изображение в элементе истории');
   }
 
   if (!item.timestamp) {
-    errors.push('Отсутствует временная метка');
+    warnings.push('Отсутствует временная метка в элементе истории');
   }
 
-  // Размер фото больше не проверяется - сохраняем оригинал
-
-  // Проверяем валидность timestamp
+  // Проверяем валидность timestamp если он есть
   if (item.timestamp && isNaN(new Date(item.timestamp).getTime())) {
-    errors.push('Некорректная временная метка');
+    warnings.push('Некорректная временная метка в элементе истории');
   }
 
   return {
@@ -104,16 +113,34 @@ export function validateHistory(history: HistoryItem[]): ValidationResult {
     warnings.push(`История ограничена ${HISTORY_CONSTRAINTS.MAX_ITEMS} элементами`);
   }
 
-  // Валидируем каждый элемент
+  // Валидируем каждый элемент, но более мягко
+  let validItemsCount = 0;
+  let itemsWithWarnings = 0;
+
   history.forEach((item, index) => {
     if (item && !item.isEmpty) {
       const itemValidation = validateHistoryItem(item);
-      if (!itemValidation.isValid) {
+
+      // Если элемент критически поврежден - добавляем ошибку
+      if (itemValidation.errors.length > 0) {
         errors.push(`Элемент ${index}: ${itemValidation.errors.join(', ')}`);
       }
-      warnings.push(...itemValidation.warnings.map(w => `Элемент ${index}: ${w}`));
+
+      // Считаем статистику
+      if (itemValidation.isValid) {
+        validItemsCount++;
+      }
+      if (itemValidation.warnings.length > 0) {
+        itemsWithWarnings++;
+        warnings.push(...itemValidation.warnings.map(w => `Элемент ${index}: ${w}`));
+      }
     }
   });
+
+  // Добавляем статистику в warnings если есть проблемы
+  if (errors.length === 0 && warnings.length > 0) {
+    warnings.unshift(`Найдено ${validItemsCount} валидных элементов, ${itemsWithWarnings} с предупреждениями`);
+  }
 
   return {
     isValid: errors.length === 0,

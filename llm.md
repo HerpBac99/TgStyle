@@ -1,8 +1,3 @@
----
-description: TgStyle - FastVLM сервер для анализа изображений одежды с ИИ
-globs:
-alwaysApply: true
----
 # FastVLM Server - AI для анализа одежды
 
 ## Обзор
@@ -446,5 +441,3 @@ tail -f logs/fastvlm.log
 ## 📚 Заключение
 
 FastVLM Server представляет собой высокопроизводительный AI-сервис для анализа изображений одежды с поддержкой GPU acceleration, graceful fallback и комплексным мониторингом производительности.
-
-

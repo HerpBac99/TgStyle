@@ -36,15 +36,16 @@ class HistoryManager {
   private loadFromStorage(): void {
     try {
       const storedHistory = localStorage.getItem(STORAGE_KEYS.HISTORY);
-      
+
+
       if (!storedHistory) {
         this.history = this.createEmptyHistory();
-        logger.info('Created empty history');
+        logger.info('Created empty history - no data in localStorage');
         return;
       }
 
       const parsedHistory = safeJsonParse<HistoryItem[]>(storedHistory, []);
-      
+
       if (!Array.isArray(parsedHistory)) {
         logger.warn('Invalid history format, creating new');
         this.history = this.createEmptyHistory();
@@ -54,25 +55,43 @@ class HistoryManager {
       // Валидация загруженной истории
       const validation = validateHistory(parsedHistory);
       if (!validation.isValid) {
-        logger.error('History validation failed', { errors: validation.errors });
+        logger.error('History validation failed', {
+          errors: validation.errors,
+          errorCount: validation.errors.length
+        });
         this.history = this.createEmptyHistory();
         return;
       }
 
       if (validation.warnings.length > 0) {
-        logger.warn('History warnings', { warnings: validation.warnings });
+        logger.warn('History warnings', {
+          warnings: validation.warnings,
+          warningCount: validation.warnings.length
+        });
       }
 
       // Дополняем до нужного размера если необходимо
       this.history = this.normalizeHistory(parsedHistory);
-      
-      logger.info('History loaded from storage', {
+
+      const filledCount = this.history.filter(item => item && !item.isEmpty).length;
+
+      logger.info('History loaded from storage successfully', {
         totalItems: this.history.length,
-        filledItems: this.history.filter(item => item && !item.isEmpty).length,
+        filledItems: filledCount,
+        emptyItems: this.history.length - filledCount,
+        sampleItem: this.history[0] ? {
+          hasPhoto: !!this.history[0].photo,
+          photoSize: this.history[0].photo ? Math.round(this.history[0].photo.length / 1024) + 'KB' : 'no photo',
+          hasAnalysis: !!this.history[0].analysis,
+          timestamp: this.history[0].timestamp
+        } : 'no items'
       });
 
     } catch (error) {
-      logger.error('Error loading history from storage', error);
+      logger.error('Error loading history from storage', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       this.history = this.createEmptyHistory();
     }
   }
@@ -114,12 +133,7 @@ class HistoryManager {
       const storageLimit = 4.5 * 1024 * 1024; // 4.5MB для безопасности
 
       if (totalEstimatedSize > storageLimit) {
-        logger.warn('localStorage limit approaching, cleaning up old items', {
-          currentHistorySize: Math.round(currentHistorySize / 1024) + 'KB',
-          otherDataSize: Math.round(otherDataSize / 1024) + 'KB',
-          totalEstimatedSize: Math.round(totalEstimatedSize / 1024) + 'KB',
-          storageLimit: Math.round(storageLimit / 1024) + 'KB'
-        });
+        logger.warn('localStorage limit approaching, cleaning up old items');
 
         // Удаляем старые элементы, оставляя место для одного элемента (1MB)
         this.cleanupOldItems(storageLimit - otherDataSize - 1024 * 1024);
@@ -162,6 +176,7 @@ class HistoryManager {
     }
     return totalSize;
   }
+
 
   /**
    * Удаляет старые элементы истории чтобы уложиться в лимит
@@ -220,17 +235,22 @@ class HistoryManager {
    */
   private normalizeHistory(history: HistoryItem[]): HistoryItem[] {
     const result = [...history];
-    
-    // Обрезаем до максимального размера
+
+    // Если массив больше максимального размера, обрезаем его
+    // Но сохраняем лишние элементы в конце (они могут быть важными)
     if (result.length > this.maxItems) {
+      logger.warn('History array larger than maxItems, truncating', {
+        currentLength: result.length,
+        maxItems: this.maxItems
+      });
       result.splice(this.maxItems);
     }
-    
+
     // Дополняем пустыми элементами если необходимо
     while (result.length < this.maxItems) {
       result.push({ isEmpty: true } as HistoryItem);
     }
-    
+
     return result;
   }
 
@@ -257,24 +277,54 @@ class HistoryManager {
       }
 
       // Найдем позицию для вставки нового элемента
-      const filledItems = this.history.filter(historyItem => historyItem && !historyItem.isEmpty);
-
-      if (filledItems.length >= this.maxItems) {
+      if (this.history.length >= this.maxItems) {
         // Если история полная, удаляем самый старый (первый) элемент
+        const oldFirstItem = this.history[0];
         this.history.shift();
         this.history.push({ ...item, isEmpty: false });
-        logger.info('Item added, oldest item removed');
+
+        logger.info('Item added, oldest item removed', {
+          removedItem: {
+            hadItem: !!oldFirstItem,
+            wasEmpty: oldFirstItem?.isEmpty,
+            hadPhoto: !!oldFirstItem?.photo
+          },
+          newArrayLength: this.history.length
+        });
       } else {
         // Добавляем новый элемент после последнего заполненного элемента
         const insertPosition = this.findInsertPosition();
-        if (insertPosition >= this.history.length) {
-          // Добавляем в конец массива
-          this.history.push({ ...item, isEmpty: false });
-          logger.info('Item added to end of array');
+
+        // Если позиция валидна (в пределах массива)
+        if (insertPosition < this.history.length) {
+          // Вставляем элемент на позицию и сдвигаем остальные вправо
+          this.history.splice(insertPosition, 0, { ...item, isEmpty: false });
+          logger.info('Item inserted at position', {
+            position: insertPosition,
+            newLength: this.history.length
+          });
         } else {
-          // Вставляем на найденную позицию
-          this.history[insertPosition] = { ...item, isEmpty: false };
-          logger.info('Item added to position', { position: insertPosition });
+        // Если массив еще не заполнен, просто добавляем в конец
+        if (this.history.length < this.maxItems) {
+          this.history.push({ ...item, isEmpty: false });
+          logger.info('Item added to end of array', {
+            newLength: this.history.length,
+            maxItems: this.maxItems
+          });
+        } else {
+          // Массив заполнен - удаляем самый старый элемент и добавляем новый
+          const oldFirstItem = this.history.shift();
+          this.history.push({ ...item, isEmpty: false });
+          logger.info('Removed oldest item and added new to end', {
+            removedItem: {
+              hadItem: !!oldFirstItem,
+              wasEmpty: oldFirstItem?.isEmpty,
+              hadPhoto: !!oldFirstItem?.photo
+            },
+            newLength: this.history.length,
+            maxItems: this.maxItems
+          });
+        }
         }
       }
 
@@ -470,12 +520,12 @@ class HistoryManager {
       filledSlots: filledItems.length,
       emptySlots: this.maxItems - filledItems.length,
       totalDataSize: Math.round(totalSize / 1024) + 'KB',
-      oldestItem: filledItems.length > 0 ? 
-        filledItems.reduce((oldest, item) => 
+      oldestItem: filledItems.length > 0 ?
+        filledItems.reduce((oldest, item) =>
           new Date(item.timestamp) < new Date(oldest.timestamp) ? item : oldest
         ).timestamp : null,
-      newestItem: filledItems.length > 0 ? 
-        filledItems.reduce((newest, item) => 
+      newestItem: filledItems.length > 0 ?
+        filledItems.reduce((newest, item) =>
           new Date(item.timestamp) > new Date(newest.timestamp) ? item : newest
         ).timestamp : null,
     };

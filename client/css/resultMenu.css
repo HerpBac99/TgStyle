@@ -552,7 +552,7 @@
 
 /* Дата анализа */
 .saved-analysis-date {
-    background-color: rgb(218, 173, 26); /* Зеленый фон */
+    background-color:  #aeaef8; /* Зеленый фон */
     color: white; /* Белый цвет текста */
     font-size: 12px; /* Размер шрифта */
     font-weight: 500; /* Жирность шрифта */
