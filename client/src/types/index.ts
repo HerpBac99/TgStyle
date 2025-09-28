@@ -55,6 +55,7 @@ export interface AppConfig {
   environment: 'development' | 'production';
   version: string;
   logLevel: 'debug' | 'info' | 'warn' | 'error';
+  telegramBotName: string;
   features: {
     fastVLM: boolean;
     pinterest: boolean;
@@ -74,11 +75,9 @@ export interface AppState {
 
 // Типы для событий приложения
 export type AppEvent = 
-  | 'app:init'
   | 'app:ready'
   | 'auth:success'
   | 'auth:failure'
-  | 'photo:selected'
   | 'photo:analyzed'
   | 'history:updated'
   | 'error:occurred';
@@ -88,8 +87,6 @@ export interface EventData {
   payload?: any;
   timestamp: number;
 }
-
-export type EventHandler = (data: EventData) => void;
 
 // Типы для логирования
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';

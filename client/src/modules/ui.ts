@@ -10,7 +10,8 @@ import type {
 import {
   DOM_SELECTORS,
   CSS_CLASSES,
-  CAROUSEL_CONFIG
+  CAROUSEL_CONFIG,
+  APP_CONFIG
 } from '@/utils/constants';
 import {
   getElement,
@@ -91,7 +92,16 @@ class UIManager {
 
   // Ссылка на Lamoda для текущей рекомендации
   private currentLamodaUrl: string | null = null;
-  
+
+  // Текущие данные анализа для отправки
+  private currentAnalysisData: {
+    imageSrc: string | null;
+    analysisText: string | null;
+  } = {
+    imageSrc: null,
+    analysisText: null,
+  };
+
   // Состояние карусели
   private carouselState = {
     currentCenterIndex: 0, // Индекс элемента в центре
@@ -160,6 +170,7 @@ class UIManager {
   private setupGlobalEventListeners(): void {
     // Обработчик изменения состояния анализа
     window.addEventListener('analysisStateChange', this.handleAnalysisStateChange.bind(this) as EventListener);
+    window.addEventListener('showAnalysisScreen', this.handleShowAnalysisScreen.bind(this) as EventListener);
 
     // Обработчик видимости страницы (для очистки состояния при сворачивании)
     document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
@@ -247,9 +258,22 @@ class UIManager {
   private handleAnalysisStateChange(event: CustomEvent): void {
     const state = event.detail;
     logger.info('Analysis state changed', state);
-    
+
     // Можно добавить обновление UI в зависимости от состояния
     // Например, показать прогресс-бар или спиннер
+  }
+
+  private handleShowAnalysisScreen(event: CustomEvent): void {
+    const { imageBase64, analysis } = event.detail;
+    logger.info('Showing analysis screen from event', { hasImage: !!imageBase64, hasAnalysis: !!analysis });
+
+    // Показываем экран анализа
+    this.showFullscreenPreview(imageBase64);
+
+    // Показываем результат анализа
+    if (analysis) {
+      this.showAnalysisResult(analysis);
+    }
   }
 
 
@@ -272,6 +296,9 @@ class UIManager {
 
     // Устанавливаем фото
     analysisPhoto.src = `data:image/jpeg;base64,${imageBase64}`;
+
+    // Сохраняем данные для отправки (оригинальное изображение)
+    this.currentAnalysisData.imageSrc = `data:image/jpeg;base64,${imageBase64}`;
 
     // Скрываем результат, показываем загрузку
     resultContainer.classList.add('hidden');
@@ -376,6 +403,9 @@ class UIManager {
 
     // Сохраняем ссылку на Lamoda для использования в кнопках
     this.currentLamodaUrl = extracted.lamodaUrl;
+
+    // Сохраняем текст анализа для отправки
+    this.currentAnalysisData.analysisText = extracted.cleanAnalysis;
 
     logger.info('Purchase recommendation processed', {
       hasRecommendation: !!extracted.purchaseRecommendation,
@@ -557,6 +587,303 @@ class UIManager {
   }
 
   /**
+   * Создает изображение с результатом анализа для отправки
+   */
+  private async createAnalysisImageForSharing(): Promise<string | null> {
+    if (!this.currentAnalysisData.imageSrc || !this.currentAnalysisData.analysisText) {
+      logger.warn('No analysis data available for sharing');
+      return null;
+    }
+
+    try {
+      // Создаем canvas
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        logger.error('Canvas context not available');
+        return null;
+      }
+
+      // Создаем изображение из base64
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = this.currentAnalysisData.imageSrc!;
+      });
+
+      // Устанавливаем размеры canvas (только изображение с подписью) - высокое качество
+      const imageWidth = Math.max(800, Math.min(img.width, 1200)); // Минимум 800px, максимум 1200px
+      const imageHeight = (img.height * imageWidth) / img.width;
+      const padding = 30;
+
+      canvas.width = imageWidth;
+      canvas.height = imageHeight + padding * 2;
+
+      // Белый фон
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Рисуем изображение
+      ctx.drawImage(img, 0, 0, imageWidth, imageHeight);
+
+      // Добавляем подпись как водяной знак
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.fillRect(0, imageHeight - 40, imageWidth, 40);
+
+      ctx.fillStyle = '#333333';
+      ctx.font = 'bold 32px Manrope, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('@LamodaStylebot', imageWidth - padding, imageHeight - padding);
+
+      // Конвертируем в base64 с высоким качеством
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      logger.info('High quality analysis image created for sharing', {
+        width: canvas.width,
+        height: canvas.height,
+        quality: 0.95
+      });
+      return dataUrl;
+
+    } catch (error) {
+      logger.error('Failed to create analysis image', error);
+      return null;
+    }
+  }
+
+  /**
+   * Отправляет результат анализа через Telegram
+   */
+  private async shareAnalysisImage(): Promise<void> {
+    try {
+      // Создаем изображение с подписью для отправки
+      const analysisImageDataUrl = await this.createAnalysisImageForSharing();
+
+      // Проверяем доступность Telegram WebApp API
+      if (window.Telegram?.WebApp?.openTelegramLink) {
+        // Создаем ссылку на shared анализ через Mini App
+        const analysisId = this.generateAnalysisShareId();
+        const shareLink = `https://t.me/${APP_CONFIG.telegramBotName}?startapp=shared_${analysisId}`;
+
+        // Сохраняем данные анализа для sharing
+        await this.saveAnalysisForSharing(analysisId);
+
+        // Пытаемся отправить изображение и ссылку через Web Share API
+        if (navigator.share && analysisImageDataUrl) {
+          try {
+            // Конвертируем data URL в Blob
+            const response = await fetch(analysisImageDataUrl);
+            const blob = await response.blob();
+            const file = new File([blob], 'tgstyle-analysis.jpg', { type: 'image/jpeg' });
+
+            // Создаем текст с ссылкой на конкретную shared историю
+            let shareText = `Посмотрите мой анализ стиля одежды от TgStyle! 🤖👗\n\n${shareLink}`;
+            if (this.currentAnalysisData.analysisText) {
+              shareText = `🤖 TgStyle анализ стиля:\n\n${this.currentAnalysisData.analysisText.substring(0, 150)}...\n\nПолный анализ: ${shareLink}`;
+            }
+
+            await navigator.share({
+              title: 'TgStyle - Анализ стиля',
+              text: shareText,
+              files: [file]
+            });
+            logger.info('Analysis image and link shared via Web Share API');
+            return;
+          } catch (shareError) {
+            logger.warn('Web Share API failed, falling back to Telegram sharing', shareError);
+          }
+
+        }
+
+        // Fallback - отправляем ссылку на анализ через Telegram
+        let analysisText = `Посмотрите мой анализ стиля одежды от TgStyle! 🤖👗\n\n${shareLink}`;
+        if (this.currentAnalysisData.analysisText) {
+          analysisText = `🤖 TgStyle анализ стиля:\n\n${this.currentAnalysisData.analysisText.substring(0, 150)}...\n\nПолный анализ: ${shareLink}`;
+        }
+
+        const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent(analysisText)}`;
+        window.Telegram.WebApp.openTelegramLink(shareUrl);
+        logger.info('Analysis link shared via Telegram');
+      } else {
+        // Fallback - копируем текст в буфер обмена
+        this.shareFallbackText();
+      }
+    } catch (error) {
+      logger.error('Failed to share analysis', error);
+      this.shareFallbackText();
+    }
+  }
+
+  /**
+   * Генерирует уникальный ID для sharing анализа
+   */
+  private generateAnalysisShareId(): string {
+    const timestamp = Date.now().toString(36);
+    const randomPart = Math.random().toString(36).substr(2, 9);
+    return `shared_${timestamp}_${randomPart}`;
+  }
+
+  /**
+   * Сохраняет данные анализа для sharing в localStorage и на сервере
+   */
+  private async saveAnalysisForSharing(analysisId: string): Promise<void> {
+    try {
+      logger.info('Starting saveAnalysisForSharing', { analysisId });
+
+      if (!this.currentAnalysisData.imageSrc || !this.currentAnalysisData.analysisText) {
+        logger.warn('No analysis data to save for sharing');
+        return;
+      }
+
+      // Используем сжатую версию фото для отправки на сервер (меньше размера)
+      const compressedPhoto = await this.compressImageForSharing(this.currentAnalysisData.imageSrc);
+
+      const sharedData = {
+        photo: compressedPhoto,
+        analysis: this.currentAnalysisData.analysisText,
+        timestamp: new Date().toISOString(),
+        sharedAt: new Date().toISOString()
+      };
+
+      logger.info('Prepared shared data', {
+        analysisId,
+        originalPhotoLength: this.currentAnalysisData.imageSrc.length,
+        compressedPhotoLength: compressedPhoto.length,
+        hasAnalysis: !!sharedData.analysis,
+        analysisLength: sharedData.analysis.length
+      });
+
+      // Сохраняем в localStorage с проверкой размера и безопасным JSON
+      try {
+        const jsonString = JSON.stringify(sharedData);
+        const sizeKB = (jsonString.length * 2) / 1024; // Приблизительный размер в KB
+        
+        // Проверяем размер данных (localStorage лимит ~5-10MB)
+        if (sizeKB > 3000) { // 3MB лимит
+          // Создаем минимальную версию только с текстом
+          const minimalData = {
+            analysis: sharedData.analysis,
+            timestamp: sharedData.timestamp,
+            sharedAt: sharedData.sharedAt,
+            photo: 'too_large'
+          };
+          
+          localStorage.setItem(`shared_analysis_${analysisId}`, JSON.stringify(minimalData));
+          logger.info('Minimal analysis saved to localStorage', { analysisId });
+        } else {
+          localStorage.setItem(`shared_analysis_${analysisId}`, jsonString);
+          logger.info('Full analysis saved to localStorage', { analysisId });
+        }
+      } catch (localStorageError) {
+        logger.error('Failed to save to localStorage', { analysisId, error: localStorageError });
+        
+        // Создаем текстовую версию без изображения
+        try {
+          const textOnlyData = {
+            analysis: sharedData.analysis,
+            timestamp: sharedData.timestamp,
+            sharedAt: sharedData.sharedAt,
+            photo: null
+          };
+          localStorage.setItem(`shared_analysis_${analysisId}`, JSON.stringify(textOnlyData));
+          logger.info('Text-only analysis saved to localStorage as fallback', { analysisId });
+        } catch (finalError) {
+          logger.error('All localStorage save attempts failed', { analysisId, error: finalError });
+        }
+      }
+
+      // Отправляем на сервер для доступа других пользователей
+      const shouldSendToServer = typeof sharedData.photo === 'string' && sharedData.photo !== 'too_large';
+      
+      if (shouldSendToServer) {
+        try {
+          logger.info('Making direct POST request to server', { analysisId });
+
+        const requestBody = {
+          analysisId,
+          photo: sharedData.photo,
+          analysis: sharedData.analysis,
+          timestamp: sharedData.timestamp
+        };
+
+        const response = await fetch('https://tgstyle.flappy.crazedns.ru/api/shared-analysis', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        const result = await response.json();
+
+          if (result.success) {
+            logger.info('Analysis shared successfully', { analysisId });
+          } else {
+            logger.warn('Server save failed', { error: result.error });
+          }
+        } catch (serverError) {
+          logger.warn('Server save failed, analysis only available locally', { analysisId });
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to save analysis for sharing', { analysisId, error });
+    }
+  }
+
+  /**
+   * Сжимает изображение для отправки на сервер (упрощенная версия)
+   */
+  private async compressImageForSharing(base64Image: string): Promise<string> {
+    try {
+      // Убираем префикс data:image/jpeg;base64, если он есть
+      const cleanBase64 = base64Image.replace(/^data:image\/[^;]+;base64,/, '');
+      
+      // Проверяем размер
+      const currentSizeKB = (cleanBase64.length * 3) / 4 / 1024;
+      const maxSizeKB = 500;
+
+      if (currentSizeKB <= maxSizeKB) {
+        return cleanBase64;
+      }
+
+      // Если изображение слишком большое, пытаемся сжать через cameraManager
+      try {
+        const compressed = await cameraManager.compressImage(`data:image/jpeg;base64,${cleanBase64}`, 0.6);
+        logger.info('Image compressed for server sharing', {
+          originalSizeKB: Math.round(currentSizeKB),
+          compressedSizeKB: Math.round((compressed.length * 3) / 4 / 1024),
+          quality: 0.6
+        });
+        return compressed;
+      } catch (compressionError) {
+        logger.warn('Compression failed, using original with size limit', compressionError);
+        // Если сжатие не удалось, обрезаем изображение до допустимого размера
+        const maxLength = Math.floor(maxSizeKB * 1024 * 4 / 3);
+        return cleanBase64.substring(0, maxLength);
+      }
+    } catch (error) {
+      logger.error('Failed to process image for sharing', error);
+      // В крайнем случае возвращаем первые 100KB изображения
+      const cleanBase64 = base64Image.replace(/^data:image\/[^;]+;base64,/, '');
+      const emergencyMaxLength = Math.floor(100 * 1024 * 4 / 3); // 100KB
+      return cleanBase64.substring(0, emergencyMaxLength);
+    }
+  }
+
+  /**
+   * Fallback функция - отправляет текстовое сообщение
+   */
+  private shareFallbackText(): void {
+    const shareText = 'Посмотрите мой анализ стиля одежды от TgStyle! ИИ помог мне разобраться в моем образе 🤖✨';
+    navigator.clipboard.writeText(shareText).then(() => {
+      logger.info('Fallback share text copied to clipboard');
+    }).catch(() => {
+      logger.warn('Failed to copy fallback text to clipboard');
+    });
+  }
+
+  /**
    * Обработчик клика по кнопке поделиться
    */
   private handleShareClick(): void {
@@ -576,23 +903,10 @@ class UIManager {
         shareBtn.classList.add('shared');
         logger.info('Share state added');
 
-        // Выполняем действие поделиться
-        try {
-          // Используем Telegram WebApp API для поделиться
-          if (window.Telegram?.WebApp?.openTelegramLink) {
-            const shareText = 'Попробуй TgStyle - анализ стиля одежды с помощью ИИ!';
-            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(shareText)}`;
-            window.Telegram.WebApp.openTelegramLink(shareUrl);
-          } else {
-            // Fallback - копируем в буфер обмена
-            const shareText = 'Попробуй TgStyle - анализ стиля одежды с помощью ИИ!';
-            navigator.clipboard.writeText(shareText).then(() => {
-            }).catch(() => {
-            });
-          }
-        } catch (error) {
-          logger.warn('Failed to share', error);
-        }
+        // Выполняем действие поделиться - отправляем фотографию разбора
+        this.shareAnalysisImage().catch((error) => {
+          logger.warn('Failed to share analysis image', error);
+        });
 
         // Анимация нажатия
         shareBtn.style.transform = 'scale(0.8)';
@@ -604,6 +918,34 @@ class UIManager {
 
     // Тактильная обратная связь
     authManager.vibrate('light');
+  }
+
+  /**
+   * Показать shared анализ другого пользователя
+   */
+  async showSharedAnalysis(photoBase64: string, analysisText: string, timestamp: string): Promise<void> {
+    logger.info('Showing shared analysis');
+
+    try {
+      // Имитируем загрузку
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Показываем экран анализа
+      this.showFullscreenPreview(photoBase64);
+
+      // Показываем результат анализа
+      this.showAnalysisResult(analysisText);
+
+      // Добавляем индикацию что это shared анализ
+      const resultHeader = getElement('.result-header h3');
+      if (resultHeader) {
+        resultHeader.textContent = `Анализ от ${new Date(timestamp).toLocaleDateString()}`;
+      }
+
+      logger.info('Shared analysis displayed successfully');
+    } catch (error) {
+      logger.error('Failed to show shared analysis', error);
+    }
   }
 
   /**
@@ -1832,3 +2174,4 @@ class UIManager {
 export const uiManager = new UIManager();
 
 export default uiManager;
+

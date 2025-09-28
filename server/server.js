@@ -37,6 +37,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 
 // API роуты
+logger.info('Loading API routes...');
 app.use('/api/auth', authRoutes);
 app.use('/api/analyze', analyzeRoutes);
 app.use('/api/history', historyRoutes);
@@ -45,13 +46,11 @@ app.use('/api', apiRoutes);
 
 // Роут для главной страницы
 app.get('/', (req, res) => {
-  logger.info('Главная страница запрошена', { ip: req.ip, userAgent: req.get('User-Agent') });
   res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
 });
 
 // Базовый роут для проверки работы сервера
 app.get('/api/health', (req, res) => {
-  logger.info('Health check запрос');
   res.json({
     success: true,
     message: 'Сервер работает',
@@ -222,7 +221,8 @@ async function startServer() {
         subscription: '/api/subscription',
         logClient: '/api/log-client',
         ping: '/api/ping',
-        health: '/api/health'
+        health: '/api/health',
+        sharedAnalysis: '/api/shared-analysis'
       });
     });
 

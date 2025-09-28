@@ -11,6 +11,7 @@ import { logger } from '@/modules/logger';
 import { authManager } from '@/modules/auth';
 import { uiManager } from '@/modules/ui';
 import { historyManager } from '@/modules/history';
+import { api } from '@/modules/api';
 
 /**
  * Класс главного приложения
@@ -19,6 +20,90 @@ class TgStyleApp {
   private tg: TelegramWebApp | null = null;
   private isInitialized = false;
   private initStartTime = Date.now();
+
+  /**
+   * Обработка URL хэшей для shared анализов
+   */
+  private handleSharedAnalysis(): void {
+    const hash = window.location.hash;
+    const urlParams = new URLSearchParams(window.location.search);
+
+    // Проверяем хэш (для прямых ссылок)
+    if (hash.startsWith('#shared-analysis-')) {
+      const analysisId = hash.replace('#shared-analysis-', '');
+      this.showSharedAnalysis(analysisId);
+      return;
+    }
+
+    // Проверяем параметры URL (для ссылок из бота через Mini App)
+    const startAppParam = urlParams.get('startapp');
+    if (startAppParam && startAppParam.startsWith('shared_')) {
+      const analysisId = startAppParam.replace('shared_', '');
+      // Устанавливаем хэш для корректной работы и показываем анализ
+      window.location.hash = `shared-analysis-${analysisId}`;
+      this.showSharedAnalysis(analysisId);
+      return;
+    }
+
+    // Проверяем Telegram WebApp start_param (для Mini App ссылок)
+    const tgStartParam = this.tg?.initDataUnsafe?.start_param;
+    if (tgStartParam && tgStartParam.startsWith('shared_')) {
+      const analysisId = tgStartParam.replace('shared_', '');
+      // Устанавливаем хэш для корректной работы и показываем анализ
+      window.location.hash = `shared-analysis-${analysisId}`;
+      this.showSharedAnalysis(analysisId);
+      return;
+    }
+
+    // Для обратной совместимости проверяем start параметр
+    const startParam = urlParams.get('start');
+    if (startParam && startParam.startsWith('shared_')) {
+      const analysisId = startParam.replace('shared_', '');
+      // Устанавливаем хэш для корректной работы и показываем анализ
+      window.location.hash = `shared-analysis-${analysisId}`;
+      this.showSharedAnalysis(analysisId);
+      return;
+    }
+  }
+
+  /**
+   * Показать shared анализ другого пользователя
+   */
+  private async showSharedAnalysis(analysisId: string): Promise<void> {
+    try {
+      // Сначала пробуем найти в localStorage
+      let sharedData = localStorage.getItem(`shared_analysis_${analysisId}`);
+
+      // Если не нашли в localStorage, пробуем получить с сервера
+      if (!sharedData) {
+        try {
+          const { api } = await import('./modules/api.js');
+          const response = await api.get(`/shared-analysis/${analysisId}`);
+
+          if ((response as any).success && (response as any).data) {
+            sharedData = JSON.stringify({
+              photo: (response as any).data.photo,
+              analysis: (response as any).data.analysis,
+              timestamp: (response as any).data.timestamp
+            });
+
+            localStorage.setItem(`shared_analysis_${analysisId}`, sharedData);
+          }
+        } catch (serverError) {
+          logger.warn('Failed to load shared analysis from server', serverError);
+        }
+      }
+
+      if (!sharedData) {
+        return;
+      }
+
+      const analysis: { photo: string; analysis: string; timestamp: string } = JSON.parse(sharedData);
+      await uiManager.showSharedAnalysis(analysis.photo, analysis.analysis, analysis.timestamp);
+    } catch (error) {
+      logger.error('Failed to show shared analysis', error);
+    }
+  }
 
   /**
    * Основной метод инициализации приложения
@@ -47,6 +132,14 @@ class TgStyleApp {
       // Выполняем авторизацию
       await this.performAuthentication();
 
+      // Обрабатываем shared анализы
+      this.handleSharedAnalysis();
+
+      // Добавляем слушатель изменений хэша
+      window.addEventListener('hashchange', () => {
+        this.handleSharedAnalysis();
+      });
+
       // Завершаем инициализацию
       this.completeInitialization();
 
@@ -70,6 +163,9 @@ class TgStyleApp {
     });
 
     this.tg = window.Telegram?.WebApp || null;
+
+    // Создаем глобальную переменную API для доступа из других модулей
+    (window as any).tgStyleApi = api;
 
     if (!this.tg) {
       logger.warn('Telegram WebApp not available, running in standalone mode');

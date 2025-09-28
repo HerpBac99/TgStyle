@@ -19,6 +19,7 @@ export const APP_CONFIG: AppConfig = {
     history: true,
     analytics: true,
   },
+  telegramBotName: (process.env as any).TELEGRAM_BOT_NAME || 'LamodaStyleBot',
 };
 
 // Настройки localStorage

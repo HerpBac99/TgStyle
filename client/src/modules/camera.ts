@@ -93,13 +93,6 @@ class CameraManager {
         const file = target.files?.[0];
         
         if (file) {
-          logger.info('File selected', {
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            lastModified: file.lastModified,
-          });
-          
           resolve(file);
         } else {
           reject(new Error('Файл не выбран'));
@@ -322,17 +315,7 @@ class CameraManager {
               throw new Error('Failed to resize image');
             }
 
-            const originalSize = (base64Image.length * 3) / 4 / 1024; // KB
-            const resizedSize = (resizedData.length * 3) / 4 / 1024; // KB
-            const compressionRatio = ((originalSize - resizedSize) / originalSize * 100);
 
-            logger.info('Image resize completed', {
-              originalSize: Math.round(originalSize) + 'KB',
-              resizedSize: Math.round(resizedSize) + 'KB',
-              originalDimensions: `${img.width}x${img.height}`,
-              resizedDimensions: `${canvas.width}x${canvas.height}`,
-              compressionRatio: Math.round(compressionRatio) + '%'
-            });
 
             resolve(resizedData);
           } catch (error) {
@@ -361,7 +344,11 @@ class CameraManager {
   async compressImage(base64Image: string, quality: number = 0.8): Promise<string> {
     return new Promise((resolve, reject) => {
       try {
-        logger.info('Starting image compression', { quality });
+        logger.info('Starting image compression', { 
+          quality,
+          imageLength: base64Image.length,
+          hasDataPrefix: base64Image.startsWith('data:')
+        });
 
         // Создаем изображение из base64
         const img = new Image();
@@ -393,16 +380,7 @@ class CameraManager {
               throw new Error('Failed to compress image');
             }
 
-            const originalSize = (base64Image.length * 3) / 4 / 1024; // KB
-            const compressedSize = (compressedData.length * 3) / 4 / 1024; // KB
-            const compressionRatio = ((originalSize - compressedSize) / originalSize * 100);
 
-            logger.info('Image compression completed', {
-              originalSize: Math.round(originalSize) + 'KB',
-              compressedSize: Math.round(compressedSize) + 'KB',
-              compressionRatio: Math.round(compressionRatio) + '%',
-              quality: quality
-            });
 
             resolve(compressedData);
           } catch (error) {
@@ -416,8 +394,12 @@ class CameraManager {
           reject(new Error('Failed to load image for compression'));
         };
 
-        // Загружаем изображение
-        img.src = `data:image/jpeg;base64,${base64Image}`;
+        // Проверяем и устанавливаем правильный data URL
+        if (base64Image.startsWith('data:')) {
+          img.src = base64Image;
+        } else {
+          img.src = `data:image/jpeg;base64,${base64Image}`;
+        }
 
       } catch (error) {
         logger.error('Error starting image compression', error);

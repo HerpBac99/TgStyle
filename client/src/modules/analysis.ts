@@ -111,45 +111,19 @@ class AnalysisManager {
       const analysisText = response.analysis || '';
       const currentSizeMB = cameraManager.calculateHistoryItemSize(imageForHistory, analysisText);
 
-      logger.info('History item size check', {
-        currentSizeMB: Math.round(currentSizeMB * 100) / 100,
-        resizeThreshold: 0.5,
-        needsResize: currentSizeMB > 0.5
-      });
-
       // Всегда делаем resize до 800x800 пикселей для экономии места
       if (currentSizeMB > 0.5) {
         try {
-          logger.info('Resizing image for history storage', {
-            currentSizeMB: Math.round(currentSizeMB * 100) / 100,
-            maxAllowedMB: 2.0
-          });
-
-          // Делаем resize изображения до 800x800 пикселей
           const resizedImage = await cameraManager.resizeImageForStorage(imageForHistory);
-
-          // Проверяем размер после resize
           const resizedSizeMB = cameraManager.calculateHistoryItemSize(resizedImage, analysisText);
-
-          logger.info('Resize completed', {
-            originalSizeMB: Math.round(currentSizeMB * 100) / 100,
-            resizedSizeMB: Math.round(resizedSizeMB * 100) / 100,
-            sizeReduction: Math.round((currentSizeMB - resizedSizeMB) / currentSizeMB * 100) + '%'
-          });
 
           // Если после resize размер все еще > 1MB, не сохраняем
           if (resizedSizeMB > 1.0) {
-            logger.warn('Image too large even after resize, skipping localStorage save', {
-              resizedSizeMB: Math.round(resizedSizeMB * 100) / 100
-            });
+            logger.warn('Image too large even after resize, skipping save');
             return;
           }
 
-          // Используем resized изображение
           imageForHistory = resizedImage;
-          logger.info('Using resized image for storage', {
-            finalSizeMB: Math.round(resizedSizeMB * 100) / 100
-          });
 
         } catch (resizeError) {
           logger.error('Image resize failed, skipping localStorage save', resizeError);
@@ -293,6 +267,11 @@ class AnalysisManager {
         const { uiManager } = await import('./ui.js');
         const { authManager } = await import('./auth.js');
 
+        // Показываем экран анализа с изображением
+        window.dispatchEvent(new CustomEvent('showAnalysisScreen', {
+          detail: { imageBase64, analysis: response.analysis }
+        }));
+
         // Обновляем карусель истории
         uiManager.updateHistoryDisplay();
 
@@ -300,13 +279,11 @@ class AnalysisManager {
         if (response.subscription) {
           authManager.updateSubscription(response.subscription);
         }
-      }
 
-      // Показываем результат в UI
-      if (response.success && response.analysis) {
-        // Импортируем uiManager динамически чтобы избежать циклических зависимостей
-        const { uiManager } = await import('./ui.js');
-        uiManager.showAnalysisResult(response.analysis);
+        // Показываем результат в UI
+        if (response.analysis) {
+          uiManager.showAnalysisResult(response.analysis);
+        }
       }
 
       logger.info('Automatic image analysis completed successfully');

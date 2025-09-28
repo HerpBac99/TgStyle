@@ -31,6 +31,15 @@ class HistoryManager {
   }
 
   /**
+   * Генерация уникального ID для анализа
+   */
+  private generateUniqueId(): string {
+    const timestamp = Date.now().toString(36);
+    const randomPart = Math.random().toString(36).substr(2, 9);
+    return `analysis_${timestamp}_${randomPart}`;
+  }
+
+  /**
    * Загрузка истории из localStorage
    */
   private loadFromStorage(): void {
@@ -274,6 +283,11 @@ class HistoryManager {
       // Добавляем timestamp если отсутствует
       if (!item.timestamp) {
         item.timestamp = new Date().toISOString();
+      }
+
+      // Генерируем уникальный ID если отсутствует
+      if (!item.id) {
+        item.id = this.generateUniqueId();
       }
 
       // Найдем позицию для вставки нового элемента

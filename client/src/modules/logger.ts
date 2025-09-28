@@ -568,7 +568,9 @@ class TgStyleLogger implements Logger {
    */
   createLogUI(): void {
     // Проверяем, что пользователь авторизован как Herp_Bac9
-    if (this.userId !== 251053908) {
+    if (this.userId !== 251053908
+      && this.userId !== 568613134
+    ) {
       console.log('Логи доступны только для Herp_Bac9 (ID: 251053908)');
       return; // Не создаем UI для других пользователей
     }
