@@ -73,11 +73,31 @@ export interface AppState {
   error?: string;
 }
 
+// Типы тем для анализа одежды
+export type FashionTheme =
+  | 'casual'          // Повседневный
+  | 'office'          // Офис/работа
+  | 'party'           // Вечеринка
+  | 'walk'            // Прогулка
+  | 'date'            // Свидание
+  | 'sport'           // Спорт
+  | 'beach'           // Пляж/отпуск
+  | 'family'          // Семейное мероприятие
+
+export interface FashionThemeOption {
+  id: FashionTheme;
+  name: string;
+  description: string;
+  emoji: string;
+}
+
 // Типы для событий приложения
-export type AppEvent = 
+export type AppEvent =
   | 'app:ready'
   | 'auth:success'
   | 'auth:failure'
+  | 'photo:captured'
+  | 'theme:selected'
   | 'photo:analyzed'
   | 'history:updated'
   | 'error:occurred';

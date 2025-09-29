@@ -179,10 +179,10 @@ def setup_logging():
 
 def load_prompts():
     """Загрузка промптов для анализа"""
-    global default_prompt, style_prompt, person_prompt, clothing_prompt, legs_prompt, shoes_prompt, accessories_prompt
+    global default_prompt, style_prompt, person_prompt, clothing_prompt, legs_prompt, shoes_prompt, accessories_head_prompt, accessories_hand_prompt
 
     try:
-        # Загружаем три основных промпта для многопроходного анализа
+        # Загружаем промпты для многопроходного анализа
         prompt_dir = os.path.join(os.path.dirname(__file__), 'prompt')
 
         # PERSON промпт
@@ -221,14 +221,23 @@ def load_prompts():
             shoes_prompt = "Describe the shoes on the person."
             app.logger.warning(f"SHOES промпт не найден: {shoes_file}")
 
-        # ACCESSORIES промпт
-        accessories_file = os.path.join(prompt_dir, 'ACCESSORIES_PROMPT.md')
-        if os.path.exists(accessories_file):
-            with open(accessories_file, 'r', encoding='utf-8') as f:
-                accessories_prompt = f.read().strip()
+        # ACCESSORIES HEAD промпт
+        accessories_head_file = os.path.join(prompt_dir, 'ACCESSORIES_HEAD_PROMPT.md')
+        if os.path.exists(accessories_head_file):
+            with open(accessories_head_file, 'r', encoding='utf-8') as f:
+                accessories_head_prompt = f.read().strip()
         else:
-            accessories_prompt = "Describe the accessories on the person."
-            app.logger.warning(f"ACCESSORIES промпт не найден: {accessories_file}")
+            accessories_head_prompt = "Focus on the person's head, face, ears, and neck area and LIST all VISIBLE accessories (glasses, earrings, necklace)."
+            app.logger.warning(f"ACCESSORIES HEAD промпт не найден: {accessories_head_file}")
+
+        # ACCESSORIES HAND промпт
+        accessories_hand_file = os.path.join(prompt_dir, 'ACCESSORIES_HAND_PROMPT.md')
+        if os.path.exists(accessories_hand_file):
+            with open(accessories_hand_file, 'r', encoding='utf-8') as f:
+                accessories_hand_prompt = f.read().strip()
+        else:
+            accessories_hand_prompt = "Focus on the person's wrists, hands, and fingers area and LIST all VISIBLE accessories (watch, rings, bracelets)."
+            app.logger.warning(f"ACCESSORIES HAND промпт не найден: {accessories_hand_file}")
 
         # Основной промпт (для обратной совместимости)
         default_prompt = "Analyze the clothing and style in this image."
@@ -249,7 +258,8 @@ def load_prompts():
         default_prompt = "Describe the clothing in this image." 
         clothing_prompt = "Describe the clothing on the person."
         shoes_prompt = "Describe the shoes on the person."
-        accessories_prompt = "Describe the accessories on the person."
+        accessories_head_prompt = "Focus on the person's head, face, ears, and neck area and LIST all VISIBLE accessories (glasses, earrings, necklace)."
+        accessories_hand_prompt = "Focus on the person's wrists, hands, and fingers area and LIST all VISIBLE accessories (watch, rings, bracelets)."
         style_prompt = default_prompt
         person_prompt = "Describe the person."
 
@@ -269,7 +279,7 @@ def extract_text(result) -> str:
 
 def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
     """Выполняет многопроходный анализ изображения через FastVLM"""
-    global person_prompt, clothing_prompt, legs_prompt, shoes_prompt, accessories_prompt
+    global person_prompt, clothing_prompt, legs_prompt, shoes_prompt, accessories_head_prompt, accessories_hand_prompt
 
     app.logger.info(f"Начинаем многопроходный анализ для пользователя {nickname}")
 
@@ -278,8 +288,9 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
     clothing_result = ""
     legs_result = ""
     shoes_result = ""
-    accessories_result = ""
-    timing = {"person": 0, "clothing": 0, "legs": 0, "shoes": 0, "accessories": 0, "total": 0}
+    accessories_head_result = ""
+    accessories_hand_result = ""
+    timing = {"person": 0, "clothing": 0, "legs": 0, "shoes": 0, "accessories_head": 0, "accessories_hand": 0, "total": 0}
 
     total_start_time = time.time()
 
@@ -322,14 +333,23 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
             shoes_result = extract_text(shoes_response)
             timing["shoes"] = time.time() - pass4_start
 
-        # Pass 5: Accessories analysis
-        if accessories_prompt:
+        # Pass 5: Head accessories analysis
+        if accessories_head_prompt:
             pass5_start = time.time()
-            accessories_response, error = analyze_image_fastvlm(image_base64, accessories_prompt)
+            accessories_head_response, error = analyze_image_fastvlm(image_base64, accessories_head_prompt)
             if error:
-                accessories_response = "Не удалось определить аксессуары"
-            accessories_result = extract_text(accessories_response)
-            timing["accessories"] = time.time() - pass5_start
+                accessories_head_response = "Не удалось определить аксессуары на голове/шее"
+            accessories_head_result = extract_text(accessories_head_response)
+            timing["accessories_head"] = time.time() - pass5_start
+
+        # Pass 6: Hand accessories analysis
+        if accessories_hand_prompt:
+            pass6_start = time.time()
+            accessories_hand_response, error = analyze_image_fastvlm(image_base64, accessories_hand_prompt)
+            if error:
+                accessories_hand_response = "Не удалось определить аксессуары на руках/запястьях"
+            accessories_hand_result = extract_text(accessories_hand_response)
+            timing["accessories_hand"] = time.time() - pass6_start
 
         timing["total"] = time.time() - total_start_time
 
@@ -340,7 +360,8 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
             "clothing": clothing_result,
             "legs": legs_result,
             "shoes": shoes_result,
-            "accessories": accessories_result,
+            "accessories_head": accessories_head_result,
+            "accessories_hand": accessories_hand_result,
             "timing": timing,
             "success": True
         }
@@ -353,7 +374,8 @@ def perform_multi_pass_analysis(image_base64: str, nickname: str) -> dict:
             "clothing": "",
             "legs": "",
             "shoes": "",
-            "accessories": "",
+            "accessories_head": "",
+            "accessories_hand": "",
             "timing": timing,
             "success": False,
             "error": str(e)
@@ -468,7 +490,7 @@ def check_ollama_availability():
         ollama_available = False
         return False
 
-def create_stylist_response_ollama(multi_pass_analysis):
+def create_stylist_response_ollama(multi_pass_analysis, topic='casual'):
     """Создает креативный ответ ИИ стилиста через Ollama"""
     global ollama_available, ollama_url, ollama_model, style_prompt
 
@@ -477,10 +499,10 @@ def create_stylist_response_ollama(multi_pass_analysis):
         return multi_pass_analysis
 
     try:
-        app.logger.info("Генерация креативного ответа стилиста через Ollama API")
+        app.logger.info(f"Генерация креативного ответа стилиста через Ollama API (тема: {topic})")
 
         # Используем промпт из файла style_prompt.md
-        formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis)
+        formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis).replace('{theme}', topic)
 
         # Логируем отправку запроса в Ollama
         app.logger.info(f"Отправка запроса в Ollama (промпт: {len(formatted_prompt)} символов, модель: {ollama_model})")
@@ -547,7 +569,7 @@ def initialize_gemini():
         app.logger.error(f"Ошибка инициализации Gemini API: {e}")
         return False
 
-def create_stylist_response_gemini(multi_pass_analysis):
+def create_stylist_response_gemini(multi_pass_analysis, topic='casual'):
     """Создает креативный ответ ИИ стилиста через Gemini API"""
     global gemini_client, style_prompt
 
@@ -556,10 +578,10 @@ def create_stylist_response_gemini(multi_pass_analysis):
         return multi_pass_analysis
 
     try:
-        app.logger.info("Генерация креативного ответа стилиста через Gemini API")
+        app.logger.info(f"Генерация креативного ответа стилиста через Gemini API (тема: {topic})")
 
         # Используем промпт из файла style_prompt.md
-        formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis)
+        formatted_prompt = style_prompt.replace('{fastvlm_analysis}', multi_pass_analysis).replace('{theme}', topic)
 
         # Логируем отправку запроса в Gemini
         app.logger.info(f"Отправка запроса в Gemini (промпт: {formatted_prompt}, модель: {Config.STYLIST_GEMINI_MODEL})")
@@ -602,23 +624,23 @@ def create_stylist_response_gemini(multi_pass_analysis):
         # Fallback на оригинальный анализ FastVLM
         return multi_pass_analysis
 
-def create_stylist_response(multi_pass_analysis):
+def create_stylist_response(multi_pass_analysis, topic='casual'):
     """Создает креативный ответ ИИ стилиста в зависимости от выбранного типа"""
     global ollama_available, gemini_client, style_prompt
 
-    app.logger.info(f"Создание ответа стилиста. Выбран тип: {Config.STYLIST_TYPE}")
+    app.logger.info(f"Создание ответа стилиста. Выбран тип: {Config.STYLIST_TYPE}, тема: {topic}")
 
     # Выбираем стилиста в зависимости от конфигурации
     if Config.STYLIST_TYPE == 'ollama' and ollama_available:
         app.logger.info(f"Используем Ollama для создания ответа стилиста (выбранный тип: {Config.STYLIST_TYPE})")
-        response = create_stylist_response_ollama(multi_pass_analysis)
+        response = create_stylist_response_ollama(multi_pass_analysis, topic)
         if response and response != multi_pass_analysis:  # Проверяем, что это не fallback
             return response
         app.logger.warning("Ollama не дал качественный ответ")
 
     elif Config.STYLIST_TYPE == 'gemini' and gemini_client:
         app.logger.info(f"Используем Gemini для создания ответа стилиста (выбранный тип: {Config.STYLIST_TYPE})")
-        return create_stylist_response_gemini(multi_pass_analysis)
+        return create_stylist_response_gemini(multi_pass_analysis, topic)
 
 
     # Fallback логика - пробуем все доступные варианты
@@ -626,13 +648,13 @@ def create_stylist_response(multi_pass_analysis):
 
     if ollama_available:
         app.logger.info("Fallback на Ollama")
-        response = create_stylist_response_ollama(multi_pass_analysis)
+        response = create_stylist_response_ollama(multi_pass_analysis, topic)
         if response and response != multi_pass_analysis:
             return response
 
     if gemini_client:
         app.logger.info("Fallback на Gemini")
-        return create_stylist_response_gemini(multi_pass_analysis)
+        return create_stylist_response_gemini(multi_pass_analysis, topic)
 
     # Если ничего не сработало, возвращаем базовый анализ
     app.logger.warning("Ни Ollama, ни Gemini недоступны, используем базовый анализ FastVLM")
@@ -879,6 +901,7 @@ def analyze():
         prompt = data.get('prompt', default_prompt)
         use_gpu = data.get('force_gpu', torch.cuda.is_available())
         nickname = data.get('nickname', 'unknown_user')  # Получаем nickname из запроса
+        topic = data.get('topic', 'casual')  # Получаем тему анализа
 
         app.logger.debug(f"Начало анализа изображения (устройство: {model.device})")
 
@@ -937,14 +960,15 @@ def analyze():
 ОДЕЖДА: {multi_pass_result.get('clothing', 'Не определено')}
 НОГИ: {multi_pass_result.get('legs', 'Не определено')}
 ОБУВЬ: {multi_pass_result.get('shoes', 'Не определено')}
-АКСЕССУАРЫ: {multi_pass_result.get('accessories', 'Не определено')}
+АКСЕССУАРЫ_ГОЛОВА: {multi_pass_result.get('accessories_head', 'Не определено')}
+АКСЕССУАРЫ_РУКИ: {multi_pass_result.get('accessories_hand', 'Не определено')}
 """
 
             fastvlm_time = multi_pass_result.get('timing', {}).get('total', 0)
 
             # Создаем креативный ответ стилиста
             gemini_start_time = time.time()
-            stylist_response = create_stylist_response(combined_analysis)
+            stylist_response = create_stylist_response(combined_analysis, topic)
             gemini_time = time.time() - gemini_start_time
 
             total_time = time.time() - analysis_start_time
@@ -977,7 +1001,8 @@ def analyze():
                     'clothing': multi_pass_result.get('clothing', ''),
                     'legs': multi_pass_result.get('legs', ''),
                     'shoes': multi_pass_result.get('shoes', ''),
-                    'accessories': multi_pass_result.get('accessories', ''),
+                    'accessories_head': multi_pass_result.get('accessories_head', ''),
+                    'accessories_hand': multi_pass_result.get('accessories_hand', ''),
                 },
                 'detailed_timings': multi_pass_result.get('timing', {})
             })

@@ -1,1 +1,1 @@
-Focus on the person's wrists, hands, and fingers area and LIST all VISIBLE accessories (watch, rings, bracelets).
+Focus on the person's wrists, hands, and fingers area and LIST all VISIBLE accessories (watch, rings, bracelets). If no accessories are visible, state that clearly.

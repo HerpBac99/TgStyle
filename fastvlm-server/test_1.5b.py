@@ -156,14 +156,14 @@ PROMPT_person = """Describe the person gender and age in the photograph."""
 PROMPT_cloth = """Focus on the person's torso area and LIST all VISIBLE Outerwear and Innerwear clothing on the person's torso, color, material, fit."""
 PROMPT_leg = """Focus on the person's legs area and LIST all VISIBLE clothing on the person's legs, color, material, fit."""
 PROMPT_shoes = """Focus on the person's feet area and LIST all VISIBLE shoes on the person's feet, color, material, fit."""
-PROMPT_HEAD_accessories = """Focus on the person's head, face, ears, and neck area and LIST all VISIBLE accessories (glasses, earrings, necklace)."""
-PROMPT_HANDS_accessories = """Focus on the person's wrists, hands, and fingers area and LIST all VISIBLE accessories (watch, rings, bracelets)."""
+PROMPT_HEAD_accessories = """Focus on the person's head, face, ears, and neck area and LIST all VISIBLE accessories."""
+PROMPT_HANDS_accessories = """Focus on the person's wrists, hands, and fingers area and LIST all VISIBLE accessories."""
 
 def main():
     if len(sys.argv) >= 2:
         image_path = sys.argv[1]
     else:
-        image_path = str(Path(__file__).parent.parent / "19.jpg")
+        image_path = str(Path(__file__).parent.parent / "8.jpg")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")

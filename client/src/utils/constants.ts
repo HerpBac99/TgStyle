@@ -140,6 +140,58 @@ export const CAROUSEL_CONFIG = {
 } as const;
 
 
+// Настройки тем для анализа одежды
+export const FASHION_THEMES = [
+  {
+    id: 'casual' as const,
+    name: 'Повседневный',
+    description: 'Для ежедневного ношения',
+    emoji: '👕',
+  },
+  {
+    id: 'office' as const,
+    name: 'Офис',
+    description: 'Для работы в офисе',
+    emoji: '💼',
+  },
+  {
+    id: 'party' as const,
+    name: 'Вечеринка',
+    description: 'Для вечеринок и клубов',
+    emoji: '🎉',
+  },
+  {
+    id: 'walk' as const,
+    name: 'Прогулка',
+    description: 'Для прогулок и активного отдыха',
+    emoji: '🚶',
+  },
+  {
+    id: 'date' as const,
+    name: 'Свидание',
+    description: 'Для свидания',
+    emoji: '💕',
+  },
+  {
+    id: 'sport' as const,
+    name: 'Спорт',
+    description: 'Для занятий спортом',
+    emoji: '⚽',
+  },
+  {
+    id: 'beach' as const,
+    name: 'Пляж',
+    description: 'Для пляжа и отпуска',
+    emoji: '🏖️',
+  },
+  {
+    id: 'family' as const,
+    name: 'Семейное',
+    description: 'Для семейных мероприятий',
+    emoji: '👨‍👩‍👧‍👦',
+  }
+] as const;
+
 // Настройки FastVLM
 export const FASTVLM_CONFIG = {
   HEALTH_CHECK_INTERVAL: 30000, // 30 секунд

@@ -18,7 +18,6 @@ import {
   getFileExtension
 } from '@/utils/helpers';
 import { logger } from './logger';
-import { analysisManager } from './analysis';
 
 /**
  * Класс для работы с камерой и изображениями
@@ -48,16 +47,11 @@ class CameraManager {
         originalSize: Math.round(imageData.originalSize / 1024) + 'KB',
       });
 
-      // Автоматически запускаем анализ фото
-      logger.info('Starting automatic photo analysis');
-      try {
-        // Запускаем анализ в фоне, не ждем результата
-        analysisManager.analyzeImage(imageData.base64).catch(error => {
-          logger.error('Auto-analysis failed', error);
-        });
-      } catch (error) {
-        logger.error('Error starting auto-analysis', error);
-      }
+      // Отправляем событие о захвате фото для показа экрана выбора темы
+      logger.info('Photo captured, dispatching event for theme selection');
+      window.dispatchEvent(new CustomEvent('photo:captured', {
+        detail: { imageData }
+      }));
 
       return {
         success: true,

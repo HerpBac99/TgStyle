@@ -5,13 +5,16 @@
 import type {
   DOMElements,
   HistoryItem,
-  TelegramWebApp
+  TelegramWebApp,
+  FashionTheme,
+  ImageData
 } from '@/types/index';
 import {
   DOM_SELECTORS,
   CSS_CLASSES,
   CAROUSEL_CONFIG,
-  APP_CONFIG
+  APP_CONFIG,
+  FASHION_THEMES
 } from '@/utils/constants';
 import {
   getElement,
@@ -102,6 +105,9 @@ class UIManager {
     analysisText: null,
   };
 
+  // Текущее изображение для выбора темы
+  private currentThemeImage: ImageData | null = null;
+
   // Состояние карусели
   private carouselState = {
     currentCenterIndex: 0, // Индекс элемента в центре
@@ -171,6 +177,7 @@ class UIManager {
     // Обработчик изменения состояния анализа
     window.addEventListener('analysisStateChange', this.handleAnalysisStateChange.bind(this) as EventListener);
     window.addEventListener('showAnalysisScreen', this.handleShowAnalysisScreen.bind(this) as EventListener);
+    window.addEventListener('photo:captured', this.handlePhotoCaptured.bind(this) as EventListener);
 
     // Обработчик видимости страницы (для очистки состояния при сворачивании)
     document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
@@ -276,6 +283,22 @@ class UIManager {
     }
   }
 
+  /**
+   * Обработчик захвата фото - показывает экран выбора темы
+   */
+  private handlePhotoCaptured(event: CustomEvent): void {
+    const { imageData } = event.detail;
+    logger.info('Photo captured, showing theme selection screen', {
+      hasImageData: !!imageData,
+      imageSize: imageData ? Math.round(imageData.originalSize / 1024) + 'KB' : 'unknown'
+    });
+
+    if (imageData) {
+      this.currentThemeImage = imageData;
+      this.showThemeSelectionScreen(imageData);
+    }
+  }
+
 
   /**
    * Отображение экрана анализа фото
@@ -309,6 +332,97 @@ class UIManager {
     this.currentPreview = analysisScreen;
 
     logger.info('Analysis screen displayed');
+  }
+
+  /**
+   * Показать экран выбора темы для анализа
+   */
+  private showThemeSelectionScreen(imageData: ImageData): void {
+    logger.info('Showing theme selection screen');
+
+    // Получаем элементы экрана выбора темы
+    const themeScreen = getElement('#theme-selection-screen');
+    const themeImage = getElement('#theme-image') as HTMLImageElement;
+    const themeGrid = getElement('#theme-grid');
+
+    if (!themeScreen || !themeImage || !themeGrid) {
+      logger.error('Theme selection screen elements not found');
+      return;
+    }
+
+    // Устанавливаем изображение
+    themeImage.src = `data:image/jpeg;base64,${imageData.base64}`;
+
+    // Очищаем предыдущие темы
+    themeGrid.innerHTML = '';
+
+    // Создаем карточки тем
+    FASHION_THEMES.forEach(theme => {
+      const themeCard = createElement('div');
+      themeCard.className = 'theme-card';
+      themeCard.dataset['theme'] = String(theme.id);
+
+      themeCard.innerHTML = `
+        <div class="theme-emoji">${theme.emoji}</div>
+        <div class="theme-name">${theme.name}</div>
+        <div class="theme-description">${theme.description}</div>
+      `;
+
+      // Добавляем обработчик клика
+      themeCard.addEventListener('click', () => {
+        this.selectTheme(theme.id as FashionTheme);
+      });
+
+      themeGrid.appendChild(themeCard);
+    });
+
+    // Показываем экран выбора темы
+    themeScreen.classList.remove('hidden');
+    this.currentPreview = themeScreen;
+
+    logger.info('Theme selection screen displayed');
+  }
+
+  /**
+   * Обработчик выбора темы
+   */
+  private selectTheme(themeId: FashionTheme): void {
+    logger.info('Theme selected', { themeId });
+
+    if (!this.currentThemeImage) {
+      logger.error('No current image for theme selection');
+      return;
+    }
+
+    // Скрываем экран выбора темы
+    const themeScreen = getElement('#theme-selection-screen');
+    if (themeScreen) {
+      themeScreen.classList.add('hidden');
+    }
+
+    // Показываем экран анализа с выбранной темой
+    this.showAnalysisWithTheme(this.currentThemeImage, themeId);
+  }
+
+  /**
+   * Показать экран анализа с выбранной темой
+   */
+  private async showAnalysisWithTheme(imageData: ImageData, theme: FashionTheme): Promise<void> {
+    logger.info('Starting analysis with theme', { theme });
+
+    try {
+      // Импортируем менеджер анализа динамически
+      const { analysisManager } = await import('./analysis.js');
+
+      // Показываем экран анализа
+      this.showFullscreenPreview(imageData.base64);
+
+      // Запускаем анализ с темой
+      await analysisManager.analyzeImage(imageData.base64, theme);
+
+    } catch (error) {
+      logger.error('Error starting analysis with theme', error);
+    }
   }
 
   /**

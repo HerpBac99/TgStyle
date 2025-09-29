@@ -1,1 +1,1 @@
-Focus on the person's torso area and LIST all VISIBLE Outerwear and Innerwear clothing on the person's torso, color, material, fit.
+Focus on the person's torso area and LIST all VISIBLE clothing on the person's torso, color, material, fit. If no torso is visible, state that clearly.

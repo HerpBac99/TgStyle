@@ -42,6 +42,7 @@ export interface AnalysisRequest {
   platform?: string;
   userAgent?: string;
   initData?: string;
+  theme?: string; // тема анализа одежды
 }
 
 

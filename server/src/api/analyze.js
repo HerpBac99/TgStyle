@@ -158,9 +158,10 @@ const FASTVLM_CONFIG = {
  * Анализирует изображение через FastVLM сервер
  * @param {Buffer} imageBuffer - Буфер изображения
  * @param {string} nickname - Никнейм пользователя для логирования
+ * @param {string} theme - Тема анализа одежды
  * @returns {Promise<Object>} Результат анализа
  */
-async function analyzeImage(imageBuffer, nickname) {
+async function analyzeImage(imageBuffer, nickname, theme) {
     try {
         logger.info('Отправка запроса в FastVLM сервер');
 
@@ -184,7 +185,8 @@ async function analyzeImage(imageBuffer, nickname) {
             body: JSON.stringify({
                 image_base64: base64Image,
                 prompt: 'Опиши одежду на фото',
-                nickname: nickname
+                nickname: nickname,
+                topic: theme || 'casual' // передаем тему, по умолчанию casual
             }),
             signal: controller.signal
         });
@@ -284,7 +286,7 @@ function cleanAnalysisText(text) {
  * POST /api/analyze
  */
 router.post('/', async (req, res) => {
-    const { photo, initData } = req.body;
+    const { photo, initData, theme } = req.body;
     let dbUser = null;
     let historyItem = null;
 
@@ -403,7 +405,7 @@ router.post('/', async (req, res) => {
         logger.info(`Начинаем анализ для пользователя: ${nickname}`);
 
         // Отправляем на анализ в FastVLM
-        const analysisResult = await analyzeImage(imageBuffer, nickname);
+        const analysisResult = await analyzeImage(imageBuffer, nickname, theme);
 
         if (analysisResult.success) {
             logger.info('FastVLM анализ завершен успешно');
