@@ -1,1 +1,1 @@
-Focus on the person's legs area. Describe all VISIBLE clothing on the person's legs. If no legs are visible, state that clearly.
+Focus on the person's legs area and LIST all VISIBLE clothing on the person's legs, color, material, fit.

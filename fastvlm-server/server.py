@@ -89,7 +89,8 @@ person_prompt = None
 clothing_prompt = None
 legs_prompt = None
 shoes_prompt = None
-accessories_prompt = None
+accessories_head_prompt = None
+accessories_hand_prompt = None
 
 # Директория для сохранения результатов FastVLM
 FASTVLM_RESULTS_DIR = os.path.join(os.path.dirname(__file__), 'results')

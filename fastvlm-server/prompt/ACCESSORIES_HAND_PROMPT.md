@@ -1,0 +1,1 @@
+Focus on the person's wrists, hands, and fingers area and LIST all VISIBLE accessories (watch, rings, bracelets).

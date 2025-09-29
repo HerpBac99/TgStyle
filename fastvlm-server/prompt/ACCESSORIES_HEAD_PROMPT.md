@@ -1,0 +1,1 @@
+Focus on the person's head, face, ears, and neck area and LIST all VISIBLE accessories (glasses, earrings, necklace).

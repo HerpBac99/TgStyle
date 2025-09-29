@@ -1,1 +1,1 @@
-Focus on the person's feet area. Describe the VISIBLE shoes on the person's feet. If no shoes are visible, state that clearly.
+Focus on the person's feet area and LIST all VISIBLE shoes on the person's feet, color, material, fit.

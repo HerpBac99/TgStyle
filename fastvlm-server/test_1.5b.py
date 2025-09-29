@@ -41,7 +41,7 @@ from PIL import Image
 
 SERVER_URL = os.environ.get("FASTVLM_URL", "http://127.0.0.1:3001")
 # Режим анализа: True = многопроходный, False = реальный режим сервера
-TECH_ANALYZE = False
+TECH_ANALYZE = True
 
 def to_base64(img: Image.Image) -> str:
     buf = io.BytesIO()
@@ -149,17 +149,15 @@ def load_image(path: str) -> Image.Image:
 #PROMPT_shoes = """Output EXACTLY one short line: Describe the VISIBLE shoes on the person's feet. If no shoes are visible, state that clearly."""
 #PROMPT_accessories = """Output EXACTLY one short line: Describe the ALL VISIBLE accessories on your head, neck, hand and bag. If no accessories are visible, state that clearly."""
 #describe in one sentence
-PROMPT_person = """Describe the person gender and age in the photograph.""" 
-PROMPT_cloth = """Focus on the person's torso area. Describe all VISIBLE Outerwear and Innerwear clothing on the person's torso. 
-**Strictly classify items using the following types:**
-**Outerwear:** Puffer/Down Jacket, Parka, Coat, Trench Coat/Raincoat, Windbreaker, Anorak, Bomber Jacket, Leather Jacket, Fleece Jacket.
-**Mid-Layers:** Sweater, Jumper, Pullover, Hoodie, Cardigan, Hoodie (Zip-up), Vest/Gilet, Sweatshirt.
-**Innerwear:** T-shirt shirt, Longsleeve T-shirt, Polo Shirt, Turtleneck/Rollneck, Shirt, Blouse, Tunic, Tank Top/Undershirt 
-If no torso is visible, state that clearly."""
-PROMPT_leg = """Focus on the person's legs area. Describe all VISIBLE clothing on the person's legs. If no legs are visible, state that clearly."""
-PROMPT_shoes = """Focus on the person's feet area. Describe the VISIBLE shoes on the person's feet. If no shoes are visible, state that clearly."""
-PROMPT_accessories = """Focus on the person's head, neck, hand and bag area. Describe the ALL VISIBLE accessories on your head, neck, hand and bag. If no accessories are visible, state that clearly."""
 
+# ОПТИМАЛЬНЫЕ ПРОМПТЫ для FastVLM 1.5B (по результатам исследования)
+# Базовая версия показала лучшие результаты - сбалансированные, точные, не избыточные 
+PROMPT_person = """Describe the person gender and age in the photograph.""" 
+PROMPT_cloth = """Focus on the person's torso area and LIST all VISIBLE Outerwear and Innerwear clothing on the person's torso, color, material, fit."""
+PROMPT_leg = """Focus on the person's legs area and LIST all VISIBLE clothing on the person's legs, color, material, fit."""
+PROMPT_shoes = """Focus on the person's feet area and LIST all VISIBLE shoes on the person's feet, color, material, fit."""
+PROMPT_HEAD_accessories = """Focus on the person's head, face, ears, and neck area and LIST all VISIBLE accessories (glasses, earrings, necklace)."""
+PROMPT_HANDS_accessories = """Focus on the person's wrists, hands, and fingers area and LIST all VISIBLE accessories (watch, rings, bracelets)."""
 
 def main():
     if len(sys.argv) >= 2:
@@ -203,9 +201,13 @@ def main():
         shoes_result = post_analyze(PROMPT_shoes, b64_image, "test_1.5b_user")
         shoes_time = time.perf_counter() - shoes_start_time
 
-        accessories_start_time = time.perf_counter()
-        accessories_result = post_analyze(PROMPT_accessories, b64_image, "test_1.5b_user")
-        accessories_time = time.perf_counter() - accessories_start_time
+        HEAD_accessories_start_time = time.perf_counter()
+        HEAD_accessories_result = post_analyze(PROMPT_HEAD_accessories, b64_image, "test_1.5b_user")
+        HEAD_accessories_time = time.perf_counter() - HEAD_accessories_start_time
+
+        HANDS_accessories_start_time = time.perf_counter()
+        HANDS_accessories_result = post_analyze(PROMPT_HANDS_accessories, b64_image, "test_1.5b_user")
+        HANDS_accessories_time = time.perf_counter() - HANDS_accessories_start_time
 
         total_time = time.perf_counter() - total_start_time
 
@@ -229,13 +231,15 @@ def main():
         cloth_result = server_result
         leg_result = server_result
         shoes_result = server_result
-        accessories_result = server_result
+        HEAD_accessories_result = server_result
+        HANDS_accessories_result = server_result
 
         person_time = server_time
         cloth_time = server_time
         leg_time = server_time
         shoes_time = server_time
-        accessories_time = server_time
+        HEAD_accessories_time = server_time
+        HANDS_accessories_time = server_time
 
     # Собираем результаты
     results = {
@@ -259,10 +263,15 @@ def main():
             "time": round(shoes_time, 3),
             "success": shoes_result.get("success", False)
         },
-        "accessories": {
-            "technical_analysis": extract_technical(accessories_result),
-            "time": round(accessories_time, 3),
-            "success": accessories_result.get("success", False)
+        "HEAD_accessories": {
+            "technical_analysis": extract_technical(HEAD_accessories_result),
+            "time": round(HEAD_accessories_time, 3),
+            "success": HEAD_accessories_result.get("success", False)
+        },
+        "HANDS_accessories": {
+            "technical_analysis": extract_technical(HANDS_accessories_result),
+            "time": round(HANDS_accessories_time, 3),
+            "success": HANDS_accessories_result.get("success", False)
         }
     }
 
@@ -313,9 +322,14 @@ def main():
             print(f"  {results['shoes']['technical_analysis']}")
             print()
 
-        if results['accessories']['technical_analysis']:
-            print(f"АКСЕССУАРЫ: ({results['accessories']['time']:.3f}с)")
-            print(f"  {results['accessories']['technical_analysis']}")
+        if results['HEAD_accessories']['technical_analysis']:
+            print(f"АКСЕССУАРЫ_ГОЛОВА: ({results['HEAD_accessories']['time']:.3f}с)")
+            print(f"  {results['HEAD_accessories']['technical_analysis']}")
+            print()
+
+        if results['HANDS_accessories']['technical_analysis']:
+            print(f"АКСЕССУАРЫ_РУКИ: ({results['HANDS_accessories']['time']:.3f}с)")
+            print(f"  {results['HANDS_accessories']['technical_analysis']}")
             print()
 
         # В режиме TECH_ANALYZE стилистический анализ не выводится
