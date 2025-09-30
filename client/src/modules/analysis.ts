@@ -6,7 +6,6 @@ import type {
   AnalysisRequest,
   AnalysisResponse,
   AnalysisState,
-  FashionTheme,
 } from '@/types/index';
 import { FASTVLM_CONFIG } from '@/utils/constants';
 import { createError, ERROR_CODES } from '@/utils/helpers';
@@ -31,7 +30,7 @@ class AnalysisManager {
   /**
    * Подготовка запроса для анализа
    */
-  private prepareAnalysisRequest(imageBase64: string, theme?: FashionTheme): AnalysisRequest {
+  private prepareAnalysisRequest(imageBase64: string, themeDescription?: string): AnalysisRequest {
     const initData = authManager.getInitData();
 
     const request: AnalysisRequest = {
@@ -44,8 +43,8 @@ class AnalysisManager {
       request.initData = initData;
     }
 
-    if (theme) {
-      request.theme = theme;
+    if (themeDescription) {
+      request.theme = themeDescription;
     }
 
     return request;
@@ -235,8 +234,8 @@ class AnalysisManager {
   /**
    * Анализ изображения по base64 строке с указанной темой
    */
-  async analyzeImage(imageBase64: string, theme?: FashionTheme): Promise<AnalysisResponse> {
-    logger.info('Starting image analysis', { theme });
+  async analyzeImage(imageBase64: string, themeDescription?: string): Promise<AnalysisResponse> {
+    logger.info('Starting image analysis', { themeDescription });
 
     try {
       // Обновляем состояние
@@ -247,7 +246,7 @@ class AnalysisManager {
       });
 
       // Подготавливаем запрос
-      const request = this.prepareAnalysisRequest(imageBase64, theme);
+      const request = this.prepareAnalysisRequest(imageBase64, themeDescription);
       
       this.updateState({
         status: 'processing',

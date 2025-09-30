@@ -394,6 +394,10 @@ class UIManager {
       return;
     }
 
+    // Находим описание темы
+    const selectedTheme = FASHION_THEMES.find(theme => theme.id === themeId);
+    const themeDescription = selectedTheme ? selectedTheme.description : 'Неизвестная тема';
+
     // Скрываем экран выбора темы
     const themeScreen = getElement('#theme-selection-screen');
     if (themeScreen) {
@@ -401,14 +405,14 @@ class UIManager {
     }
 
     // Показываем экран анализа с выбранной темой
-    this.showAnalysisWithTheme(this.currentThemeImage, themeId);
+    this.showAnalysisWithTheme(this.currentThemeImage, themeDescription);
   }
 
   /**
    * Показать экран анализа с выбранной темой
    */
-  private async showAnalysisWithTheme(imageData: ImageData, theme: FashionTheme): Promise<void> {
-    logger.info('Starting analysis with theme', { theme });
+  private async showAnalysisWithTheme(imageData: ImageData, themeDescription: string): Promise<void> {
+    logger.info('Starting analysis with theme', { themeDescription });
 
     try {
       // Импортируем менеджер анализа динамически
@@ -418,7 +422,7 @@ class UIManager {
       this.showFullscreenPreview(imageData.base64);
 
       // Запускаем анализ с темой
-      await analysisManager.analyzeImage(imageData.base64, theme);
+      await analysisManager.analyzeImage(imageData.base64, themeDescription);
 
     } catch (error) {
       logger.error('Error starting analysis with theme', error);
