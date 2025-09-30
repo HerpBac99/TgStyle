@@ -153,17 +153,17 @@ def load_image(path: str) -> Image.Image:
 # ОПТИМАЛЬНЫЕ ПРОМПТЫ для FastVLM 1.5B (по результатам исследования)
 # Базовая версия показала лучшие результаты - сбалансированные, точные, не избыточные 
 PROMPT_person = """Describe the person gender and age in the photograph.""" 
-PROMPT_cloth = """Focus on the person's torso area and LIST all VISIBLE Outerwear and Innerwear clothing on the person's torso, color, material, fit."""
-PROMPT_leg = """Focus on the person's legs area and LIST all VISIBLE clothing on the person's legs, color, material, fit."""
-PROMPT_shoes = """Focus on the person's feet area and LIST all VISIBLE shoes on the person's feet, color, material, fit."""
-PROMPT_HEAD_accessories = """Focus on the person's head, face, ears, and neck area and LIST all VISIBLE accessories."""
-PROMPT_HANDS_accessories = """Focus on the person's wrists, hands, and fingers area and LIST all VISIBLE accessories."""
+PROMPT_cloth = """Focus ONLY on tosro clothing. LIST all VISIBLE Outerwear and Innerwear clothing on the person's torso. Describe color, material, fit."""
+PROMPT_leg = """Focus ONLY on legs clothing. LIST all VISIBLE clothing on the person's legs. Describe color, material, fit."""
+PROMPT_shoes = """Focus ONLY on feet clothing. LIST all VISIBLE shoes on the person's feet. Describe color, material, fit."""
+PROMPT_HEAD_accessories = """Focus ONLY on the person's HEAD, FACE, EARS, and NECK area and LIST all VISIBLE accessories."""
+PROMPT_HANDS_accessories = """Focus ONLY on the person's WRISTS, HANDS area and LIST all VISIBLE accessories."""
 
 def main():
     if len(sys.argv) >= 2:
         image_path = sys.argv[1]
     else:
-        image_path = str(Path(__file__).parent.parent / "8.jpg")
+        image_path = str(Path(__file__).parent.parent / "14.jpg")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")

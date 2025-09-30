@@ -517,8 +517,32 @@
     border-radius: 0 !important; /* Убирает скругление углов */
     outline: none !important; /* Убирает контур */
 
-    /* ВОТ ГЛАВНЫЙ ФИКС: Убирает серый квадрат при нажатии на iOS/WebKit */
-    -webkit-tap-highlight-color: transparent !important;
+   /* ВОТ ГЛАВНЫЙ ФИКС: Убирает серый квадрат при нажатии на iOS/WebKit */
+   -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Ссылки на Lamoda в тексте анализа */
+a.lamoda-link,
+a.lamoda-link:link,
+a.lamoda-link:visited,
+a.lamoda-link:hover,
+a.lamoda-link:active,
+a.lamoda-link:focus,
+.analysis-text a.lamoda-link,
+.analysis-text a.lamoda-link:link,
+.analysis-text a.lamoda-link:visited,
+.analysis-text a.lamoda-link:hover,
+.analysis-text a.lamoda-link:active,
+.analysis-text a.lamoda-link:focus {
+    color: linear-gradient(0deg, #fca777, #fc9825) !important; /* Ярко-красный цвет */
+    text-decoration: none !important; /* Убираем подчеркивание */
+    font-weight: 600 !important; /* Полужирный шрифт */
+    transition: all 0.3s ease !important; /* Плавная анимация */
+    border-radius: 4px !important; /* Скругление углов */
+    padding: 2px 4px !important; /* Небольшой отступ */
+    background-color: rgba(255, 107, 107, 0.1) !important; /* Полупрозрачный фон */
+    outline: none !important; /* Убираем outline при фокусе */
+    box-shadow: none !important; /* Убираем box-shadow */
 }
 
 .share-btn svg path {

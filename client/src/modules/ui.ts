@@ -494,7 +494,19 @@ class UIManager {
    * Обрабатывает markdown в тексте (жирный текст)
    */
   private processMarkdown(text: string): string {
-    return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    let processed = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // Обрабатываем @"текст_поиска" отображаемый_текст@ для создания ссылок на Lamoda (с опциональным пробелом после @)
+    processed = processed.replace(/@\s*"([^"]+)"\s*([^@]+)@/g, (_, searchText, displayText) => {
+      // Кодируем текст поиска для URL
+      const encodedText = encodeURIComponent(searchText.trim());
+      // Создаем ссылку на Lamoda
+      const lamodaUrl = `https://www.lamoda.ru/catalogsearch/result/?q=${encodedText}&gender_section=men`;
+      // Возвращаем выделенный подчеркнутый текст со ссылкой и inline стилями для гарантии
+      return `<a href="${lamodaUrl}" target="_blank" rel="noopener noreferrer" class="lamoda-link" style="color: #ff6b6b !important; text-decoration: none !important; font-weight: 600 !important; padding: 2px 4px !important; border-radius: 4px !important; transition: all 0.3s ease !important; background: rgba(255, 107, 107, 0.1) !important;">${displayText.trim()}</a>`;
+    });
+
+    return processed;
   }
 
   /**
@@ -548,14 +560,15 @@ class UIManager {
       `<div class="analysis-block analysis-block-${index + 1}" style="animation-delay: ${block.delay}s">${block.content}</div>`
     ).join('');
 
-    // Добавляем кнопку рекомендаций в конце
-    const recommendationButton = this.currentLamodaUrl
-      ? `<div class="recommendation-button-container">
-           <button id="find-recommendations-btn" class="recommendation-button">
-             Найти рекомендации
-           </button>
-         </div>`
-      : '';
+    // Добавляем кнопку рекомендаций в конце (ПОКА ЗАКОММЕНТИРОВАНО)
+    // const recommendationButton = this.currentLamodaUrl
+    //   ? `<div class="recommendation-button-container">
+    //        <button id="find-recommendations-btn" class="recommendation-button">
+    //          Найти рекомендации
+    //        </button>
+    //      </div>`
+    //   : '';
+    const recommendationButton = ''; // Пока скрываем кнопку рекомендаций
 
     analysisText.innerHTML = blocksHtml + recommendationButton;
 

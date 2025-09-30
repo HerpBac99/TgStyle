@@ -1,1 +1,1 @@
-Focus on the person's head, face, ears, and neck area and LIST all VISIBLE accessories (glasses, earrings, necklace). If no accessories are visible, state that clearly.
+Focus ONLY on the person's HEAD, FACE, EARS, and NECK area and LIST all VISIBLE accessories.

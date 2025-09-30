@@ -163,7 +163,7 @@ export const FASHION_THEMES = [
   {
     id: 'walk' as const,
     name: 'Прогулка',
-    description: 'Для прогулок и активного отдыха',
+    description: 'Для прогулок отдыха',
     emoji: '🚶',
   },
   {

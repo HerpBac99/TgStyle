@@ -395,6 +395,10 @@ def analyze_image_fastvlm(image_base64, prompt_text=None):
         image_data = base64.b64decode(image_base64)
         image = Image.open(io.BytesIO(image_data)).convert('RGB')
 
+        # Логируем размер оригинального изображения для отладки
+        original_size = image.size
+        app.logger.info(f"Оригинальный размер изображения: {original_size[0]}x{original_size[1]}")
+
         # Подготавливаем промпт
         qs = prompt_text
         if model.config.mm_use_im_start_end:
