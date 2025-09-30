@@ -760,6 +760,7 @@ button:active {
     /* Шрифт для лучшей читаемости */
     font-size: 11px; /* Размер шрифта */
     font-weight: 500; /* Жирность шрифта */
+    font-family: 'Manrope', sans-serif; /* Основной шрифт приложения */
     text-align: center; /* Центрирование текста */
 }
 

@@ -608,7 +608,7 @@ class TgStyleLogger implements Logger {
       display: none;
       flex-direction: column;
       color: white;
-      font-family: monospace;
+      font-family: 'Manrope', sans-serif;
       padding: 10px;
     `;
 

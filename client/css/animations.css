@@ -338,3 +338,85 @@
         opacity: 1;
     }
 }
+
+/* =======================================
+   АНИМАЦИИ КАРТОЧЕК ТЕМ 
+   настраивается в themeCard.classList.add('theme-card-bounce')
+   ======================================= */
+
+/* Каскадное появление карточек тем */
+@keyframes themeCardCascade {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Альтернативная анимация: появление слева направо */
+@keyframes themeCardSlideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Альтернативная анимация: появление справа налево */
+@keyframes themeCardSlideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Эффект "всплывания" для карточек */
+@keyframes themeCardBounce {
+    0% {
+        opacity: 0;
+        transform: translateY(30px) scale(0.8);
+    }
+    60% {
+        opacity: 0.8;
+        transform: translateY(-5px) scale(1.05);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Классы для анимации карточек тем */
+.theme-card-animated {
+    opacity: 0;
+    animation-fill-mode: both;
+}
+
+/* Каскадная анимация карточек */
+.theme-card-cascade {
+    animation: themeCardCascade 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Bounce анимация карточек */
+.theme-card-bounce {
+    animation: themeCardBounce 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+}
+
+/* Слайд анимации карточек */
+.theme-card-slide-left {
+    animation: themeCardSlideInLeft 0.5s ease-out forwards;
+}
+
+.theme-card-slide-right {
+    animation: themeCardSlideInRight 0.5s ease-out forwards;
+}

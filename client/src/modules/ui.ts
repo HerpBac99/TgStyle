@@ -356,10 +356,10 @@ class UIManager {
     // Очищаем предыдущие темы
     themeGrid.innerHTML = '';
 
-    // Создаем карточки тем
-    FASHION_THEMES.forEach(theme => {
+    // Создаем карточки тем с анимацией
+    FASHION_THEMES.forEach((theme, index) => {
       const themeCard = createElement('div');
-      themeCard.className = 'theme-card';
+      themeCard.className = 'theme-card theme-card-animated';
       themeCard.dataset['theme'] = String(theme.id);
 
       themeCard.innerHTML = `
@@ -374,6 +374,12 @@ class UIManager {
       });
 
       themeGrid.appendChild(themeCard);
+
+      // Добавляем каскадную анимацию с задержкой
+      setTimeout(() => {
+        themeCard.classList.add('theme-card-bounce');
+        themeCard.style.animationDelay = `${index * 0.1}s`;
+      }, 50); // Небольшая задержка перед началом анимации
     });
 
     // Показываем экран выбора темы
@@ -2261,6 +2267,7 @@ class UIManager {
       zIndex: '10001',
       fontSize: '14px',
       fontWeight: '500',
+      fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
       opacity: '0',
       transition: 'opacity 0.3s ease',
     });
