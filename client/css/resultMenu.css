@@ -189,24 +189,49 @@
     }
 }
 .analysis-screen {
-    position: fixed; /* Фиксированное позиционирование на весь экран */
-    top: 0; /* Прижимает к верхнему краю */
-    left: 0; /* Прижимает к левому краю */
-    width: 100%; /* Полная ширина экрана */
-    height: 100vh; /* Полная высота экрана */
-    background: var(--gradient-bg) !important; /* Градиентный фон из переменной */
-    z-index: 9999; /* Высокий z-индекс для отображения поверх всего */
-    display: flex; /* Включает flexbox */
-    flex-direction: column; /* Вертикальное расположение дочерних элементов */
-    gap: 0; /* Явно убираем gap между секциями */
-    opacity: 0; /* Изначально скрыт */
-    transform: scale(0.95); /* Изначально уменьшен */
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* Анимация появления */
+    /*
+     * ЭКРАН АНАЛИЗА ИЗОБРАЖЕНИЯ
+     * Полноэкранный модальный экран с результатами анализа
+     */
+
+    /* ПОЗИЦИОНИРОВАНИЕ */
+    position: fixed; /* position: fixed - фиксированное позиционирование относительно viewport */
+    top: 0; /* top: 0 - прижимает к верхнему краю экрана */
+    left: 0; /* left: 0 - прижимает к левому краю экрана */
+
+    /* РАЗМЕРЫ */
+    width: 100%; /* width: 100% - занимает всю ширину экрана */
+    height: 100vh; /* height: 100vh - высота равна полной высоте экрана */
+
+    /* ФОН */
+    background: var(--gradient-bg) !important;
+    /* !important - принудительно применяет градиент */
+
+    /* СЛОЙ */
+    z-index: 9999; /* z-index: 9999 - очень высокий слой, поверх всего */
+
+    /* FLEXBOX - вертикальная раскладка */
+    display: flex; /* display: flex - включает FLEXBOX */
+    flex-direction: column; /* flex-direction: column - элементы располагаются вертикально */
+    gap: 0; /* gap: 0 - нет промежутков между элементами */
+
+    /* ИНИЦИАЛЬНОЕ СОСТОЯНИЕ - скрыт */
+    opacity: 0; /* opacity: 0 - полностью прозрачный */
+    transform: scale(0.95); /* transform: scale(0.95) - уменьшен до 95% размера */
+
+    /* АНИМАЦИЯ ПЕРЕХОДА */
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    /* transition: all - все свойства, 0.4s - длительность, cubic-bezier - кривая анимации */
 }
 
 .analysis-screen:not(.hidden) {
-    opacity: 1; /* Делает экран видимым */
-    transform: scale(1); /* Возвращает нормальный размер */
+    /*
+     * ВИДИМОЕ СОСТОЯНИЕ ЭКРАНА АНАЛИЗА
+     * Применяется когда убран класс .hidden
+     */
+
+    opacity: 1; /* opacity: 1 - полностью непрозрачный (видимый) */
+    transform: scale(1); /* transform: scale(1) - нормальный размер (100%) */
 }
 
 /* Верхняя половина - контейнер для фото */
@@ -307,26 +332,50 @@
 
 /* Контейнер результата анализа */
 .analysis-result-container {
-    position: absolute; /* Абсолютное позиционирование */
-    top: 0; /* Прижимает к верхнему краю */
-    left: 10px; /* Прижимает к левому краю */
-    right: 10px; /* Прижимает к правому краю */
-    bottom: 0; /* Прижимает к нижнему краю */
-    background: white; /* Белый фон */
-    border-radius: 16px 16px 0 0; /* Скругление верхних углов */
-    border: 5px solid var(--card-border-color); /* Граница из переменной */
-    margin: 0; /* Убираем margin, который создавал расстояние */
-    box-shadow: 0 -4px 16px rgba(0,0,0,0.1); /* Тень снизу */
-    opacity: 0; /* Изначально скрыт */
-    transform: translateY(100%); /* Изначально смещен вниз */
-    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1); /* Анимация появления */
-    display: flex; /* Включает flexbox */
-    flex-direction: column; /* Вертикальное расположение элементов */
+    /*
+     * КОНТЕЙНЕР РЕЗУЛЬТАТОВ АНАЛИЗА
+     * Белая панель, которая выезжает снизу с результатами
+     */
+
+    /* ПОЗИЦИОНИРОВАНИЕ */
+    position: absolute; /* position: absolute - абсолютное позиционирование */
+    top: 0; /* top: 0 - прижимает к верхнему краю родителя */
+    left: 10px; /* left: 10px - отступ слева 10px */
+    right: 10px; /* right: 10px - отступ справа 10px */
+    bottom: 0; /* bottom: 0 - прижимает к нижнему краю родителя */
+
+    /* ВНЕШНИЙ ВИД */
+    background: white; /* background: white - белый фон */
+    border-radius: 16px 16px 0 0; /* border-radius: 16px 16px 0 0 - скругление только верхних углов */
+    border: 5px solid var(--card-border-color); /* border: 5px solid - рамка толщиной 5px */
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.1);
+    /* box-shadow: смещение-X=0, смещение-Y=-4px, размытие=16px, цвет с прозрачностью */
+    /* Тень направлена вверх (отрицательное смещение Y) */
+
+    /* ОТСТУПЫ */
+    margin: 0; /* margin: 0 - убирает внешние отступы */
+
+    /* FLEXBOX */
+    display: flex; /* display: flex - включает FLEXBOX */
+    flex-direction: column; /* flex-direction: column - вертикальное расположение */
+
+    /* ИНИЦИАЛЬНОЕ СОСТОЯНИЕ */
+    opacity: 0; /* opacity: 0 - полностью прозрачный */
+    transform: translateY(100%); /* transform: translateY(100%) - смещен вниз на 100% своей высоты */
+
+    /* АНИМАЦИЯ ПОЯВЛЕНИЯ */
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    /* transition: all - все свойства, 0.6s - длительность, cubic-bezier - плавная кривая */
 }
 
 .analysis-result-container:not(.hidden) {
-    opacity: 1; /* Делает контейнер видимым */
-    transform: translateY(0); /* Возвращает нормальное положение */
+    /*
+     * ВИДИМОЕ СОСТОЯНИЕ КОНТЕЙНЕРА РЕЗУЛЬТАТОВ
+     * Панель выезжает снизу и становится видимой
+     */
+
+    opacity: 1; /* opacity: 1 - полностью непрозрачный (видимый) */
+    transform: translateY(0); /* transform: translateY(0) - возвращает в нормальное положение */
 }
 
 /* Заголовок результата */
@@ -364,10 +413,6 @@
 
 /* Стили для блоков анализа с каскадной анимацией */
 .analysis-block {
-    opacity: 0;
-    transform: translateY(10px);
-    animation: fadeInUp 0.6s ease-out forwards;
-    animation-delay: 0s;
     margin-bottom: 12px;
     line-height: 1.6;
     color: #444;
@@ -386,17 +431,6 @@
     color: #2c2c30;
 }
 
-/* Анимация появления блоков */
-@keyframes fadeInUp {
-    0% {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
 
 /* Стили для контейнера кнопки рекомендаций */
 .recommendation-button-container {
@@ -406,8 +440,6 @@
     text-align: center;
     width: 100%;
     padding: 16px 0; /* Добавляем отступы сверху и снизу */
-    opacity: 0;
-    animation: fadeInUp 0.6s ease-out 3.2s forwards;
     flex-shrink: 0; /* Запрещает сжатие контейнера */
 }
 
@@ -654,11 +686,6 @@ a.lamoda-link:focus,
     border-radius: 20px;
 }
 
-/* Анимация спиннера */
-@keyframes spin {
-    0% { transform: rotate(0deg); } /* Начальное положение - без поворота */
-    100% { transform: rotate(360deg); } /* Конечное положение - полный поворот */
-}
 
 /*
  * Стили для выделения текста (дополнение к mainMenu.css)

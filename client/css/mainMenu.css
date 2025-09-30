@@ -3,59 +3,75 @@
  * Новый дизайн с градиентным фоном
  */
 :root {
+    /*
+     * CSS ПЕРЕМЕННЫЕ - глобальные цвета и значения для всего приложения
+     * Изменяя здесь, меняем цвет по всему приложению
+     */
+
     /* Градиентный фон - от светло-мятного до бежевого */
-    /*--gradient-bg: linear-gradient(135deg, #a9e2ab 0%, #E8F5E8 50%, #e4e4b3 100%); */
-    --gradient-bg: linear-gradient(135deg, #FFDAB9 0%, #E6E6FA 50%, #E6E6FA 100%); /* Основной градиентный фон приложения */
+    /*--gradient-bg: linear-gradient(135deg, #a9e2ab 0%, #E8F5E8 50%, #e4e4b3 100%); */ /* Закомментированный старый градиент */
+    --gradient-bg: linear-gradient(135deg, #FFDAB9 0%, #E6E6FA 50%, #E6E6FA 100%);
+    /* linear-gradient(135deg, ...) - градиент под углом 135 градусов
+       #FFDAB9 (персиковый) 0% - цвет от начала градиента
+       #E6E6FA (лавандовый) 50% - цвет в середине
+       #E6E6FA 100% - цвет в конце (тот же лавандовый) */
 
     /* Основной цвет текста - темно-коричневый */
-    --tg-theme-text-color: #5D4037; /* Цвет основного текста */
+    --tg-theme-text-color: #5D4037; /* #5D4037 - hex код цвета (темно-коричневый) */
 
     /* Цвет кнопок - терракотовый */
-    --tg-theme-button-color: #A0522D !important; /* Основной цвет кнопок */
+    --tg-theme-button-color: #A0522D !important;
+    /* !important - принудительно применяет стиль, игнорируя другие правила */
 
     /* Цвет текста на кнопках - белый */
-    --tg-theme-button-text-color: #ffffff; /* Цвет текста на кнопках */
+    --tg-theme-button-text-color: #ffffff; /* #ffffff - чисто белый цвет */
 
     /* Вторичный цвет фона - полупрозрачный белый */
-    --tg-theme-secondary-bg-color: rgba(255, 255, 255, 0.9); /* Фон второстепенных элементов */
+    --tg-theme-secondary-bg-color: rgba(255, 255, 255, 0.9);
+    /* rgba(255, 255, 255, 0.9) - красный=255, зеленый=255, синий=255 (белый), альфа=0.9 (90% непрозрачности) */
 
     /* Цвет для подсказок и вспомогательного текста */
-    --tg-theme-hint-color: #8D6E63; /* Цвет вспомогательного текста */
+    --tg-theme-hint-color: #8D6E63; /* Серо-коричневый цвет для второстепенного текста */
 
     /* Цвета для карт карусели */
-    --card-bg-color: #f7eee6; /* Фон карт карусели */
-    --card-border-color: #ffffff; /* Цвет границы карт */
-    --card-shadow: 0 8px 32px rgba(93, 64, 55, 0.1); /* Тень карт карусели */
+    --card-bg-color: #f7eee6; /* Светло-бежевый фон карт */
+    --card-border-color: #ffffff; /* Белая рамка карт */
+    --card-shadow: 0 8px 32px rgba(93, 64, 55, 0.1);
+    /* box-shadow: смещение-X=0, смещение-Y=8px, размытие=32px, цвет с прозрачностью */
 }
 
 /*
- * Обнуление стандартных отступов и установка правильного расчета размеров
+ * ОБНУЛЕНИЕ СТАНДАРТНЫХ СТИЛЕЙ БРАУЗЕРА
  * Применяется ко всем элементам на странице
  */
 * {
-    margin: 0; /* Убирает внешние отступы у всех элементов */
-    padding: 0; /* Убирает внутренние отступы у всех элементов */
-    box-sizing: border-box; /* Включает padding и border в расчет ширины/высоты */
+    margin: 0; /* margin: 0 - убирает ВНЕШНИЕ отступы у всех элементов (расстояние между элементами) */
+    padding: 0; /* padding: 0 - убирает ВНУТРЕННИЕ отступы у всех элементов (отступы внутри элемента) */
+    box-sizing: border-box; /* box-sizing: border-box - включает padding и border в расчет ширины/высоты элемента */
+    /* border-box значит: width = content + padding + border (стандартный расчет размеров) */
 }
 
 /*
- * Запрещаем выделение текста на всем приложении для лучшего UX
- * Исключаем контейнер с анализом текста
+ * ЗАПРЕТ ВЫДЕЛЕНИЯ ТЕКСТА - для лучшего мобильного UX
+ * Исключаем контейнер с анализом текста (там выделение разрешено)
  */
 * {
-    user-select: none; /* Запрещает выделение текста мышью */
-    -webkit-user-select: none; /* Запрещает выделение в WebKit (Safari, Chrome) */
-    -moz-user-select: none; /* Запрещает выделение в Firefox */
-    -ms-user-select: none; /* Запрещает выделение в IE/Edge */
+    user-select: none; /* user-select: none - запрещает выделение текста мышью/тачпадом */
+    -webkit-user-select: none; /* -webkit-user-select: none - для Safari, Chrome, Edge (WebKit движок) */
+    -moz-user-select: none; /* -moz-user-select: none - для Firefox (Mozilla) */
+    -ms-user-select: none; /* -ms-user-select: none - для старых IE/Edge (Microsoft) */
 }
 
-/* Разрешаем выделение текста только в контейнере с анализом */
+/*
+ * РАЗРЕШЕНИЕ ВЫДЕЛЕНИЯ ТЕКСТА - только в результатах анализа
+ * Где пользователь может копировать текст анализа
+ */
 .analysis-text,
 .analysis-text * {
-    user-select: text; /* Разрешает выделение текста в результатах анализа */
-    -webkit-user-select: text; /* Разрешает выделение в WebKit браузерах */
-    -moz-user-select: text; /* Разрешает выделение в Firefox */
-    -ms-user-select: text; /* Разрешает выделение в IE/Edge */
+    user-select: text; /* user-select: text - РАЗРЕШАЕТ выделение текста мышью/тачпадом */
+    -webkit-user-select: text; /* Для Safari, Chrome, Edge */
+    -moz-user-select: text; /* Для Firefox */
+    -ms-user-select: text; /* Для старых IE/Edge */
 }
 
 /*
@@ -63,24 +79,33 @@
  * Определяют фон, шрифт и базовое расположение элементов
  */
 body {
-    /* Основной шрифт - Montserrat, если не доступен - системные шрифты */
-    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; /* Семейство шрифтов для всего приложения */
+    /*
+     * ОСНОВНЫЕ СТИЛИ ДЛЯ ВСЕГО ДОКУМЕНТА
+     */
 
-    /* Градиентный фон */
-    background: var(--gradient-bg) !important; /* Устанавливает градиентный фон на весь экран */
+    /* Шрифт - иерархия: Manrope -> системные шрифты */
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    /* 'Manrope' - основной шрифт (Google Fonts)
+       -apple-system - шрифт iOS/macOS
+       BlinkMacSystemFont - шрифт Chrome/Android
+       'Segoe UI' - шрифт Windows
+       Roboto, Helvetica, Arial - запасные шрифты */
 
-    /* Цвет текста - берется из переменной CSS */
-    color: var(--tg-theme-text-color); /* Основной цвет текста */
+    /* Градиентный фон на весь экран */
+    background: var(--gradient-bg) !important;
+    /* !important - принудительно применяет градиент, игнорируя другие background правила */
 
-    /* Центрирование содержимого по горизонтали */
-    display: flex; /* Включает flexbox для центрирования */
-    justify-content: center; /* Центрирует содержимое по горизонтали */
+    /* Цвет текста по умолчанию */
+    color: var(--tg-theme-text-color); /* Использует переменную --tg-theme-text-color */
 
-    /* Отступов по краям нет */
-    padding: 0; /* Убирает внутренние отступы */
+    /* FLEXBOX - центрирование всего приложения */
+    display: flex; /* display: flex - включает FLEXBOX модель раскладки */
+    justify-content: center; /* justify-content: center - центрирует по ГОРИЗОНТАЛИ */
+    /* align-items: stretch - по умолчанию, растягивает элементы на всю высоту */
 
-    /* Минимальная высота - полный экран */
-    min-height: 100vh; /* Минимальная высота равна высоте экрана */
+    /* Отступы и размеры */
+    padding: 0; /* padding: 0 - нет внутренних отступов */
+    min-height: 100vh; /* min-height: 100vh - минимум высота экрана (100% viewport height) */
 }
 
 /*
@@ -88,23 +113,29 @@ body {
  * Содержит все элементы интерфейса
  */
 .app-container {
-    /* Ширина на весь доступный размер, но не более 500px */
-    width: 100%; /* Занимает всю доступную ширину */
-    max-width: 500px; /* Максимальная ширина контейнера */
+    /*
+     * ГЛАВНЫЙ КОНТЕЙНЕР ПРИЛОЖЕНИЯ
+     * Содержит все элементы интерфейса, ограничивает максимальную ширину
+     */
 
-    /* Элементы располагаются в колонку и центрируются */
-    display: flex; /* Включает flexbox */
-    flex-direction: column; /* Элементы располагаются вертикально */
-    align-items: center; /* Центрирует элементы по горизонтали */
+    /* РЕСПОНСИВНАЯ ШИРИНА */
+    width: 100%; /* width: 100% - занимает всю доступную ширину родителя */
+    max-width: 500px; /* max-width: 500px - максимальная ширина для мобильных устройств */
 
-    /* Отступов по краям нет */
-    padding: 0; /* Убирает внутренние отступы */
+    /* FLEXBOX - вертикальная раскладка */
+    display: flex; /* display: flex - включает FLEXBOX */
+    flex-direction: column; /* flex-direction: column - элементы располагаются ВЕРТИКАЛЬНО (столбец) */
+    align-items: center; /* align-items: center - центрирует элементы по ГОРИЗОНТАЛИ внутри контейнера */
 
-    /* Позиционирование относительное для абсолютного позиционирования дочерних элементов */
-    position: relative; /* Создает контекст позиционирования для дочерних элементов */
+    /* Отступы */
+    padding: 0; /* padding: 0 - нет внутренних отступов */
 
-    /* Высота на весь экран */
-    height: 100vh; /* Высота равна высоте экрана */
+    /* ПОЗИЦИОНИРОВАНИЕ */
+    position: relative; /* position: relative - относительное позиционирование */
+    /* Создает контекст позиционирования для абсолютно позиционированных дочерних элементов */
+
+    /* ВЫСОТА */
+    height: 100vh; /* height: 100vh - высота равна полной высоте экрана (viewport height) */
 }
 
 /*
@@ -112,26 +143,34 @@ body {
  * Задают внешний вид логотипа TgStyle вверху страницы
  */
 .app-title {
-    /* Каллиграфический шрифт для красивого отображения */
-    font-family: 'Manrope', sans-serif;  /* Каллиграфический шрифт для логотипа */
+    /*
+     * ЗАГОЛОВОК ПРИЛОЖЕНИЯ - "TgStyle"
+     * Большой текст в верхней части экрана
+     */
 
-    /* Большой размер шрифта */
-    font-size: 3rem; /* Размер шрифта заголовка */
+    /* ШРИФТ */
+    font-family: 'Manrope', sans-serif;
+    /* 'Manrope' - основной шрифт, sans-serif - запасной без засечек */
 
-    /* Жирное начертание */
-    font-weight: 700; /* Жирность шрифта */
+    /* РАЗМЕР И НАСЫЩЕННОСТЬ */
+    font-size: 3rem; /* font-size: 3rem - размер в 3 раза больше базового (обычно 48px) */
+    font-weight: 700; /* font-weight: 700 - очень жирный шрифт (bold) */
 
-    /* Белый цвет текста, хорошо выглядит на фоне Tiffany */
-    color: #2c2c30; /* Белый цвет текста */
+    /* ЦВЕТ */
+    color: #2c2c30; /* #2c2c30 - темно-серый цвет */
 
-    /* Легкая тень для улучшения читаемости */
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.1); /* Тень для лучшей видимости */
+    /* ТЕНЬ ТЕКСТА */
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    /* text-shadow: смещение-X=1px, смещение-Y=1px, размытие=2px, цвет с прозрачностью */
+    /* Создает легкую тень для лучшей читаемости на любом фоне */
 
-    /* Выравнивание по центру */
-    text-align: center; /* Центрирование текста */
+    /* ВЫРАВНИВАНИЕ */
+    text-align: center; /* text-align: center - центрирует текст по горизонтали */
 
-    /* Отступы: сверху 100px, снизу 20px */
-    margin: 100px 0 20px 0; /* Отступы вокруг заголовка */
+    /* ОТСТУПЫ */
+    margin: 100px 0 20px 0;
+    /* margin: верх=100px, право=0, низ=20px, лево=0 */
+    /* Большой отступ сверху для размещения под статус-баром */
 }
 
 /*
@@ -139,27 +178,28 @@ body {
  * Отображается в правом верхнем углу
  */
 .user-profile {
-    /* Абсолютное позиционирование относительно .app-container */
-    position: absolute; /* Абсолютное позиционирование */
-    top: 20px; /* Отступ сверху */
-    right: 20px; /* Отступ справа */
+    /*
+     * ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ - аватарка и информация
+     * Располагается в правом верхнем углу
+     */
 
-    /* Элементы располагаются горизонтально и центрируются по вертикали */
-    display: flex; /* Включает flexbox */
-    align-items: center; /* Центрирует элементы по вертикали */
+    /* ПОЗИЦИОНИРОВАНИЕ */
+    position: absolute; /* position: absolute - абсолютное позиционирование относительно ближайшего relative родителя */
+    top: 20px; /* top: 20px - отступ от верхнего края родителя */
+    right: 20px; /* right: 20px - отступ от правого края родителя */
 
-    /* Отступ сверху 80px */
-    margin-top: 65px; /* Дополнительный отступ сверху */
+    /* FLEXBOX - горизонтальная раскладка */
+    display: flex; /* display: flex - включает FLEXBOX */
+    align-items: center; /* align-items: center - центрирует элементы по вертикали */
+    flex-direction: column; /* flex-direction: column - элементы располагаются вертикально */
+    align-items: flex-end; /* align-items: flex-end - выравнивает элементы по ПРАВОМУ краю */
 
-    /* Расстояние между элементами 10px */
-    gap: 10px; /* Расстояние между дочерними элементами */
+    /* ОТСТУПЫ И ПРОБЕЛЫ */
+    margin-top: 65px; /* margin-top: 65px - дополнительный отступ сверху (смещает ниже) */
+    gap: 10px; /* gap: 10px - расстояние между дочерними элементами */
 
-    /* Элементы располагаются вертикально и выравниваются по правому краю */
-    flex-direction: column; /* Вертикальное расположение элементов */
-    align-items: flex-end; /* Выравнивание по правому краю */
-
-    /* Поверх других элементов */
-    z-index: 10; /* Z-индекс для отображения поверх других элементов */
+    /* СЛОЙ */
+    z-index: 10; /* z-index: 10 - элемент отображается ПОВЕРХ других элементов */
 }
 
 /*
@@ -167,25 +207,30 @@ body {
  * Круглая аватарка с границей
  */
 .user-photo {
-    /* Размеры 40x40px */
-    width: 50px; /* Ширина аватарки */
-    height: 50px; /* Высота аватарки */
+    /*
+     * АВАТАРКА ПОЛЬЗОВАТЕЛЯ - круглое фото
+     * Размеры и стили для фото профиля
+     */
 
-    /* Скругление в круг */
-    border-radius: 50%; /* Скругляет углы для создания круга */
+    /* РАЗМЕРЫ */
+    width: 50px; /* width: 50px - ширина аватарки */
+    height: 50px; /* height: 50px - высота аватарки */
 
-    /* Серый фон по умолчанию, если нет фото */
-    background-color: #ccc; /* Цвет фона по умолчанию */
+    /* ФОРМА - ПЕРФЕКТНЫЙ КРУГ */
+    border-radius: 50%; /* border-radius: 50% - скругляет все углы до круга */
 
-    /* Фото заполняет доступное пространство */
-    background-size: cover; /* Масштабирует изображение для заполнения */
-    background-position: center; /* Центрирует изображение */
+    /* ФОН */
+    background-color: #ccc; /* background-color: #ccc - серый цвет фона, если нет фото */
+    background-size: cover; /* background-size: cover - изображение заполняет весь контейнер, сохраняя пропорции */
+    background-position: center; /* background-position: center - центрирует изображение */
 
-    /* Белая граница 2px */
-    border: 2px solid #fff; /* Белая рамка вокруг аватарки */
+    /* РАМКА */
+    border: 2px solid #fff; /* border: толщина=2px, стиль=solid, цвет=#fff (белый) */
 
-    /* Легкая тень для объемности */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Тень для создания эффекта объема */
+    /* ТЕНЬ */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    /* box-shadow: смещение-X=0, смещение-Y=2px, размытие=4px, цвет с прозрачностью */
+    /* Создает эффект объема и отделения от фона */
 }
 
 /*
@@ -284,52 +329,51 @@ body {
     animation: premium-glow 2s ease-in-out infinite alternate;
 }
 
-@keyframes premium-glow {
-    from {
-        box-shadow: 0 2px 6px rgba(255, 215, 0, 0.4);
-    }
-    to {
-        box-shadow: 0 2px 12px rgba(255, 215, 0, 0.8);
-    }
-}
 
 /*
  * Стили для кнопок
  * Применяются ко всем кнопкам, если не переопределены
  */
 button {
-    /* Фон цвета из переменной CSS */
-    background-color: var(--tg-theme-button-color); /* Цвет фона кнопки */
+    /*
+     * БАЗОВЫЕ СТИЛИ ДЛЯ ВСЕХ КНОПОК
+     * Общие свойства, которые наследуют все button элементы
+     */
 
-    /* Цвет текста из переменной CSS */
-    color: var(--tg-theme-button-text-color); /* Цвет текста на кнопке */
+    /* ФОН */
+    background-color: var(--tg-theme-button-color); /* Использует переменную --tg-theme-button-color */
 
-    /* Без границы */
-    border: none; /* Убирает рамку кнопки */
+    /* ЦВЕТ ТЕКСТА */
+    color: var(--tg-theme-button-text-color); /* Использует переменную --tg-theme-button-text-color */
 
-    /* Внутренние отступы 12px по вертикали и 20px по горизонтали */
-    padding: 12px 20px; /* Внутренние отступы кнопки */
+    /* РАМКА */
+    border: none; /* border: none - убирает рамку кнопки */
 
-    /* Скругленные углы */
-    border-radius: 10px; /* Радиус скругления углов */
+    /* ВНУТРЕННИЕ ОТСТУПЫ */
+    padding: 12px 20px;
+    /* padding: вертикаль=12px, горизонталь=20px */
+    /* Отступы внутри кнопки от текста до краев */
 
-    /* Размер шрифта 16px */
-    font-size: 16px; /* Размер шрифта на кнопке */
+    /* СКРУГЛЕНИЕ УГЛОВ */
+    border-radius: 10px; /* border-radius: 10px - радиус скругления всех углов */
 
-    /* Указатель меняется на руку при наведении */
-    cursor: pointer; /* Курсор в виде руки */
+    /* ШРИФТ */
+    font-size: 16px; /* font-size: 16px - размер шрифта */
+    font-family: 'Manrope', sans-serif; /* font-family - семейство шрифтов */
+    font-weight: 500; /* font-weight: 500 - средняя жирность */
 
-    /* Шрифт как у основного текста */
-    font-family: 'Manrope', sans-serif; /* Шрифт кнопки */
+    /* КУРСОР */
+    cursor: pointer; /* cursor: pointer - курсор мыши меняется на "руку" */
 
-    /* Средняя жирность */
-    font-weight: 500; /* Жирность шрифта */
+    /* ТЕНЬ */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    /* box-shadow: смещение-X=0, смещение-Y=2px, размытие=5px, цвет с прозрачностью */
 
-    /* Тень для объемности */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Тень для эффекта объема */
-
-    /* Плавный переход для анимации нажатия */
-    transition: transform 0.2s, box-shadow 0.2s; /* Анимация при взаимодействии */
+    /* АНИМАЦИЯ ПЕРЕХОДОВ */
+    transition: transform 0.2s, box-shadow 0.2s;
+    /* transition: свойство=transform, длительность=0.2s
+       transition: свойство=box-shadow, длительность=0.2s */
+    /* Плавные переходы при наведении/нажатии */
 }
 
 /*
@@ -337,11 +381,20 @@ button {
  * Эффект нажатия
  */
 button:active {
-    /* Слегка сдвигается вниз */
-    transform: translateY(1px); /* Сдвиг кнопки вниз при нажатии */
+    /*
+     * ЭФФЕКТ НАЖАТИЯ КНОПКИ
+     * Стили применяются когда пользователь нажимает на кнопку
+     */
 
-    /* Тень становится меньше */
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1); /* Уменьшенная тень при нажатии */
+    /* ТРАНСФОРМАЦИЯ - сдвиг вниз */
+    transform: translateY(1px);
+    /* transform: translateY(1px) - сдвигает элемент ВНИЗ на 1 пиксель */
+    /* Создает эффект "вдавливания" кнопки */
+
+    /* ТЕНЬ - уменьшенная */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    /* box-shadow: смещение-X=0, смещение-Y=1px, размытие=2px, цвет */
+    /* Тень становится меньше и ближе к элементу */
 }
 
 /*
@@ -436,26 +489,56 @@ button:active {
  * Горизонтальная карусель с центральной увеличенной картой
  */
 .history-carousel-container {
-    width: 100%; /* Полная ширина контейнера */
-    height: 50vh; /* Высота равна половине экрана */
-    margin: 32px 0; /* Отступы сверху и снизу */
-    overflow: hidden; /* Скрывает выходящий за пределы контент */
-    display: flex; /* Включает flexbox */
-    flex-direction: column; /* Вертикальное расположение элементов */
-    justify-content: center; /* Центрирует элементы по вертикали */
-    position: relative; /* Создает контекст позиционирования */
+    /*
+     * КОНТЕЙНЕР КАРУСЕЛИ ИСТОРИИ АНАЛИЗОВ
+     * Основной контейнер для горизонтальной карусели
+     */
+
+    /* РАЗМЕРЫ */
+    width: 100%; /* width: 100% - занимает всю ширину родителя */
+    height: 50vh; /* height: 50vh - высота равна 50% высоты экрана (viewport height) */
+
+    /* ОТСТУПЫ */
+    margin: 32px 0; /* margin: верх=32px, низ=32px - отступы сверху и снизу */
+
+    /* FLEXBOX */
+    display: flex; /* display: flex - включает FLEXBOX раскладку */
+    flex-direction: column; /* flex-direction: column - элементы располагаются вертикально */
+    justify-content: center; /* justify-content: center - центрирует элементы по вертикали */
+
+    /* ПЕРЕПОЛНЕНИЕ */
+    overflow: hidden; /* overflow: hidden - скрывает контент, выходящий за границы */
+
+    /* ПОЗИЦИОНИРОВАНИЕ */
+    position: relative; /* position: relative - создает контекст для абсолютно позиционированных детей */
 }
 
 .history-carousel {
-    display: flex; /* Включает flexbox для горизонтального расположения */
-    align-items: center; /* Центрирует элементы по вертикали */
-    justify-content: flex-start; /* Выравнивает элементы слева */
-    gap: 20px; /* Расстояние между картами */
-    padding: 0; /* Убирает внутренние отступы */
-    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Анимация трансформации */
-    transform-origin: center; /* Точка начала трансформации */
-    height: 100%; /* Полная высота контейнера */
-    position: relative; /* Создает контекст позиционирования */
+    /*
+     * ГОРИЗОНТАЛЬНАЯ КАРУСЕЛЬ
+     * Контейнер с картами, который можно прокручивать
+     */
+
+    /* FLEXBOX - горизонтальная раскладка */
+    display: flex; /* display: flex - включает FLEXBOX */
+    align-items: center; /* align-items: center - центрирует элементы по вертикали */
+    justify-content: flex-start; /* justify-content: flex-start - выравнивает элементы по левому краю */
+
+    /* ПРОБЕЛЫ */
+    gap: 20px; /* gap: 20px - расстояние между картами */
+    padding: 0; /* padding: 0 - нет внутренних отступов */
+
+    /* РАЗМЕРЫ */
+    height: 100%; /* height: 100% - занимает всю высоту родителя */
+
+    /* ПОЗИЦИОНИРОВАНИЕ */
+    position: relative; /* position: relative - для создания контекста позиционирования */
+
+    /* АНИМАЦИЯ ПЕРЕМЕЩЕНИЯ */
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    /* transition: свойство=transform, длительность=0.3s, timing-function=cubic-bezier(...) */
+    /* cubic-bezier - кривая анимации для плавного замедления */
+    transform-origin: center; /* transform-origin: center - точка начала трансформации в центре */
 }
 
 /*
@@ -463,30 +546,74 @@ button:active {
  * Каждая карта представляет собой контейнер для сохраненного анализа
  */
 .history-card {
-    position: relative; /* Относительное позиционирование */
-    width: 200px; /* Ширина карты */
-    aspect-ratio: 3 / 4; /* Соотношение сторон 3:4 */
-    border-radius: 20px; /* Скругление углов */
-    overflow: hidden; /* Скрывает выходящий контент */
-    background: var(--card-bg-color); /* Фон из переменной */
-    backdrop-filter: blur(10px); /* Размытие фона */
-    border: 5px solid var(--card-border-color); /* Граница из переменной */
-    cursor: pointer; /* Курсор в виде руки */
-    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Анимация изменений */
-    display: flex; /* Включает flexbox */
-    align-items: center; /* Центрирует по вертикали */
-    justify-content: center; /* Центрирует по горизонтали */
-    user-select: none; /* Запрещает выделение текста */
-    flex-shrink: 0; /* Запрещает сжатие */
-    background-size: cover; /* Масштабирует фоновое изображение */
-    background-position: center; /* Центрирует фоновое изображение */
+    /*
+     * КАРТА КАРУСЕЛИ - контейнер для одного анализа
+     * Прямоугольная карточка с изображением и информацией
+     */
+
+    /* ПОЗИЦИОНИРОВАНИЕ */
+    position: relative; /* position: relative - для создания контекста для абсолютных детей */
+
+    /* РАЗМЕРЫ */
+    width: 200px; /* width: 200px - фиксированная ширина */
+    aspect-ratio: 3 / 4; /* aspect-ratio: 3/4 - соотношение ширина:высота = 3:4 */
+    /* Автоматически рассчитывает высоту: 200px * (4/3) = 266.67px */
+
+    /* ФОРМА */
+    border-radius: 20px; /* border-radius: 20px - скругляет все углы */
+    overflow: hidden; /* overflow: hidden - скрывает контент, выходящий за границы */
+
+    /* ФОН И СТИЛИЗАЦИЯ */
+    background: var(--card-bg-color); /* Использует переменную цвета фона */
+    background-size: cover; /* background-size: cover - изображение покрывает весь контейнер */
+    background-position: center; /* background-position: center - центрирует фоновое изображение */
+
+    /* РАМКА */
+    border: 5px solid var(--card-border-color); /* border: толщина=5px, цвет из переменной */
+
+    /* ВИЗУАЛЬНЫЕ ЭФФЕКТЫ */
+    backdrop-filter: blur(10px); /* backdrop-filter: blur(10px) - размытие заднего фона */
+
+    /* FLEXBOX */
+    display: flex; /* display: flex - включает FLEXBOX */
+    align-items: center; /* align-items: center - центрирует по вертикали */
+    justify-content: center; /* justify-content: center - центрирует по горизонтали */
+
+    /* ИНТЕРАКТИВНОСТЬ */
+    cursor: pointer; /* cursor: pointer - курсор в виде руки при наведении */
+    user-select: none; /* user-select: none - запрещает выделение текста */
+
+    /* FLEX СВОЙСТВА */
+    flex-shrink: 0; /* flex-shrink: 0 - элемент не сжимается в flex контейнере */
+
+    /* АНИМАЦИИ */
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    /* transition: все свойства, длительность=0.4s, easing функция для плавности */
 }
 
 /* Центральная карта - увеличенная и перекрывающая соседние */
 .history-card.center {
-    z-index: 10; /* Отображает карту поверх других */
-    transform: scale(1.2); /* Увеличивает карту в 1.2 раза */
-    border: 5px solid var(--card-border-color); /* Граница из переменной */
+    /*
+     * АКТИВНАЯ (ЦЕНТРАЛЬНАЯ) КАРТА КАРУСЕЛИ
+     * Выделена размером, цветом рамки и пульсацией
+     */
+
+    /* СЛОЙ */
+    z-index: 10; /* z-index: 10 - отображает карту ПОВЕРХ других карт */
+
+    /* ТРАНСФОРМАЦИЯ - увеличение */
+    transform: scale(1.2); /* transform: scale(1.2) - увеличивает карту в 1.2 раза */
+
+    /* РАМКА - пульсирующая лавандовая */
+    border: 5px solid #E6E6FA; /* border: толщина=5px, цвет=#E6E6FA (лавандовый) */
+
+    /* ТЕНЬ - усиленная для выделения */
+    box-shadow: 0 12px 40px rgba(255, 218, 185, 0.3);
+    /* box-shadow: смещение-X=0, смещение-Y=12px, размытие=40px, цвет с прозрачностью */
+
+    /* АНИМАЦИЯ - пульсирующая рамка */
+    animation: cardBorderPulse 2s ease-in-out infinite;
+    /* animation: название=cardBorderPulse, длительность=2s, timing=ease-in-out, повтор=infinite */
 }
 
 .history-card:hover {
@@ -495,6 +622,25 @@ button:active {
 
 .history-card.center:hover {
     transform: translateY(-4px) scale(1.12); /* Поднимает центральную карту вверх */
+}
+
+/* Неактивные карты - с небольшим размытием и затемнением */
+.history-card:not(.center) {
+    /*
+     * НЕАКТИВНЫЕ КАРТЫ КАРУСЕЛИ (боковые)
+     * Применяется ко всем картам, кроме центральной (.center)
+     */
+
+    /* ФИЛЬТРЫ - визуальные эффекты */
+    filter: blur(0.5px) brightness(0.8);
+    /* filter: blur(0.5px) - легкое размытие краев (радиус 0.5 пикселя)
+       filter: brightness(0.8) - затемнение до 80% яркости (0.8 = 80%) */
+    /* blur(0.5px) создает едва заметное размытие
+       brightness(0.8) делает цвета менее насыщенными */
+
+    /* ПРОЗРАЧНОСТЬ - дополнительное затемнение */
+    opacity: 0.8; /* opacity: 0.8 - элемент становится на 80% непрозрачным (20% прозрачности) */
+    /* opacity влияет на весь элемент, включая дочерние элементы */
 }
 
 /* Содержимое карты */
@@ -615,49 +761,6 @@ button:active {
     font-size: 11px; /* Размер шрифта */
     font-weight: 500; /* Жирность шрифта */
     text-align: center; /* Центрирование текста */
-}
-
-/* Анимации появления элементов при загрузке приложения */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes slideInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.history-carousel-container {
-    opacity: 0;
-    transform: translateY(20px);
-    animation: slideInUp 0.5s ease-out 0.2s forwards;
-}
-
-.carousel-dots {
-    opacity: 0;
-    animation: fadeIn 0.3s ease-out 0.2s forwards;
 }
 
 /* =======================================
@@ -888,26 +991,6 @@ button:active {
     font-weight: 500;
 }
 
-/* Анимации модального окна */
-@keyframes modalFadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes modalSlideUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px) scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
 
 /* Адаптивность для мобильных устройств */
 @media (max-width: 480px) {
