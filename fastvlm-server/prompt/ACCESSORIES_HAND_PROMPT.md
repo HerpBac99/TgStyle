@@ -1,1 +1,1 @@
-Focus ONLY on the person's WRISTS, HANDS area and LIST all VISIBLE accessories.
+Output EXACTLY one short line: Describe All accessories on person's HANDS. Describe type, color, material.

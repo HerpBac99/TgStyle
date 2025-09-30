@@ -1,1 +1,1 @@
-Focus ONLY on the person's LEGS area and LIST all VISIBLE clothing on the person's legs, color, material, fit.
+Output EXACTLY one short line: Describe All clothing on person's LEGS. Describe type, color, material, fit.

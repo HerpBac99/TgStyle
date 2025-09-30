@@ -1,1 +1,1 @@
-Focus ONLY on the person's FEET area and LIST all VISIBLE shoes on the person's feet, color, material, fit.
+Output EXACTLY one short line: Describe All shoes on person's FEET. Describe type, color, material, fit.

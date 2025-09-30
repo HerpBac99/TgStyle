@@ -153,11 +153,11 @@ def load_image(path: str) -> Image.Image:
 # ОПТИМАЛЬНЫЕ ПРОМПТЫ для FastVLM 1.5B (по результатам исследования)
 # Базовая версия показала лучшие результаты - сбалансированные, точные, не избыточные 
 PROMPT_person = """Describe the person gender and age in the photograph.""" 
-PROMPT_cloth = """Focus ONLY on tosro clothing. LIST all VISIBLE Outerwear and Innerwear clothing on the person's torso. Describe color, material, fit."""
-PROMPT_leg = """Focus ONLY on legs clothing. LIST all VISIBLE clothing on the person's legs. Describe color, material, fit."""
-PROMPT_shoes = """Focus ONLY on feet clothing. LIST all VISIBLE shoes on the person's feet. Describe color, material, fit."""
-PROMPT_HEAD_accessories = """Focus ONLY on the person's HEAD, FACE, EARS, and NECK area and LIST all VISIBLE accessories."""
-PROMPT_HANDS_accessories = """Focus ONLY on the person's WRISTS, HANDS area and LIST all VISIBLE accessories."""
+PROMPT_cloth = """Output EXACTLY one short line: Describe ONLY VISIBLE outerwear and innerwear clothing on person's TORSO. Describe type, color, material, fit."""
+PROMPT_leg = """Output EXACTLY one short line: Describe ONLY VISIBLE clothing on person's LEGS. Describe type, color, material, fit."""
+PROMPT_shoes = """Output EXACTLY one short line: Describe ONLY VISIBLE shoes on person's FEET. Describe type, color, material, fit."""
+PROMPT_HEAD_accessories = """Output EXACTLY one short line: Describe ONLY VISIBLE accessories on person's HEAD. Describe type, color, material."""
+PROMPT_HANDS_accessories = """Output EXACTLY one short line: Describe ONLY VISIBLE accessories on person's HANDS. Describe type, color, material."""
 
 def main():
     if len(sys.argv) >= 2:

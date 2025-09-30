@@ -1,1 +1,1 @@
-Focus ONLY on the person's TORSO area and LIST all VISIBLE Outerwear and Innerwear clothing on the person's torso, color, material, fit.
+Output EXACTLY one short line: Describe All outerwear and innerwear clothing on person's TORSO. Describe type, color, material, fit.

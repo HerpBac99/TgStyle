@@ -46,6 +46,9 @@ from llava.mm_utils import tokenizer_image_token, process_images, get_model_name
 from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 
 # Импортируем Gemini API
+
+# Импортируем модуль умной предобработки изображений
+from image_preprocessing import smart_preprocess_image
 try:
     from google import genai
     from google.genai import types
@@ -395,9 +398,7 @@ def analyze_image_fastvlm(image_base64, prompt_text=None):
         image_data = base64.b64decode(image_base64)
         image = Image.open(io.BytesIO(image_data)).convert('RGB')
 
-        # Логируем размер оригинального изображения для отладки
-        original_size = image.size
-        app.logger.info(f"Оригинальный размер изображения: {original_size[0]}x{original_size[1]}")
+
 
         # Подготавливаем промпт
         qs = prompt_text
@@ -914,9 +915,19 @@ def analyze():
             image_data = base64.b64decode(image_base64)
             image = Image.open(io.BytesIO(image_data))
 
-            # Логируем информацию о полученном изображении
-            image_size_mb = len(image_data) / (1024 * 1024)
-            app.logger.info(f"Пришла фотография: {image.size[0]}x{image.size[1]} пикселей, вес: {image_size_mb:.2f} MB, пользователь: {nickname}")
+            # Быстрая предобработка для мобильных фотографий
+            from image_preprocessing import fast_mobile_preprocess
+            image, image_base64, metadata = fast_mobile_preprocess(
+                image.convert("RGB"),
+                target_width=1344,
+                target_height=1008,
+                quality=95
+            )
+
+            # Логируем быструю обработку
+            original_size_mb = len(image_data) / (1024 * 1024)
+            app.logger.info(f"Быстрая предобработка: {metadata['original_size']} → {metadata['final_size']} пикселей, {original_size_mb:.2f} MB → {metadata['compressed_size_mb']:.2f} MB, пользователь: {nickname}")
+
 
         except Exception as e:
             update_performance_stats(time.time() - analysis_start_time, success=False)
@@ -926,40 +937,30 @@ def analyze():
                 'error': f'Invalid image data: {e}'
             }), 400
 
-        # Сохраняем во временный файл с максимальным качеством
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
-            # Сохраняем с качеством 100% для сохранения деталей
-            image.save(temp_file, 'JPEG', quality=100, optimize=False, subsampling=0)
-            temp_image_path = temp_file.name
+        # Выполняем многопроходный анализ изображения
+        app.logger.info(f"Выполняем многопроходный анализ изображения для пользователя {nickname}")
 
-        # Логируем качество сохранения
-        app.logger.info(f"Сохранил изображение с качеством 100%: {image.size[0]}x{image.size[1]}")
+        # Выполняем анализ по 3 промптам для детального разбора
+        multi_pass_result = perform_multi_pass_analysis(image_base64, nickname)
 
-        try:
-            # Выполняем многопроходный анализ изображения
-            app.logger.info(f"Выполняем многопроходный анализ изображения для пользователя {nickname}")
+        # Проверяем, что результат является словарем
+        if not isinstance(multi_pass_result, dict):
+            update_performance_stats(time.time() - analysis_start_time, success=False)
+            app.logger.error(f"Multi-pass analysis returned invalid result: {type(multi_pass_result)}")
+            return jsonify({
+                'success': False,
+                'error': 'Invalid multi-pass analysis result'
+            }), 500
 
-            # Выполняем анализ по 3 промптам для детального разбора
-            multi_pass_result = perform_multi_pass_analysis(image_base64, nickname)
+        if not multi_pass_result.get('success', False):
+            update_performance_stats(time.time() - analysis_start_time, success=False)
+            return jsonify({
+                'success': False,
+                'error': multi_pass_result.get('error', 'Multi-pass analysis failed')
+            }), 500
 
-            # Проверяем, что результат является словарем
-            if not isinstance(multi_pass_result, dict):
-                update_performance_stats(time.time() - analysis_start_time, success=False)
-                app.logger.error(f"Multi-pass analysis returned invalid result: {type(multi_pass_result)}")
-                return jsonify({
-                    'success': False,
-                    'error': 'Invalid multi-pass analysis result'
-                }), 500
-
-            if not multi_pass_result.get('success', False):
-                update_performance_stats(time.time() - analysis_start_time, success=False)
-                return jsonify({
-                    'success': False,
-                    'error': multi_pass_result.get('error', 'Multi-pass analysis failed')
-                }), 500
-
-            # Объединяем результаты анализа
-            combined_analysis = f"""
+        # Объединяем результаты анализа
+        combined_analysis = f"""
 ЧЕЛОВЕК: {multi_pass_result.get('person', 'Не определено')}
 ОДЕЖДА: {multi_pass_result.get('clothing', 'Не определено')}
 НОГИ: {multi_pass_result.get('legs', 'Не определено')}
@@ -968,55 +969,49 @@ def analyze():
 АКСЕССУАРЫ_РУКИ: {multi_pass_result.get('accessories_hand', 'Не определено')}
 """
 
-            fastvlm_time = multi_pass_result.get('timing', {}).get('total', 0)
+        fastvlm_time = multi_pass_result.get('timing', {}).get('total', 0)
 
-            # Создаем креативный ответ стилиста
-            gemini_start_time = time.time()
-            stylist_response = create_stylist_response(combined_analysis, topic)
-            gemini_time = time.time() - gemini_start_time
+        # Создаем креативный ответ стилиста
+        gemini_start_time = time.time()
+        stylist_response = create_stylist_response(combined_analysis, topic)
+        gemini_time = time.time() - gemini_start_time
 
-            total_time = time.time() - analysis_start_time
+        total_time = time.time() - analysis_start_time
 
-            performance_stats['successful_requests'] += 1
-            # Обновляем среднее время ответа
-            performance_stats['average_processing_time'] = (
-                (performance_stats['average_processing_time'] * (performance_stats['successful_requests'] - 1) + total_time)
-                / performance_stats['successful_requests']
-            )
+        performance_stats['successful_requests'] += 1
+        # Обновляем среднее время ответа
+        performance_stats['average_processing_time'] = (
+            (performance_stats['average_processing_time'] * (performance_stats['successful_requests'] - 1) + total_time)
+            / performance_stats['successful_requests']
+        )
 
-            app.logger.info(f"Полный анализ завершен за {total_time:.2f}с (FastVLM: {fastvlm_time:.2f}с, стилист: {gemini_time:.2f}с)")
+        app.logger.info(f"Полный анализ завершен за {total_time:.2f}с (FastVLM: {fastvlm_time:.2f}с, стилист: {gemini_time:.2f}с)")
 
-            save_analysis_with_nickname(combined_analysis, stylist_response, nickname, image.size, fastvlm_time, gemini_time)
+        save_analysis_with_nickname(combined_analysis, stylist_response, nickname, image.size, fastvlm_time, gemini_time)
 
-            return jsonify({
-                'success': True,
-                'technical_analysis': combined_analysis,  # Технический анализ FastVLM
-                'analysis': stylist_response,  # Креативный ответ стилиста
-                'model_used': 'fastvlm',
-                'model_type': Config.MODEL_TYPE,
-                'device': Config.DEVICE,
-                'timing': {
-                    'total_time': round(total_time, 2),
-                    'fastvlm_time': round(fastvlm_time, 2),
-                    'stylist_time': round(gemini_time, 2)
-                },
-                'multi_pass_results': {
-                    'person': multi_pass_result.get('person', ''),
-                    'clothing': multi_pass_result.get('clothing', ''),
-                    'legs': multi_pass_result.get('legs', ''),
-                    'shoes': multi_pass_result.get('shoes', ''),
-                    'accessories_head': multi_pass_result.get('accessories_head', ''),
-                    'accessories_hand': multi_pass_result.get('accessories_hand', ''),
-                },
-                'detailed_timings': multi_pass_result.get('timing', {})
-            })
+        return jsonify({
+            'success': True,
+            'technical_analysis': combined_analysis,  # Технический анализ FastVLM
+            'analysis': stylist_response,  # Креативный ответ стилиста
+            'model_used': 'fastvlm',
+            'model_type': Config.MODEL_TYPE,
+            'device': Config.DEVICE,
+            'timing': {
+                'total_time': round(total_time, 2),
+                'fastvlm_time': round(fastvlm_time, 2),
+                'stylist_time': round(gemini_time, 2)
+            },
+            'multi_pass_results': {
+                'person': multi_pass_result.get('person', ''),
+                'clothing': multi_pass_result.get('clothing', ''),
+                'legs': multi_pass_result.get('legs', ''),
+                'shoes': multi_pass_result.get('shoes', ''),
+                'accessories_head': multi_pass_result.get('accessories_head', ''),
+                'accessories_hand': multi_pass_result.get('accessories_hand', ''),
+            },
+            'detailed_timings': multi_pass_result.get('timing', {})
+        })
 
-        finally:
-            # Удаляем временный файл
-            try:
-                os.unlink(temp_image_path)
-            except:
-                pass
 
     except Exception as e:
         # Определяем переменные времени если они существуют
@@ -1081,7 +1076,6 @@ def analyze_for_test():
             image.save(temp_file, 'JPEG', quality=100, optimize=False, subsampling=0)
             temp_image_path = temp_file.name
 
-        try:
             # Выполняем только технический анализ FastVLM
             app.logger.info(f"Выполняем технический анализ изображения для пользователя {nickname}")
 
@@ -1120,12 +1114,6 @@ def analyze_for_test():
                 }
             })
 
-        finally:
-            # Удаляем временный файл
-            try:
-                os.unlink(temp_image_path)
-            except:
-                pass
 
     except Exception as e:
         total_time = time.time() - analysis_start_time
