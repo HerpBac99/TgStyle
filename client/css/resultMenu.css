@@ -6,73 +6,6 @@
 /*
  * Стили для экрана выбора темы
  */
-.theme-selection-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100vh;
-    background: var(--gradient-bg) !important;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    opacity: 0;
-    transform: scale(0.95);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.theme-selection-screen:not(.hidden) {
-    opacity: 1;
-    transform: scale(1);
-}
-
-/* Верхняя половина - контейнер для фото */
-.theme-top-section {
-    height: 50vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Контейнер для фото с молочной рамкой */
-.theme-photo-container {
-    width: 300px;
-    aspect-ratio: 3 / 4;
-    max-height: 400px;
-    background: #f8f6f3;
-    border-radius: 16px;
-    border: 5px solid var(--card-border-color);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
-}
-
-.theme-selection-screen:not(.hidden) .theme-photo-container {
-    opacity: 1;
-}
-
-/* Фото в контейнере */
-.theme-photo {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: cover;
-    border-radius: 11px;
-}
-
-/* Нижняя половина - выбор темы */
-.theme-bottom-section {
-    height: 50vh;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px; 
-    overflow-y: auto;
-    margin-bottom: 10px;
-}
 
 /* Заголовок секции тем */
 .theme-header {
@@ -319,7 +252,7 @@
     width: 40px; /* Ширина спиннера */
     height: 40px; /* Высота спиннера */
     border: 3px solid rgba(255,255,255,0.3); /* Полупрозрачная граница */
-    border-top: 3px solid white; /* Белая верхняя граница для эффекта вращения */
+    border-top: 3px solid rgb(219, 172, 111); /* Белая верхняя граница для эффекта вращения */
     border-radius: 50%; /* Скругляет углы для создания круга */
     margin: 0 auto 15px; /* Центрирует и добавляет отступ снизу */
     animation: spin 1s linear infinite; /* Анимация вращения */
@@ -327,7 +260,7 @@
 
 /* Текст загрузки с анимацией */
 .loading-text {
-    color: #2d2d5c; /* Темно-синий цвет текста для лучшей видимости на сиреневом фоне */
+    color: #2e2e58; /* Темно-синий цвет текста для лучшей видимости на сиреневом фоне */
     font-size: 16px; /* Размер шрифта */
     font-weight: 600; /* Жирность шрифта */
     margin: 0; /* Убирает внешние отступы */

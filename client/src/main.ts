@@ -9,7 +9,7 @@ import type { TelegramWebApp } from '@/types/index';
 import { APP_CONFIG, APP_EVENTS } from '@/utils/constants';
 import { logger } from '@/modules/logger';
 import { authManager } from '@/modules/auth';
-import { uiManager } from '@/modules/ui';
+import { uiManager } from '@/modules/uiManager';
 import { historyManager } from '@/modules/history';
 import { api } from '@/modules/api';
 

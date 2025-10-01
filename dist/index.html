@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" crossorigin src="/assets/main-BnKsIGc-.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-VXo5-Mno.css">
+  <script type="module" crossorigin src="/assets/main-DxTReOI9.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-BMurM2gI.css">
 </head>
 <body>
     <div class="app-container">
@@ -63,6 +63,20 @@
             </div>
         </div>
 
+        <!-- Секция выбора темы (показывается сначала) -->
+        <div id="analysis-theme-selection" class="analysis-theme-selection hidden">
+            <!-- Заголовок -->
+            <div class="theme-header">
+                <h3>Выберите ситуацию</h3>
+                <p class="theme-subtitle">Для более точного анализа одежды</p>
+            </div>
+
+            <!-- Сетка тем -->
+            <div id="analysis-theme-grid" class="theme-grid">
+                <!-- Карточки тем будут создаваться динамически -->
+            </div>
+        </div>
+
         <!-- Нижняя половина - результат -->
         <div class="analysis-bottom-section">
             <!-- Индикатор загрузки -->
@@ -107,29 +121,6 @@
         </div>
     </div>
 
-    <!-- Экран выбора темы для анализа -->
-    <div id="theme-selection-screen" class="theme-selection-screen hidden">
-        <!-- Верхняя половина - фото -->
-        <div class="theme-top-section">
-            <div class="theme-photo-container">
-                <img id="theme-image" src="" alt="Фото для анализа" class="theme-photo">
-            </div>
-        </div>
-
-        <!-- Нижняя половина - выбор темы -->
-        <div class="theme-bottom-section">
-            <!-- Заголовок -->
-            <div class="theme-header">
-                <h3>Выберите ситуацию</h3>
-                <p class="theme-subtitle">Для более точного анализа одежды</p>
-            </div>
-
-            <!-- Сетка тем -->
-            <div id="theme-grid" class="theme-grid">
-                <!-- Карточки тем будут создаваться динамически -->
-            </div>
-        </div>
-    </div>
 
     <!-- Экран просмотра сохраненного анализа -->
     <div id="saved-analysis-screen" class="saved-analysis-screen hidden">
