@@ -8,36 +8,40 @@
      * Изменяя здесь, меняем цвет по всему приложению
      */
 
-    /* Градиентный фон - от светло-мятного до бежевого */
-    /*--gradient-bg: linear-gradient(135deg, #a9e2ab 0%, #E8F5E8 50%, #e4e4b3 100%); */ /* Закомментированный старый градиент */
-    --gradient-bg: linear-gradient(135deg, #FFDAB9 0%, #E6E6FA 50%, #E6E6FA 100%);
-    /* linear-gradient(135deg, ...) - градиент под углом 135 градусов
-       #FFDAB9 (персиковый) 0% - цвет от начала градиента
-       #E6E6FA (лавандовый) 50% - цвет в середине
-       #E6E6FA 100% - цвет в конце (тот же лавандовый) */
+    /* === НЕОМОРФНЫЕ ЦВЕТА И ЭФФЕКТЫ === */
 
-    /* Основной цвет текста - темно-коричневый */
-    --tg-theme-text-color: #5D4037; /* #5D4037 - hex код цвета (темно-коричневый) */
+    /* Градиентный фон - современный минималистичный */
+    --gradient-bg: linear-gradient(135deg, #dfebf7 0%, #f1f5f9 50%, #e2e8f0 100%);
 
-    /* Цвет кнопок - терракотовый */
-    --tg-theme-button-color: #A0522D !important;
-    /* !important - принудительно применяет стиль, игнорируя другие правила */
+    /* Основная палитра - современные цвета */
+    --primary-color: #6366f1;      /* Indigo */
+    --secondary-color: #ec4899;    /* Pink */
+    --accent-color: #06b6d4;       /* Cyan */
 
-    /* Цвет текста на кнопках - белый */
-    --tg-theme-button-text-color: #ffffff; /* #ffffff - чисто белый цвет */
+    /* Неоморфные базовые цвета */
+    --neumorph-light: #ffffff;     /* Светлый цвет для теней */
+    --neumorph-dark: #d1d5db;      /* Тёмный цвет для теней */
+    --neumorph-bg: linear-gradient(145deg, #f0f4f8, #e2e8f0); /* Градиент для объёмных элементов */
 
-    /* Вторичный цвет фона - полупрозрачный белый */
-    --tg-theme-secondary-bg-color: rgba(255, 255, 255, 0.9);
-    /* rgba(255, 255, 255, 0.9) - красный=255, зеленый=255, синий=255 (белый), альфа=0.9 (90% непрозрачности) */
+    /* Основной цвет текста - современный тёмно-серый */
+    --tg-theme-text-color: #374151;
 
-    /* Цвет для подсказок и вспомогательного текста */
-    --tg-theme-hint-color: #8D6E63; /* Серо-коричневый цвет для второстепенного текста */
+    /* Кнопки - неоморфные */
+    --tg-theme-button-color: var(--neumorph-bg);
+    --tg-theme-button-text-color: #374151;
 
-    /* Цвета для карт карусели */
-    --card-bg-color: #f7eee6; /* Светло-бежевый фон карт */
-    --card-border-color: #ffffff; /* Белая рамка карт */
-    --card-shadow: 0 8px 32px rgba(93, 64, 55, 0.1);
-    /* box-shadow: смещение-X=0, смещение-Y=8px, размытие=32px, цвет с прозрачностью */
+    /* Вторичный цвет фона */
+    --tg-theme-secondary-bg-color: rgba(255, 255, 255, 0.95);
+
+    /* Цвет для подсказок */
+    --tg-theme-hint-color: #6b7280;
+
+    /* === КАРТОЧКИ - НЕОМОРФНЫЙ СТИЛЬ === */
+    --card-bg: var(--neumorph-bg);
+    --card-border-color: transparent;
+    --card-shadow-light: inset 8px 8px 16px var(--neumorph-dark), inset -8px -8px 16px var(--neumorph-light);
+    --card-shadow-convex: 8px 8px 16px var(--neumorph-dark), -8px -8px 16px var(--neumorph-light);
+    --card-shadow-hover: 12px 12px 24px var(--neumorph-dark), -12px -12px 24px var(--neumorph-light), inset 2px 2px 4px rgba(255,255,255,0.1);
 }
 
 /*
@@ -418,43 +422,46 @@ button:active {
  * Круглая кнопка с иконкой камеры
  */
 .camera-btn {
-    /* Размеры 90x90px для удобного нажатия */
-    width: 80px; /* Ширина кнопки камеры */
-    height: 80px; /* Высота кнопки камеры */
+    /* РАЗМЕРЫ */
+    width: 80px;
+    height: 80px;
 
-    /* Скругление в круг */
-    border-radius: 50%; /* Скругляет углы для создания круга */
+    /* НЕОМОРФНЫЙ СТИЛЬ */
+    border-radius: 50%;
+    border: none;
 
-    border: 2px solid #fff; /* Белая рамка вокруг кнопки */
+    /* НЕОМОРФНЫЙ ГРАДИЕНТ */
+    background: linear-gradient(145deg, #06b6d4, #0891b2);
 
-    /* Терракотовый фон - прямой цвет, не переменная */
-    background-color: #FF69B4 !important; /* Розовый цвет фона */
+    /* НЕОМОРФНЫЕ ТЕНИ - ВЫПУКЛЫЙ ЭФФЕКТ */
+    box-shadow: 8px 8px 16px rgba(6, 182, 212, 0.3), -8px -8px 16px rgba(255, 255, 255, 0.8);
 
-    /* Цвет иконки белый */
-    color: #ffffff !important; /* Белый цвет иконки */
+    /* ЦВЕТ ИКОНКИ */
+    color: #ffffff;
 
-    /* Центрирование иконки */
-    display: flex; /* Включает flexbox */
-    align-items: center; /* Центрирует по вертикали */
-    justify-content: center; /* Центрирует по горизонтали */
+    /* ЦЕНТРИРОВАНИЕ */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
 
-    /* Без внутренних отступов */
-    padding: 0; /* Убирает внутренние отступы */
-
-    /* Заметная тень для объемности */
-    box-shadow: 0 4px 10px rgba(0,0,0,0.15); /* Тень для эффекта объема */
-
-    /* Плавная анимация нажатия */
-    transition: transform 0.3s ease; /* Анимация при нажатии */
+    /* СОВРЕМЕННЫЕ АНИМАЦИИ */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /*
- * Стили для активного состояния кнопки камеры
- * Эффект нажатия
+ * Эффекты для кнопки камеры
  */
+.camera-btn:hover {
+    /* НЕОМОРФНЫЙ HOVER */
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 12px 12px 24px rgba(6, 182, 212, 0.4), -12px -12px 24px rgba(255, 255, 255, 0.9);
+}
+
 .camera-btn:active {
-    /* Уменьшается при нажатии */
-    transform: scale(0.95); /* Уменьшает размер кнопки при нажатии */
+    /* ЭФФЕКТ НАЖАТИЯ - ВДАВЛЕННОСТЬ */
+    transform: translateY(1px) scale(0.98);
+    box-shadow: inset 4px 4px 8px rgba(6, 182, 212, 0.3), inset -4px -4px 8px rgba(255, 255, 255, 0.9);
 }
 
 /*
@@ -563,16 +570,14 @@ button:active {
     border-radius: 20px; /* border-radius: 20px - скругляет все углы */
     overflow: hidden; /* overflow: hidden - скрывает контент, выходящий за границы */
 
-    /* ФОН И СТИЛИЗАЦИЯ */
-    background: var(--card-bg-color); /* Использует переменную цвета фона */
+    /* НЕОМОРФНЫЙ ФОН */
+    background: var(--neumorph-bg);
     background-size: cover; /* background-size: cover - изображение покрывает весь контейнер */
     background-position: center; /* background-position: center - центрирует фоновое изображение */
+    border: none;
 
-    /* РАМКА */
-    border: 5px solid var(--card-border-color); /* border: толщина=5px, цвет из переменной */
-
-    /* ВИЗУАЛЬНЫЕ ЭФФЕКТЫ */
-    backdrop-filter: blur(10px); /* backdrop-filter: blur(10px) - размытие заднего фона */
+    /* НЕОМОРФНЫЕ ТЕНИ - ВЫПУКЛЫЙ ЭФФЕКТ */
+    box-shadow: var(--card-shadow-convex);
 
     /* FLEXBOX */
     display: flex; /* display: flex - включает FLEXBOX */
@@ -604,43 +609,45 @@ button:active {
     /* ТРАНСФОРМАЦИЯ - увеличение */
     transform: scale(1.2); /* transform: scale(1.2) - увеличивает карту в 1.2 раза */
 
-    /* РАМКА - пульсирующая лавандовая */
-    border: 5px solid #E6E6FA; /* border: толщина=5px, цвет=#E6E6FA (лавандовый) */
+    /* НЕОМОРФНЫЕ ТЕНИ - ПРЕМИУМ ЭФФЕКТ */
+    box-shadow: var(--card-shadow-hover);
 
-    /* ТЕНЬ - усиленная для выделения */
-    box-shadow: 0 12px 40px rgba(255, 218, 185, 0.3);
-    /* box-shadow: смещение-X=0, смещение-Y=12px, размытие=40px, цвет с прозрачностью */
-
-    /* АНИМАЦИЯ - пульсирующая рамка */
-    animation: cardBorderPulse 2s ease-in-out infinite;
-    /* animation: название=cardBorderPulse, длительность=2s, timing=ease-in-out, повтор=infinite */
+    /* СВЕЧЕНИЕ ДЛЯ ВЫДЕЛЕНИЯ */
+    filter: brightness(1.05);
 }
 
 .history-card:hover {
-    transform: translateY(-4px) scale(1.02); /* Поднимает карту вверх и слегка увеличивает */
+    /* НЕОМОРФНЫЙ HOVER - ЭФФЕКТ НАЖАТИЯ */
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: var(--card-shadow-hover);
 }
 
 .history-card.center:hover {
-    transform: translateY(-4px) scale(1.12); /* Поднимает центральную карту вверх */
+    transform: translateY(-2px) scale(1.18);
+    box-shadow: 16px 16px 32px var(--neumorph-dark), -16px -16px 32px var(--neumorph-light), inset 2px 2px 4px rgba(255,255,255,0.2);
 }
 
-/* Неактивные карты - с небольшим размытием и затемнением */
+/* Неактивные карты - приглушённые неоморфные */
 .history-card:not(.center) {
     /*
-     * НЕАКТИВНЫЕ КАРТЫ КАРУСЕЛИ (боковые)
-     * Применяется ко всем картам, кроме центральной (.center)
+     * НЕАКТИВНЫЕ КАРТЫ КАРУСЕЛИ (боковые) - НЕОМОРФНЫЙ СТИЛЬ
+     * Мягкое затемнение для фокуса на центральной карте
      */
 
-    /* ФИЛЬТРЫ - визуальные эффекты */
-    filter: blur(0.5px) brightness(0.8);
-    /* filter: blur(0.5px) - легкое размытие краев (радиус 0.5 пикселя)
-       filter: brightness(0.8) - затемнение до 80% яркости (0.8 = 80%) */
-    /* blur(0.5px) создает едва заметное размытие
-       brightness(0.8) делает цвета менее насыщенными */
+    /* НЕОМОРФНЫЕ ТЕНИ - МЕНЬШЕ ОБЪЁМА */
+    box-shadow: 4px 4px 8px var(--neumorph-dark), -4px -4px 8px var(--neumorph-light);
 
-    /* ПРОЗРАЧНОСТЬ - дополнительное затемнение */
-    opacity: 0.8; /* opacity: 0.8 - элемент становится на 80% непрозрачным (20% прозрачности) */
-    /* opacity влияет на весь элемент, включая дочерние элементы */
+    /* ВИЗУАЛЬНЫЕ ЭФФЕКТЫ */
+    filter: brightness(0.9) saturate(0.9);
+    opacity: 0.85;
+
+    /* МЕНЬШЕЕ УВЕЛИЧЕНИЕ ПРИ HOVER */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.history-card:not(.center):hover {
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 6px 6px 12px var(--neumorph-dark), -6px -6px 12px var(--neumorph-light);
 }
 
 /* Содержимое карты */

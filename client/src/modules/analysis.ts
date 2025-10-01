@@ -268,7 +268,7 @@ class AnalysisManager {
         await this.saveToHistory(response, imageBase64);
 
         // ОБНОВЛЯЕМ UI ПОСЛЕ СОХРАНЕНИЯ
-        const { uiManager } = await import('./ui.js');
+        const { uiManager } = await import('./uiManager.js');
         const { authManager } = await import('./auth.js');
 
         // Показываем экран анализа с изображением

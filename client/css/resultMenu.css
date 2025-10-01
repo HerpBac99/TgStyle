@@ -3,6 +3,25 @@
  * Новый дизайн с фото сверху и результатом снизу
  */
 
+/* === НЕОМОРФНЫЕ ПЕРЕМЕННЫЕ ДЛЯ РЕЗУЛЬТАТОВ === */
+:root {
+    /* Неоморфные базовые цвета */
+    --neumorph-light: #ffffff;
+    --neumorph-dark: #d1d5db;
+    --neumorph-bg: linear-gradient(145deg, #f0f4f8, #e2e8f0);
+
+    /* Цвета для карточек тем */
+    --card-bg: var(--neumorph-bg);
+    --card-border-color: transparent;
+    --card-shadow-convex: 8px 8px 16px var(--neumorph-dark), -8px -8px 16px var(--neumorph-light);
+    --card-shadow-hover: 12px 12px 24px var(--neumorph-dark), -12px -12px 24px var(--neumorph-light), inset 2px 2px 4px rgba(255,255,255,0.1);
+
+    /* Текстовые цвета */
+    --text-primary: #374151;
+    --text-secondary: #6b7280;
+    --accent-color: #06b6d4;
+}
+
 /*
  * Стили для экрана выбора темы
  */
@@ -35,33 +54,52 @@
     min-height: 0; /* Для корректной работы overflow */
 }
 
-/* Карточка темы */
+/* Карточка темы - НЕОМОРФНЫЙ СТИЛЬ */
 .theme-card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border-color);
-    border-radius: 12px;
-    padding: 8px 5px;
+    /* НЕОМОРФНЫЙ ФОН */
+    background: var(--neumorph-bg);
+    border: none;
+    border-radius: 16px;
+
+    /* НЕОМОРФНЫЕ ТЕНИ - ВЫПУКЛЫЙ ЭФФЕКТ */
+    box-shadow: var(--card-shadow-convex);
+
+    /* РАЗМЕТКА */
+    padding: 12px 8px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     text-align: center;
     min-height: 120px;
+
+    /* ТИПОГРАФИКА */
     font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+    /* СОВРЕМЕННЫЕ АНИМАЦИИ */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .theme-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-    border-color: var(--accent-color);
+    /* НЕОМОРФНЫЙ HOVER - ЭФФЕКТ НАЖАТИЯ */
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: var(--card-shadow-hover);
+    filter: brightness(1.02);
 }
 
 .theme-card:active {
-    transform: translateY(0);
+    /* ЭФФЕКТ НАЖАТИЯ - ВДАВЛЕННОСТЬ */
+    transform: translateY(1px) scale(0.98);
+    box-shadow: inset 4px 4px 8px var(--neumorph-dark), inset -4px -4px 8px var(--neumorph-light);
     transition-duration: 0.1s;
 }
+
+/* Анимация скрытия контейнера выбора тем */
+.theme-selection-fade-out {
+    animation: themeSelectionFadeOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
 
 /* Эмодзи темы */
 .theme-emoji {
@@ -406,20 +444,41 @@
     border-radius: 0 0 16px 16px; /* Скругление нижних углов */
 }
 
-/* Базовые стили для кнопок действий */
+/* Базовые стили для кнопок действий - НЕОМОРФНЫЙ СТИЛЬ */
 .action-btn {
-    border: none; /* Убирает рамку */
-    padding: 14px 20px; /* Внутренние отступы */
-    border-radius: 12px; /* Скругление углов */
-    font-size: 16px; /* Размер шрифта */
-    font-weight: 500; /* Жирность шрифта */
-    cursor: pointer; /* Курсор в виде руки */
-    transition: all 0.3s ease; /* Анимация при взаимодействии */
-    display: flex; /* Включает flexbox */
-    align-items: center; /* Центрирует по вертикали */
-    justify-content: center; /* Центрирует по горизонтали */
-    gap: 8px; /* Расстояние между элементами */
-    outline: none; /* Убирает контур при фокусе */
+    /* НЕОМОРФНЫЙ ФОН */
+    background: var(--neumorph-bg);
+    border: none;
+
+    /* НЕОМОРФНЫЕ ТЕНИ */
+    box-shadow: var(--card-shadow-convex);
+
+    /* РАЗМЕТКА */
+    padding: 14px 20px;
+    border-radius: 16px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    outline: none;
+
+    /* СОВРЕМЕННЫЕ АНИМАЦИИ */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.action-btn:hover {
+    /* НЕОМОРФНЫЙ HOVER */
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: var(--card-shadow-hover);
+}
+
+.action-btn:active {
+    /* ЭФФЕКТ НАЖАТИЯ - ВДАВЛЕННОСТЬ */
+    transform: translateY(1px) scale(0.98);
+    box-shadow: inset 4px 4px 8px var(--neumorph-dark), inset -4px -4px 8px var(--neumorph-light);
 }
 
 .action-btn:focus {
@@ -553,11 +612,7 @@ a.lamoda-link:focus,
     box-shadow: 0 6px 16px rgba(129, 216, 208, 0.4); /* Увеличивает тень при наведении */
 }
 
-/* Анимация нажатия для всех кнопок */
-.action-btn:active {
-    transform: scale(0.95); /* Уменьшает кнопку при нажатии */
-    outline: none; /* Убирает контур при нажатии */
-}
+/* Анимация нажатия - переопределена выше для неоморфного стиля */
 
 
 

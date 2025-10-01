@@ -140,11 +140,14 @@ export class UIAnalysisManager {
     const resultContainer = getElement('#analysis-result-container');
 
     if (themeSelection && loadingIndicator && resultContainer) {
-      // Анимируем скрытие выбора темы
-      themeSelection.classList.add('hidden');
+      // Анимируем скрытие выбора темы с плавной анимацией
+      themeSelection.classList.add('theme-selection-fade-out');
 
-      // Через небольшую задержку показываем загрузку
+      // Через время анимации скрываем контейнер полностью и показываем загрузку
       setTimeout(() => {
+        themeSelection.classList.add('hidden');
+        themeSelection.classList.remove('theme-selection-fade-out');
+
         resultContainer.classList.add('hidden');
         loadingIndicator.classList.remove('hidden');
 
@@ -157,7 +160,7 @@ export class UIAnalysisManager {
         } else {
           logger.error('No current theme image available for analysis');
         }
-      }, 150); // Уменьшенная задержка для более плавного перехода
+      }, 400); // Время соответствует длительности анимации themeSelectionFadeOut
     }
 
     logger.info('Theme selection hidden, starting analysis');
