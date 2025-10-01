@@ -69,8 +69,9 @@
     padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 5px; 
     overflow-y: auto;
+    margin-bottom: 10px;
 }
 
 /* Заголовок секции тем */
@@ -324,13 +325,16 @@
     animation: spin 1s linear infinite; /* Анимация вращения */
 }
 
-/* Текст загрузки */
+/* Текст загрузки с анимацией */
 .loading-text {
-    color: white; /* Белый цвет текста */
+    color: #2d2d5c; /* Темно-синий цвет текста для лучшей видимости на сиреневом фоне */
     font-size: 16px; /* Размер шрифта */
-    font-weight: 500; /* Жирность шрифта */
+    font-weight: 600; /* Жирность шрифта */
     margin: 0; /* Убирает внешние отступы */
-    text-shadow: 0 1px 3px rgba(0,0,0,0.3); /* Тень для лучшей видимости */
+    text-shadow: 0 2px 8px rgba(255,255,255,0.8), 0 1px 3px rgba(0,0,0,0.5); /* Улучшенная тень для лучшей видимости */
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Плавная смена текста */
+    opacity: 1;
+    transform: translateY(0);
 }
 
 /* Контейнер результата анализа */

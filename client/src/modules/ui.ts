@@ -39,6 +39,72 @@ declare global {
 }
 
 /**
+ * Фразы для анимации текста загрузки
+ */
+const LOADING_PHRASES = [
+  'Сканируем одежду ...',
+  'Определяем типы вещей и фасоны ...',
+  'Находим элементы гардероба ...',
+  'Анализируем стиль и настроение ...',
+  'Изучаем цвета, оттенки и материалы ...',
+  'Сравниваем с актуальными трендами ...',
+  'Подбираем аксессуары и акценты ...',
+  'Уточняем детали ...',
+  'Определяем тренды ...',
+  'Генерируем рекомендации ...',
+  'Почти готово ...',
+  'Еще немного ...'
+];
+
+/**
+ * Управление анимацией текста загрузки
+ */
+class LoadingTextAnimator {
+  private phrases: string[] = LOADING_PHRASES;
+  private currentIndex: number = 0;
+  private intervalId: number | null = null;
+  private textElement: HTMLElement | null = null;
+
+  constructor() {
+    this.textElement = getElement('.loading-text');
+  }
+
+  start(): void {
+    if (!this.textElement) return;
+
+    this.currentIndex = 0;
+    this.updateText();
+
+    // Меняем фразу каждые 1.2 секунды (чтобы синхронизироваться с анимацией спиннера)
+    this.intervalId = window.setInterval(() => {
+      this.currentIndex = (this.currentIndex + 1) % this.phrases.length;
+      this.updateText();
+    }, 3500);
+  }
+
+  stop(): void {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+
+    // Возвращаем исходный текст
+    if (this.textElement) {
+      this.textElement.textContent = 'Анализируем вашу одежду...';
+    }
+  }
+
+  private updateText(): void {
+    if (this.textElement) {
+      this.textElement.textContent = this.phrases[this.currentIndex] || '';
+    }
+  }
+}
+
+// Создаем глобальный экземпляр аниматора
+const loadingTextAnimator = new LoadingTextAnimator();
+
+/**
  * Интерфейс для состояния долгого нажатия
  */
 interface LongPressState {
@@ -327,6 +393,9 @@ class UIManager {
     resultContainer.classList.add('hidden');
     loadingIndicator.classList.remove('hidden');
 
+    // Запускаем анимацию текста загрузки
+    loadingTextAnimator.start();
+
     // Показываем экран анализа
     analysisScreen.classList.remove('hidden');
     this.currentPreview = analysisScreen;
@@ -524,6 +593,9 @@ class UIManager {
    */
   showAnalysisResult(result: string): void {
     logger.info('Showing analysis result');
+
+    // Останавливаем анимацию текста загрузки
+    loadingTextAnimator.stop();
 
     const loadingIndicator = getElement('#analysis-loading');
     const resultContainer = getElement('#analysis-result-container');
