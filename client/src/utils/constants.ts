@@ -195,7 +195,6 @@ export const FASHION_THEMES = [
 // Настройки FastVLM
 export const FASTVLM_CONFIG = {
   HEALTH_CHECK_INTERVAL: 30000, // 30 секунд
-  MAX_RETRIES: 3,
   RETRY_DELAY: 1000 // 1 секунда
 } as const;
 

@@ -85,6 +85,11 @@ class LoadingTextAnimator {
     }
   }
 
+  // Алиас для совместимости
+  stopAndReset(): void {
+    this.stop();
+  }
+
   private updateText(): void {
     if (this.textElement) {
       this.textElement.textContent = this.phrases[this.currentIndex] || '';
@@ -116,7 +121,10 @@ export class UIAnalysisManager {
   // Текущее изображение для выбора темы
   private currentThemeImage: ImageData | null = null;
 
-  constructor() {}
+  constructor() {
+    // Обработчик изменения состояния анализа
+    window.addEventListener('analysisStateChange', this.handleAnalysisStateChange.bind(this) as EventListener);
+  }
 
 
   /**
@@ -140,6 +148,15 @@ export class UIAnalysisManager {
     const resultContainer = getElement('#analysis-result-container');
 
     if (themeSelection && loadingIndicator && resultContainer) {
+      // Добавляем анимацию скрытия к карточкам тем
+      const themeCards = themeSelection.querySelectorAll('.theme-card');
+      themeCards.forEach((card, index) => {
+        // Добавляем задержку для каскадного эффекта
+        setTimeout(() => {
+          card.classList.add('fade-out');
+        }, index * 50); // 50ms задержка между карточками
+      });
+
       // Анимируем скрытие выбора темы с плавной анимацией
       themeSelection.classList.add('theme-selection-fade-out');
 
@@ -148,11 +165,16 @@ export class UIAnalysisManager {
         themeSelection.classList.add('hidden');
         themeSelection.classList.remove('theme-selection-fade-out');
 
+        // Очищаем классы анимации от карточек
+        const themeCards = themeSelection.querySelectorAll('.theme-card');
+        themeCards.forEach(card => {
+          card.classList.remove('fade-out');
+        });
+
         resultContainer.classList.add('hidden');
         loadingIndicator.classList.remove('hidden');
 
-        // Запускаем анимацию текста загрузки
-        loadingTextAnimator.start();
+        
 
         // Запускаем анализ
         if (this.currentThemeImage) {
@@ -161,6 +183,9 @@ export class UIAnalysisManager {
           logger.error('No current theme image available for analysis');
         }
       }, 400); // Время соответствует длительности анимации themeSelectionFadeOut
+
+      // Запускаем анимацию текста загрузки
+      loadingTextAnimator.start();
     }
 
     logger.info('Theme selection hidden, starting analysis');
@@ -277,8 +302,6 @@ export class UIAnalysisManager {
       resultContainer.classList.add('hidden');
       loadingIndicator.classList.remove('hidden');
 
-      // Запускаем анимацию текста загрузки
-      loadingTextAnimator.start();
 
       logger.info('Loading indicator displayed');
     }
@@ -323,6 +346,20 @@ export class UIAnalysisManager {
     } catch (error) {
       logger.error('Error capturing photo', error);
       this.logError('Ошибка при работе с камерой');
+    }
+  }
+
+  /**
+   * Обработчик изменения состояния анализа
+   */
+  private handleAnalysisStateChange(event: CustomEvent): void {
+    const state = event.detail;
+    logger.info('Analysis state changed in UI', state);
+
+    // Обрабатываем состояние ошибки
+    if (state.status === 'error' && state.error) {
+      logger.warn('Analysis error occurred, showing in UI', { error: state.error });
+      this.showAnalysisError();
     }
   }
 
@@ -1015,6 +1052,42 @@ export class UIAnalysisManager {
     this.cleanupFunctions = [];
 
     logger.info('Analysis UI Manager destroyed');
+  }
+
+  /**
+   * Закрытие экрана анализа (публичный метод для обработки ошибок)
+   */
+  closeAnalysisScreen(): void {
+    this.closePreview();
+  }
+
+  /**
+   * Показать ошибку анализа вместо результата
+   */
+  showAnalysisError(): void {
+    logger.info('Showing analysis error');
+
+    // Останавливаем анимацию текста загрузки
+    loadingTextAnimator.stop();
+
+    const loadingIndicator = getElement('#analysis-loading');
+    const resultContainer = getElement('#analysis-result-container');
+    const analysisText = getElement('#analysis-text');
+
+    if (!loadingIndicator || !resultContainer || !analysisText) {
+      logger.error('Analysis result elements not found');
+      return;
+    }
+
+    // Скрываем загрузку, показываем результат
+    loadingIndicator.classList.add('hidden');
+    resultContainer.classList.remove('hidden');
+
+    // Показываем сообщение об ошибке
+    analysisText.innerHTML = `<div class="analysis-error">Возникла ошибка при анализе вашей одежды. Попробуйте снова. Пожалуйста, проверьте ваше соединение с интернетом.</div>`;
+
+    // Настраиваем обработчики кнопок (даже при ошибке кнопки должны работать)
+    this.setupResultButtons();
   }
 }
 

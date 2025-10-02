@@ -7,8 +7,6 @@ import type {
   AnalysisResponse,
   AnalysisState,
 } from '@/types/index';
-import { FASTVLM_CONFIG } from '@/utils/constants';
-import { createError, ERROR_CODES } from '@/utils/helpers';
 import { logger } from './logger';
 import { api } from './api';
 import { authManager } from './auth';
@@ -24,8 +22,6 @@ class AnalysisManager {
     progress: 0,
   };
 
-  private retryCount = 0;
-  private maxRetries = FASTVLM_CONFIG.MAX_RETRIES;
 
   /**
    * Подготовка запроса для анализа
@@ -50,51 +46,6 @@ class AnalysisManager {
     return request;
   }
 
-  /**
-   * Выполнение анализа с повторными попытками
-   */
-  private async performAnalysisWithRetry(request: AnalysisRequest): Promise<AnalysisResponse> {
-    this.retryCount = 0;
-
-    while (this.retryCount <= this.maxRetries) {
-      try {
-        if (this.retryCount > 0) {
-          this.updateState({
-            status: 'processing',
-            progress: 30 + (this.retryCount * 20),
-            currentStep: `Повторная попытка (${this.retryCount}/${this.maxRetries})...`,
-          });
-
-          // Задержка перед повторной попыткой
-          await this.delay(FASTVLM_CONFIG.RETRY_DELAY * this.retryCount);
-        }
-
-        const response = await api.analyzeImage(request);
-        
-        if (response.success) {
-          return response;
-        } else {
-          throw createError(ERROR_CODES.ANALYSIS_FAILED, response.error || 'Сервер вернул ошибку');
-        }
-
-      } catch (error) {
-        this.retryCount++;
-        
-        if (this.retryCount > this.maxRetries) {
-          logger.error('All retry attempts failed', {
-            retryCount: this.retryCount,
-            maxRetries: this.maxRetries,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          throw error;
-        }
-
-        logger.warn(`Analysis attempt ${this.retryCount} failed, retrying...`, error);
-      }
-    }
-
-    throw createError(ERROR_CODES.ANALYSIS_FAILED, 'Превышено количество попыток анализа');
-  }
 
 
   /**
@@ -185,12 +136,6 @@ class AnalysisManager {
     window.dispatchEvent(event);
   }
 
-  /**
-   * Задержка выполнения
-   */
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 
   /**
    * Получение текущего состояния анализа
@@ -207,7 +152,6 @@ class AnalysisManager {
       status: 'idle',
       progress: 0,
     };
-    this.retryCount = 0;
   }
 
   /**
@@ -254,8 +198,15 @@ class AnalysisManager {
         currentStep: 'Отправка на анализ...',
       });
 
-      // Выполняем анализ с повторными попытками
-      const response = await this.performAnalysisWithRetry(request);
+      // Отправляем на анализ
+      const response = await api.analyzeImage(request);
+
+      // Проверяем успешность ответа от сервера
+      if (!response.success) {
+        // Показываем user-friendly сообщение вместо технических ошибок
+        const userFriendlyMessage = 'Сервер временно недоступен. Попробуйте позже.';
+        throw new Error(userFriendlyMessage);
+      }
 
       this.updateState({
         status: 'completed',
@@ -263,31 +214,29 @@ class AnalysisManager {
         currentStep: 'Анализ завершен',
       });
 
-      // Сохраняем в историю если анализ успешен
-      if (response.success) {
-        await this.saveToHistory(response, imageBase64);
+      // Сохраняем в историю
+      await this.saveToHistory(response, imageBase64);
 
-        // ОБНОВЛЯЕМ UI ПОСЛЕ СОХРАНЕНИЯ
-        const { uiManager } = await import('./uiManager.js');
-        const { authManager } = await import('./auth.js');
+      // ОБНОВЛЯЕМ UI ПОСЛЕ СОХРАНЕНИЯ
+      const { uiManager } = await import('./uiManager.js');
+      const { authManager } = await import('./auth.js');
 
-        // Показываем экран анализа с изображением
-        window.dispatchEvent(new CustomEvent('showAnalysisScreen', {
-          detail: { imageBase64, analysis: response.analysis }
-        }));
+      // Показываем экран анализа с изображением
+      window.dispatchEvent(new CustomEvent('showAnalysisScreen', {
+        detail: { imageBase64, analysis: response.analysis }
+      }));
 
-        // Обновляем карусель истории
-        uiManager.updateHistoryDisplay();
+      // Обновляем карусель истории
+      uiManager.updateHistoryDisplay();
 
-        // Обновляем информацию о подписке (если вернулся новый статус)
-        if (response.subscription) {
-          authManager.updateSubscription(response.subscription);
-        }
+      // Обновляем информацию о подписке (если вернулся новый статус)
+      if (response.subscription) {
+        authManager.updateSubscription(response.subscription);
+      }
 
-        // Показываем результат в UI
-        if (response.analysis) {
-          uiManager.showAnalysisResult(response.analysis);
-        }
+      // Показываем результат в UI
+      if (response.analysis) {
+        uiManager.showAnalysisResult(response.analysis);
       }
 
       logger.info('Automatic image analysis completed successfully');
@@ -295,7 +244,7 @@ class AnalysisManager {
 
     } catch (error) {
       logger.error('Automatic image analysis failed', error);
-      
+
       this.updateState({
         status: 'error',
         progress: 0,
@@ -303,8 +252,6 @@ class AnalysisManager {
       });
 
       throw error;
-    } finally {
-      this.retryCount = 0;
     }
   }
 
@@ -315,8 +262,6 @@ class AnalysisManager {
     return {
       currentStatus: this.currentState.status,
       progress: this.currentState.progress,
-      retryCount: this.retryCount,
-      maxRetries: this.maxRetries,
       isAnalyzing: this.isAnalyzing(),
       hasResult: false, // Result always undefined since we don't use classification
       hasError: !!this.currentState.error,

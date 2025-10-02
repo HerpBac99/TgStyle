@@ -150,7 +150,7 @@ async function saveAnalysisToHistory(userId, photoData, technicalAnalysis) {
 const FASTVLM_CONFIG = {
     HOST: 'http://127.0.0.1',
     PORT: 3001,
-    TIMEOUT: 30000, // 30 секунд
+    TIMEOUT: 60000, // 60 секунд
     ENDPOINT: '/analyze'
 };
 
