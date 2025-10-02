@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { validateTelegramWebAppData } = require('../utils/telegram');
 const { logger } = require('../controllers/logsController');
+const sharp = require('sharp');
 
 // Импортируем Prisma клиент
 const prisma = require('../lib/prisma');
@@ -112,14 +113,96 @@ async function updateUserCounters(userId) {
 }
 
 /**
- * Сохранение результата анализа в истории
+ * Оптимизация изображения для хранения в истории (аналогично localStorage)
+ * Resize до 800x800px, JPEG качество 0.85
+ */
+async function optimizeImageForStorage(base64Image) {
+    try {
+        // Убираем префикс data:image/...;base64, если есть
+        let cleanBase64 = base64Image;
+        if (base64Image.includes(',')) {
+            cleanBase64 = base64Image.split(',')[1];
+        }
+
+        // Конвертируем base64 в Buffer
+        const imageBuffer = Buffer.from(cleanBase64, 'base64');
+
+        // Оптимизируем изображение с помощью Sharp
+        const optimizedBuffer = await sharp(imageBuffer)
+            .resize(800, 800, {
+                fit: 'inside', // сохраняем пропорции
+                withoutEnlargement: true // не увеличиваем маленькие изображения
+            })
+            .jpeg({
+                quality: 85, // качество 85%
+                progressive: true
+            })
+            .toBuffer();
+
+        // Конвертируем обратно в base64
+        const optimizedBase64 = optimizedBuffer.toString('base64');
+
+        const originalSize = Math.round(imageBuffer.length / 1024);
+        const optimizedSize = Math.round(optimizedBuffer.length / 1024);
+
+        logger.info('Image optimized for storage', {
+            originalSizeKB: originalSize,
+            optimizedSizeKB: optimizedSize,
+            compressionRatio: ((originalSize - optimizedSize) / originalSize * 100).toFixed(1) + '%'
+        });
+
+        return optimizedBase64;
+
+    } catch (error) {
+        logger.error('Error optimizing image for storage', {
+            error: error.message,
+            stack: error.stack
+        });
+        // В случае ошибки возвращаем оригинальное изображение
+        return base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
+    }
+}
+
+/**
+ * Сохранение результата анализа в истории с оптимизацией изображений и лимитом 50 записей
  */
 async function saveAnalysisToHistory(userId, photoData, technicalAnalysis) {
     try {
+        // Оптимизируем изображение перед сохранением
+        const optimizedPhotoData = await optimizeImageForStorage(photoData);
+
+        // Проверяем количество записей в истории пользователя
+        const historyCount = await prisma.historyItem.count({
+            where: { userId }
+        });
+
+        // Если уже 50 записей, удаляем самую старую
+        if (historyCount >= 50) {
+            const oldestItem = await prisma.historyItem.findFirst({
+                where: { userId },
+                orderBy: { createdAt: 'asc' }, // самая старая
+                select: { id: true, createdAt: true }
+            });
+
+            if (oldestItem) {
+                await prisma.historyItem.delete({
+                    where: { id: oldestItem.id }
+                });
+
+                logger.info('Удалена самая старая запись истории', {
+                    userId,
+                    deletedItemId: oldestItem.id,
+                    createdAt: oldestItem.createdAt,
+                    remainingCount: historyCount - 1
+                });
+            }
+        }
+
+        // Создаем новую запись
         const historyItem = await prisma.historyItem.create({
             data: {
                 userId,
-                photoData, // base64 изображения
+                photoData: optimizedPhotoData, // оптимизированное base64 изображение
                 technicalAnalysis, // результат FastVLM
                 analysisText: null, // пользовательское описание пока пустое
                 isPublic: true, // по умолчанию публичное
@@ -130,7 +213,9 @@ async function saveAnalysisToHistory(userId, photoData, technicalAnalysis) {
         logger.info('Анализ сохранен в историю', {
             historyItemId: historyItem.id,
             userId,
-            photoSize: photoData.length
+            originalPhotoSize: Math.round(photoData.length / 1024) + 'KB',
+            optimizedPhotoSize: Math.round(optimizedPhotoData.length / 1024) + 'KB',
+            totalHistoryItems: historyCount >= 50 ? 50 : historyCount + 1
         });
 
         return historyItem;

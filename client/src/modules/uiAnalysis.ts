@@ -171,6 +171,12 @@ export class UIAnalysisManager {
           card.classList.remove('fade-out');
         });
 
+        // Показываем нижнюю секцию обратно
+        const bottomSection = getElement('.analysis-bottom-section');
+        if (bottomSection) {
+          bottomSection.style.display = '';
+        }
+
         resultContainer.classList.add('hidden');
         loadingIndicator.classList.remove('hidden');
 
@@ -294,6 +300,12 @@ export class UIAnalysisManager {
       resultContainer.classList.add('hidden');
       loadingIndicator.classList.add('hidden');
       themeSelection.classList.remove('hidden');
+
+      // Скрываем нижнюю секцию полностью, чтобы не блокировала клики
+      const bottomSection = getElement('.analysis-bottom-section');
+      if (bottomSection) {
+        bottomSection.style.display = 'none';
+      }
 
       logger.info('Theme selection displayed');
     } else {

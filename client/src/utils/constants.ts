@@ -31,7 +31,7 @@ export const STORAGE_KEYS = {
 
 // Ограничения истории
 export const HISTORY_CONSTRAINTS = {
-  MAX_ITEMS: 10, // Увеличено до 10 слотов для карусели
+  MAX_ITEMS: 50, // Увеличено до 50 для сервера (синхронизировано)
 } as const;
 
 // Настройки логирования
