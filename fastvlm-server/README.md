@@ -256,6 +256,123 @@ const response = await fetch('http://127.0.0.1:3001/analyze', {
 });
 ```
 
+## 🎨 Удаление заднего фона
+
+### Быстрый запуск background_removal.py
+
+**Скрипт для удаления заднего фона на фотографиях с использованием AI.**
+
+### 1. Установка зависимостей
+```bash
+cd fastvlm-server
+pip install rembg opencv-python onnxruntime-gpu==1.16.3
+```
+
+### 2. Запуск на одном изображении
+```bash
+# Обработать одно фото (результат сохранится как photo_bg.jpg)
+python background_removal.py --input ../photos/photo.jpg --output ../results/photo_bg.jpg
+
+# Или короче
+python background_removal.py -i ../photos/photo.jpg -o ../results/photo_bg.jpg
+```
+
+### 3. Пакетная обработка директории
+```bash
+# Обработать все JPG файлы в директории
+python background_removal.py --input ../photos/ --output ../results/ --batch
+
+# Пример: обработать 5 конкретных фото
+python background_removal.py -i ../photos/ -o ../results/ -b
+```
+
+### 4. Выбор устройства (GPU/CPU)
+```bash
+# GPU режим
+python background_removal.py -i photo.jpg -o result.jpg --gpu
+
+# CPU режим (по умолчанию, рекомендуется)
+python background_removal.py -i photo.jpg -o result.jpg
+```
+
+### Параметры скрипта
+- `--input, -i`: путь к изображению или директории
+- `--output, -o`: путь для сохранения результата
+- `--batch, -b`: пакетная обработка всех изображений в директории
+- `--gpu`: использовать GPU
+- `--cpu`: использовать CPU (по умолчанию)
+- `--no-crop`: отключить автоматическое обрезание до границ объекта
+- `--no-postprocess`: отключить постобработку краев
+
+### Примеры использования
+
+#### Обработка одного фото
+```bash
+python background_removal.py --input ../1.jpg --output ../1_bg.jpg
+```
+
+#### Обработка директории с фото
+```bash
+# Создать папку для результатов
+mkdir ../bg_results
+
+# Обработать все фото из photos/ и сохранить в bg_results/
+python background_removal.py --input ../photos/ --output ../bg_results/ --batch
+```
+
+#### Сравнение качества (для тестирования)
+```bash
+# GPU режим
+python background_removal.py -i ../1.jpg -o ../1_gpu.jpg --gpu
+
+# CPU режим (по умолчанию)
+python background_removal.py -i ../1.jpg -o ../1_cpu.jpg
+```
+
+### Результаты
+- **Качество**: Высокое (нейронная сеть U2Net)
+- **Формат**: JPG с белым фоном
+- **Скорость**: 2-3 секунды на фото (CPU), зависит от GPU
+- **Именование**: `{original_name}_bg.jpg`
+- **Автообрезание**: Удаление лишнего фона, подгонка под границы объекта
+
+### Устранение проблем
+```bash
+# Если CUDA не работает
+python background_removal.py -i photo.jpg -o result.jpg --cpu
+
+# Проверить GPU
+python -c "import onnxruntime as ort; print(ort.get_available_providers())"
+```
+
+## 🖼️ Создание коллажей
+
+### Быстрый запуск collage_maker.py
+
+**Скрипт для создания вертикальных коллажей из двух фотографий.**
+
+### Пример использования
+```bash
+cd fastvlm-server
+
+# Создать коллаж: верхняя половина кофты + нижняя половина штанов
+python collage_maker.py --top ../set/4_bg.jpg --bottom ../set/1_bg.jpg --output ../my_collage.jpg
+
+# Создать коллаж с другим соотношением (60% кофты, 40% штанов)
+python collage_maker.py --top ../set/4_bg.jpg --bottom ../set/1_bg.jpg --output ../collage_60_40.jpg --ratio 0.6
+```
+
+### Параметры скрипта
+- `--top, -t`: путь к изображению для верхней части
+- `--bottom, -b`: путь к изображению для нижней части
+- `--output, -o`: путь для сохранения коллажа
+- `--ratio, -r`: соотношение разреза (0.5 = пополам)
+
+### Результат
+- **Формат**: JPG с белым фоном
+- **Размер**: Автоматически подбирается по минимальной ширине
+- **Качество**: Высокое (95% JPEG)
+
 ---
 
-*Этот сервер обеспечивает высокопроизводительный анализ изображений одежды с использованием FastVLM модели.*
+*Этот сервер обеспечивает высокопроизводительный анализ изображений одежды с использованием FastVLM модели и включает инструменты для предварительной обработки изображений и создания коллажей.*
