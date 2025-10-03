@@ -633,28 +633,107 @@ export class UIAnalysisManager {
    * Обработчик клика по кнопке лайк
    */
   private handleLikeClick(): void {
-    logger.info('Like button clicked');
+    logger.info('=== LIKE BUTTON CLICKED ===');
 
     const likeBtn = getElement('#like-btn');
-    if (likeBtn) {
-      // Переключаем состояние лайка
-      const isLiked = likeBtn.classList.contains('liked');
+    logger.info(`Like button element found: ${!!likeBtn}`);
 
-      if (isLiked) {
-        // Убираем лайк
-        likeBtn.classList.remove('liked');
-        logger.info('Like removed');
-      } else {
-        // Добавляем лайк
-        likeBtn.classList.add('liked');
-        logger.info('Like added');
+    if (!likeBtn) {
+      logger.error('Like button not found in DOM!');
+      return;
+    }
 
-        // Анимация нажатия
-        likeBtn.style.transform = 'scale(0.8)';
-        setTimeout(() => {
-          likeBtn.style.transform = 'scale(1)';
-        }, 150);
+    // Проверяем, что элемент видимый и кликабельный
+    const rect = likeBtn.getBoundingClientRect();
+    logger.info(`Like button position: x=${rect.left}, y=${rect.top}, visible=${rect.width > 0 && rect.height > 0}`);
+
+    // Переключаем состояние лайка
+    const isLiked = likeBtn.classList.contains('liked');
+    logger.info(`Like button current state: isLiked=${isLiked}`);
+
+    // Находим SVG path элемент
+    const svgPath = likeBtn.querySelector('svg path') as SVGPathElement;
+    logger.info(`SVG path element found: ${!!svgPath}`);
+
+    if (svgPath) {
+      // ЛОГИРУЕМ ТЕКУЩИЕ СТИЛИ ПЕРЕД ИЗМЕНЕНИЯМИ
+      const computedStyle = window.getComputedStyle(svgPath);
+      logger.info('=== SVG PATH CURRENT STATE ===', {
+        tagName: svgPath.tagName,
+        id: svgPath.id,
+        className: svgPath.className,
+        outerHTML: svgPath.outerHTML.substring(0, 200) + '...',
+        currentFill: svgPath.getAttribute('fill'),
+        currentStroke: svgPath.getAttribute('stroke'),
+        computedFill: computedStyle.fill,
+        computedStroke: computedStyle.stroke,
+        styleFill: svgPath.style.fill,
+        styleStroke: svgPath.style.stroke,
+        allStyles: svgPath.style.cssText,
+        parentClasses: svgPath.parentElement?.parentElement?.className
+      });
+    }
+
+    if (isLiked) {
+      // Убираем лайк - заменяем SVG на пустое сердце
+      likeBtn.classList.remove('liked');
+
+      if (svgPath) {
+        // ЗАМЕНЯЕМ ВЕСЬ SVG ЭЛЕМЕНТ НА НОВЫЙ С НУЖНЫМИ СТИЛЯМИ
+        const newSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        newSvg.setAttribute('width', '24');
+        newSvg.setAttribute('height', '24');
+        newSvg.setAttribute('viewBox', '0 0 24 24');
+
+        const newPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        newPath.setAttribute('d', 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z');
+        newPath.setAttribute('fill', 'none');
+        newPath.setAttribute('stroke', '#eb858d');
+        newPath.setAttribute('stroke-width', '3');
+
+        newSvg.appendChild(newPath);
+        const svgElement = svgPath.parentElement;
+        if (svgElement && svgElement.parentElement) {
+          svgElement.parentElement.replaceChild(newSvg, svgElement);
+        }
+
+        logger.info('Like removed - SVG replaced with empty heart');
       }
+
+      logger.info('Like removed successfully');
+    } else {
+      // Добавляем лайк - заменяем SVG на закрашенное сердце
+      likeBtn.classList.add('liked');
+
+      if (svgPath) {
+        // ЗАМЕНЯЕМ ВЕСЬ SVG ЭЛЕМЕНТ НА НОВЫЙ С НУЖНЫМИ СТИЛЯМИ
+        const newSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        newSvg.setAttribute('width', '24');
+        newSvg.setAttribute('height', '24');
+        newSvg.setAttribute('viewBox', '0 0 24 24');
+
+        const newPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        newPath.setAttribute('d', 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z');
+        newPath.setAttribute('fill', '#eb858d');
+        newPath.setAttribute('stroke', '#eb858d');
+        newPath.setAttribute('stroke-width', '3');
+
+        newSvg.appendChild(newPath);
+        const svgElement = svgPath.parentElement;
+        if (svgElement && svgElement.parentElement) {
+          svgElement.parentElement.replaceChild(newSvg, svgElement);
+        }
+
+        logger.info('Like added - SVG replaced with filled heart');
+      }
+
+      logger.info('Like added successfully');
+
+      // Анимация нажатия
+      likeBtn.style.transform = 'scale(0.8)';
+      setTimeout(() => {
+        likeBtn.style.transform = 'scale(1)';
+      }, 150);
     }
 
     // Тактильная обратная связь

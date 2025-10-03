@@ -571,17 +571,26 @@
     -webkit-tap-highlight-color: transparent !important;
 }
 
-.like-btn svg {
-    stroke: #ff4757; /* Красный цвет обводки */
-    stroke-width: 3; /* Толщина обводки */
-    fill: none; /* Без заливки */
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Анимация изменений */
+/* Стили для кнопки лайк - базовые */
+.like-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
 }
 
-.like-btn.liked svg {
-    fill: #ff4757; /* Красная заливка для лайкнутого состояния */
-    stroke: #ff4757; /* Красная обводка для лайкнутого состояния */
+/* SVG сердечка - базовые стили */
+.like-btn svg {
+    width: 24px;
+    height: 24px;
+    display: block;
 }
+
+/* SVG стили теперь управляются JS - полная замена элементов */
 
 /* Кнопка поделиться */
 .share-btn {
