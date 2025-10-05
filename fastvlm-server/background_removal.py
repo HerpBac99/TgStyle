@@ -335,14 +335,22 @@ def process_single_image(input_path: str, output_path: str,
             result = remover.crop_to_content(result)
 
         # Сохраняем результат
-        # Конвертируем в RGB для JPG (JPG не поддерживает прозрачность)
-        if result.mode == 'RGBA':
-            # Создаем белый фон и накладываем изображение
-            background = Image.new('RGB', result.size, (255, 255, 255))
-            background.paste(result, mask=result.split()[-1])  # Используем альфа-канал как маску
-            result = background
-
-        result.save(output_path, 'JPEG', quality=95)  # JPG с высоким качеством
+        if output_path.lower().endswith('.png'):
+            # Сохраняем как PNG с прозрачностью
+            if result.mode == 'RGBA':
+                result.save(output_path, 'PNG')
+            else:
+                # Конвертируем в RGBA для прозрачности
+                result = result.convert('RGBA')
+                result.save(output_path, 'PNG')
+        else:
+            # Сохраняем как JPG с белым фоном
+            if result.mode == 'RGBA':
+                # Создаем белый фон и накладываем изображение
+                background = Image.new('RGB', result.size, (255, 255, 255))
+                background.paste(result, mask=result.split()[-1])  # Используем альфа-канал как маску
+                result = background
+            result.save(output_path, 'JPEG', quality=95)  # JPG с высоким качеством
 
         total_time = time.time() - start_time
         logger.info(f"[SUCCESS] ЗАВЕРШЕНО: {output_path}")

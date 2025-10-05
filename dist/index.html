@@ -3,43 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TgStyle</title>
+    <title>TgStyle</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" crossorigin src="/assets/main-6Mj_5K8j.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-DrCmEb7J.css">
+  <script type="module" crossorigin src="/assets/main-B33agV_b.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-Cg1Ozh7R.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- App title at the top -->
-        <h1 class="app-title">TgStyle</h1>
-        
-        <!-- User profile in top right -->
-        <div class="user-profile">
-            <div id="user-photo" class="user-photo"></div>
-            <!-- Информация о подписке -->
-            <div class="subscription-info">
-                <div id="subscription-status" class="subscription-status free">Free</div>
-                <div class="analyses-info">
-                    <span id="analyses-left" class="analyses-left">3</span>
+        <!-- Основной контент анализа -->
+        <div class="main-content">
+            <!-- App title at the top -->
+            <h1 class="app-title">TgStyle</h1>
+
+            <!-- User profile in top right -->
+            <div class="user-profile">
+                <div id="user-photo" class="user-photo"></div>
+                <!-- Информация о подписке -->
+                <div class="subscription-info">
+                    <div id="subscription-status" class="subscription-status free">Free</div>
+                    <div class="analyses-info">
+                        <span id="analyses-left" class="analyses-left">3</span>
+                    </div>
                 </div>
+                <!-- <span id="user-name"></span> -->
             </div>
-            <!-- <span id="user-name"></span> -->
+
+             <!-- Контейнер с каруселью истории анализов -->
+             <div class="history-carousel-container">
+                 <div class="history-carousel">
+                     <!-- Карты будут создаваться динамически -->
+                 </div>
+
+                 <!-- Точки навигации -->
+                 <div class="carousel-dots">
+                     <!-- Точки будут создаваться динамически -->
+                 </div>
+             </div>
         </div>
-        
-         <!-- Контейнер с каруселью истории анализов -->
-         <div class="history-carousel-container">
-             <div class="history-carousel">
-                 <!-- Карты будут создаваться динамически -->
-             </div>
-             
-             <!-- Точки навигации -->
-             <div class="carousel-dots">
-                 <!-- Точки будут создаваться динамически -->
-             </div>
-         </div>
+
+        <!-- Контент гардероба -->
+        <div class="wardrobe-content hidden">
+            <div class="wardrobe-placeholder">
+                <h2>Гардероб</h2>
+                <p>Раздел находится в разработке</p>
+            </div>
+        </div>
         
         <!-- Camera button at the bottom -->
         <!-- Индикатор загрузки карусели 
@@ -52,6 +63,24 @@
             </button>
         </div>
         -->
+        <!-- Область закладок внизу -->
+        <div class="tabs-area">
+            <div class="tabs-container">
+                <button class="tab-button active" data-tab="main">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    <span class="tab-label">Разбор стиля</span>
+                </button>
+                <button class="tab-button" data-tab="wardrobe">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V9.06h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
+                    </svg>
+                    <span class="tab-label">Гардероб</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Экран анализа фото -->

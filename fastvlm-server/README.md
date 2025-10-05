@@ -329,11 +329,20 @@ python background_removal.py -i ../1.jpg -o ../1_gpu.jpg --gpu
 python background_removal.py -i ../1.jpg -o ../1_cpu.jpg
 ```
 
+#### Сохранение с прозрачным фоном (PNG)
+```bash
+# Одно фото в PNG (прозрачный фон)
+python background_removal.py -i ../1.jpg -o ../1_bg_transparent.png
+
+# Пакетная обработка в PNG
+python background_removal.py -i ../photos/ -o ../transparent_results/ --batch
+```
+
 ### Результаты
 - **Качество**: Высокое (нейронная сеть U2Net)
-- **Формат**: JPG с белым фоном
+- **Формат**: JPG с белым фоном или PNG с прозрачностью (в зависимости от расширения выходного файла)
 - **Скорость**: 2-3 секунды на фото (CPU), зависит от GPU
-- **Именование**: `{original_name}_bg.jpg`
+- **Именование**: `{original_name}_bg.jpg` или `{original_name}_bg.png`
 - **Автообрезание**: Удаление лишнего фона, подгонка под границы объекта
 
 ### Устранение проблем

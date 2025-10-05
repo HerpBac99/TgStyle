@@ -38,6 +38,9 @@ export class UIManager {
       uiAnalysisManager.init();
       uiCoreManager.init();
 
+      // Настраиваем обработчики закладок
+      this.setupTabsListeners();
+
       // Настраиваем глобальные обработчики событий
       this.setupGlobalEventListeners();
 
@@ -61,6 +64,76 @@ export class UIManager {
     document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
 
     logger.info('Global UI event listeners setup');
+  }
+
+  /**
+   * Настраивает обработчики закладок
+   */
+  private setupTabsListeners(): void {
+    // Находим все кнопки закладок
+    const tabButtons = document.querySelectorAll('.tab-button');
+
+    logger.info('Setting up tab listeners', { foundButtons: tabButtons.length });
+
+    tabButtons.forEach(button => {
+      button.addEventListener('click', this.handleTabClick.bind(this));
+      logger.info('Added click listener to tab button', { tab: button.getAttribute('data-tab') });
+    });
+  }
+
+  /**
+   * Обработчик клика по закладке
+   */
+  private handleTabClick(event: Event): void {
+    const button = event.target as HTMLElement;
+    const tabButton = button.closest('.tab-button') as HTMLElement;
+
+    if (!tabButton) return;
+
+    const tabName = tabButton.dataset['tab'];
+    if (!tabName) return;
+
+    logger.info('Tab clicked', { tab: tabName });
+
+    // Убираем активный класс у всех закладок
+    document.querySelectorAll('.tab-button').forEach(btn => {
+      btn.classList.remove('active');
+    });
+
+    // Добавляем активный класс к нажатой закладке
+    tabButton.classList.add('active');
+
+    // Обработка переключения закладок
+    this.handleTabSwitch(tabName);
+  }
+
+  /**
+   * Обработка переключения закладок
+   */
+  private handleTabSwitch(tabName: string): void {
+    const mainContent = document.querySelector('.main-content') as HTMLElement;
+    const wardrobeContent = document.querySelector('.wardrobe-content') as HTMLElement;
+
+    logger.info('Tab switch called', { tabName });
+
+    switch (tabName) {
+      case 'main':
+        // Показываем главный экран с анализом
+        if (mainContent) mainContent.classList.remove('hidden');
+        if (wardrobeContent) wardrobeContent.classList.add('hidden');
+        uiMenuManager.updateHistoryDisplay();
+        break;
+
+      case 'wardrobe':
+        // Показываем экран гардероба
+        if (mainContent) mainContent.classList.add('hidden');
+        if (wardrobeContent) wardrobeContent.classList.remove('hidden');
+        break;
+
+      default:
+        logger.warn('Unknown tab', { tab: tabName });
+        break;
+    }
   }
 
   /**

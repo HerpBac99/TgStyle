@@ -1,0 +1,33 @@
+/*
+ * СТИЛИ ГАРДЕРОБА
+ * Отдельный файл для стилей раздела гардероба
+ */
+
+/* Контент гардероба */
+.wardrobe-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    background: white;
+}
+
+/* Заглушка гардероба */
+.wardrobe-placeholder {
+    text-align: center;
+    color: #666;
+}
+
+.wardrobe-placeholder h2 {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #333;
+}
+
+.wardrobe-placeholder p {
+    font-size: 1.1rem;
+    color: #888;
+}

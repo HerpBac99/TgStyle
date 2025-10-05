@@ -70,17 +70,15 @@ class CameraManager {
   /**
    * Выбор файла через input[type="file"]
    */
-  private selectFile(options: Partial<CameraOptions> = {}): Promise<File> {
+  private selectFile(_options: Partial<CameraOptions> = {}): Promise<File> {
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'image/*';
+      input.accept = 'image/*'; // Telegram WebApp переопределит это и покажет свой диалог выбора
       input.style.display = 'none';
 
-      // Настройка для камеры на мобильных устройствах
-      if (options.preferCamera) {
-        input.setAttribute('capture', 'camera');
-      }
+      // Telegram WebApp автоматически показывает модальное окно с выбором источника
+      // (камера/галерея/файл) на всех платформах, включая iOS
 
       input.addEventListener('change', (event) => {
         const target = event.target as HTMLInputElement;

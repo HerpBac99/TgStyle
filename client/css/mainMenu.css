@@ -139,7 +139,7 @@ body {
     /* Создает контекст позиционирования для абсолютно позиционированных дочерних элементов */
 
     /* ВЫСОТА */
-    height: 100vh; /* height: 100vh - высота равна полной высоте экрана (viewport height) */
+    height: calc(100vh - 80px); /* height: calc(100vh - 80px) - высота экрана минус высота закладок */
 }
 
 /*
@@ -1037,4 +1037,115 @@ button:active {
 /* Скрытый класс для модального окна */
 .subscription-modal.hidden {
     display: none;
+}
+
+
+/* =======================================
+   СТИЛИ ОБЛАСТИ ЗАКЛАДОК
+   ======================================= */
+
+/* Основной контейнер закладок */
+.tabs-area {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: var(--gradient-bg);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Контейнер кнопок закладок */
+.tabs-container {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    height: 100%;
+}
+
+/* Кнопки закладок */
+.tab-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex: 1;
+    height: 100%;
+    user-select: none;
+    position: relative;
+    box-shadow: none;
+    /* Убираем все возможные границы */
+    border-left: none !important;
+    border-right: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    /* Убираем вебкит-специфичные стили для мобильных */
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    /* Убираем любые возможные фоновые изображения или цвета */
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* Убираем любые возможные границы между кнопками */
+.tab-button + .tab-button {
+    border-left: none !important;
+    border-right: none !important;
+}
+
+/* Все состояния кнопок - убираем любые эффекты браузера */
+.tab-button:hover,
+.tab-button:active,
+.tab-button:focus,
+.tab-button:focus-visible {
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+    scale: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* Иконка закладки */
+.tab-icon {
+    width: 24px;
+    height: 24px;
+    transition: all 0.2s ease;
+    color: #8e8e93;
+}
+
+/* Активная иконка - залитая черным */
+.tab-button.active .tab-icon {
+    color: #000000;
+    fill: #000000;
+    stroke: #000000;
+}
+
+/* Название закладки */
+.tab-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: #8e8e93;
+    text-align: center;
+    transition: color 0.2s ease;
+    margin-top: 2px;
+}
+
+/* Активная закладка */
+.tab-button.active .tab-label {
+    color: #000000;
 }
