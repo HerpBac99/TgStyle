@@ -11,7 +11,7 @@
     /* === НЕОМОРФНЫЕ ЦВЕТА И ЭФФЕКТЫ === */
 
     /* Градиентный фон - современный минималистичный */
-    --gradient-bg: linear-gradient(135deg, #dfebf7 0%, #f1f5f9 50%, #e2e8f0 100%);
+    --gradient-bg: linear-gradient(135deg, #EFECEB 0%, #E2D1C8 50%, #DEB6B5 100%);
 
     /* Основная палитра - современные цвета */
     --primary-color: #6366f1;      /* Indigo */
@@ -24,11 +24,11 @@
     --neumorph-bg: linear-gradient(145deg, #e8ecf2, #d4dbe4); /* Более контрастный градиент */
 
     /* Основной цвет текста - современный тёмно-серый */
-    --tg-theme-text-color: #374151;
+    --tg-theme-text-color: #2c2c30;
 
     /* Кнопки - неоморфные */
     --tg-theme-button-color: var(--neumorph-bg);
-    --tg-theme-button-text-color: #374151;
+    --tg-theme-button-text-color: #2c2c30;
 
     /* Вторичный цвет фона */
     --tg-theme-secondary-bg-color: rgba(255, 255, 255, 0.95);
@@ -53,6 +53,32 @@
     padding: 0; /* padding: 0 - убирает ВНУТРЕННИЕ отступы у всех элементов (отступы внутри элемента) */
     box-sizing: border-box; /* box-sizing: border-box - включает padding и border в расчет ширины/высоты элемента */
     /* border-box значит: width = content + padding + border (стандартный расчет размеров) */
+}
+
+/* СКРЫТИЕ КНОПОК ЗАГОЛОВКА TELEGRAM WEBAPP */
+/* Полностью скрываем текст кнопок "Закрыть" и меню в заголовке */
+.tg-header-button,
+.tg-header-close,
+.tg-header-menu,
+[class*="tg-header"] button,
+[class*="tg-header"] span:not([class*="tg-header-title"]) {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    display: none !important;
+    pointer-events: none !important;
+}
+
+/* Дополнительные селекторы для различных версий Telegram */
+.telegram-header button,
+.telegram-header .close-button,
+.telegram-header .menu-button,
+.tg-web-app-header button,
+.tg-web-app-header .close,
+.tg-web-app-header .menu {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    display: none !important;
+    pointer-events: none !important;
 }
 
 /*
@@ -161,7 +187,7 @@ body {
     font-weight: 700; /* font-weight: 700 - очень жирный шрифт (bold) */
 
     /* ЦВЕТ */
-    color: #2c2c30; /* #2c2c30 - темно-серый цвет */
+    color: var(--tg-theme-text-color); /* #2c2c30 - темно-серый цвет */
 
     /* ТЕНЬ ТЕКСТА */
     text-shadow: 1px 1px 2px rgba(0,0,0,0.1);

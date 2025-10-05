@@ -8,6 +8,7 @@ import { logger } from './logger';
 import { uiMenuManager } from './uiMenu';
 import { uiAnalysisManager } from './uiAnalysis';
 import { uiCoreManager } from './uiCore';
+import { uiWardrobeManager } from './uiWardrobe';
 
 // Объявляем глобальную переменную Telegram
 declare global {
@@ -37,6 +38,7 @@ export class UIManager {
       uiMenuManager.init();
       uiAnalysisManager.init();
       uiCoreManager.init();
+      // uiWardrobeManager не требует инициализации
 
       // Настраиваем обработчики закладок
       this.setupTabsListeners();
@@ -128,6 +130,11 @@ export class UIManager {
         // Показываем экран гардероба
         if (mainContent) mainContent.classList.add('hidden');
         if (wardrobeContent) wardrobeContent.classList.remove('hidden');
+
+        // Обрабатываем открытие гардероба через специализированный менеджер
+        uiWardrobeManager.handleWardrobeOpen().catch(error => {
+          logger.error('Error handling wardrobe open', error);
+        });
         break;
 
       default:
@@ -226,7 +233,8 @@ export class UIManager {
         hasCurrentImage: !!uiAnalysisManager.getCurrentThemeImage?.(),
         hasAnalysisData: !!uiAnalysisManager.getCurrentAnalysisData?.(),
         hasLamodaUrl: !!uiAnalysisManager.getCurrentLamodaUrl?.()
-      }
+      },
+      wardrobeManager: uiWardrobeManager.getStats(),
     };
   }
 
@@ -249,6 +257,7 @@ export class UIManager {
       uiMenuManager.destroy();
       uiAnalysisManager.destroy();
       uiCoreManager.destroy();
+      uiWardrobeManager.destroy();
 
       logger.info('All UI modules destroyed successfully');
     } catch (error) {
@@ -263,7 +272,7 @@ export const uiManager = new UIManager();
 // Тип UIManager экспортируется через объявление class выше
 
 // Экспортируем отдельные менеджеры для прямого доступа при необходимости
-export { uiMenuManager, uiAnalysisManager, uiCoreManager };
+export { uiMenuManager, uiAnalysisManager, uiCoreManager, uiWardrobeManager };
 
 // Импортируем типы для обратной совместимости
 

@@ -62,22 +62,43 @@ class AuthManager {
     try {
       // Разворачиваем приложение
       this.tg.expand();
-      
+
       // Включаем подтверждение закрытия
       this.tg.enableClosingConfirmation();
-      
+
       // Входим в полноэкранный режим если поддерживается
       if (this.tg.isVersionAtLeast('6.9') && this.tg.requestFullscreen) {
         logger.info('Requesting fullscreen mode');
         this.tg.requestFullscreen();
       }
 
+      // Минимизируем заголовок для экономии места
+      this.minimizeHeader();
+
       // Уведомляем Telegram что приложение готово
       this.tg.ready();
-      
+
       logger.info('Telegram WebApp configured successfully');
     } catch (error) {
       logger.error('Error configuring Telegram WebApp', error);
+    }
+  }
+
+  /**
+   * Минимизация заголовка Telegram WebApp для освобождения места
+   */
+  private minimizeHeader(): void {
+    if (!this.tg) return;
+
+    try {
+      // Устанавливаем цвет заголовка таким же как фон приложения
+      // чтобы визуально скрыть его
+      this.tg.setHeaderColor('#81D8D0');
+      this.tg.setBackgroundColor('#81D8D0');
+
+      logger.info('Telegram header minimized successfully');
+    } catch (error) {
+      logger.warn('Error minimizing Telegram header', error);
     }
   }
 

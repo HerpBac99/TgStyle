@@ -49,9 +49,48 @@
 
         <!-- Контент гардероба -->
         <div class="wardrobe-content hidden">
-            <div class="wardrobe-placeholder">
-                <h2>Гардероб</h2>
-                <p>Раздел находится в разработке</p>
+            <!-- Силуэт гардероба -->
+            <div id="wardrobe-silhouette-container" class="wardrobe-silhouette-container hidden">
+                <div class="wardrobe-header">
+                    <h2>Мой гардероб</h2>
+                </div>
+                <div class="silhouette-wrapper">
+                    <button class="change-gender-btn" id="change-gender-btn">
+                        Изменить
+                    </button>
+                    <div class="wardrobe-silhouette" id="wardrobe-silhouette">
+                        <!-- SVG силуэт будет вставлен сюда -->
+                    </div>
+                    <div class="wardrobe-placeholder-text">
+                        <p>Гардероб находится в разработке</p>
+                        <p>Скоро здесь появится управление вашей одеждой</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Модальное окно выбора пола (глобальное) -->
+        <div id="gender-selection-modal" class="gender-selection-modal hidden">
+            <div class="gender-selection-overlay"></div>
+            <div class="gender-selection-content">
+                <div class="gender-selection-header">
+                    <h2>Добро пожаловать в гардероб!</h2>
+                    <p>Выберите свой пол для персонализации</p>
+                </div>
+                <div class="gender-selection-grid">
+                    <button class="gender-card male-card" data-gender="male">
+                        <div class="gender-icon">
+                            <img src="asset/man.png" alt="Мужчина" />
+                        </div>
+                        <div class="gender-label">Мужской</div>
+                    </button>
+                    <button class="gender-card female-card" data-gender="female">
+                        <div class="gender-icon">
+                            <img src="asset/woman.png" alt="Женщина" />
+                        </div>
+                        <div class="gender-label">Женский</div>
+                    </button>
+                </div>
             </div>
         </div>
         
