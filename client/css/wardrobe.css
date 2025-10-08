@@ -14,137 +14,6 @@
     overflow: hidden;
 }
 
-/* Модальное окно выбора пола */
-.gender-selection-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.gender-selection-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(5px);
-}
-
-.gender-selection-content {
-    position: relative;
-    background: white;
-    border-radius: 20px;
-    margin: 1rem;
-    max-width: 400px;
-    width: 100%;
-    padding: 1.5rem;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    animation: modalSlideIn 0.3s ease-out;
-}
-
-@keyframes modalSlideIn {
-    from {
-        opacity: 0;
-        transform: scale(0.9) translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
-}
-
-.gender-selection-header {
-    text-align: center;
-    margin-bottom: 1rem;
-}
-
-.gender-selection-header h2 {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: var(--tg-theme-text-color);
-    margin-bottom: 0.5rem;
-}
-
-.gender-selection-header p {
-    font-size: 1rem;
-    color: #666;
-    margin: 0;
-}
-
-.gender-selection-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    width: 100%;
-}
-
-.gender-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    padding: 0;
-    border: none;
-    background: transparent;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
-.gender-card:hover {
-    border-color: #667eea;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
-}
-
-.gender-card.male-card:hover {
-    border-color: #4a90e2;
-    box-shadow: 0 8px 20px rgba(74, 144, 226, 0.2);
-}
-
-.gender-card.female-card:hover {
-    border-color: #e91e63;
-    box-shadow: 0 8px 20px rgba(233, 30, 99, 0.2);
-}
-
-.gender-icon {
-    width: 130px;
-    height: 200px;
-    margin-bottom: 1rem;
-    transition: transform 0.3s ease;
-    overflow: hidden;
-    display: flex;
-    align-items: stretch;
-    justify-content: stretch;
-}
-
-.male-card:hover .gender-icon {
-    transform: scale(1.1);
-}
-
-.female-card:hover .gender-icon {
-    transform: scale(1.1);
-}
-
-.gender-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-    flex: 1;
-}
-
-.gender-label {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #333;
-}
 
 /* Контейнер силуэта */
 .wardrobe-silhouette-container {
@@ -152,7 +21,6 @@
     flex-direction: column;
     height: 100%;
     width: 100%;
-    border: 1px solid red;
 }
 
 .wardrobe-header {
@@ -162,7 +30,6 @@
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    border: 1px solid green;
 }
 
 .wardrobe-header h2 {
@@ -173,93 +40,93 @@
     color: var(--tg-theme-text-color);
     text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
     margin-top: 15%;
-    border: 1px solid blue;
-}
-
-.change-gender-btn {
-    position: absolute;
-    top: 0;
-    right: 0;
-    display: flex;
-    align-items: center;
-    padding: 8px 12px; /* Явные внутренние отступы */
-    margin: 0; /* Без отступов */
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 12px;
-    color: white;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.change-gender-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: translateY(-1px);
-}
-
-.change-gender-btn svg {
-    width: 16px;
-    height: 16px;
 }
 
 .silhouette-wrapper {
     flex: 1;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: transparent; /* Прозрачный фон */
+}
+
+/* Canvas */
+#wardrobe-canvas {
+    display: block;
+    background: transparent !important; /* Прозрачный фон */
+}
+
+/* Кнопка добавить фото (плюсик в правом верхнем углу) */
+.add-item-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: rgba(218, 109, 163, 0.8) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white; /* Белый цвет иконки */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: none;
+    z-index: 10;
+}
+
+.add-item-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.add-item-btn svg {
+    width: 24px;
+    height: 24px;
+    stroke: white; /* Белый цвет обводки иконки */
+}
+
+/* Индикатор загрузки обработки фото */
+.wardrobe-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    position: relative;
-    border: 1px solid purple;
+    background: transparent; /* Прозрачный фон */
+    z-index: 100;
 }
 
-.wardrobe-silhouette {
-    width: 100%;
-    height: 100%;
-    filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.3));
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    border: 1px solid orange;
-    pointer-events: none;
+.wardrobe-loading.hidden {
+    display: none;
 }
 
-/* Фоновые изображения для разных полов */
-.male-silhouette {
-    background-image: url('/asset/man.png') !important;
+/* Спиннер */
+.wardrobe-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(218, 109, 163, 0.2);
+    border-top-color: rgba(218, 109, 163, 0.8);
+    border-radius: 50%;
+    animation: wardrobe-spin 1s linear infinite;
 }
 
-.female-silhouette {
-    background-image: url('/asset/woman.png') !important;
+@keyframes wardrobe-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
-.wardrobe-placeholder-text {
-    text-align: center;
-    color: rgba(255, 255, 255, 0.9);
-    border: 1px solid pink;
-}
-
-.wardrobe-placeholder-text p {
-    margin: 0.5rem 0;
-    font-size: 1rem;
+/* Текст загрузки */
+.wardrobe-loading-text {
+    margin-top: 20px;
+    font-size: 16px;
     font-weight: 500;
-}
-
-/* Заглушка гардероба (для обратной совместимости) */
-.wardrobe-placeholder {
-    text-align: center;
-    color: #666;
-}
-
-.wardrobe-placeholder h2 {
-    font-size: 2rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
     color: #333;
+    text-align: center;
 }
 
-.wardrobe-placeholder p {
-    font-size: 1.1rem;
-    color: #888;
-}

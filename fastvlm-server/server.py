@@ -49,6 +49,10 @@ from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_S
 
 # Импортируем модуль умной предобработки изображений
 from image_preprocessing import smart_preprocess_image
+
+# Импортируем модуль удаления фона
+from background_removal import BackgroundRemover
+
 try:
     from google import genai
     from google.genai import types
@@ -84,6 +88,9 @@ gemini_client = None
 ollama_available = False
 ollama_url = "http://127.0.0.1:11434"
 ollama_model = "gemma3:4b"  # Лучшая модель для стилистики - баланс скорости и качества
+
+# Глобальная переменная для BackgroundRemover
+background_remover = None
 
 # Глобальные переменные для промптов
 default_prompt = None
@@ -1218,6 +1225,92 @@ def get_model_debug():
             'error': str(e)
         }), 500
 
+@app.route('/remove-background', methods=['POST'])
+def remove_background():
+    """Удаление фона с изображения"""
+    start_time = time.time()
+    
+    try:
+        if background_remover is None:
+            return jsonify({
+                'success': False,
+                'error': 'Background remover not initialized'
+            }), 500
+
+        # Получаем данные
+        data = request.get_json()
+        if not data or 'image_base64' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'No image provided'
+            }), 400
+
+        image_base64 = data['image_base64']
+        
+        # Удаляем префикс data:image если есть
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+
+        app.logger.info("Начинаем удаление фона с изображения")
+
+        # Декодируем изображение
+        try:
+            image_data = base64.b64decode(image_base64)
+            image = Image.open(io.BytesIO(image_data)).convert('RGB')
+            app.logger.debug(f"Изображение декодировано: {image.size}")
+        except Exception as e:
+            app.logger.error(f"Ошибка декодирования изображения: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Invalid image data: {e}'
+            }), 400
+
+        # Удаляем фон
+        result_image, processing_time = background_remover.remove_background(image)
+        app.logger.info(f"Фон удален за {processing_time:.2f}с")
+
+        # Постобработка краев
+        result_image = background_remover.post_process_mask(result_image, feather=2)
+        
+        # Обрезаем до содержимого
+        result_image = background_remover.crop_to_content(result_image, padding=10)
+        app.logger.debug(f"Изображение обрезано: {result_image.size}")
+
+        # Конвертируем результат в base64 PNG (с прозрачностью)
+        output_buffer = io.BytesIO()
+        result_image.save(output_buffer, format='PNG')
+        output_base64 = base64.b64encode(output_buffer.getvalue()).decode('utf-8')
+
+        total_time = time.time() - start_time
+        app.logger.info(f"Удаление фона завершено за {total_time:.2f}с")
+
+        return jsonify({
+            'success': True,
+            'image_base64': f'data:image/png;base64,{output_base64}',
+            'timing': {
+                'total_time': round(total_time, 2),
+                'processing_time': round(processing_time, 2)
+            },
+            'image_info': {
+                'original_size': f'{image.size[0]}x{image.size[1]}',
+                'result_size': f'{result_image.size[0]}x{result_image.size[1]}'
+            }
+        })
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        error_msg = f"Ошибка удаления фона: {e}"
+        app.logger.error(error_msg)
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timing': {
+                'total_time': round(total_time, 2)
+            }
+        }), 500
+
 def cleanup_resources():
     """Очистка ресурсов при завершении"""
     global model, tokenizer, image_processor
@@ -1307,6 +1400,15 @@ if __name__ == '__main__':
 
         # Инициализируем Gemini API
         initialize_gemini()
+
+        # Инициализируем Background Remover (ТОЛЬКО CPU для лучшей производительности)
+        try:
+            app.logger.info("Инициализация Background Remover на CPU...")
+            background_remover = BackgroundRemover(use_gpu=False)
+            app.logger.info("Background Remover инициализирован успешно (CPU)")
+        except Exception as e:
+            app.logger.error(f"Ошибка инициализации Background Remover: {e}")
+            background_remover = None
 
         # Загрузка модели
         app.logger.info("Запуск FastVLM сервера...")

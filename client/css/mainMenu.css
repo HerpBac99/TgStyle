@@ -11,7 +11,7 @@
     /* === НЕОМОРФНЫЕ ЦВЕТА И ЭФФЕКТЫ === */
 
     /* Градиентный фон - современный минималистичный */
-    --gradient-bg: linear-gradient(135deg, #EFECEB 0%, #E2D1C8 50%, #DEB6B5 100%);
+    --gradient-bg: linear-gradient(135deg, #dfebf7 0%, #f1f5f9 50%, #e2e8f0 100%);
 
     /* Основная палитра - современные цвета */
     --primary-color: #6366f1;      /* Indigo */

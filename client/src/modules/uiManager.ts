@@ -115,6 +115,7 @@ export class UIManager {
   private handleTabSwitch(tabName: string): void {
     const mainContent = document.querySelector('.main-content') as HTMLElement;
     const wardrobeContent = document.querySelector('.wardrobe-content') as HTMLElement;
+    const silhouetteContainerMain = document.getElementById('wardrobe-silhouette-container') as HTMLElement;
 
     logger.info('Tab switch called', { tabName });
 
@@ -122,14 +123,19 @@ export class UIManager {
       case 'main':
         // Показываем главный экран с анализом
         if (mainContent) mainContent.classList.remove('hidden');
+        //Скрываем экран гардероба
         if (wardrobeContent) wardrobeContent.classList.add('hidden');
+        if (silhouetteContainerMain) silhouetteContainerMain.classList.add('hidden');
+
         uiMenuManager.updateHistoryDisplay();
         break;
 
       case 'wardrobe':
-        // Показываем экран гардероба
+        // Скрываем главный экран с анализом
         if (mainContent) mainContent.classList.add('hidden');
+        // Показываем экран гардероба
         if (wardrobeContent) wardrobeContent.classList.remove('hidden');
+        if (silhouetteContainerMain) silhouetteContainerMain.classList.remove('hidden');
 
         // Обрабатываем открытие гардероба через специализированный менеджер
         uiWardrobeManager.handleWardrobeOpen().catch(error => {
@@ -234,7 +240,7 @@ export class UIManager {
         hasAnalysisData: !!uiAnalysisManager.getCurrentAnalysisData?.(),
         hasLamodaUrl: !!uiAnalysisManager.getCurrentLamodaUrl?.()
       },
-      wardrobeManager: uiWardrobeManager.getStats(),
+      wardrobeManager: uiWardrobeManager.getStatus(),
     };
   }
 

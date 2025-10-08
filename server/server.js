@@ -18,6 +18,7 @@ const prisma = require('./src/lib/prisma');
 // Импорт API маршрутов
 const authRoutes = require('./src/api/auth');
 const analyzeRoutes = require('./src/api/analyze');
+const backgroundRemovalRoutes = require('./src/api/backgroundRemoval');
 const historyRoutes = require('./src/api/history');
 const subscriptionRoutes = require('./src/api/subscription');
 const apiRoutes = require('./routes/api');
@@ -40,6 +41,7 @@ app.use(express.static(path.join(__dirname, '..', 'dist')));
 logger.info('Loading API routes...');
 app.use('/api/auth', authRoutes);
 app.use('/api/analyze', analyzeRoutes);
+app.use('/api/remove-background', backgroundRemovalRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api', apiRoutes);

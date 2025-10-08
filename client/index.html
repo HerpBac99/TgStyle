@@ -55,41 +55,21 @@
                     <h2>Мой гардероб</h2>
                 </div>
                 <div class="silhouette-wrapper">
-                    <button class="change-gender-btn" id="change-gender-btn">
-                        Изменить
-                    </button>
-                    <div class="wardrobe-silhouette" id="wardrobe-silhouette">
-                        <!-- SVG силуэт будет вставлен сюда -->
-                    </div>
-                    <div class="wardrobe-placeholder-text">
-                        <p>Гардероб находится в разработке</p>
-                        <p>Скоро здесь появится управление вашей одеждой</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+                    <!-- Canvas для редактирования изображений -->
+                    <canvas id="wardrobe-canvas"></canvas>
 
-        <!-- Модальное окно выбора пола (глобальное) -->
-        <div id="gender-selection-modal" class="gender-selection-modal hidden">
-            <div class="gender-selection-overlay"></div>
-            <div class="gender-selection-content">
-                <div class="gender-selection-header">
-                    <h2>Добро пожаловать в гардероб!</h2>
-                    <p>Выберите свой пол для персонализации</p>
-                </div>
-                <div class="gender-selection-grid">
-                    <button class="gender-card male-card" data-gender="male">
-                        <div class="gender-icon">
-                            <img src="asset/man.png" alt="Мужчина" />
-                        </div>
-                        <div class="gender-label">Мужской</div>
-                    </button>
-                    <button class="gender-card female-card" data-gender="female">
-                        <div class="gender-icon">
-                            <img src="asset/woman.png" alt="Женщина" />
-                        </div>
-                        <div class="gender-label">Женский</div>
-                    </button>
+                    <!-- Индикатор загрузки обработки фото -->
+                    <div class="wardrobe-loading hidden" id="wardrobe-loading">
+                        <div class="wardrobe-spinner"></div>
+                        <p class="wardrobe-loading-text">Обрабатываем фото...</p>
+                    </div>
+
+                    <!-- Кнопка добавить предмет (плюсик) -->
+                    <div class="add-item-btn" id="add-item-btn" aria-label="Добавить предмет">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14M5 12h14"></path>
+                        </svg>
+                    </div>
                 </div>
             </div>
         </div>
