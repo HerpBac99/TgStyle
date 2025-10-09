@@ -49,27 +49,21 @@
 
         <!-- Контент гардероба -->
         <div class="wardrobe-content hidden">
-            <!-- Силуэт гардероба -->
-            <div id="wardrobe-silhouette-container" class="wardrobe-silhouette-container hidden">
+            <!-- Гардероб с карточками одежды -->
+            <div id="wardrobe-clothes-container" class="wardrobe-clothes-container hidden">
                 <div class="wardrobe-header">
                     <h2>Мой гардероб</h2>
                 </div>
-                <div class="silhouette-wrapper">
-                    <!-- Canvas для редактирования изображений -->
-                    <canvas id="wardrobe-canvas"></canvas>
-
-                    <!-- Индикатор загрузки обработки фото -->
-                    <div class="wardrobe-loading hidden" id="wardrobe-loading">
-                        <div class="wardrobe-spinner"></div>
-                        <p class="wardrobe-loading-text">Обрабатываем фото...</p>
-                    </div>
-
-                    <!-- Кнопка добавить предмет (плюсик) -->
+                <div class="wardrobe-clothes-grid" id="wardrobe-clothes-grid">
+                    <!-- Кнопка добавить предмет -->
                     <div class="add-item-btn" id="add-item-btn" aria-label="Добавить предмет">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 5v14M5 12h14"></path>
-                        </svg>
+                        <div class="add-item-btn-content">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M12 5v14M5 12h14"></path>
+                            </svg>
+                        </div>
                     </div>
+                    <!-- Карточки одежды будут добавляться динамически -->
                 </div>
             </div>
         </div>
@@ -94,6 +88,12 @@
                         <path d="m21 21-4.35-4.35"></path>
                     </svg>
                     <span class="tab-label">Разбор стиля</span>
+                </button>
+                <button class="tab-button active" data-tab="capsules">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V9.06h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
+                    </svg>
+                    <span class="tab-label">Капсулы</span>
                 </button>
                 <button class="tab-button" data-tab="wardrobe">
                     <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -192,6 +192,33 @@
                 <div id="saved-analysis-date" class="saved-analysis-date">
                     <!-- Сюда будет вставлена дата -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно предпросмотра одежды -->
+    <div id="wardrobe-preview-modal" class="wardrobe-preview-modal hidden">
+        <div class="wardrobe-preview-overlay"></div>
+        <div class="wardrobe-preview-content">
+            <div class="wardrobe-preview-image-container">
+                <img id="wardrobe-preview-image" src="" alt="Предпросмотр одежды" class="wardrobe-preview-image">
+            </div>
+            <div class="wardrobe-preview-loading hidden" id="wardrobe-preview-loading">
+                <div class="wardrobe-preview-spinner"></div>
+                <p class="wardrobe-preview-loading-text">Обрабатываем фото...</p>
+            </div>
+            <div class="wardrobe-preview-actions" id="wardrobe-preview-actions">
+                <button id="wardrobe-preview-cancel" class="wardrobe-preview-btn cancel-btn" aria-label="Отменить">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                <button id="wardrobe-preview-confirm" class="wardrobe-preview-btn confirm-btn" aria-label="Подтвердить">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                </button>
             </div>
         </div>
     </div>

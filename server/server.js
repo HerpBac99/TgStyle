@@ -21,6 +21,7 @@ const analyzeRoutes = require('./src/api/analyze');
 const backgroundRemovalRoutes = require('./src/api/backgroundRemoval');
 const historyRoutes = require('./src/api/history');
 const subscriptionRoutes = require('./src/api/subscription');
+const wardrobeRoutes = require('./src/api/wardrobe');
 const apiRoutes = require('./routes/api');
 
 // Импорт логгера
@@ -37,6 +38,9 @@ app.use(express.urlencoded({ extended: true }));
 // Middleware для статических файлов клиента (собранные в dist/)
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 
+// Middleware для раздачи загруженных файлов (изображения гардероба)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // API роуты
 logger.info('Loading API routes...');
 app.use('/api/auth', authRoutes);
@@ -44,6 +48,7 @@ app.use('/api/analyze', analyzeRoutes);
 app.use('/api/remove-background', backgroundRemovalRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/subscription', subscriptionRoutes);
+app.use('/api/wardrobe', wardrobeRoutes);
 app.use('/api', apiRoutes);
 
 // Роут для главной страницы

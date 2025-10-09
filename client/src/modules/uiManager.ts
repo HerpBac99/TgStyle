@@ -115,7 +115,7 @@ export class UIManager {
   private handleTabSwitch(tabName: string): void {
     const mainContent = document.querySelector('.main-content') as HTMLElement;
     const wardrobeContent = document.querySelector('.wardrobe-content') as HTMLElement;
-    const silhouetteContainerMain = document.getElementById('wardrobe-silhouette-container') as HTMLElement;
+    const clothesContainerMain = document.getElementById('wardrobe-clothes-container') as HTMLElement;
 
     logger.info('Tab switch called', { tabName });
 
@@ -125,7 +125,7 @@ export class UIManager {
         if (mainContent) mainContent.classList.remove('hidden');
         //Скрываем экран гардероба
         if (wardrobeContent) wardrobeContent.classList.add('hidden');
-        if (silhouetteContainerMain) silhouetteContainerMain.classList.add('hidden');
+        if (clothesContainerMain) clothesContainerMain.classList.add('hidden');
 
         uiMenuManager.updateHistoryDisplay();
         break;
@@ -135,7 +135,7 @@ export class UIManager {
         if (mainContent) mainContent.classList.add('hidden');
         // Показываем экран гардероба
         if (wardrobeContent) wardrobeContent.classList.remove('hidden');
-        if (silhouetteContainerMain) silhouetteContainerMain.classList.remove('hidden');
+        if (clothesContainerMain) clothesContainerMain.classList.remove('hidden');
 
         // Обрабатываем открытие гардероба через специализированный менеджер
         uiWardrobeManager.handleWardrobeOpen().catch(error => {

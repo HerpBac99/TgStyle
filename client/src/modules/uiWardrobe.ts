@@ -1,272 +1,61 @@
 /**
  * Модуль для управления UI гардероба
- * Canvas редактор для удаления фона и редактирования изображений
+ * Грид с карточками одежды и модальное окно предпросмотра
  */
 
 import { logger } from './logger';
-import * as fabric from 'fabric';
 
 /**
- * Класс для управления UI гардероба с Canvas редактором
+ * Интерфейс для элемента гардероба
+ */
+interface WardrobeItem {
+  id: number;
+  imageUrl: string;
+  name?: string;
+  category?: string;
+  color?: string;
+  tags?: string[];
+  createdAt: string;
+}
+
+/**
+ * Класс для управления UI гардероба с гридом карточек
  */
 export class UIWardrobeManager {
   private cleanupFunctions: (() => void)[] = [];
-  private fabricCanvas: fabric.Canvas | null = null;
-  private images: fabric.Image[] = [];
+  private wardrobeItems: WardrobeItem[] = [];
+  private currentPreviewImage: string | null = null;
 
   constructor() {
-    logger.info('Canvas Wardrobe Manager initialized');
+    logger.info('Wardrobe Grid Manager initialized');
   }
 
   /**
    * Обработать открытие гардероба
    */
   async handleWardrobeOpen(): Promise<void> {
-    logger.info('Wardrobe opened - initializing canvas editor');
+    logger.info('Wardrobe opened - initializing grid');
 
-    // Ждем, пока элементы станут видимыми и получат размеры
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Настраиваем обработчики событий
+    this.setupEventListeners();
+    
+    // Загружаем сохраненные элементы гардероба с сервера
+    await this.loadWardrobeItems();
+    
+    // Рендерим грид
+    this.renderGrid();
 
-    // Проверяем доступность canvas элементов
-    const canvasElement = document.getElementById('wardrobe-canvas') as HTMLCanvasElement;
-    const wrapper = document.querySelector('.silhouette-wrapper') as HTMLElement;
-
-    if (!canvasElement) {
-      logger.error('Canvas element not found in DOM');
-      return;
-    }
-    if (!wrapper) {
-      logger.error('Wrapper element not found in DOM');
-      return;
-    }
-
-    logger.info('Canvas elements found, initializing...');
-
-    // Инициализируем Canvas
-    this.initializeCanvas();
-    this.setupCanvasEventListeners();
-    logger.info('Canvas editor ready');
+    logger.info('Wardrobe grid ready');
   }
 
   /**
-   * Инициализировать Fabric Canvas
+   * Настройка обработчиков событий
    */
-  private initializeCanvas(): void {
-    const canvasElement = document.getElementById('wardrobe-canvas') as HTMLCanvasElement;
-    const wrapper = document.querySelector('.silhouette-wrapper') as HTMLElement;
-
-    if (!canvasElement || !wrapper) {
-      logger.error('Canvas or wrapper element not found');
-      return;
-    }
-
-    // Получаем размеры wrapper
-    const rect = wrapper.getBoundingClientRect();
-    logger.info(`Wrapper rect: ${rect.width}x${rect.height}`);
-
-    // Используем размеры wrapper напрямую
-    const width = Math.floor(rect.width);
-    const height = Math.floor(rect.height);
-
-    if (width < 100 || height < 100) {
-      logger.error(`Canvas dimensions too small: ${width}x${height}`);
-      return;
-    }
-
-    // Очищаем предыдущий canvas если есть
-    if (this.fabricCanvas) {
-      this.fabricCanvas.dispose();
-    }
-
-    // Инициализируем Fabric Canvas
-    this.fabricCanvas = new fabric.Canvas('wardrobe-canvas', {
-      width: width,
-      height: height,
-      // backgroundColor не указываем - будет прозрачный
-      selection: false,
-    });
-
-    // Настраиваем canvas для лучшего UX
-    this.setupCanvasBehavior();
-
-    logger.info(`Fabric Canvas initialized: ${width}x${height}`);
-  }
-
-  /**
-   * Настроить поведение Fabric Canvas
-   */
-  private setupCanvasBehavior(): void {
-    if (!this.fabricCanvas) return;
-
-    try {
-      // Добавляем кастомный контрол удаления для всех объектов (маленькая кнопка в левом верхнем углу)
-      // Вместо prototype используем более надежный подход
-      const deleteControl = new fabric.Control({
-        x: -0.5,
-        y: -0.5,
-        offsetX: -4,
-        offsetY: -25,
-        cursorStyle: 'pointer',
-        mouseUpHandler: this.deleteObject.bind(this),
-        render: this.renderDeleteIcon.bind(this)
-      });
-
-      // Добавляем контрол ко всем существующим объектам и новым
-      this.fabricCanvas.forEachObject((obj: any) => {
-        if (obj && !obj.controls['deleteControl']) {
-          obj.controls['deleteControl'] = deleteControl;
-        }
-      });
-
-      // Переопределяем метод добавления объектов, чтобы добавлять контрол к новым объектам
-      const originalAdd = this.fabricCanvas.add;
-      this.fabricCanvas.add = (...args: any[]) => {
-        const result = originalAdd.apply(this.fabricCanvas, args);
-        const obj = args[0];
-        if (obj && obj.controls && !obj.controls['deleteControl']) {
-          obj.controls['deleteControl'] = deleteControl;
-        }
-        return result;
-      };
-
-      logger.info('Delete control setup completed');
-    } catch (error) {
-      logger.error('Error setting up delete control', error);
-    }
-
-    // Запрещаем выход объектов за границы canvas
-    this.fabricCanvas.on('object:moving', (e: any) => {
-      const obj = e.target;
-      if (!obj) return;
-
-      obj.setCoords();
-      const bound = obj.getBoundingRect();
-
-      // Ограничиваем движение по горизонтали
-      if (bound.left < 0) {
-        obj.set('left', obj.left! - bound.left);
-      }
-      if (bound.left + bound.width > this.fabricCanvas!.width!) {
-        obj.set('left', this.fabricCanvas!.width! - bound.width);
-      }
-
-      // Ограничиваем движение по вертикали
-      if (bound.top < 0) {
-        obj.set('top', obj.top! - bound.top);
-      }
-      if (bound.top + bound.height > this.fabricCanvas!.height!) {
-        obj.set('top', this.fabricCanvas!.height! - bound.height);
-      }
-    });
-
-    // Ограничиваем масштабирование
-    this.fabricCanvas.on('object:scaling', (e: any) => {
-      const obj = e.target;
-      if (!obj) return;
-
-      // Минимальный размер - 30px
-      const minSize = 30;
-
-      if (obj.scaleX! * obj.width! < minSize) {
-        obj.scaleX = minSize / obj.width!;
-      }
-      if (obj.scaleY! * obj.height! < minSize) {
-        obj.scaleY = minSize / obj.height!;
-      }
-    });
-
-    // Обработчик выделения объектов - перемещаем наверх
-    this.fabricCanvas.on('selection:created', (options) => {
-      if (options.selected && options.selected.length > 0) {
-        const selectedObject = options.selected[0];
-
-        if (selectedObject && selectedObject.type === 'image') {
-          // Активируем объект
-          this.fabricCanvas!.setActiveObject(selectedObject);
-
-          // Перемещаем объект наверх через remove/add
-          const currentIndex = this.fabricCanvas!.getObjects().indexOf(selectedObject);
-
-          if (currentIndex !== -1 && currentIndex < this.fabricCanvas!.getObjects().length - 1) {
-            this.fabricCanvas!.remove(selectedObject);
-            this.fabricCanvas!.add(selectedObject);
-          }
-
-          this.fabricCanvas!.renderAll();
-        }
-      }
-    });
-  }
-
-  /**
-   * Обработчик удаления объекта
-   */
-  private deleteObject(_eventData: any, transform: any): boolean {
-    const target = transform.target;
-    if (!target || !this.fabricCanvas) {
-      logger.warn('Delete object called with invalid target or canvas', { hasTarget: !!target, hasCanvas: !!this.fabricCanvas });
-      return false;
-    }
-
-    logger.info('Delete button clicked - removing object from canvas');
-
-    // Удаляем объект с canvas
-    this.fabricCanvas.remove(target);
-
-    // Удаляем из массива изображений
-    const index = this.images.indexOf(target);
-    if (index > -1) {
-      this.images.splice(index, 1);
-    }
-
-    // Перерисовываем canvas
-    this.fabricCanvas.renderAll();
-
-    logger.info(`Object deleted. Remaining images: ${this.images.length}`);
-
-    return true;
-  }
-
-  /**
-   * Рендер маленькой иконки удаления с буквой X (8x8 пикселей) для кастомного контрола
-   */
-  private renderDeleteIcon(ctx: CanvasRenderingContext2D, left: number, top: number, _styleOverride: any, _fabricObject: fabric.Object): void {
-    const size = 20; // Маленькая кнопка 8x8 пикселей
-    const centerX = left;
-    const centerY = top;
-
-    // Рисуем красный круг
-    ctx.save();
-    ctx.fillStyle = '#ff4757';
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, size / 2, 0, 2 * Math.PI);
-    ctx.fill();
-    ctx.stroke();
-
-    // Рисуем букву X (диагональные линии под 45 градусов)
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-
-    // Левая верхняя - правая нижняя диагональ
-    ctx.moveTo(centerX - 3, centerY - 3);
-    ctx.lineTo(centerX + 3, centerY + 3);
-
-    // Правая верхняя - левая нижняя диагональ
-    ctx.moveTo(centerX + 3, centerY - 3);
-    ctx.lineTo(centerX - 3, centerY + 3);
-
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  /**
-   * Настройка обработчиков событий для Canvas
-   */
-  private setupCanvasEventListeners(): void {
+  private setupEventListeners(): void {
     const addBtn = document.getElementById('add-item-btn') as HTMLElement;
+    const confirmBtn = document.getElementById('wardrobe-preview-confirm') as HTMLElement;
+    const cancelBtn = document.getElementById('wardrobe-preview-cancel') as HTMLElement;
+    const modalOverlay = document.querySelector('.wardrobe-preview-overlay') as HTMLElement;
 
     if (addBtn) {
       const handleAdd = () => {
@@ -276,9 +65,47 @@ export class UIWardrobeManager {
 
       addBtn.addEventListener('click', handleAdd);
 
-      // Сохраняем функцию очистки
       this.cleanupFunctions.push(() => {
         addBtn.removeEventListener('click', handleAdd);
+      });
+    }
+
+    if (confirmBtn) {
+      const handleConfirm = () => {
+        logger.info('Confirm button clicked');
+        this.confirmPreview();
+      };
+
+      confirmBtn.addEventListener('click', handleConfirm);
+
+      this.cleanupFunctions.push(() => {
+        confirmBtn.removeEventListener('click', handleConfirm);
+      });
+    }
+
+    if (cancelBtn) {
+      const handleCancel = () => {
+        logger.info('Cancel button clicked');
+        this.cancelPreview();
+      };
+
+      cancelBtn.addEventListener('click', handleCancel);
+
+      this.cleanupFunctions.push(() => {
+        cancelBtn.removeEventListener('click', handleCancel);
+      });
+    }
+
+    if (modalOverlay) {
+      const handleOverlayClick = () => {
+        logger.info('Modal overlay clicked');
+        this.cancelPreview();
+      };
+
+      modalOverlay.addEventListener('click', handleOverlayClick);
+
+      this.cleanupFunctions.push(() => {
+        modalOverlay.removeEventListener('click', handleOverlayClick);
       });
     }
   }
@@ -305,7 +132,11 @@ export class UIWardrobeManager {
           if (file) {
             logger.info('Photo selected for upload', { fileName: file.name, size: file.size });
 
-            // Здесь будет вызов удаления фона через Python скрипт
+            // Показываем модальное окно с индикатором загрузки
+            this.showPreviewModal();
+            this.showLoadingInModal(true);
+
+            // Обрабатываем фото с удалением фона
             await this.processPhotoWithBackgroundRemoval(file);
           } else {
             logger.warn('No file selected');
@@ -335,9 +166,6 @@ export class UIWardrobeManager {
    * Обработать фото с удалением фона
    */
   private async processPhotoWithBackgroundRemoval(file: File): Promise<void> {
-    // Показываем индикатор загрузки
-    this.showLoadingIndicator(true);
-
     try {
       // Конвертируем файл в base64
       const base64 = await this.fileToBase64(file);
@@ -372,14 +200,17 @@ export class UIWardrobeManager {
       });
 
       // Скрываем индикатор загрузки
-      this.showLoadingIndicator(false);
+      this.showLoadingInModal(false);
 
-      // Показываем обработанное изображение
-      this.showProcessedImage(result.image_base64);
+      // Показываем обработанное изображение в модальном окне
+      this.showImageInModal(result.image_base64);
+
+      // Сохраняем текущее изображение для подтверждения
+      this.currentPreviewImage = result.image_base64;
 
     } catch (error) {
       // Скрываем индикатор загрузки при ошибке
-      this.showLoadingIndicator(false);
+      this.showLoadingInModal(false);
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Error processing photo with background removal', {
         error: errorMessage,
@@ -390,120 +221,330 @@ export class UIWardrobeManager {
       try {
         const base64 = await this.fileToBase64(file);
         logger.warn('Showing original photo without background removal');
-        this.showProcessedImage(base64);
+        this.showImageInModal(base64);
+        this.currentPreviewImage = base64;
       } catch (fallbackError) {
         const fallbackErrorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
         logger.error('Error showing original photo', { error: fallbackErrorMessage });
+        this.cancelPreview();
       }
     }
   }
 
   /**
-   * Показать обработанное изображение с рамкой трансформации
+   * Показать модальное окно предпросмотра
    */
-  private showProcessedImage(base64: string): void {
-    if (!this.fabricCanvas) {
-      logger.error('Fabric Canvas not initialized - reinitializing...');
-      this.initializeCanvas();
-      if (!this.fabricCanvas) {
-        logger.error('Failed to initialize Fabric Canvas');
-        return;
-      }
+  private showPreviewModal(): void {
+    const modal = document.getElementById('wardrobe-preview-modal');
+    const imageElement = document.getElementById('wardrobe-preview-image') as HTMLImageElement;
+    
+    // Очищаем предыдущее изображение
+    if (imageElement) {
+      imageElement.src = '';
     }
-
-    logger.info('Showing processed image on canvas...');
-
-    // Создаем HTML Image элемент для загрузки
-    const imgElement = new Image();
-    imgElement.crossOrigin = 'anonymous';
-
-    imgElement.onload = () => {
-      logger.info(`Image loaded: ${imgElement.width}x${imgElement.height}`);
-
-      // Вычисляем масштаб для заполнения 80% canvas
-      const canvasWidth = this.fabricCanvas!.width!;
-      const canvasHeight = this.fabricCanvas!.height!;
-      const imgWidth = imgElement.width;
-      const imgHeight = imgElement.height;
-      
-      const scale = Math.min(
-        (canvasWidth * 0.8) / imgWidth,
-        (canvasHeight * 0.8) / imgHeight
-      );
-
-      logger.info(`Scaling image: original ${imgWidth}x${imgHeight}, canvas ${canvasWidth}x${canvasHeight}, scale ${scale.toFixed(3)}`);
-
-      // Создаем Fabric Image из HTML Image элемента
-      const fabricImg = new fabric.Image(imgElement, {
-        left: canvasWidth / 2,
-        top: canvasHeight / 2,
-        originX: 'center',
-        originY: 'center',
-        scaleX: scale,
-        scaleY: scale,
-        selectable: true,
-        hasControls: true,
-        hasBorders: true,
-        lockScalingFlip: true,
-        transparentCorners: false,
-        cornerColor: '#ffffff',
-        cornerStrokeColor: '#333333',
-        borderColor: '#333333',
-        borderOpacityWhenMoving: 0.8,
-        cornerSize: 12,
-        touchCornerSize: 24,
-        borderDashArray: [5, 5],
-      });
-
-      // Добавляем изображение на canvas
-      this.fabricCanvas!.add(fabricImg);
-
-      // Явно добавляем контрол удаления к новому изображению
-      const deleteControl = new fabric.Control({
-        x: -0.5,
-        y: -0.5,
-        offsetX: -4,
-        offsetY: -25,
-        cursorStyle: 'pointer',
-        mouseUpHandler: this.deleteObject.bind(this),
-        render: this.renderDeleteIcon.bind(this)
-      });
-      fabricImg.controls['deleteControl'] = deleteControl;
-      logger.info('Delete control added to new image');
-
-      // Сохраняем ссылку на изображение в массив
-      this.images.push(fabricImg);
-
-      // Выделяем изображение
-      this.fabricCanvas!.setActiveObject(fabricImg);
-
-      // Перерисовываем canvas
-      this.fabricCanvas!.renderAll();
-
-      const scaledWidth = (imgWidth * scale).toFixed(0);
-      const scaledHeight = (imgHeight * scale).toFixed(0);
-      logger.info(`Image added to canvas: ${imgWidth}x${imgHeight} -> ${scaledWidth}x${scaledHeight}`);
-    };
-
-    imgElement.onerror = (error) => {
-      logger.error('Error loading image element:', error);
-    };
-
-    // Устанавливаем src изображения
-    imgElement.src = base64;
+    
+    if (modal) {
+      modal.classList.remove('hidden');
+    }
   }
 
   /**
-   * Показать/скрыть индикатор загрузки
+   * Скрыть модальное окно предпросмотра
    */
-  private showLoadingIndicator(show: boolean): void {
-    const loadingElement = document.getElementById('wardrobe-loading');
+  private hidePreviewModal(): void {
+    const modal = document.getElementById('wardrobe-preview-modal');
+    const imageElement = document.getElementById('wardrobe-preview-image') as HTMLImageElement;
+    
+    // Очищаем изображение при закрытии
+    if (imageElement) {
+      imageElement.src = '';
+    }
+    
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Показать/скрыть индикатор загрузки в модальном окне
+   */
+  private showLoadingInModal(show: boolean): void {
+    const loadingElement = document.getElementById('wardrobe-preview-loading');
+    const actionsElement = document.getElementById('wardrobe-preview-actions');
+    
     if (loadingElement) {
       if (show) {
         loadingElement.classList.remove('hidden');
       } else {
         loadingElement.classList.add('hidden');
       }
+    }
+
+    if (actionsElement) {
+      if (show) {
+        actionsElement.style.display = 'none';
+      } else {
+        actionsElement.style.display = 'flex';
+      }
+    }
+  }
+
+  /**
+   * Показать изображение в модальном окне
+   */
+  private showImageInModal(base64: string): void {
+    const imageElement = document.getElementById('wardrobe-preview-image') as HTMLImageElement;
+    if (imageElement) {
+      imageElement.src = base64;
+    }
+  }
+
+  /**
+   * Подтвердить предпросмотр и добавить карточку
+   */
+  private async confirmPreview(): Promise<void> {
+    if (!this.currentPreviewImage) {
+      logger.warn('No preview image to confirm');
+      return;
+    }
+
+    logger.info('Confirming preview - adding item optimistically');
+
+    // Создаем временный элемент для немедленного отображения
+    const tempItem: WardrobeItem = {
+      id: Date.now(), // временный ID
+      imageUrl: this.currentPreviewImage,
+      createdAt: new Date().toISOString()
+    };
+
+    // Добавляем в массив элементов сразу (оптимистичное обновление UI)
+    this.wardrobeItems.unshift(tempItem);
+
+    // Сохраняем imageBase64 для отправки на сервер
+    const imageToSave = this.currentPreviewImage;
+
+    // Перерисовываем грид сразу
+    this.renderGrid();
+
+    // Скрываем модальное окно сразу
+    this.hidePreviewModal();
+
+    // Очищаем текущее превью
+    this.currentPreviewImage = null;
+
+    logger.info('Item added to grid, saving to server in background');
+
+    // Сохраняем на сервер в фоне
+    try {
+      // Получаем initData из Telegram WebApp
+      const initData = (window as any).Telegram?.WebApp?.initData || '';
+
+      // Отправляем на сервер
+      const response = await fetch('/api/wardrobe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          initData,
+          imageBase64: imageToSave
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save item');
+      }
+
+      logger.info('Item saved successfully on server', { id: result.item.id });
+
+      // Заменяем временный элемент на реальный с сервера
+      const index = this.wardrobeItems.findIndex(item => item.id === tempItem.id);
+      if (index !== -1) {
+        this.wardrobeItems[index] = result.item;
+        // Обновляем грид с реальными данными
+        this.renderGrid();
+      }
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error saving wardrobe item to server', { error: errorMessage });
+      
+      // Удаляем временный элемент при ошибке
+      const index = this.wardrobeItems.findIndex(item => item.id === tempItem.id);
+      if (index !== -1) {
+        this.wardrobeItems.splice(index, 1);
+        this.renderGrid();
+      }
+      
+      alert('Ошибка при сохранении предмета на сервер. Предмет не был сохранен.');
+    }
+  }
+
+  /**
+   * Отменить предпросмотр
+   */
+  private cancelPreview(): void {
+    logger.info('Cancelling preview');
+
+    // Скрываем модальное окно
+    this.hidePreviewModal();
+
+    // Очищаем текущее превью
+    this.currentPreviewImage = null;
+  }
+
+  /**
+   * Рендерить грид с карточками
+   */
+  private renderGrid(): void {
+    const grid = document.getElementById('wardrobe-clothes-grid');
+    if (!grid) {
+      logger.error('Wardrobe grid element not found');
+      return;
+    }
+
+    // Очищаем грид, кроме кнопки добавления
+    const addBtn = document.getElementById('add-item-btn');
+    grid.innerHTML = '';
+    if (addBtn) {
+      grid.appendChild(addBtn);
+    }
+
+    // Добавляем карточки одежды
+    this.wardrobeItems.forEach(item => {
+      const card = this.createItemCard(item);
+      grid.insertBefore(card, addBtn); // Вставляем перед кнопкой добавления
+    });
+
+    logger.info(`Grid rendered with ${this.wardrobeItems.length} items`);
+  }
+
+  /**
+   * Создать карточку элемента одежды
+   */
+  private createItemCard(item: WardrobeItem): HTMLElement {
+    const card = document.createElement('div');
+    card.className = 'wardrobe-item-card';
+    card.dataset['itemId'] = item.id.toString();
+
+    const content = document.createElement('div');
+    content.className = 'wardrobe-item-card-content';
+
+    const image = document.createElement('img');
+    image.className = 'wardrobe-item-image';
+    image.src = item.imageUrl;
+    image.alt = item.name || 'Одежда';
+
+    content.appendChild(image);
+    card.appendChild(content);
+
+    // Обработчик удаления карточки (долгое нажатие)
+    let longPressTimer: number;
+    
+    const startLongPress = () => {
+      longPressTimer = window.setTimeout(() => {
+        if (confirm('Удалить этот предмет из гардероба?')) {
+          this.removeItem(item.id);
+        }
+      }, 800); // 800ms для долгого нажатия
+    };
+
+    const cancelLongPress = () => {
+      clearTimeout(longPressTimer);
+    };
+
+    card.addEventListener('mousedown', startLongPress);
+    card.addEventListener('mouseup', cancelLongPress);
+    card.addEventListener('mouseleave', cancelLongPress);
+    card.addEventListener('touchstart', startLongPress);
+    card.addEventListener('touchend', cancelLongPress);
+
+    return card;
+  }
+
+  /**
+   * Удалить элемент из гардероба
+   */
+  private async removeItem(itemId: number): Promise<void> {
+    logger.info('Removing item', { itemId });
+
+    try {
+      // Получаем initData из Telegram WebApp
+      const initData = (window as any).Telegram?.WebApp?.initData || '';
+
+      // Отправляем запрос на сервер
+      const response = await fetch(`/api/wardrobe/${itemId}?initData=${encodeURIComponent(initData)}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete item');
+      }
+
+      logger.info('Item deleted successfully', { itemId });
+
+      // Удаляем из массива
+      const index = this.wardrobeItems.findIndex(item => item.id === itemId);
+      if (index !== -1) {
+        this.wardrobeItems.splice(index, 1);
+      }
+
+      // Перерисовываем грид
+      this.renderGrid();
+
+      logger.info(`Item removed. Remaining items: ${this.wardrobeItems.length}`);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error removing wardrobe item', { error: errorMessage, itemId });
+      
+      alert('Ошибка при удалении предмета. Попробуйте еще раз.');
+    }
+  }
+
+  /**
+   * Загрузить элементы гардероба с сервера
+   */
+  private async loadWardrobeItems(): Promise<void> {
+    try {
+      logger.info('Loading wardrobe items from server');
+
+      // Получаем initData из Telegram WebApp
+      const initData = (window as any).Telegram?.WebApp?.initData || '';
+
+      const response = await fetch(`/api/wardrobe?initData=${encodeURIComponent(initData)}`, {
+        method: 'GET'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to load items');
+      }
+
+      this.wardrobeItems = result.items;
+      logger.info(`Loaded ${this.wardrobeItems.length} items from server`);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error loading wardrobe items', { error: errorMessage });
+      this.wardrobeItems = [];
     }
   }
 
@@ -525,12 +566,8 @@ export class UIWardrobeManager {
   getStatus() {
     return {
       initialized: true,
-      canvasReady: !!this.fabricCanvas,
-      imagesCount: this.images.length,
-      canvasSize: this.fabricCanvas ? {
-        width: this.fabricCanvas.width,
-        height: this.fabricCanvas.height
-      } : null,
+      itemsCount: this.wardrobeItems.length,
+      hasPreviewImage: !!this.currentPreviewImage,
       cleanupFunctionsCount: this.cleanupFunctions.length,
     };
   }
@@ -539,25 +576,19 @@ export class UIWardrobeManager {
    * Очистка ресурсов
    */
   destroy(): void {
-    logger.info('Destroying canvas wardrobe manager');
-
-    // Очищаем Fabric Canvas
-    if (this.fabricCanvas) {
-      this.fabricCanvas.dispose();
-      this.fabricCanvas = null;
-      this.images = [];
-    }
+    logger.info('Destroying wardrobe manager');
 
     // Выполняем все функции очистки
     this.cleanupFunctions.forEach(cleanup => {
       try {
         cleanup();
       } catch (error) {
-        logger.error('Error during canvas cleanup', error);
+        logger.error('Error during cleanup', error);
       }
     });
 
     this.cleanupFunctions = [];
+    this.currentPreviewImage = null;
   }
 }
 
