@@ -27,6 +27,48 @@
     background: transparent;
 }
 
+/* Кнопка добавления одежды на канвас */
+.canvas-add-item-btn {
+    position: absolute;
+    top: 10vh;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: rgba(218, 109, 163, 0.8) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: none;
+    cursor: pointer;
+    z-index: 2010;
+}
+
+.canvas-add-item-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.canvas-add-item-btn:active {
+    transform: scale(0.95);
+}
+
+.canvas-add-item-btn-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.canvas-add-item-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: white;
+    stroke-width: 2;
+}
+
 /* Модальное окно capsules */
 .capsules-modal {
     position: fixed;

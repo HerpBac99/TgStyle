@@ -4,20 +4,7 @@
  */
 
 import { logger } from './logger';
-
-/**
- * Enum категорий одежды (соответствует новым категориям классификации)
- */
-enum ClothingCategory {
-  OUTERWEAR = 'OUTERWEAR',     // Верхняя одежда (куртки, пальто, плащи, бомберы, жакеты, безрукавки)
-  INNERWEAR = 'INNERWEAR',     // Свитеры (кофты, водолазки, свитеры, кардиганы)
-  BODYWEAR = 'BODYWEAR',       // Футболки и рубашки (футболки, рубашки, блузки, топы, майки, поло)
-  FULLBODY = 'FULLBODY',       // Цельная одежда (платья, костюмы, комбинезоны, спортивные костюмы)
-  LEGWEAR = 'LEGWEAR',         // Штаны (штаны, брюки, джинсы, шорты, бриджы, спортивные штаны)
-  FOOTWEAR = 'FOOTWEAR',       // Обувь (вся обувь)
-  HEADWEAR = 'HEADWEAR',       // Головные уборы (все головные уборы)
-  ACCESSORIES = 'ACCESSORIES'  // Аксессуары
-}
+import { PhotoUploadManager, PhotoUploadHandler, ClothingCategory } from './photoUploadManager';
 
 
 /**
@@ -40,15 +27,17 @@ interface WardrobeItem {
 /**
  * Класс для управления UI гардероба с гридом карточек
  */
-export class UIWardrobeManager {
+export class UIWardrobeManager implements PhotoUploadHandler {
   private cleanupFunctions: (() => void)[] = [];
   private wardrobeItems: WardrobeItem[] = [];
   private currentPreviewImage: string | null = null;
   private currentClassification: any = null; // Данные классификации для сохранения
   private currentFilter: string = 'ALL'; // Текущий активный фильтр
+  private photoUploadManager: PhotoUploadManager;
 
   constructor() {
     logger.info('Wardrobe Grid Manager initialized');
+    this.photoUploadManager = new PhotoUploadManager(this);
   }
 
   /**
@@ -84,7 +73,7 @@ export class UIWardrobeManager {
     if (addBtn) {
       const handleAdd = () => {
         logger.info('Add item button clicked');
-        this.handlePhotoUpload();
+        this.photoUploadManager.handlePhotoUpload();
       };
 
       addBtn.addEventListener('click', handleAdd);
@@ -210,57 +199,6 @@ export class UIWardrobeManager {
     logger.info('Filter applied', { filter: filterValue });
   }
 
-  /**
-   * Обработчик загрузки фото
-   */
-  private async handlePhotoUpload(): Promise<void> {
-    try {
-      logger.info('Starting photo upload process');
-
-      // Создаем input для выбора файла
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.style.display = 'none';
-
-      input.onchange = async (event) => {
-        try {
-          logger.info('Input onchange triggered');
-          const target = event.target as HTMLInputElement;
-          const file = target.files?.[0];
-
-          if (file) {
-            logger.info('Photo selected for upload', { fileName: file.name, size: file.size });
-
-            // Показываем модальное окно с индикатором загрузки
-            this.showPreviewModal();
-            this.showLoadingInModal(true);
-
-            // Обрабатываем фото с удалением фона
-            await this.processPhotoWithBackgroundRemoval(file);
-          } else {
-            logger.warn('No file selected');
-          }
-        } catch (error) {
-          logger.error('Error in photo upload onchange handler', error);
-        }
-      };
-
-      // Добавляем input в DOM и кликаем по нему
-      document.body.appendChild(input);
-      logger.info('Input element added to DOM, triggering click');
-      input.click();
-
-      // Удаляем input после использования
-      setTimeout(() => {
-        document.body.removeChild(input);
-        logger.info('Input element removed from DOM');
-      }, 1000);
-
-    } catch (error) {
-      logger.error('Error in handlePhotoUpload', error);
-    }
-  }
 
   /**
    * Преобразовать категорию в enum (сервер уже вернул нормализованную)
@@ -279,7 +217,7 @@ export class UIWardrobeManager {
   /**
    * Обработать фото с удалением фона и классификацией
    */
-  private async processPhotoWithBackgroundRemoval(file: File): Promise<void> {
+  async processPhotoWithBackgroundRemoval(file: File): Promise<void> {
     try {
       // Конвертируем файл в base64
       const base64 = await this.fileToBase64(file);
@@ -365,20 +303,43 @@ export class UIWardrobeManager {
   }
 
   /**
-   * Показать модальное окно предпросмотра
+   * Очистить модальное окно предпросмотра
    */
-  private showPreviewModal(): void {
-    const modal = document.getElementById('wardrobe-preview-modal');
+  private clearPreviewModal(): void {
+    // Очищаем изображение
     const imageElement = document.getElementById('wardrobe-preview-image') as HTMLImageElement;
-    
-    // Очищаем предыдущее изображение
     if (imageElement) {
       imageElement.src = '';
     }
-    
+
+    // Очищаем информацию о классификации
+    const infoElement = document.getElementById('wardrobe-preview-info');
+    if (infoElement) {
+      infoElement.innerHTML = '';
+      infoElement.style.display = 'none';
+    }
+
+    // Очищаем текущие данные
+    this.currentPreviewImage = null;
+    this.currentClassification = null;
+
+    logger.info('Preview modal cleared');
+  }
+
+  /**
+   * Показать модальное окно предпросмотра
+   */
+  showPreviewModal(): void {
+    // Полностью очищаем модальное окно перед показом
+    this.clearPreviewModal();
+
+    const modal = document.getElementById('wardrobe-preview-modal');
+
     if (modal) {
       modal.classList.remove('hidden');
     }
+
+    logger.info('Preview modal shown and cleared');
   }
 
   /**
@@ -401,7 +362,7 @@ export class UIWardrobeManager {
   /**
    * Показать/скрыть индикатор загрузки в модальном окне
    */
-  private showLoadingInModal(show: boolean): void {
+  showLoadingInModal(show: boolean): void {
     const loadingElement = document.getElementById('wardrobe-preview-loading');
     const actionsElement = document.getElementById('wardrobe-preview-actions');
     
@@ -605,6 +566,11 @@ export class UIWardrobeManager {
         // НЕ перерисовываем грид - визуально ничего не изменилось
         // Картинка уже отображается, просто обновили id и imageUrl в массиве
       }
+
+      // Отправляем событие о сохранении нового элемента гардероба
+      window.dispatchEvent(new CustomEvent('wardrobe:item-saved', {
+        detail: { item: result.item }
+      }));
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -811,7 +777,7 @@ export class UIWardrobeManager {
   /**
    * Конвертировать файл в base64
    */
-  private fileToBase64(file: File): Promise<string> {
+  fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);

@@ -5,6 +5,8 @@
 
 import { logger } from './logger';
 import * as fabric from 'fabric';
+import { PhotoUploadManager, ClothingCategory, PhotoUploadHandler } from './photoUploadManager';
+import { UIWardrobeManager } from './uiWardrobe';
 
 // Делаем fabric доступным глобально для совместимости
 (window as any).fabric = fabric;
@@ -14,20 +16,6 @@ declare global {
   interface Window {
     fabric: any;
   }
-}
-
-/**
- * Enum категорий одежды (совпадает с wardrobe)
- */
-enum ClothingCategory {
-  OUTERWEAR = 'OUTERWEAR',
-  INNERWEAR = 'INNERWEAR',
-  BODYWEAR = 'BODYWEAR',
-  FULLBODY = 'FULLBODY',
-  LEGWEAR = 'LEGWEAR',
-  FOOTWEAR = 'FOOTWEAR',
-  HEADWEAR = 'HEADWEAR',
-  ACCESSORIES = 'ACCESSORIES'
 }
 
 /**
@@ -57,8 +45,14 @@ export class UICapsulesManager {
   private currentFilter: string = 'ALL'; // Текущий активный фильтр
   private isCanvasVisible: boolean = false;
   private fabricCanvas: fabric.Canvas | null = null; // Fabric.js canvas instance
+  private wardrobeManager: UIWardrobeManager | null = null; // Ссылка на wardrobe manager
+  private photoUploadManager: PhotoUploadManager;
+  private photoUploadHandler: PhotoUploadHandler;
 
   constructor() {
+    this.photoUploadManager = new PhotoUploadManager();
+    this.photoUploadHandler = this.createPhotoUploadHandler();
+    this.photoUploadManager.setHandler(this.photoUploadHandler);
   }
 
   /**
@@ -67,13 +61,17 @@ export class UICapsulesManager {
   async handleCapsulesOpen(): Promise<void> {
     try {
       this.checkDOMElements();
-      this.showCanvas();
-      this.initializeCanvas();
+      // Инициализируем wardrobe manager для доступа к загрузке фото
+      this.wardrobeManager = new UIWardrobeManager();
+      // Инициализируем wardrobe manager для настройки обработчиков событий
+      await this.wardrobeManager.handleWardrobeOpen();
+      // Canvas будет инициализирован только при переходе к canvas режиму
       await this.loadWardrobeItems();
       this.createFilters();
       this.renderGrid();
       this.showModal();
       this.setupEventListeners();
+      // BackButton будет настроен в handleNextClick при переходе к canvas
     } catch (error) {
       logger.error('Error opening capsules', {
         error: error instanceof Error ? error.message : String(error),
@@ -296,6 +294,7 @@ export class UICapsulesManager {
   closeCapsules(): void {
     this.hideModal();
     this.hideCanvas();
+    this.hideBackButton(); // Скрыть BackButton
     this.selectedItems.clear();
 
     this.cleanupFunctions.forEach(cleanup => {
@@ -560,7 +559,7 @@ export class UICapsulesManager {
 
 
       // Получаем выбранные элементы
-      const selectedItemsData = this.wardrobeItems.filter(item => this.selectedItems.has(item.id));
+      let selectedItemsData = this.wardrobeItems.filter(item => this.selectedItems.has(item.id));
 
       if (selectedItemsData.length === 0) {
         logger.error('No items found for selected IDs', {
@@ -570,11 +569,28 @@ export class UICapsulesManager {
         return;
       }
 
-      // Добавляем на canvas
-      this.addItemsToCanvas(selectedItemsData);
+      // Сортируем элементы по слоям (от нижнего к верхнему для правильного наложения)
+      selectedItemsData = this.sortItemsByLayer(selectedItemsData);
 
       // Скрываем модальное окно
       this.hideModal();
+
+      // Показываем canvas контейнер ПЕРЕД инициализацией
+      this.showCanvas();
+
+      // Инициализируем canvas только после показа контейнера
+      if (!this.fabricCanvas) {
+        this.initializeCanvas();
+      }
+
+      // Добавляем на canvas
+      this.addItemsToCanvas(selectedItemsData);
+
+      // Настраиваем BackButton для возврата
+      this.setupBackButton();
+
+      // Настраиваем кнопку добавления одежды
+      this.setupCanvasAddButton();
 
     } catch (error) {
       logger.error('Error in handleNextClick', {
@@ -617,8 +633,13 @@ export class UICapsulesManager {
    * Асинхронная загрузка изображений
    */
   private async loadImagesAsync(items: WardrobeItem[]): Promise<void> {
-    const loadingPromises = items.map((item, index) => this.loadSingleImage(item, index));
-    await Promise.allSettled(loadingPromises);
+    // Загружаем изображения последовательно, чтобы сохранить порядок слоев
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item) {
+        await this.loadSingleImage(item, i);
+      }
+    }
 
     this.fabricCanvas!.renderAll();
   }
@@ -641,7 +662,7 @@ export class UICapsulesManager {
 
       imageObj.onload = () => {
         try {
-          this.addImageToCanvas(imageObj, index);
+          this.addImageToCanvas(imageObj, index, item);
           resolve();
         } catch (error) {
           logger.error('Error adding image to canvas', { itemId: item.id, error });
@@ -672,13 +693,13 @@ export class UICapsulesManager {
   /**
    * Добавить изображение на canvas
    */
-  private addImageToCanvas(imageObj: HTMLImageElement, index: number): void {
+  private addImageToCanvas(imageObj: HTMLImageElement, _index: number, item: WardrobeItem): void {
     if (!this.fabricCanvas) {
       throw new Error('Canvas not initialized');
     }
 
     // Вычисляем масштаб и позицию
-    const { scale, x, y } = this.calculateImagePosition(imageObj, index);
+    const { scale, x, y } = this.calculateImagePosition(imageObj, item);
 
     // Создаем Fabric.js Image объект
     const fabricImg = new fabric.Image(imageObj, {
@@ -710,37 +731,118 @@ export class UICapsulesManager {
   }
 
   /**
+   * Сортировать элементы по слоям одежды (от нижнего к верхнему для правильного наложения)
+   */
+  private sortItemsByLayer(items: WardrobeItem[]): WardrobeItem[] {
+    const layerOrder = {
+      'LEGWEAR': 1,      // Штаны - самый нижний слой
+      'BODYWEAR': 2,     // Футболки - над штанами
+      'INNERWEAR': 3,    // Кофты - над футболками
+      'FULLBODY': 4,     // Полностью закрывающая одежда
+      'FOOTWEAR': 5,     // Обувь - над кофтами
+      'OUTERWEAR': 6,    // Куртки, пальто - самый верхний слой
+      'HEADWEAR': 7,     // Головные уборы
+      'ACCESSORIES': 8   // Аксессуары
+    };
+
+    // Сортируем от НИЖНЕГО слоя к ВЕРХНЕМУ, чтобы верхние слои добавлялись последними
+    return items.sort((a, b) => {
+      const aLayer = layerOrder[a.category?.toUpperCase() as keyof typeof layerOrder] || 99;
+      const bLayer = layerOrder[b.category?.toUpperCase() as keyof typeof layerOrder] || 99;
+      return aLayer - bLayer; // Прямая сортировка
+    });
+  }
+
+  /**
    * Вычислить позицию и масштаб изображения
    */
-  private calculateImagePosition(imageObj: HTMLImageElement, index: number): { scale: number; x: number; y: number } {
+  private calculateImagePosition(imageObj: HTMLImageElement, item: WardrobeItem): { scale: number; x: number; y: number } {
     if (!this.fabricCanvas) {
       throw new Error('Canvas not initialized');
     }
 
     const canvasWidth = this.fabricCanvas.width!;
     const canvasHeight = this.fabricCanvas.height!;
+    const canvasCenterX = canvasWidth / 2;
+    const canvasCenterY = canvasHeight / 2;
+
     const imgWidth = imageObj.naturalWidth;
     const imgHeight = imageObj.naturalHeight;
+    const category = item.category?.toUpperCase() || '';
 
-    // Масштабируем изображение до 25% от размера canvas
-    const scale = Math.min(
+    // Базовый масштаб - 25% от размера canvas
+    let baseScale = Math.min(
       (canvasWidth * 0.25) / imgWidth,
       (canvasHeight * 0.25) / imgHeight
     );
 
-    // Позиционируем изображения в сетке (2 колонки)
-    const cols = 2;
-    const spacing = 20;
-    const scaledWidth = imgWidth * scale;
-    const scaledHeight = imgHeight * scale;
+    // Для OUTERWEAR увеличиваем масштаб на 10%
+    if (category === 'OUTERWEAR') {
+      baseScale *= 1.5;
+    }
+    else if (category === 'INNERWEAR'
+      || category === 'BODYWEAR'
+    ) {
+      baseScale *= 1.3;
+    }
 
-    const col = index % cols;
-    const row = Math.floor(index / cols);
+    // Позиционирование по типам одежды
+    let x: number;
+    let y: number;
 
-    const x = spacing + col * (scaledWidth + spacing) + scaledWidth / 2;
-    const y = spacing + row * (scaledHeight + spacing) + scaledHeight / 2;
+    switch (category) {
+      case 'INNERWEAR':
+      case 'BODYWEAR':
+        // Выше середины по центру
+        x = canvasCenterX;
+        y = canvasCenterY - 90; // 10px выше центра
+        break;
 
-    return { scale, x, y };
+      case 'LEGWEAR':
+        // Ниже середины по центру
+        x = canvasCenterX;
+        y = canvasCenterY + 60; // 100px ниже центра
+        break;
+
+      case 'FOOTWEAR':
+        // Ниже LEGWEAR
+        x = canvasCenterX;
+        y = canvasCenterY + 150; // 200px ниже центра
+        break;
+
+      case 'OUTERWEAR':
+        // Почти у средней линии, низ ниже середины на 20px
+        x = canvasCenterX - 100;
+        y = canvasCenterY - 30; // 20px ниже центра
+        break;
+
+      case 'FULLBODY':
+        // По центру, низ ниже середины на 50px
+        x = canvasCenterX;
+        y = canvasCenterY - 50; // 50px ниже центра
+        break;
+
+      case 'HEADWEAR':
+        // Выше торса
+        x = canvasCenterX;
+        y = canvasCenterY - 200; // 200px выше центра
+        break;
+
+      case 'ACCESSORIES':
+        // Сбоку от центра (чередуем левую и правую сторону)
+        const isLeftSide = Math.random() > 0.5;
+        x = isLeftSide ? canvasCenterX - 150 : canvasCenterX + 150;
+        y = canvasCenterY - 50;
+        break;
+
+      default:
+        // По умолчанию - по центру
+        x = canvasCenterX;
+        y = canvasCenterY;
+        break;
+    }
+
+    return { scale: baseScale, x, y };
   }
 
   /**
@@ -863,6 +965,225 @@ export class UICapsulesManager {
         developmentMode: this.isDevelopmentMode(),
       }
     };
+  }
+
+  /**
+   * Настроить BackButton для возврата к модальному окну
+   */
+  private setupBackButton(): void {
+    try {
+      const tg = (window as any).Telegram?.WebApp;
+      if (!tg) {
+        logger.warn('Telegram WebApp not available for BackButton setup');
+        return;
+      }
+
+      // Показать BackButton
+      tg.BackButton.show();
+
+      // Установить обработчик события back_button_pressed
+      const handleBackButtonPressed = () => {
+        this.returnToModal();
+      };
+
+      // Подписаться на событие
+      tg.BackButton.onClick(handleBackButtonPressed);
+
+      // Добавить в cleanup функции
+      this.cleanupFunctions.push(() => {
+        tg.BackButton.offClick(handleBackButtonPressed);
+      });
+
+      logger.info('BackButton configured for capsules return');
+    } catch (error) {
+      logger.error('Error setting up BackButton', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Скрыть BackButton
+   */
+  private hideBackButton(): void {
+    try {
+      const tg = (window as any).Telegram?.WebApp;
+      if (!tg) return;
+
+      tg.BackButton.hide();
+      logger.info('BackButton hidden');
+    } catch (error) {
+      logger.error('Error hiding BackButton', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Вернуться к модальному окну выбора одежды
+   */
+  private returnToModal(): void {
+    try {
+      // Скрыть canvas
+      this.hideCanvas();
+
+      // Показать модальное окно с уже выбранными элементами
+      this.showModal();
+
+      // Обновить состояние кнопки "Далее"
+      this.updateNextButtonState();
+
+      logger.info('Returned to modal window with selected items', {
+        selectedCount: this.selectedItems.size
+      });
+    } catch (error) {
+      logger.error('Error returning to modal', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Настроить кнопку добавления одежды на canvas
+   */
+  private setupCanvasAddButton(): void {
+    const addBtn = document.getElementById('canvas-add-item-btn') as HTMLElement;
+
+    if (!addBtn) {
+      logger.error('Canvas add item button not found');
+      return;
+    }
+
+    const handleAdd = async () => {
+      logger.info('Canvas add item button clicked');
+      // Используем централизованный менеджер загрузки фото
+      await this.photoUploadManager.handlePhotoUpload();
+    };
+
+    addBtn.addEventListener('click', handleAdd);
+
+    // Добавляем функцию очистки
+    this.cleanupFunctions.push(() => {
+      addBtn.removeEventListener('click', handleAdd);
+    });
+
+    // Подписываемся на событие сохранения нового элемента гардероба
+    const handleItemSaved = (event: CustomEvent) => {
+      const { item } = event.detail;
+      logger.info('New wardrobe item saved, adding to canvas', { itemId: item.id });
+      this.addNewItemToCanvas(item);
+    };
+
+    window.addEventListener('wardrobe:item-saved', handleItemSaved as EventListener);
+
+    // Добавляем функцию очистки
+    this.cleanupFunctions.push(() => {
+      window.removeEventListener('wardrobe:item-saved', handleItemSaved as EventListener);
+    });
+  }
+
+  /**
+   * Создать обработчик для загрузки фото в контексте капсул
+   */
+  private createPhotoUploadHandler(): PhotoUploadHandler {
+    return {
+      showPreviewModal: () => {
+        if (this.wardrobeManager) {
+          this.wardrobeManager.showPreviewModal();
+        }
+      },
+
+      showLoadingInModal: (show: boolean) => {
+        if (this.wardrobeManager) {
+          this.wardrobeManager.showLoadingInModal(show);
+        }
+      },
+
+      processPhotoWithBackgroundRemoval: async (file: File) => {
+        if (this.wardrobeManager) {
+          await this.wardrobeManager.processPhotoWithBackgroundRemoval(file);
+        }
+      },
+
+      fileToBase64: async (file: File) => {
+        if (this.wardrobeManager) {
+          return await this.wardrobeManager.fileToBase64(file);
+        }
+        throw new Error('Wardrobe manager not available');
+      }
+    };
+  }
+
+  /**
+   * Добавить новый элемент гардероба на canvas
+   */
+  private addNewItemToCanvas(item: WardrobeItem): void {
+    try {
+      // Добавляем элемент в массив wardrobeItems
+      this.wardrobeItems.push(item);
+      logger.info('Item added to wardrobe items array', { itemId: item.id, totalItems: this.wardrobeItems.length });
+
+      // Если canvas еще не инициализирован, просто обновляем массив
+      if (!this.fabricCanvas) {
+        logger.warn('Canvas not initialized, item will be available when canvas is created');
+        return;
+      }
+
+      // Создаем изображение для canvas
+      this.loadSingleImageForCanvas(item);
+
+      // Обновляем грид в модальном окне, если он показан
+      if (!this.isCanvasVisible) {
+        this.renderGrid();
+      }
+
+      logger.info('New item successfully added to canvas', { itemId: item.id });
+
+    } catch (error) {
+      logger.error('Error adding new item to canvas', {
+        error: error instanceof Error ? error.message : String(error),
+        itemId: item.id
+      });
+    }
+  }
+
+  /**
+   * Загрузить и добавить одно изображение на canvas для нового элемента
+   */
+  private async loadSingleImageForCanvas(item: WardrobeItem): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Проверяем URL перед загрузкой
+      if (!this.isValidImageUrl(item.imageUrl)) {
+        logger.error('Invalid image URL for new item', { itemId: item.id, url: item.imageUrl });
+        reject(new Error(`Invalid URL for item ${item.id}`));
+        return;
+      }
+
+      // Создаем HTML Image элемент для загрузки
+      const imageObj = new Image();
+      imageObj.crossOrigin = 'anonymous';
+
+      imageObj.onload = () => {
+        try {
+          this.addImageToCanvas(imageObj, 0, item); // index = 0 для новых элементов
+          resolve();
+        } catch (error) {
+          logger.error('Error adding new image to canvas', { itemId: item.id, error });
+          reject(error);
+        }
+      };
+
+      imageObj.onerror = (error) => {
+        logger.error('Failed to load image for new canvas item', {
+          itemId: item.id,
+          url: item.imageUrl,
+          error: error?.toString() || 'Unknown error'
+        });
+        reject(new Error(`Failed to load image ${item.id}`));
+      };
+
+      imageObj.src = item.imageUrl;
+    });
   }
 
   /**
