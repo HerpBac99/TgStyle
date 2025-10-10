@@ -116,6 +116,7 @@ export class UIManager {
   private handleTabSwitch(tabName: string): void {
     const mainContent = document.querySelector('.main-content') as HTMLElement;
     const wardrobeContent = document.querySelector('.wardrobe-content') as HTMLElement;
+    const capsulesContent = document.querySelector('.capsules-content') as HTMLElement;
     const clothesContainerMain = document.getElementById('wardrobe-clothes-container') as HTMLElement;
 
     logger.info('Tab switch called', { tabName });
@@ -127,6 +128,8 @@ export class UIManager {
         //Скрываем экран гардероба
         if (wardrobeContent) wardrobeContent.classList.add('hidden');
         if (clothesContainerMain) clothesContainerMain.classList.add('hidden');
+        // Скрываем экран капсул
+        if (capsulesContent) capsulesContent.classList.add('hidden');
 
         uiMenuManager.updateHistoryDisplay();
         break;
@@ -137,6 +140,8 @@ export class UIManager {
         // Показываем экран гардероба
         if (wardrobeContent) wardrobeContent.classList.remove('hidden');
         if (clothesContainerMain) clothesContainerMain.classList.remove('hidden');
+        // Скрываем экран капсул
+        if (capsulesContent) capsulesContent.classList.add('hidden');
 
         // Обрабатываем открытие гардероба через специализированный менеджер
         uiWardrobeManager.handleWardrobeOpen().catch(error => {
@@ -150,8 +155,10 @@ export class UIManager {
         // Скрываем экран гардероба
         if (wardrobeContent) wardrobeContent.classList.add('hidden');
         if (clothesContainerMain) clothesContainerMain.classList.add('hidden');
+        // Показываем экран капсул
+        if (capsulesContent) capsulesContent.classList.remove('hidden');
 
-        // Обрабатываем открытие capsules через специализированный менеджер
+        // Обрабатываем открытие капсул через специализированный менеджер
         uiCapsulesManager.handleCapsulesOpen().catch(error => {
           logger.error('Error handling capsules open', error);
         });

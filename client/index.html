@@ -76,6 +76,28 @@
                 </div>
             </div>
         </div>
+
+        <!-- Контент капсул -->
+        <div class="capsules-content hidden">
+            <!-- Капсулы с карточками образов -->
+            <div id="capsules-clothes-container" class="capsules-clothes-container hidden">
+                <div class="capsules-header">
+                    <h2>Мои образы</h2>
+                </div>
+
+                <div class="capsules-clothes-grid" id="capsules-clothes-grid">
+                    <!-- Кнопка создать капсулу -->
+                    <div class="add-capsule-btn" id="add-capsule-btn" aria-label="Создать капсулу">
+                        <div class="add-capsule-btn-content">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M12 5v14M5 12h14"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <!-- Карточки капсул будут добавляться динамически -->
+                </div>
+            </div>
+        </div>
         
         <!-- Camera button at the bottom -->
         <!-- Индикатор загрузки карусели 
@@ -297,6 +319,15 @@
             <div class="canvas-add-item-btn-content">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M12 5v14M5 12h14"></path>
+                </svg>
+            </div>
+        </button>
+
+        <!-- Кнопка сохранения капсулы -->
+        <button id="canvas-save-capsule-btn" class="canvas-save-capsule-btn" aria-label="Сохранить капсулу">
+            <div class="canvas-save-capsule-btn-content">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
             </div>
         </button>

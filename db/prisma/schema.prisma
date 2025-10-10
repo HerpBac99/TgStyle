@@ -22,6 +22,7 @@ model User {
   subscriptionEndDate  DateTime?
   totalAnalyses        Int            @default(0)
   weeklyResetDate      DateTime       @default(now())
+  capsules             Capsule[]
   comments             Comment[]
   historyItems         HistoryItem[]
   relatedNotifications Notification[] @relation("NotificationRelatedUser")
@@ -113,11 +114,11 @@ model WardrobeItem {
   id         Int               @id @default(autoincrement())
   telegramId BigInt            @map("telegram_id")
   imagePath  String            @map("image_path") @db.VarChar(500)
-  
+
   // Классификация
   category   ClothingCategory? // Основная категория
   subtype    String?           @db.VarChar(100)  // Детализация: jacket, coat, jeans
-  
+
   // Атрибуты от FastVLM
   color      String?           @db.VarChar(50)   // Основной цвет
   style      String?           @db.VarChar(100)  // Стиль: casual, formal, sport
@@ -125,18 +126,48 @@ model WardrobeItem {
   pattern    String?           @db.VarChar(100)  // Узор: plain, striped, checked
   fit       String?           @db.VarChar(100)  // Посадка/фит: slim, regular, loose
   description String?          @db.VarChar(500)  // Описание предмета одежды
-  
+
   // Пользовательские данные
   name       String?           @db.VarChar(255)  // Название от пользователя
   tags       String[]                             // Теги
-  
+
   createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt  DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   user       User              @relation(fields: [telegramId], references: [telegramId], onDelete: Cascade, onUpdate: NoAction, map: "fk_wardrobe_user")
+
+  // Связь с капсулами (многие ко многим)
+  capsules   Capsule[]
 
   @@index([category], map: "idx_wardrobe_category")
   @@index([subtype], map: "idx_wardrobe_subtype")
   @@index([createdAt(sort: Desc)], map: "idx_wardrobe_created_at")
   @@index([telegramId], map: "idx_wardrobe_telegram_id")
   @@map("wardrobe_items")
+}
+
+model Capsule {
+  id          Int      @id @default(autoincrement())
+  telegramId  BigInt   @map("telegram_id")
+  user        User     @relation(fields: [telegramId], references: [telegramId], onDelete: Cascade, onUpdate: NoAction, map: "fk_capsule_user")
+
+  name        String?  @db.VarChar(255)  // Название капсулы
+  description String?  @db.VarChar(500)  // Описание капсулы
+
+  canvasData  Json     // Данные canvas: wardrobe_items[], items[], canvas{}
+  thumbnailPath String? @map("thumbnail_path") // Путь к thumbnail изображению
+
+  analysis    String?  @db.Text         // Анализ от LLM стилиста
+  analysisDate DateTime? @map("analysis_date")
+
+  isPublic    Boolean  @default(false) @map("is_public")  // Можно ли делиться капсулой
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  items       WardrobeItem[]
+
+  @@index([telegramId], map: "idx_capsule_telegram_id")
+  @@index([createdAt(sort: Desc)], map: "idx_capsule_created_at")
+  @@index([isPublic], map: "idx_capsule_is_public")
+  @@map("capsules")
 }

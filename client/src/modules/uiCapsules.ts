@@ -36,12 +36,26 @@ interface WardrobeItem {
 }
 
 /**
+ * Интерфейс для капсулы стиля
+ */
+interface StyleCapsule {
+  id: number;
+  name: string;
+  description?: string;
+  thumbnailUrl: string;
+  createdAt: string;
+  items: WardrobeItem[]; // Элементы одежды в капсуле
+}
+
+/**
  * Класс для управления Capsules функционалом
  */
 export class UICapsulesManager {
   private cleanupFunctions: (() => void)[] = [];
   private wardrobeItems: WardrobeItem[] = [];
+  private capsules: StyleCapsule[] = []; // Массив капсул стиля
   private selectedItems: Set<number> = new Set(); // Множество выбранных элементов
+  private selectedItemsData: WardrobeItem[] = []; // Данные выбранных элементов для canvas
   private currentFilter: string = 'ALL'; // Текущий активный фильтр
   private isCanvasVisible: boolean = false;
   private fabricCanvas: fabric.Canvas | null = null; // Fabric.js canvas instance
@@ -56,9 +70,35 @@ export class UICapsulesManager {
   }
 
   /**
-   * Обработчик открытия capsules
+   * Обработчик открытия capsules - показывает грид с капсулами
    */
   async handleCapsulesOpen(): Promise<void> {
+    try {
+      this.checkDOMElements();
+
+      // Показываем контейнер капсул
+      const container = document.getElementById('capsules-clothes-container');
+      if (container) {
+        container.classList.remove('hidden');
+      }
+
+      // Загружаем капсулы с сервера
+      await this.loadCapsules();
+      // Рендерим грид с капсулами
+      this.renderCapsulesGrid();
+      this.setupCapsulesEventListeners();
+      logger.info('Capsules grid opened');
+    } catch (error) {
+      logger.error('Error opening capsules grid', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Обработчик кнопки "Добавить капсулу" - открывает создание капсулы
+   */
+  async handleAddCapsuleClick(): Promise<void> {
     try {
       this.checkDOMElements();
       // Инициализируем wardrobe manager для доступа к загрузке фото
@@ -72,8 +112,9 @@ export class UICapsulesManager {
       this.showModal();
       this.setupEventListeners();
       // BackButton будет настроен в handleNextClick при переходе к canvas
+      logger.info('Add capsule modal opened');
     } catch (error) {
-      logger.error('Error opening capsules', {
+      logger.error('Error opening add capsule modal', {
         error: error instanceof Error ? error.message : String(error),
         phase: this.getErrorPhase(error)
       });
@@ -92,7 +133,9 @@ export class UICapsulesManager {
       'capsules-modal-overlay',
       'capsules-modal-content',
       'capsules-filters',
-      'capsules-grid'
+      'capsules-grid',
+      'capsules-clothes-grid',
+      'add-capsule-btn'
     ];
 
     const missingElements: string[] = [];
@@ -296,6 +339,13 @@ export class UICapsulesManager {
     this.hideCanvas();
     this.hideBackButton(); // Скрыть BackButton
     this.selectedItems.clear();
+    this.selectedItemsData = [];
+
+    // Скрываем контейнер капсул
+    const container = document.getElementById('capsules-clothes-container');
+    if (container) {
+      container.classList.add('hidden');
+    }
 
     this.cleanupFunctions.forEach(cleanup => {
       try {
@@ -559,9 +609,9 @@ export class UICapsulesManager {
 
 
       // Получаем выбранные элементы
-      let selectedItemsData = this.wardrobeItems.filter(item => this.selectedItems.has(item.id));
+      this.selectedItemsData = this.wardrobeItems.filter(item => this.selectedItems.has(item.id));
 
-      if (selectedItemsData.length === 0) {
+      if (this.selectedItemsData.length === 0) {
         logger.error('No items found for selected IDs', {
           selectedIds: Array.from(this.selectedItems),
           availableItems: this.wardrobeItems.length
@@ -570,7 +620,7 @@ export class UICapsulesManager {
       }
 
       // Сортируем элементы по слоям (от нижнего к верхнему для правильного наложения)
-      selectedItemsData = this.sortItemsByLayer(selectedItemsData);
+      this.selectedItemsData = this.sortItemsByLayer(this.selectedItemsData);
 
       // Скрываем модальное окно
       this.hideModal();
@@ -584,13 +634,16 @@ export class UICapsulesManager {
       }
 
       // Добавляем на canvas
-      this.addItemsToCanvas(selectedItemsData);
+      this.addItemsToCanvas(this.selectedItemsData);
 
       // Настраиваем BackButton для возврата
       this.setupBackButton();
 
       // Настраиваем кнопку добавления одежды
       this.setupCanvasAddButton();
+
+      // Настраиваем кнопку сохранения капсулы
+      this.setupCanvasSaveButton();
 
     } catch (error) {
       logger.error('Error in handleNextClick', {
@@ -916,6 +969,200 @@ export class UICapsulesManager {
   }
 
   /**
+   * Рендерить грид с капсулами стиля
+   */
+  private renderCapsulesGrid(): void {
+    const grid = document.getElementById('capsules-clothes-grid');
+    if (!grid) {
+      logger.error('Capsules clothes grid element not found');
+      return;
+    }
+
+    // Очищаем грид, кроме кнопки добавления
+    const addBtn = document.getElementById('add-capsule-btn');
+    grid.innerHTML = '';
+    if (addBtn) {
+      grid.appendChild(addBtn);
+    }
+
+    // Добавляем карточки капсул
+    this.capsules.forEach(capsule => {
+      const card = this.createCapsuleCard(capsule);
+      grid.insertBefore(card, addBtn); // Вставляем перед кнопкой добавления
+    });
+
+    logger.info(`Capsules grid rendered with ${this.capsules.length} capsules`);
+  }
+
+  /**
+   * Создать карточку капсулы
+   */
+  private createCapsuleCard(capsule: StyleCapsule): HTMLElement {
+    const card = document.createElement('div');
+    card.className = 'capsules-item-card';
+    card.dataset['capsuleId'] = capsule.id.toString();
+
+    const content = document.createElement('div');
+    content.className = 'capsules-item-card-content';
+
+    const image = document.createElement('img');
+    image.className = 'capsules-item-image';
+    image.src = capsule.thumbnailUrl;
+    image.alt = capsule.name;
+
+    content.appendChild(image);
+    card.appendChild(content);
+
+    // Обработчик клика для просмотра капсулы
+    const handleClick = () => {
+      this.viewCapsule(capsule.id);
+    };
+
+    card.addEventListener('click', handleClick);
+
+    // Обработчик удаления капсулы (долгое нажатие)
+    let longPressTimer: number;
+
+    const startLongPress = () => {
+      longPressTimer = window.setTimeout(() => {
+        if (confirm('Удалить эту капсулу?')) {
+          this.removeCapsule(capsule.id);
+        }
+      }, 800); // 800ms для долгого нажатия
+    };
+
+    const cancelLongPress = () => {
+      clearTimeout(longPressTimer);
+    };
+
+    card.addEventListener('mousedown', startLongPress);
+    card.addEventListener('mouseup', cancelLongPress);
+    card.addEventListener('mouseleave', cancelLongPress);
+    card.addEventListener('touchstart', startLongPress);
+    card.addEventListener('touchend', cancelLongPress);
+
+    // Добавляем в cleanup функции
+    this.cleanupFunctions.push(() => {
+      card.removeEventListener('click', handleClick);
+      card.removeEventListener('mousedown', startLongPress);
+      card.removeEventListener('mouseup', cancelLongPress);
+      card.removeEventListener('mouseleave', cancelLongPress);
+      card.removeEventListener('touchstart', startLongPress);
+      card.removeEventListener('touchend', cancelLongPress);
+    });
+
+    return card;
+  }
+
+  /**
+   * Настройка обработчиков событий для грида капсул
+   */
+  private setupCapsulesEventListeners(): void {
+    const addBtn = document.getElementById('add-capsule-btn');
+    if (addBtn) {
+      const handleAdd = () => {
+        logger.info('Add capsule button clicked');
+        this.handleAddCapsuleClick();
+      };
+
+      addBtn.addEventListener('click', handleAdd);
+
+      this.cleanupFunctions.push(() => {
+        addBtn.removeEventListener('click', handleAdd);
+      });
+    }
+  }
+
+  /**
+   * Просмотреть капсулу (заглушка)
+   */
+  private viewCapsule(capsuleId: number): void {
+    logger.info('Viewing capsule', { capsuleId });
+    // TODO: Реализовать просмотр капсулы
+    alert(`Просмотр капсулы ${capsuleId} (функционал в разработке)`);
+  }
+
+  /**
+   * Удалить капсулу
+   */
+  private async removeCapsule(capsuleId: number): Promise<void> {
+    logger.info('Removing capsule', { capsuleId });
+
+    try {
+      // Получаем initData из Telegram WebApp
+      const initData = (window as any).Telegram?.WebApp?.initData || '';
+
+      // Отправляем запрос на сервер
+      const response = await fetch(`/api/capsules/${capsuleId}?initData=${encodeURIComponent(initData)}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete capsule');
+      }
+
+      logger.info('Capsule deleted successfully', { capsuleId });
+
+      // Удаляем из массива
+      const index = this.capsules.findIndex(capsule => capsule.id === capsuleId);
+      if (index !== -1) {
+        this.capsules.splice(index, 1);
+      }
+
+      // Перерисовываем грид
+      this.renderCapsulesGrid();
+
+      logger.info(`Capsule removed. Remaining capsules: ${this.capsules.length}`);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error removing capsule', { error: errorMessage, capsuleId });
+
+      alert('Ошибка при удалении капсулы. Попробуйте еще раз.');
+    }
+  }
+
+  /**
+   * Загрузить капсулы с сервера
+   */
+  private async loadCapsules(): Promise<void> {
+    try {
+      logger.info('Loading capsules from server');
+
+      // Получаем initData из Telegram WebApp
+      const initData = (window as any).Telegram?.WebApp?.initData || '';
+
+      const response = await fetch(`/api/capsules?initData=${encodeURIComponent(initData)}`, {
+        method: 'GET'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to load capsules');
+      }
+
+      this.capsules = result.capsules || [];
+      logger.info(`Loaded ${this.capsules.length} capsules from server`);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error loading capsules', { error: errorMessage });
+      this.capsules = [];
+    }
+  }
+
+  /**
    * Получить статус менеджера capsules
    */
   getStatus() {
@@ -925,7 +1172,9 @@ export class UICapsulesManager {
       canvasReady: !!this.fabricCanvas,
       modalVisible: !document.getElementById('capsules-modal')?.classList.contains('hidden'),
       itemsCount: this.wardrobeItems.length,
+      capsulesCount: this.capsules.length,
       selectedCount: this.selectedItems.size,
+      selectedItemsDataCount: this.selectedItemsData.length,
       currentFilter: this.currentFilter,
       cleanupFunctionsCount: this.cleanupFunctions.length,
       fabricVersion: (window as any).fabric?.version || 'unknown',
@@ -955,6 +1204,8 @@ export class UICapsulesManager {
         modalContent: !!document.querySelector('.capsules-modal-content'),
         filters: !!document.getElementById('capsules-filters'),
         grid: !!document.getElementById('capsules-grid'),
+        capsulesClothesGrid: !!document.getElementById('capsules-clothes-grid'),
+        addCapsuleBtn: !!document.getElementById('add-capsule-btn'),
       },
       libraries: {
         fabric: !!(window as any).fabric,
@@ -1083,6 +1334,30 @@ export class UICapsulesManager {
   }
 
   /**
+   * Настроить кнопку сохранения капсулы
+   */
+  private setupCanvasSaveButton(): void {
+    const saveBtn = document.getElementById('canvas-save-capsule-btn') as HTMLElement;
+
+    if (!saveBtn) {
+      logger.error('Canvas save capsule button not found');
+      return;
+    }
+
+    const handleSave = async () => {
+      logger.info('Canvas save capsule button clicked');
+      await this.saveCapsule();
+    };
+
+    saveBtn.addEventListener('click', handleSave);
+
+    // Добавляем функцию очистки
+    this.cleanupFunctions.push(() => {
+      saveBtn.removeEventListener('click', handleSave);
+    });
+  }
+
+  /**
    * Создать обработчик для загрузки фото в контексте капсул
    */
   private createPhotoUploadHandler(): PhotoUploadHandler {
@@ -1187,6 +1462,197 @@ export class UICapsulesManager {
   }
 
   /**
+   * Сохранить капсулу
+   */
+  private async saveCapsule(): Promise<void> {
+    if (!this.fabricCanvas) {
+      logger.error('No canvas to save capsule from');
+      return;
+    }
+
+    try {
+      logger.info('Starting capsule save process');
+
+      // Получаем данные canvas
+      const canvasData = this.getCanvasData();
+      const canvasImage = this.canvasToImage();
+
+      // Создаем временную капсулу для оптимистичного обновления UI
+      const tempCapsule: StyleCapsule = {
+        id: Date.now(), // временный ID
+        name: `Капсула ${new Date().toLocaleDateString()}`,
+        thumbnailUrl: canvasImage,
+        createdAt: new Date().toISOString(),
+        items: this.selectedItemsData || [] // элементы, выбранные для canvas
+      };
+
+      // Добавляем в массив капсул сразу (оптимистичное обновление UI)
+      this.capsules.unshift(tempCapsule);
+
+      // Перерисовываем грид сразу
+      this.renderCapsulesGrid();
+
+      // Скрываем canvas
+      this.hideCanvas();
+
+      // Показываем грид капсул
+      this.showCapsulesGrid();
+
+      logger.info('Capsule added to grid, saving to server in background');
+
+      // Сохраняем на сервер в фоне
+      await this.saveCapsuleToServer(canvasData, canvasImage, tempCapsule);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error saving capsule', { error: errorMessage });
+      alert('Ошибка при сохранении капсулы. Попробуйте еще раз.');
+    }
+  }
+
+  /**
+   * Получить данные canvas для сохранения
+   */
+  private getCanvasData(): any {
+    if (!this.fabricCanvas) {
+      throw new Error('No canvas available');
+    }
+
+    const objects = this.fabricCanvas.getObjects();
+    const canvasData = {
+      wardrobe_items: this.wardrobeItems, // все доступные элементы гардероба
+      selected_items: this.selectedItemsData || [], // выбранные элементы
+      canvas: {
+        width: this.fabricCanvas.width,
+        height: this.fabricCanvas.height,
+        backgroundColor: this.fabricCanvas.backgroundColor,
+        objects: objects.map(obj => {
+          const fabricObj = obj as any;
+          return {
+            id: fabricObj.id || fabricObj.itemId,
+            type: fabricObj.type,
+            left: fabricObj.left,
+            top: fabricObj.top,
+            scaleX: fabricObj.scaleX,
+            scaleY: fabricObj.scaleY,
+            angle: fabricObj.angle,
+            width: fabricObj.width,
+            height: fabricObj.height,
+            originX: fabricObj.originX,
+            originY: fabricObj.originY,
+            itemData: fabricObj.itemData // данные элемента гардероба
+          };
+        })
+      }
+    };
+
+    return canvasData;
+  }
+
+  /**
+   * Конвертировать canvas в изображение base64
+   */
+  private canvasToImage(): string {
+    if (!this.fabricCanvas) {
+      throw new Error('No canvas available');
+    }
+
+    // Получаем canvas element
+    const canvasElement = this.fabricCanvas.getElement() as HTMLCanvasElement;
+    return canvasElement.toDataURL('image/png');
+  }
+
+  /**
+   * Сохранить капсулу на сервер
+   */
+  private async saveCapsuleToServer(canvasData: any, canvasImage: string, tempCapsule: StyleCapsule): Promise<void> {
+    try {
+      // Получаем initData из Telegram WebApp
+      const initData = (window as any).Telegram?.WebApp?.initData || '';
+
+      // Отправляем на сервер
+      const response = await fetch('/api/capsules', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          initData,
+          name: tempCapsule.name,
+          canvasData: canvasData,
+          thumbnailImage: canvasImage,
+          itemIds: this.selectedItemsData?.map(item => item.id) || []
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save capsule');
+      }
+
+      logger.info('Capsule saved successfully on server', { id: result.capsule.id });
+
+      // Заменяем временную капсулу на реальную с сервера
+      const index = this.capsules.findIndex(capsule => capsule.id === tempCapsule.id);
+      if (index !== -1) {
+        this.capsules[index] = result.capsule;
+        // Перерисовываем грид с обновленными данными
+        this.renderCapsulesGrid();
+      }
+
+      // Отправляем событие о сохранении новой капсулы
+      window.dispatchEvent(new CustomEvent('capsule:saved', {
+        detail: { capsule: result.capsule }
+      }));
+
+      // Показываем сообщение об успехе
+      if ((window as any).Telegram?.WebApp?.showPopup) {
+        (window as any).Telegram.WebApp.showPopup({
+          message: 'Капсула успешно сохранена!',
+          buttons: [{ id: 'ok', type: 'close' }]
+        });
+      }
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error saving capsule to server', { error: errorMessage });
+
+      // Удаляем временную капсулу при ошибке
+      const index = this.capsules.findIndex(capsule => capsule.id === tempCapsule.id);
+      if (index !== -1) {
+        this.capsules.splice(index, 1);
+        this.renderCapsulesGrid();
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Показать грид капсул
+   */
+  private showCapsulesGrid(): void {
+    // Скрываем canvas
+    this.hideCanvas();
+    // Скрываем BackButton
+    this.hideBackButton();
+
+    // Показываем контейнер капсул
+    const container = document.getElementById('capsules-clothes-container');
+    if (container) {
+      container.classList.remove('hidden');
+    }
+
+    // Перерисовываем грид
+    this.renderCapsulesGrid();
+  }
+
+  /**
    * Очистка ресурсов
    */
   destroy(): void {
@@ -1194,6 +1660,7 @@ export class UICapsulesManager {
     this.closeCapsules();
 
     this.wardrobeItems = [];
+    this.capsules = [];
     this.selectedItems.clear();
     this.currentFilter = 'ALL';
   }
