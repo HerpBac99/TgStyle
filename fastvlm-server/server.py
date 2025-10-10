@@ -1372,6 +1372,7 @@ def map_material_to_russian(material_input: str) -> str:
 
         # Трикотаж
         'knit': 'трикотаж',
+        'knit fabric': 'трикотаж',
         'jersey': 'джерси',
         'sweater knit': 'трикотаж для свитеров',
         'rib knit': 'ребристый трикотаж',
@@ -1418,63 +1419,64 @@ def map_to_clothing_category(type_description: str) -> str:
 
     # OUTERWEAR - jackets, coats, trench coats, bombers, blazers, vests
     if any(keyword in text for keyword in [
-        'outerwear', 'jackets', 'coat', 'coats', 'trench', 'trench coats', 'bomber', 'bombers', 'blazer', 'blazers', 'vest', 'vests',
-        'parkas', 'windbreakers', 'leather jackets', 'denim jackets', 'wool coats',
-        'raincoats', 'peacoats', 'cardigans', 'blouses', 'tunics', 'overcoats', 'overcoat'
+        'outerwear', 'jacket', 'jackets', 'coat', 'coats', 'trench', 'trench coat', 'trench coats', 'bomber', 'bombers', 'blazer', 'blazers', 'vest', 'vests',
+        'parka', 'parkas', 'windbreaker', 'windbreakers', 'leather jacket', 'leather jackets', 'denim jacket', 'denim jackets', 'wool coat', 'wool coats',
+        'raincoat', 'raincoats', 'peacoat', 'peacoats', 'cardigan', 'cardigans', 'blouse', 'blouses', 'tunic', 'tunics', 'overcoat', 'overcoats'
     ]):
         return 'OUTERWEAR'
 
     # SWEATERS - sweaters, turtlenecks, hoodies, cardigans, pullovers
     if any(keyword in text for keyword in [
-        'sweaters', 'turtlenecks', 'hoodies', 'cardigans', 'pullovers',
-        'crewsnecks', 'v-necks', 'mock necks', 'cable knits', 'chunky knits',
-        'cashmere sweaters', 'wool sweaters', 'cotton sweaters'
+        'sweater', 'sweaters', 'turtleneck', 'turtlenecks', 'hoodie', 'hoodies', 'cardigan', 'cardigans', 'pullover', 'pullovers',
+        'crewneck', 'crewsnecks', 'v-neck', 'v-necks', 'mock neck', 'mock necks', 'cable knit', 'cable knits', 'chunky knit', 'chunky knits',
+        'cashmere sweater', 'cashmere sweaters', 'wool sweater', 'wool sweaters', 'cotton sweater', 'cotton sweaters',
+        'sweatshirt', 'sweatshirts'
     ]):
         return 'INNERWEAR'
 
     # BODYWEAR - t-shirts, shirts, blouses, tops, tank tops
     if any(keyword in text for keyword in [
-        'bodywear', 't-shirts', 'shirts', 'blouses', 'tops', 'tank tops', 'crop tops',
-        'long-sleeve shirts', 'polo shirts', 'button-up shirts', 'dress shirts',
-        'graphic tees', 'henley shirts', 'thermal shirts', 'athletic shirts', 'sleeveless tops'
+        'bodywear', 't-shirt', 't-shirts', 'shirt', 'shirts', 'blouse', 'blouses', 'top', 'tops', 'tank top', 'tank tops', 'crop top', 'crop tops',
+        'long-sleeve shirt', 'long-sleeve shirts', 'polo shirt', 'polo shirts', 'button-up shirt', 'button-up shirts', 'dress shirt', 'dress shirts',
+        'graphic tee', 'graphic tees', 'henley shirt', 'henley shirts', 'thermal shirt', 'thermal shirts', 'athletic shirt', 'athletic shirts', 'sleeveless top', 'sleeveless tops'
     ]):
         return 'BODYWEAR'
 
     # FULLBODY - dresses, jumpsuits, rompers, suits, tracksuits
     if any(keyword in text for keyword in [
-        'fullbody', 'dresses', 'jumpsuits', 'rompers', 'suits', 'tracksuits', 'sportswear sets',
-        'overalls', 'coveralls', 'bodysuits', 'unitards', 'leotards', 'wedding dresses',
-        'cocktail dresses', 'maxi dresses', 'midi dresses', 'mini dresses'
+        'fullbody', 'dress', 'dresses', 'jumpsuit', 'jumpsuits', 'romper', 'rompers', 'suit', 'suits', 'tracksuit', 'tracksuits', 'sportswear set', 'sportswear sets',
+        'overall', 'overalls', 'coverall', 'coveralls', 'bodysuit', 'bodysuits', 'unitard', 'unitards', 'leotard', 'leotards', 'wedding dress', 'wedding dresses',
+        'cocktail dress', 'cocktail dresses', 'maxi dress', 'maxi dresses', 'midi dress', 'midi dresses', 'mini dress', 'mini dresses'
     ]):
         return 'FULLBODY'
 
     # PANTS - pants, trousers, jeans, shorts, capris, joggers, leggings
     if any(keyword in text for keyword in [
-        'pants', 'trousers', 'jeans', 'shorts', 'capris', 'joggers', 'leggings',
-        'chinos', 'khakis', 'cargo pants', 'wide-leg pants', 'skinny jeans',
-        'bootcut jeans', 'straight-leg pants', 'athletic shorts'
+        'pant','pants', 'trouser', 'trousers', 'jean', 'jeans', 'short', 'shorts', 'capri', 'capris', 'jogger', 'joggers', 'legging', 'leggings',
+        'chino', 'chinos', 'khaki', 'khakis', 'cargo pant', 'cargo pants', 'wide-leg pant', 'wide-leg pants', 'skinny jean', 'skinny jeans',
+        'bootcut jean', 'bootcut jeans', 'straight-leg pant', 'straight-leg pants', 'athletic short', 'athletic shorts'
     ]):
         return 'LEGWEAR'
 
     # SHOES - all types of footwear
     if any(keyword in text for keyword in [
-        'shoes', 'boots', 'sneakers', 'sandals', 'heels', 'flats',
-        'loafers', 'oxfords', 'running shoes', 'hiking boots', 'ankle boots',
-        'knee-high boots', 'cowboy boots', 'flip-flops', 'espadrilles'
+        'shoe', 'shoes', 'boot', 'boots', 'sneaker', 'sneakers', 'sandal', 'sandals', 'heel', 'heels', 'flat', 'flats',
+        'loafer', 'loafers', 'oxford', 'oxfords', 'running shoe', 'running shoes', 'hiking boot', 'hiking boots', 'ankle boot', 'ankle boots',
+        'knee-high boot', 'knee-high boots', 'cowboy boot', 'cowboy boots', 'flip-flop', 'flip-flops', 'espadrille', 'espadrilles'
     ]):
         return 'FOOTWEAR'
 
     # HEADWEAR - all headwear
     if any(keyword in text for keyword in [
-        'headwear', 'hats', 'caps', 'beanies', 'scarves', 'headbands', 'berets',
-        'fedoras', 'baseball caps', 'bucket hats', 'sun hats', 'knitted hats', 'wool hats'
+        'headwear', 'hat', 'hats', 'cap', 'caps', 'beanie', 'beanies', 'scarf', 'scarves', 'headband', 'headbands', 'beret', 'berets',
+        'fedora', 'fedoras', 'baseball cap', 'baseball caps', 'bucket hat', 'bucket hats', 'sun hat', 'sun hats', 'knitted hat', 'knitted hats', 'wool hat', 'wool hats'
     ]):
         return 'HEADWEAR'
 
     # ACCESSORIES - bags, belts, jewelry, watches, gloves, sunglasses, scarves
     if any(keyword in text for keyword in [
-        'accessories', 'bags', 'belts', 'jewelry', 'watches', 'gloves',
-        'sunglasses', 'scarves', 'ties', 'bowties', 'cufflinks'
+        'accessories', 'bag', 'bags', 'belt', 'belts', 'jewelry', 'watch', 'watches', 'glove', 'gloves',
+        'sunglass', 'sunglasses', 'scarf', 'scarves', 'tie', 'ties', 'bowtie', 'bowties', 'cufflink', 'cufflinks'
     ]):
         return 'ACCESSORIES'
 

@@ -45,6 +45,7 @@ export class UIWardrobeManager {
   private wardrobeItems: WardrobeItem[] = [];
   private currentPreviewImage: string | null = null;
   private currentClassification: any = null; // Данные классификации для сохранения
+  private currentFilter: string = 'ALL'; // Текущий активный фильтр
 
   constructor() {
     logger.info('Wardrobe Grid Manager initialized');
@@ -58,10 +59,13 @@ export class UIWardrobeManager {
 
     // Настраиваем обработчики событий
     this.setupEventListeners();
-    
+
     // Загружаем сохраненные элементы гардероба с сервера
     await this.loadWardrobeItems();
-    
+
+    // Создаем фильтры
+    this.createFilters();
+
     // Рендерим грид
     this.renderGrid();
 
@@ -128,6 +132,82 @@ export class UIWardrobeManager {
         modalOverlay.removeEventListener('click', handleOverlayClick);
       });
     }
+  }
+
+  /**
+   * Создать фильтры категорий
+   */
+  private createFilters(): void {
+    const filtersContainer = document.getElementById('wardrobe-filters');
+    if (!filtersContainer) {
+      logger.error('Wardrobe filters container not found');
+      return;
+    }
+
+    // Очищаем контейнер
+    filtersContainer.innerHTML = '';
+
+    // Создаем фильтр "Все"
+    const allFilterBtn = this.createFilterButton('ALL', 'Все');
+    allFilterBtn.classList.add('active'); // Активен по умолчанию
+    filtersContainer.appendChild(allFilterBtn);
+
+    // Создаем фильтры для каждой категории
+    Object.values(ClothingCategory).forEach(category => {
+      const filterBtn = this.createFilterButton(category, this.getCategoryNameRu(ClothingCategory[category as keyof typeof ClothingCategory]));
+      filtersContainer.appendChild(filterBtn);
+    });
+
+    logger.info('Filters created');
+  }
+
+  /**
+   * Создать кнопку фильтра
+   */
+  private createFilterButton(filterValue: string, filterText: string): HTMLElement {
+    const button = document.createElement('button');
+    button.className = 'wardrobe-filter-btn';
+    button.textContent = filterText;
+    button.dataset['filter'] = filterValue;
+
+    // Обработчик клика
+    const handleClick = () => {
+      this.setActiveFilter(filterValue);
+    };
+
+    button.addEventListener('click', handleClick);
+
+    // Добавляем в cleanup функции
+    this.cleanupFunctions.push(() => {
+      button.removeEventListener('click', handleClick);
+    });
+
+    return button;
+  }
+
+  /**
+   * Установить активный фильтр
+   */
+  private setActiveFilter(filterValue: string): void {
+    logger.info('Setting active filter', { filter: filterValue });
+
+    // Снимаем активный класс со всех кнопок
+    const allButtons = document.querySelectorAll('.wardrobe-filter-btn');
+    allButtons.forEach(btn => btn.classList.remove('active'));
+
+    // Устанавливаем активный класс на выбранную кнопку
+    const activeButton = document.querySelector(`.wardrobe-filter-btn[data-filter="${filterValue}"]`) as HTMLElement;
+    if (activeButton) {
+      activeButton.classList.add('active');
+    }
+
+    // Обновляем текущий фильтр
+    this.currentFilter = filterValue;
+
+    // Перерисовываем грид с учетом фильтра
+    this.renderGrid();
+
+    logger.info('Filter applied', { filter: filterValue });
   }
 
   /**
@@ -578,13 +658,31 @@ export class UIWardrobeManager {
       grid.appendChild(addBtn);
     }
 
-    // Добавляем карточки одежды
-    this.wardrobeItems.forEach(item => {
+    // Фильтруем элементы по текущему фильтру
+    const filteredItems = this.getFilteredItems();
+
+    // Добавляем карточки одежды (только отфильтрованные)
+    filteredItems.forEach(item => {
       const card = this.createItemCard(item);
       grid.insertBefore(card, addBtn); // Вставляем перед кнопкой добавления
     });
 
-    logger.info(`Grid rendered with ${this.wardrobeItems.length} items`);
+    logger.info(`Grid rendered with ${filteredItems.length} filtered items (total: ${this.wardrobeItems.length})`);
+  }
+
+  /**
+   * Получить отфильтрованные элементы
+   */
+  private getFilteredItems(): WardrobeItem[] {
+    if (this.currentFilter === 'ALL') {
+      return this.wardrobeItems;
+    }
+
+    // Фильтруем по категории
+    return this.wardrobeItems.filter(item => {
+      const itemCategory = item.category;
+      return itemCategory === this.currentFilter;
+    });
   }
 
   /**
@@ -729,6 +827,7 @@ export class UIWardrobeManager {
     return {
       initialized: true,
       itemsCount: this.wardrobeItems.length,
+      currentFilter: this.currentFilter,
       hasPreviewImage: !!this.currentPreviewImage,
       cleanupFunctionsCount: this.cleanupFunctions.length,
     };
@@ -752,6 +851,7 @@ export class UIWardrobeManager {
     this.cleanupFunctions = [];
     this.currentPreviewImage = null;
     this.currentClassification = null;
+    this.currentFilter = 'ALL'; // Сбрасываем фильтр
   }
 }
 

@@ -88,7 +88,7 @@ def main():
         image_path = sys.argv[1]
     else:
         #image_path = str(Path(__file__).parent.parent / "item_251053908_mhlxnwym.png") - пальто
-        image_path = str(Path(__file__).parent.parent / "server" / "uploads" / "wardrobe" / "251053908" / "item_251053908_6cuey0f0.png")
+        image_path = str(Path(__file__).parent.parent / "server" / "uploads" / "wardrobe" / "251053908" / "item_251053908_70enz1op.png")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")

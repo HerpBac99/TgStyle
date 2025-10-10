@@ -43,6 +43,53 @@
     margin: 0;
 }
 
+/* Фильтры категорий */
+.wardrobe-filters {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    margin: 20px 0 16px 0; /* Увеличиваем верхний отступ на 4px для учета подъема активных кнопок */
+    padding: 0 16px;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+    -webkit-overflow-scrolling: touch;
+}
+
+.wardrobe-filters::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+}
+
+.wardrobe-filter-btn {
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.8);
+    color: var(--tg-theme-text-color);
+    border: none;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-tap-highlight-color: transparent;
+    white-space: nowrap;
+}
+
+.wardrobe-filter-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.wardrobe-filter-btn.active {
+    background: #000;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
 /* Грид с карточками одежды */
 .wardrobe-clothes-grid {
     display: grid;
