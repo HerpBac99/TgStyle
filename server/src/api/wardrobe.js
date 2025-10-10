@@ -93,7 +93,7 @@ async function deleteImageFromDisk(imagePath) {
  */
 router.post('/', async (req, res) => {
     try {
-        const { initData, imageBase64, name, category, color, tags } = req.body;
+        const { initData, imageBase64, name, category, color, material, style, fit, description, tags } = req.body;
         
         // Валидация Telegram данных
         if (!initData) {
@@ -138,6 +138,10 @@ router.post('/', async (req, res) => {
                 name: name || null,
                 category: category || null,
                 color: color || null,
+                material: material || null,
+                style: style || null,
+                fit: fit || null,
+                description: description || null,
                 tags: tags || []
             }
         });
@@ -158,6 +162,10 @@ router.post('/', async (req, res) => {
                 name: wardrobeItem.name,
                 category: wardrobeItem.category,
                 color: wardrobeItem.color,
+                material: wardrobeItem.material,
+                style: wardrobeItem.style,
+                fit: wardrobeItem.fit,
+                description: wardrobeItem.description,
                 tags: wardrobeItem.tags,
                 createdAt: wardrobeItem.createdAt
             }
@@ -221,6 +229,10 @@ router.get('/', async (req, res) => {
             name: item.name,
             category: item.category,
             color: item.color,
+            material: item.material,
+            style: item.style,
+            fit: item.fit,
+            description: item.description,
             tags: item.tags,
             createdAt: item.createdAt
         }));

@@ -1,0 +1,175 @@
+// ПРЕДЛОЖЕНИЕ: Классификация одежды для WardrobeItem
+// Два уровня: category (верхний уровень) + subtype (детализация)
+
+// ===== ВАРИАНТ РЕКОМЕНДУЕМЫЙ =====
+
+enum ClothingCategory {
+  OUTERWEAR   // Верхняя одежда (куртки, пальто, плащи, пуховики)
+  INNERWEAR   // Внутренняя одежда (водолазки, свитеры, кардиганы, худи)
+  BODYWEAR    // Одежда на тело (рубашки, футболки, топы, блузки)
+  FULLBODY    // Цельная одежда (платья, комбинезоны, ромперы, костюмы)
+  LEGWEAR     // Одежда на ноги (джинсы, брюки, штаны, шорты, юбки)
+  FOOTWEAR    // Обувь (кроссовки, кеды, ботинки, сапоги, туфли)
+  HEADWEAR    // Головные уборы (шапки, шляпы, кепки, панамы)
+  ACCESSORIES // Аксессуары (сумки, шарфы, перчатки, очки, ремни)
+}
+
+model WardrobeItem {
+  id         Int               @id @default(autoincrement())
+  telegramId BigInt            @map("telegram_id")
+  imagePath  String            @map("image_path") @db.VarChar(500)
+  
+  // КЛАССИФИКАЦИЯ
+  category   ClothingCategory  // Основная категория (обязательно)
+  subtype    String?           @db.VarChar(100)  // Детализация: "jacket", "coat", "jeans" (опционально)
+  
+  // АТРИБУТЫ ОТ FASTVLM
+  color      String?           @db.VarChar(50)   // Основной цвет
+  style      String?           @db.VarChar(100)  // Стиль: casual, formal, sport, etc
+  material   String?           @db.VarChar(100)  // Материал: cotton, denim, leather, etc
+  pattern    String?           @db.VarChar(100)  // Узор: plain, striped, checked, etc
+  
+  // ПОЛЬЗОВАТЕЛЬСКИЕ ДАННЫЕ
+  name       String?           @db.VarChar(255)  // Название от пользователя
+  tags       String[]                             // Теги от пользователя
+  
+  // МЕТАДАННЫЕ
+  createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt  DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  
+  user       User              @relation(fields: [telegramId], references: [telegramId], onDelete: Cascade)
+
+  @@index([telegramId], map: "idx_wardrobe_telegram_id")
+  @@index([category], map: "idx_wardrobe_category")
+  @@index([subtype], map: "idx_wardrobe_subtype")
+  @@index([createdAt(sort: Desc)], map: "idx_wardrobe_created_at")
+  @@map("wardrobe_items")
+}
+
+// ===== ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ =====
+
+// Пример 1: Куртка
+// category: OUTERWEAR
+// subtype: "jacket"
+// color: "black"
+// style: "casual"
+// material: "leather"
+
+// Пример 2: Джинсы
+// category: LEGWEAR
+// subtype: "jeans"
+// color: "blue"
+// style: "casual"
+// material: "denim"
+// pattern: "plain"
+
+// Пример 3: Кроссовки
+// category: FOOTWEAR
+// subtype: "sneakers"
+// color: "white"
+// style: "sport"
+
+// Пример 4: Платье
+// category: FULLBODY
+// subtype: "dress"
+// color: "red"
+// style: "casual"
+// pattern: "floral"
+
+// ===== СПРАВОЧНИК ПОДТИПОВ =====
+// Можно создать в коде или отдельной таблице для валидации
+
+// OUTERWEAR subtypes:
+// - jacket (куртка)
+// - coat (пальто)
+// - raincoat (плащ)
+// - puffer (пуховик)
+// - vest (жилет)
+// - blazer (пиджак)
+
+// INNERWEAR subtypes:
+// - sweater (свитер)
+// - cardigan (кардиган)
+// - turtleneck (водолазка)
+// - hoodie (худи)
+
+// BODYWEAR subtypes:
+// - shirt (рубашка)
+// - t-shirt (футболка)
+// - top (топ)
+// - blouse (блузка)
+// - tank-top (майка)
+// - polo (поло)
+
+// FULLBODY subtypes:
+// - dress (платье)
+// - jumpsuit (комбинезон)
+// - romper (ромпер)
+// - overalls (комбинезон рабочий)
+// - suit (костюм)
+
+// LEGWEAR subtypes:
+// - jeans (джинсы)
+// - pants (брюки)
+// - shorts (шорты)
+// - skirt (юбка)
+// - leggings (легинсы)
+
+// FOOTWEAR subtypes:
+// - sneakers (кроссовки)
+// - boots (ботинки)
+// - shoes (туфли)
+// - sandals (сандалии)
+// - slippers (тапочки)
+
+// HEADWEAR subtypes:
+// - cap (кепка)
+// - beanie (шапка)
+// - hat (шляпа)
+// - panama (панама)
+
+// ===== ПОЧЕМУ ТАКАЯ СТРУКТУРА =====
+
+// 1. ПРОСТОТА
+//    - Один enum для категорий
+//    - String для подтипов (гибкость)
+//    - Легко понять и работать
+
+// 2. ГИБКОСТЬ
+//    - Можно добавлять новые подтипы без миграций
+//    - FastVLM может возвращать любые подтипы
+//    - Не нужно обновлять enum при каждом новом типе
+
+// 3. ЗАПРОСЫ
+//    prisma.wardrobeItem.findMany({ where: { category: 'OUTERWEAR' } })  // Вся верхняя одежда
+//    prisma.wardrobeItem.findMany({ where: { subtype: 'jacket' } })      // Только куртки
+//    prisma.wardrobeItem.findMany({ where: { category: 'OUTERWEAR', subtype: 'jacket' } }) // Куртки из верхней одежды
+
+// 4. МАСШТАБИРОВАНИЕ
+//    - Если понадобится сложная иерархия → можно мигрировать на отдельную таблицу ClothingType
+//    - Сейчас это избыточно для вашего кейса
+
+// ===== АЛЬТЕРНАТИВА: Отдельная таблица (если нужна строгая типизация) =====
+
+/*
+model ClothingType {
+  id       Int                @id @default(autoincrement())
+  name     String             @unique  // "jacket", "jeans"
+  category ClothingCategory   // OUTERWEAR, LEGWEAR
+  nameRu   String             // "Куртка", "Джинсы"
+  
+  items    WardrobeItem[]
+  
+  @@map("clothing_types")
+}
+
+model WardrobeItem {
+  ...
+  clothingTypeId Int?
+  clothingType   ClothingType? @relation(fields: [clothingTypeId], references: [id])
+  ...
+}
+
+// Плюсы: Строгая типизация, можно добавить переводы, описания
+// Минусы: Нужно заполнять справочник, больше JOIN'ов
+*/

@@ -254,3 +254,35 @@
     stroke: var(--tg-theme-text-color);
 }
 
+/* Информация о классификации одежды */
+.wardrobe-preview-info {
+    display: none;
+    padding: 16px;
+    background: rgba(218, 109, 163, 0.1);
+    border-radius: 12px;
+    border: 1px solid rgba(218, 109, 163, 0.2);
+}
+
+.classification-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.classification-item:not(:last-child) {
+    border-bottom: 1px solid rgba(218, 109, 163, 0.1);
+}
+
+.classification-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(218, 109, 163, 0.9);
+}
+
+.classification-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--tg-theme-text-color);
+}
+

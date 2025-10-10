@@ -6,6 +6,21 @@
 import { logger } from './logger';
 
 /**
+ * Enum категорий одежды (соответствует новым категориям классификации)
+ */
+enum ClothingCategory {
+  OUTERWEAR = 'OUTERWEAR',     // Верхняя одежда (куртки, пальто, плащи, бомберы, жакеты, безрукавки)
+  INNERWEAR = 'INNERWEAR',     // Свитеры (кофты, водолазки, свитеры, кардиганы)
+  BODYWEAR = 'BODYWEAR',       // Футболки и рубашки (футболки, рубашки, блузки, топы, майки, поло)
+  FULLBODY = 'FULLBODY',       // Цельная одежда (платья, костюмы, комбинезоны, спортивные костюмы)
+  LEGWEAR = 'LEGWEAR',         // Штаны (штаны, брюки, джинсы, шорты, бриджы, спортивные штаны)
+  FOOTWEAR = 'FOOTWEAR',       // Обувь (вся обувь)
+  HEADWEAR = 'HEADWEAR',       // Головные уборы (все головные уборы)
+  ACCESSORIES = 'ACCESSORIES'  // Аксессуары
+}
+
+
+/**
  * Интерфейс для элемента гардероба
  */
 interface WardrobeItem {
@@ -14,6 +29,10 @@ interface WardrobeItem {
   name?: string;
   category?: string;
   color?: string;
+  material?: string;
+  style?: string;
+  fit?: string;
+  description?: string;
   tags?: string[];
   createdAt: string;
 }
@@ -25,6 +44,7 @@ export class UIWardrobeManager {
   private cleanupFunctions: (() => void)[] = [];
   private wardrobeItems: WardrobeItem[] = [];
   private currentPreviewImage: string | null = null;
+  private currentClassification: any = null; // Данные классификации для сохранения
 
   constructor() {
     logger.info('Wardrobe Grid Manager initialized');
@@ -163,17 +183,31 @@ export class UIWardrobeManager {
   }
 
   /**
-   * Обработать фото с удалением фона
+   * Преобразовать категорию в enum (сервер уже вернул нормализованную)
+   */
+  private stringToClothingCategory(category: string): ClothingCategory {
+    const normalized = category.toUpperCase().trim();
+    
+    if (normalized in ClothingCategory) {
+      return ClothingCategory[normalized as keyof typeof ClothingCategory];
+    }
+    
+    // Fallback
+    return ClothingCategory.BODYWEAR;
+  }
+
+  /**
+   * Обработать фото с удалением фона и классификацией
    */
   private async processPhotoWithBackgroundRemoval(file: File): Promise<void> {
     try {
       // Конвертируем файл в base64
       const base64 = await this.fileToBase64(file);
 
-      logger.info('Sending photo to remove background...');
+      logger.info('Sending photo to classify and remove background...');
 
-      // Вызываем API через прокси на нашем сервере
-      const response = await fetch('/api/remove-background', {
+      // Вызываем API classify-clothing (который делает и удаление фона и классификацию)
+      const response = await fetch('/api/classify-clothing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,29 +218,48 @@ export class UIWardrobeManager {
       });
 
       if (!response.ok) {
-        throw new Error(`Background removal failed: ${response.statusText}`);
+        throw new Error(`Classification failed: ${response.statusText}`);
       }
 
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error || 'Background removal failed');
+        throw new Error(result.error || 'Classification failed');
       }
 
-      logger.info('Background removed successfully', {
+      logger.info('Photo classified successfully', {
         timing: result.timing,
-        originalSize: result.image_info?.original_size,
-        resultSize: result.image_info?.result_size
+        classification: result.classification
+      });
+
+      // Преобразуем категорию в enum (сервер уже вернул нормализованную)
+      const categoryEnum = this.stringToClothingCategory(result.classification.category);
+
+      logger.info('Classification from server', {
+        category: result.classification.category,
+        subtype: result.classification.subtype,
+        color: result.classification.color  // Уже на русском от сервера
       });
 
       // Скрываем индикатор загрузки
       this.showLoadingInModal(false);
 
       // Показываем обработанное изображение в модальном окне
-      this.showImageInModal(result.image_base64);
+      this.showImageInModal(result.processed_image_base64);
 
-      // Сохраняем текущее изображение для подтверждения
-      this.currentPreviewImage = result.image_base64;
+      // Показываем информацию о классификации
+      this.showClassificationInfo(
+        categoryEnum,
+        result.classification.color,
+        result.classification.material,
+        result.classification.style,
+        result.classification.fit,
+        result.classification.description
+      );
+
+      // Сохраняем текущее изображение и данные классификации для подтверждения
+      this.currentPreviewImage = result.processed_image_base64;
+      this.currentClassification = result.classification;
 
     } catch (error) {
       // Скрываем индикатор загрузки при ошибке
@@ -300,11 +353,105 @@ export class UIWardrobeManager {
   }
 
   /**
+   * Показать информацию о классификации в модальном окне
+   */
+  private showClassificationInfo(category: ClothingCategory, color: string, material?: string, style?: string, fit?: string, description?: string): void {
+    // Создаем или находим контейнер для информации
+    let infoElement = document.getElementById('wardrobe-preview-info');
+
+    if (!infoElement) {
+      // Создаем элемент если не существует
+      infoElement = document.createElement('div');
+      infoElement.id = 'wardrobe-preview-info';
+      infoElement.className = 'wardrobe-preview-info';
+
+      const imageContainer = document.querySelector('.wardrobe-preview-image-container');
+      if (imageContainer) {
+        imageContainer.parentElement?.insertBefore(infoElement, imageContainer.nextSibling);
+      }
+    }
+
+    // Переводим категорию на русский
+    const categoryRu = this.getCategoryNameRu(category);
+
+    // Формируем HTML с информацией
+    let infoHtml = `
+      <div class="classification-item">
+        <span class="classification-label">Категория:</span>
+        <span class="classification-value">${categoryRu}</span>
+      </div>
+      <div class="classification-item">
+        <span class="classification-label">Цвет:</span>
+        <span class="classification-value">${color || 'Не определен'}</span>
+      </div>
+    `;
+
+    // Добавляем дополнительные поля если они есть
+    if (material) {
+      infoHtml += `
+      <div class="classification-item">
+        <span class="classification-label">Материал:</span>
+        <span class="classification-value">${material}</span>
+      </div>
+      `;
+    }
+
+    if (style) {
+      infoHtml += `
+      <div class="classification-item">
+        <span class="classification-label">Стиль:</span>
+        <span class="classification-value">${style}</span>
+      </div>
+      `;
+    }
+
+    if (fit) {
+      infoHtml += `
+      <div class="classification-item">
+        <span class="classification-label">Посадка:</span>
+        <span class="classification-value">${fit}</span>
+      </div>
+      `;
+    }
+
+    if (description) {
+      infoHtml += `
+      <div class="classification-item">
+        <span class="classification-label">Описание:</span>
+        <span class="classification-value">${description}</span>
+      </div>
+      `;
+    }
+
+    infoElement.innerHTML = infoHtml;
+
+    // Показываем элемент
+    infoElement.style.display = 'block';
+  }
+
+  /**
+   * Получить русское название категории
+   */
+  private getCategoryNameRu(category: ClothingCategory): string {
+    const names: Record<ClothingCategory, string> = {
+      [ClothingCategory.OUTERWEAR]: 'Верхняя одежда',
+      [ClothingCategory.INNERWEAR]: 'Кофты',
+      [ClothingCategory.BODYWEAR]: 'Футболки и рубашки',
+      [ClothingCategory.FULLBODY]: 'Платья и костюмы',
+      [ClothingCategory.LEGWEAR]: 'Штаны',
+      [ClothingCategory.FOOTWEAR]: 'Обувь',
+      [ClothingCategory.HEADWEAR]: 'Головные уборы',
+      [ClothingCategory.ACCESSORIES]: 'Аксессуары'
+    };
+    return names[category] || category;
+  }
+
+  /**
    * Подтвердить предпросмотр и добавить карточку
    */
   private async confirmPreview(): Promise<void> {
-    if (!this.currentPreviewImage) {
-      logger.warn('No preview image to confirm');
+    if (!this.currentPreviewImage || !this.currentClassification) {
+      logger.warn('No preview image or classification data to confirm');
       return;
     }
 
@@ -320,8 +467,9 @@ export class UIWardrobeManager {
     // Добавляем в массив элементов сразу (оптимистичное обновление UI)
     this.wardrobeItems.unshift(tempItem);
 
-    // Сохраняем imageBase64 для отправки на сервер
+    // Сохраняем данные для отправки на сервер
     const imageToSave = this.currentPreviewImage;
+    const classificationData = this.currentClassification;
 
     // Перерисовываем грид сразу
     this.renderGrid();
@@ -329,8 +477,9 @@ export class UIWardrobeManager {
     // Скрываем модальное окно сразу
     this.hidePreviewModal();
 
-    // Очищаем текущее превью
+    // Очищаем текущие данные
     this.currentPreviewImage = null;
+    this.currentClassification = null;
 
     logger.info('Item added to grid, saving to server in background');
 
@@ -339,15 +488,21 @@ export class UIWardrobeManager {
       // Получаем initData из Telegram WebApp
       const initData = (window as any).Telegram?.WebApp?.initData || '';
 
-      // Отправляем на сервер
-      const response = await fetch('/api/wardrobe', {
+      // Отправляем на сервер с данными классификации
+      const response: Response = await fetch('/api/wardrobe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           initData,
-          imageBase64: imageToSave
+          imageBase64: imageToSave,
+          category: classificationData.category,
+          color: classificationData.color,
+          material: classificationData.material,
+          style: classificationData.style,
+          fit: classificationData.fit,
+          description: classificationData.description
         })
       });
 
@@ -355,7 +510,7 @@ export class UIWardrobeManager {
         throw new Error(`Server error: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result: any = await response.json();
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to save item');
@@ -363,25 +518,25 @@ export class UIWardrobeManager {
 
       logger.info('Item saved successfully on server', { id: result.item.id });
 
-      // Заменяем временный элемент на реальный с сервера
+      // Заменяем временный элемент на реальный с сервера (только в массиве)
       const index = this.wardrobeItems.findIndex(item => item.id === tempItem.id);
       if (index !== -1) {
         this.wardrobeItems[index] = result.item;
-        // Обновляем грид с реальными данными
-        this.renderGrid();
+        // НЕ перерисовываем грид - визуально ничего не изменилось
+        // Картинка уже отображается, просто обновили id и imageUrl в массиве
       }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Error saving wardrobe item to server', { error: errorMessage });
-      
+
       // Удаляем временный элемент при ошибке
       const index = this.wardrobeItems.findIndex(item => item.id === tempItem.id);
       if (index !== -1) {
         this.wardrobeItems.splice(index, 1);
         this.renderGrid();
       }
-      
+
       alert('Ошибка при сохранении предмета на сервер. Предмет не был сохранен.');
     }
   }
@@ -395,8 +550,15 @@ export class UIWardrobeManager {
     // Скрываем модальное окно
     this.hidePreviewModal();
 
-    // Очищаем текущее превью
+    // Очищаем текущие данные
     this.currentPreviewImage = null;
+    this.currentClassification = null;
+
+    // Скрываем информацию о классификации
+    const infoElement = document.getElementById('wardrobe-preview-info');
+    if (infoElement) {
+      infoElement.style.display = 'none';
+    }
   }
 
   /**
@@ -589,6 +751,7 @@ export class UIWardrobeManager {
 
     this.cleanupFunctions = [];
     this.currentPreviewImage = null;
+    this.currentClassification = null;
   }
 }
 

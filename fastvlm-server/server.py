@@ -101,6 +101,7 @@ legs_prompt = None
 shoes_prompt = None
 accessories_head_prompt = None
 accessories_hand_prompt = None
+class_prompt = None
 
 # Директория для сохранения результатов FastVLM
 FASTVLM_RESULTS_DIR = os.path.join(os.path.dirname(__file__), 'results')
@@ -189,7 +190,7 @@ def setup_logging():
 
 def load_prompts():
     """Загрузка промптов для анализа"""
-    global default_prompt, style_prompt, person_prompt, clothing_prompt, legs_prompt, shoes_prompt, accessories_head_prompt, accessories_hand_prompt
+    global default_prompt, style_prompt, person_prompt, clothing_prompt, legs_prompt, shoes_prompt, accessories_head_prompt, accessories_hand_prompt, class_prompt
 
     try:
         # Загружаем промпты для многопроходного анализа
@@ -261,6 +262,15 @@ def load_prompts():
             style_prompt = default_prompt
             app.logger.warning(f"Файл стиля промпта не найден: {style_prompt_file}. Используется основной промпт")
 
+        # CLASS промпт для классификации одежды
+        class_prompt_file = os.path.join(prompt_dir, 'CLASS_PROMPT.md')
+        if os.path.exists(class_prompt_file):
+            with open(class_prompt_file, 'r', encoding='utf-8') as f:
+                class_prompt = f.read().strip()
+        else:
+            class_prompt = "Analyze the clothing item in the photograph and provide a strict answer in this format:\n1. [Type of clothing]\n2. [Subtype of clothing]\n3. [Color]\n4. [Material]\n5. [Fit]\n6. [Style]"
+            app.logger.warning(f"CLASS промпт не найден: {class_prompt_file}")
+
         app.logger.info("Промпты загружены успешно")
 
     except Exception as e:
@@ -272,6 +282,7 @@ def load_prompts():
         accessories_hand_prompt = "Focus on the person's wrists, hands, and fingers area and LIST all VISIBLE accessories (watch, rings, bracelets)."
         style_prompt = default_prompt
         person_prompt = "Describe the person."
+        class_prompt = "Analyze the clothing item in the photograph and provide a strict answer in this format:\n1. [Type of clothing]\n2. [Subtype of clothing]\n3. [Color]\n4. [Material]\n5. [Fit]\n6. [Style]"
 
 
 def extract_text(result) -> str:
@@ -1223,6 +1234,451 @@ def get_model_debug():
         return jsonify({
             'loaded': False,
             'error': str(e)
+        }), 500
+
+
+
+def map_color_to_russian(color_input: str) -> str:
+    """
+    Маппинг английского цвета на русский язык
+
+    Args:
+        color_input: Цвет на английском (может содержать оттенок: dark blue, light gray, etc.)
+
+    Returns:
+        Цвет на русском языке с оттенком
+    """
+    normalized = color_input.lower().strip()
+
+    # Color mapping dictionary
+    color_map = {
+        # Основные цвета
+        'black': 'черный',
+        'white': 'белый',
+        'red': 'красный',
+        'blue': 'синий',
+        'green': 'зеленый',
+        'yellow': 'желтый',
+        'orange': 'оранжевый',
+        'purple': 'фиолетовый',
+        'pink': 'розовый',
+        'brown': 'коричневый',
+        'gray': 'серый',
+        'grey': 'серый',
+        'beige': 'бежевый',
+        'navy': 'темно-синий',
+        'maroon': 'бордовый',
+        'turquoise': 'бирюзовый',
+        'olive': 'оливковый',
+        'cream': 'кремовый',
+        'gold': 'золотой',
+        'silver': 'серебряный',
+        'bronze': 'бронзовый',
+        'khaki': 'хаки',
+        'coral': 'коралловый',
+        'lavender': 'лавандовый',
+        'mint': 'мятный',
+        'peach': 'персиковый',
+        'burgundy': 'бургунди',
+        'teal': 'сине-зеленый',
+        'indigo': 'индиго',
+        'violet': 'фиолетовый',
+        'magenta': 'пурпурный',
+        'cyan': 'голубой',
+        'tan': 'желтовато-коричневый',
+        'ivory': 'слоновая кость',
+        'coral': 'коралловый',
+        'olive green': 'оливково-зеленый',
+        'greenish-grey': 'серо-зеленый'
+    }
+
+    # Паттерны с оттенками (dark, light, bright, pale)
+    if 'dark' in normalized:
+        base_color = normalized.replace('dark', '').strip()
+        russian_base = color_map.get(base_color, base_color)
+        return f'темно-{russian_base}'
+
+    if 'light' in normalized:
+        base_color = normalized.replace('light', '').strip()
+        russian_base = color_map.get(base_color, base_color)
+        return f'светло-{russian_base}'
+
+    if 'bright' in normalized:
+        base_color = normalized.replace('bright', '').strip()
+        russian_base = color_map.get(base_color, base_color)
+        return f'ярко-{russian_base}'
+
+    if 'pale' in normalized:
+        base_color = normalized.replace('pale', '').strip()
+        russian_base = color_map.get(base_color, base_color)
+        return f'бледно-{russian_base}'
+
+    # Простые цвета без оттенков
+    return color_map.get(normalized, color_input)
+
+
+def map_material_to_russian(material_input: str) -> str:
+    """
+    Маппинг английского материала на русский язык
+
+    Args:
+        material_input: Материал на английском
+
+    Returns:
+        Материал на русском языке
+    """
+    normalized = material_input.lower().strip()
+
+    # Material mapping dictionary
+    material_map = {
+        # Ткани и материалы одежды
+        'cotton': 'хлопок',
+        'wool': 'шерсть',
+        'silk': 'шелк',
+        'linen': 'лен',
+        'polyester': 'полиэстер',
+        'nylon': 'нейлон',
+        'spandex': 'спандекс',
+        'elastane': 'эластан',
+        'lycra': 'лайкра',
+        'rayon': 'вискоза',
+        'viscose': 'вискоза',
+        'acetate': 'ацетат',
+        'acrylic': 'акрил',
+        'cashmere': 'кашемир',
+        'angora': 'ангора',
+        'mohair': 'мохер',
+        'alpaca': 'альпака',
+        'merino': 'меринос',
+        'bamboo': 'бамбук',
+        'modal': 'модал',
+        'tencel': 'тенсел',
+        'lyocell': 'лиоцел',
+
+        # Кожа и замша
+        'leather': 'кожа',
+        'genuine leather': 'натуральная кожа',
+        'faux leather': 'искусственная кожа',
+        'suede': 'замша',
+        'velvet': 'бархат',
+        'velour': 'велюр',
+        'fur': 'мех',
+        'faux fur': 'искусственный мех',
+
+        # Джинс и деним
+        'denim': 'деним',
+        'jean': 'джинсовая ткань',
+        'jeans': 'джинсы',
+
+        # Трикотаж
+        'knit': 'трикотаж',
+        'jersey': 'джерси',
+        'sweater knit': 'трикотаж для свитеров',
+        'rib knit': 'ребристый трикотаж',
+        'interlock': 'интерлок',
+        'fleece': 'флис',
+        'polar fleece': 'полар флис',
+
+        # Другие материалы
+        'chiffon': 'шифон',
+        'satin': 'сатин',
+        'taffeta': 'тафта',
+        'organza': 'органза',
+        'lace': 'кружево',
+        'mesh': 'сетка',
+        'tulle': 'фатин',
+        'crepe': 'креп',
+        'poplin': 'поплин',
+        'broadcloth': 'батист',
+        'oxford': 'оксфорд',
+        'twill': 'твил',
+        'canvas': 'холст',
+        'gabardine': 'габардин',
+        'corduroy': 'вельвет',
+        'plush': 'плюш',
+        'chenille': 'шенилл',
+        'boucle': 'букле'
+    }
+
+    # Простые материалы без модификаторов
+    return material_map.get(normalized, material_input)
+
+
+def map_to_clothing_category(type_description: str) -> str:
+    """
+    Маппинг описания типа одежды на ClothingCategory enum
+
+    Args:
+        type_description: Описание типа одежды от LLM (первый пункт ответа)
+
+    Returns:
+        Нормализованная категория (OUTERWEAR, INNERWEAR, LEGWEAR, FOOTWEAR, HEADWEAR, ACCESSORIES)
+    """
+    text = type_description.lower().strip()
+
+    # OUTERWEAR - jackets, coats, trench coats, bombers, blazers, vests
+    if any(keyword in text for keyword in [
+        'outerwear', 'jackets', 'coat', 'coats', 'trench', 'trench coats', 'bomber', 'bombers', 'blazer', 'blazers', 'vest', 'vests',
+        'parkas', 'windbreakers', 'leather jackets', 'denim jackets', 'wool coats',
+        'raincoats', 'peacoats', 'cardigans', 'blouses', 'tunics', 'overcoats', 'overcoat'
+    ]):
+        return 'OUTERWEAR'
+
+    # SWEATERS - sweaters, turtlenecks, hoodies, cardigans, pullovers
+    if any(keyword in text for keyword in [
+        'sweaters', 'turtlenecks', 'hoodies', 'cardigans', 'pullovers',
+        'crewsnecks', 'v-necks', 'mock necks', 'cable knits', 'chunky knits',
+        'cashmere sweaters', 'wool sweaters', 'cotton sweaters'
+    ]):
+        return 'INNERWEAR'
+
+    # BODYWEAR - t-shirts, shirts, blouses, tops, tank tops
+    if any(keyword in text for keyword in [
+        'bodywear', 't-shirts', 'shirts', 'blouses', 'tops', 'tank tops', 'crop tops',
+        'long-sleeve shirts', 'polo shirts', 'button-up shirts', 'dress shirts',
+        'graphic tees', 'henley shirts', 'thermal shirts', 'athletic shirts', 'sleeveless tops'
+    ]):
+        return 'BODYWEAR'
+
+    # FULLBODY - dresses, jumpsuits, rompers, suits, tracksuits
+    if any(keyword in text for keyword in [
+        'fullbody', 'dresses', 'jumpsuits', 'rompers', 'suits', 'tracksuits', 'sportswear sets',
+        'overalls', 'coveralls', 'bodysuits', 'unitards', 'leotards', 'wedding dresses',
+        'cocktail dresses', 'maxi dresses', 'midi dresses', 'mini dresses'
+    ]):
+        return 'FULLBODY'
+
+    # PANTS - pants, trousers, jeans, shorts, capris, joggers, leggings
+    if any(keyword in text for keyword in [
+        'pants', 'trousers', 'jeans', 'shorts', 'capris', 'joggers', 'leggings',
+        'chinos', 'khakis', 'cargo pants', 'wide-leg pants', 'skinny jeans',
+        'bootcut jeans', 'straight-leg pants', 'athletic shorts'
+    ]):
+        return 'LEGWEAR'
+
+    # SHOES - all types of footwear
+    if any(keyword in text for keyword in [
+        'shoes', 'boots', 'sneakers', 'sandals', 'heels', 'flats',
+        'loafers', 'oxfords', 'running shoes', 'hiking boots', 'ankle boots',
+        'knee-high boots', 'cowboy boots', 'flip-flops', 'espadrilles'
+    ]):
+        return 'FOOTWEAR'
+
+    # HEADWEAR - all headwear
+    if any(keyword in text for keyword in [
+        'headwear', 'hats', 'caps', 'beanies', 'scarves', 'headbands', 'berets',
+        'fedoras', 'baseball caps', 'bucket hats', 'sun hats', 'knitted hats', 'wool hats'
+    ]):
+        return 'HEADWEAR'
+
+    # ACCESSORIES - bags, belts, jewelry, watches, gloves, sunglasses, scarves
+    if any(keyword in text for keyword in [
+        'accessories', 'bags', 'belts', 'jewelry', 'watches', 'gloves',
+        'sunglasses', 'scarves', 'ties', 'bowties', 'cufflinks'
+    ]):
+        return 'ACCESSORIES'
+
+    # По умолчанию возвращаем ACCESSORIES
+    app.logger.warning(f"Не удалось определить категорию для: {type_description}")
+    return 'ACCESSORIES'
+
+
+@app.route('/classify_clothing', methods=['POST'])
+def classify_clothing():
+    """Классификация одежды: удаление фона + анализ через FastVLM"""
+    start_time = time.time()
+
+    try:
+        if background_remover is None or model is None:
+            return jsonify({
+                'success': False,
+                'error': 'Background remover or model not initialized'
+            }), 500
+
+        # Получаем данные
+        data = request.get_json()
+        if not data or 'image_base64' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'No image provided'
+            }), 400
+
+        image_base64 = data['image_base64']
+
+        # Получаем prompt (по умолчанию используем глобальный class_prompt)
+        prompt = data.get('prompt', class_prompt)
+
+        # Правильная обработка base64: удаляем префикс data:image если есть
+        if image_base64.startswith('data:image'):
+            image_base64 = image_base64.split(',', 1)[1] if ',' in image_base64 else image_base64
+
+        app.logger.info(f"Промпт для классификации: {prompt}")
+
+        # Шаг 1: Декодируем изображение
+        try:
+            image_data = base64.b64decode(image_base64)
+            image = Image.open(io.BytesIO(image_data)).convert('RGB')
+            app.logger.info(f"Изображение декодировано: {image.size}")
+        except Exception as e:
+            app.logger.error(f"Ошибка декодирования изображения: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Invalid image data: {e}'
+            }), 400
+
+        # Шаг 2: Удаляем фон
+        bg_removal_start = time.time()
+        result_image, bg_processing_time = background_remover.remove_background(image)
+        result_image = background_remover.post_process_mask(result_image, feather=2)
+        result_image = background_remover.crop_to_content(result_image, padding=10)
+        bg_removal_time = time.time() - bg_removal_start
+        app.logger.info(f"Фон удален за {bg_removal_time:.2f}с")
+
+        # Конвертируем результат в base64 для анализа
+        output_buffer = io.BytesIO()
+        result_image.save(output_buffer, format='PNG')
+        processed_image_base64 = base64.b64encode(output_buffer.getvalue()).decode('utf-8')
+
+        # Шаг 3: Проверяем prompt
+        if prompt is None:
+            app.logger.error("Prompt не задан")
+            return jsonify({
+                'success': False,
+                'error': 'Classification prompt not provided'
+            }), 500
+
+        app.logger.debug(f"Используем prompt: {prompt[:100]}...")
+
+        # Шаг 4: Анализируем через FastVLM
+        analysis_start = time.time()
+        classification_text, error = analyze_image_fastvlm(processed_image_base64, prompt)
+        analysis_time = time.time() - analysis_start
+
+        if error:
+            app.logger.error(f"Ошибка анализа: {error}")
+            return jsonify({
+                'success': False,
+                'error': error
+            }), 500
+
+        app.logger.info(f"Анализ завершен за {analysis_time:.2f}с")
+        app.logger.info(f"Результат анализа: {classification_text}")
+
+        # Шаг 5: Парсим результат
+        parsing_start = time.time()
+        try:
+            lines = [line.strip() for line in classification_text.strip().split('\n') if line.strip()]
+
+            # Извлекаем значения (формат: "1. Value")
+            parsed_data = {}
+            for line in lines:
+                if '. ' in line:
+                    parts = line.split('. ', 1)
+                    if len(parts) == 2:
+                        index = parts[0].strip()
+                        value = parts[1].strip()
+                        parsed_data[index] = value
+
+            parsing_time = time.time() - parsing_start
+            app.logger.info(f"⏱️ Парсинг результата: {parsing_time*1000:.1f}мс")
+
+            # Новый формат ответа:
+            # 1. Тип одежды (для определения категории)
+            # 2. Цвет
+            # 3. Материал
+            # 4. Посадка (fit)
+            # 5. Стиль
+            # 6. Описание
+
+            raw_type = parsed_data.get('1', 'Unknown')  # Тип одежды для определения категории
+            raw_color = parsed_data.get('2', 'Unknown')  # Цвет (уже на русском от LLM)
+            raw_material = parsed_data.get('3', 'Unknown')  # Материал
+            raw_fit = parsed_data.get('4', 'Unknown')  # Посадка
+            raw_style = parsed_data.get('5', 'Unknown')  # Стиль
+            raw_description = parsed_data.get('6', 'Unknown')  # Описание
+
+            # Нормализуем категорию через маппинг
+            mapping_start = time.time()
+            normalized_category = map_to_clothing_category(raw_type)
+            mapping_time = time.time() - mapping_start
+            app.logger.info(f"⏱️ Маппинг категории: {mapping_time*1000:.1f}мс ({raw_type} -> {normalized_category})")
+
+            # Цвет на английском от LLM - переводим на русский
+            color_start = time.time()
+            color_russian = map_color_to_russian(raw_color) if raw_color != 'Unknown' else 'Неизвестно'
+            color_time = time.time() - color_start
+            app.logger.info(f"⏱️ Перевод цвета: {color_time*1000:.1f}мс ({raw_color} -> {color_russian})")
+
+            # Материал на английском от LLM - переводим на русский
+            material_start = time.time()
+            material_russian = map_material_to_russian(raw_material) if raw_material != 'Unknown' else 'Неизвестно'
+            material_time = time.time() - material_start
+            app.logger.info(f"⏱️ Перевод материала: {material_time*1000:.1f}мс ({raw_material} -> {material_russian})")
+
+            classification = {
+                'category': normalized_category,  # Нормализованная категория (OUTERWEAR, INNERWEAR, etc.)
+                'type': raw_type,  # Оригинальный тип от LLM
+                'color': color_russian,  # Цвет на русском языке
+                'material': material_russian,  # Материал на русском языке
+                'fit': raw_fit,  # Посадка
+                'style': raw_style,  # Стиль
+                'description': raw_description  # Самое главное - описание
+            }
+
+            app.logger.info(f"Классификация распарсена: {classification}")
+
+        except Exception as e:
+            app.logger.error(f"Ошибка парсинга результата: {e}")
+            classification = {
+                'category': 'ACCESSORIES',
+                'type': 'Unknown',
+                'color': 'Неизвестно',
+                'material': 'Неизвестно',
+                'fit': 'Unknown',
+                'style': 'Unknown',
+                'description': 'Unknown',
+                'raw_text': classification_text
+            }
+
+        total_time = time.time() - start_time
+        post_processing_time = total_time - bg_removal_time - analysis_time
+        
+        app.logger.info(f"✅ Классификация завершена за {total_time:.2f}с")
+        app.logger.info(f"📊 Детализация времени:")
+        app.logger.info(f"   - Удаление фона: {bg_removal_time:.2f}с ({bg_removal_time/total_time*100:.1f}%)")
+        app.logger.info(f"   - LLM анализ: {analysis_time:.2f}с ({analysis_time/total_time*100:.1f}%)")
+        app.logger.info(f"   - Постобработка: {post_processing_time:.2f}с ({post_processing_time/total_time*100:.1f}%)")
+
+        # Возвращаем результат с изображением без фона
+        return jsonify({
+            'success': True,
+            'classification': classification,
+            'processed_image_base64': f'data:image/png;base64,{processed_image_base64}',
+            'raw_analysis': classification_text,
+            'timing': {
+                'total_time': round(total_time, 2),
+                'background_removal_time': round(bg_removal_time, 2),
+                'analysis_time': round(analysis_time, 2),
+                'post_processing_time': round(post_processing_time, 2)
+            },
+            'image_info': {
+                'original_size': f'{image.size[0]}x{image.size[1]}',
+                'processed_size': f'{result_image.size[0]}x{result_image.size[1]}'
+            }
+        })
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        error_msg = f"Ошибка классификации: {e}"
+        app.logger.error(error_msg)
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timing': {
+                'total_time': round(total_time, 2)
+            }
         }), 500
 
 @app.route('/remove-background', methods=['POST'])

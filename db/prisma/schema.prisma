@@ -98,19 +98,44 @@ model Notification {
   @@map("notifications")
 }
 
+enum ClothingCategory {
+  OUTERWEAR   // Верхняя одежда (куртки, пальто, плащи, бомберы, жакеты, безрукавки)
+  INNERWEAR   // Свитеры (кофты, водолазки, свитеры, кардиганы, худи)
+  BODYWEAR    // Футболки и рубашки (футболки, рубашки, блузки, топы, майки, поло, лонгсливы)
+  FULLBODY    // Цельная одежда (платья, костюмы, комбинезоны, спортивные костюмы, комплекты)
+  LEGWEAR     // Штаны (штаны, брюки, джинсы, шорты, бриджы, спортивные штаны)
+  FOOTWEAR    // Обувь (кроссовки, ботинки, туфли, сапоги, сандалии)
+  HEADWEAR    // Головные уборы (шапки, шляпы, кепки, панамы, шарфы)
+  ACCESSORIES // Аксессуары (сумки, ремни, украшения, очки, перчатки)
+}
+
 model WardrobeItem {
-  id         Int      @id @default(autoincrement())
-  telegramId BigInt   @map("telegram_id")
-  imagePath  String   @map("image_path") @db.VarChar(500)
-  name       String?  @db.VarChar(255)
-  category   String?  @db.VarChar(100)
-  color      String?  @db.VarChar(50)
-  tags       String[]
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
-  user       User     @relation(fields: [telegramId], references: [telegramId], onDelete: Cascade, onUpdate: NoAction, map: "fk_wardrobe_user")
+  id         Int               @id @default(autoincrement())
+  telegramId BigInt            @map("telegram_id")
+  imagePath  String            @map("image_path") @db.VarChar(500)
+  
+  // Классификация
+  category   ClothingCategory? // Основная категория
+  subtype    String?           @db.VarChar(100)  // Детализация: jacket, coat, jeans
+  
+  // Атрибуты от FastVLM
+  color      String?           @db.VarChar(50)   // Основной цвет
+  style      String?           @db.VarChar(100)  // Стиль: casual, formal, sport
+  material   String?           @db.VarChar(100)  // Материал: cotton, denim, leather
+  pattern    String?           @db.VarChar(100)  // Узор: plain, striped, checked
+  fit       String?           @db.VarChar(100)  // Посадка/фит: slim, regular, loose
+  description String?          @db.VarChar(500)  // Описание предмета одежды
+  
+  // Пользовательские данные
+  name       String?           @db.VarChar(255)  // Название от пользователя
+  tags       String[]                             // Теги
+  
+  createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt  DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  user       User              @relation(fields: [telegramId], references: [telegramId], onDelete: Cascade, onUpdate: NoAction, map: "fk_wardrobe_user")
 
   @@index([category], map: "idx_wardrobe_category")
+  @@index([subtype], map: "idx_wardrobe_subtype")
   @@index([createdAt(sort: Desc)], map: "idx_wardrobe_created_at")
   @@index([telegramId], map: "idx_wardrobe_telegram_id")
   @@map("wardrobe_items")
