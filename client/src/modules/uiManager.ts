@@ -9,6 +9,7 @@ import { uiMenuManager } from './uiMenu';
 import { uiAnalysisManager } from './uiAnalysis';
 import { uiCoreManager } from './uiCore';
 import { uiWardrobeManager } from './uiWardrobe';
+import { uiCapsulesManager } from './uiCapsules';
 
 // Объявляем глобальную переменную Telegram
 declare global {
@@ -143,6 +144,19 @@ export class UIManager {
         });
         break;
 
+      case 'capsules':
+        // Скрываем главный экран с анализом
+        if (mainContent) mainContent.classList.add('hidden');
+        // Скрываем экран гардероба
+        if (wardrobeContent) wardrobeContent.classList.add('hidden');
+        if (clothesContainerMain) clothesContainerMain.classList.add('hidden');
+
+        // Обрабатываем открытие capsules через специализированный менеджер
+        uiCapsulesManager.handleCapsulesOpen().catch(error => {
+          logger.error('Error handling capsules open', error);
+        });
+        break;
+
       default:
         logger.warn('Unknown tab', { tab: tabName });
         break;
@@ -241,6 +255,7 @@ export class UIManager {
         hasLamodaUrl: !!uiAnalysisManager.getCurrentLamodaUrl?.()
       },
       wardrobeManager: uiWardrobeManager.getStatus(),
+      capsulesManager: uiCapsulesManager.getStatus(),
     };
   }
 
@@ -264,6 +279,7 @@ export class UIManager {
       uiAnalysisManager.destroy();
       uiCoreManager.destroy();
       uiWardrobeManager.destroy();
+      uiCapsulesManager.destroy();
 
       logger.info('All UI modules destroyed successfully');
     } catch (error) {
@@ -278,7 +294,7 @@ export const uiManager = new UIManager();
 // Тип UIManager экспортируется через объявление class выше
 
 // Экспортируем отдельные менеджеры для прямого доступа при необходимости
-export { uiMenuManager, uiAnalysisManager, uiCoreManager, uiWardrobeManager };
+export { uiMenuManager, uiAnalysisManager, uiCoreManager, uiWardrobeManager, uiCapsulesManager };
 
 // Импортируем типы для обратной совместимости
 
