@@ -8,7 +8,7 @@ import { logger } from './logger';
 /**
  * Интерфейс для элемента гардероба
  */
-interface WardrobeItem {
+export interface WardrobeItem {
   id: number;
   imageUrl: string;
   name?: string;
@@ -25,7 +25,7 @@ interface WardrobeItem {
 /**
  * Enum категорий одежды
  */
-enum ClothingCategory {
+export enum ClothingCategory {
   OUTERWEAR = 'OUTERWEAR',
   INNERWEAR = 'INNERWEAR',
   BODYWEAR = 'BODYWEAR',
@@ -39,7 +39,7 @@ enum ClothingCategory {
 /**
  * Интерфейс для обработчика результатов загрузки
  */
-interface PhotoUploadHandler {
+export interface PhotoUploadHandler {
   showPreviewModal(): void;
   showLoadingInModal(show: boolean): void;
   processPhotoWithBackgroundRemoval(file: File): Promise<void>;
@@ -153,7 +153,3 @@ export class PhotoUploadManager {
 
 // Создаем глобальный экземпляр менеджера загрузки фото
 export const photoUploadManager = new PhotoUploadManager();
-
-// Экспортируем типы и значения для использования в других модулях
-export type { WardrobeItem, PhotoUploadHandler };
-export { ClothingCategory };

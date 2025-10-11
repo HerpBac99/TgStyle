@@ -334,12 +334,30 @@ async function getCapsule(req, res) {
 async function updateCapsule(req, res) {
   try {
     const { id } = req.params;
-    const { telegramId, name, description, canvasData, analysis } = req.body;
+    const { initData, canvasData, thumbnailImage, itemIds } = req.body;
+
+    // Валидация Telegram данных
+    if (!initData) {
+        return res.status(401).json({
+            success: false,
+            error: 'Missing Telegram authentication data'
+        });
+    }
+
+    const validationResult = validateTelegramWebAppData(initData);
+    if (!validationResult.isValid) {
+        return res.status(401).json({
+            success: false,
+            error: validationResult.error || 'Invalid Telegram authentication'
+        });
+    }
+
+    const telegramId = BigInt(validationResult.data.user.id);
 
     const capsule = await prisma.capsule.findFirst({
       where: {
         id: parseInt(id),
-        telegramId: BigInt(telegramId)
+        telegramId: telegramId
       }
     });
 
@@ -350,22 +368,24 @@ async function updateCapsule(req, res) {
       });
     }
 
+    // Сохраняем thumbnail изображение если оно передано
+    let thumbnailPath = capsule.thumbnailPath; // сохраняем старый путь по умолчанию
+    if (thumbnailImage) {
+      thumbnailPath = await saveCapsuleThumbnail(telegramId, thumbnailImage);
+    }
+
     // Обновляем связи с wardrobe items если переданы новые
     const updateData = {
-      name: name !== undefined ? name : capsule.name,
-      description: description !== undefined ? description : capsule.description,
       canvasData: canvasData || capsule.canvasData,
-      analysis: analysis !== undefined ? analysis : capsule.analysis,
-      analysisDate: analysis !== undefined ? new Date() : capsule.analysisDate
+      thumbnailPath: thumbnailPath
     };
 
-    if (canvasData && canvasData.wardrobe_items) {
-      const wardrobeItemIds = canvasData.wardrobe_items;
-
-      // Проверяем доступ к items
+    // Проверяем доступ к wardrobe items если они переданы
+    const wardrobeItemIds = itemIds || [];
+    if (wardrobeItemIds.length > 0) {
       const userItems = await prisma.wardrobeItem.findMany({
         where: {
-          telegramId: BigInt(telegramId),
+          telegramId: telegramId,
           id: { in: wardrobeItemIds }
         },
         select: { id: true }
@@ -404,17 +424,21 @@ async function updateCapsule(req, res) {
       }
     });
 
+    logger.info(`Capsule updated: ${updatedCapsule.id} for user ${telegramId}`, {
+      thumbnailPath: thumbnailPath,
+      itemCount: updatedCapsule.items.length
+    });
+
     res.json({
       success: true,
       capsule: {
         id: updatedCapsule.id,
         name: updatedCapsule.name,
-        description: updatedCapsule.description,
+        thumbnailUrl: updatedCapsule.thumbnailPath ? `/uploads/capsules/${telegramId}/${updatedCapsule.thumbnailPath}` : null,
         canvasData: updatedCapsule.canvasData,
-        analysis: updatedCapsule.analysis,
-        analysisDate: updatedCapsule.analysisDate,
         createdAt: updatedCapsule.createdAt,
-        itemCount: updatedCapsule.items.length
+        itemCount: updatedCapsule.items.length,
+        items: updatedCapsule.items
       }
     });
 
