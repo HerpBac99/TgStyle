@@ -630,7 +630,7 @@ export class UIWardrobeManager implements PhotoUploadHandler {
     // Добавляем карточки одежды (только отфильтрованные)
     filteredItems.forEach(item => {
       const card = this.createItemCard(item);
-      grid.insertBefore(card, addBtn); // Вставляем перед кнопкой добавления
+      grid.appendChild(card);
     });
 
     logger.info(`Grid rendered with ${filteredItems.length} filtered items (total: ${this.wardrobeItems.length})`);

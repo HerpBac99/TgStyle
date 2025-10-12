@@ -4,7 +4,7 @@
  */
 
 import { logger } from './logger';
-import { WardrobeItem, PhotoUploadManager, PhotoUploadHandler } from './photoUploadManager';
+import { WardrobeItem, PhotoUploadManager, PhotoUploadHandler, ClothingCategory } from './photoUploadManager';
 import { navigationManager } from './navigationManager';
 import { UICapsulesGrid, StyleCapsule } from './uiCapsulesGrid';
 import { uiModalManager } from './uiModalManager';
@@ -39,6 +39,10 @@ export class UICapsulesManager {
   // Фото менеджер для добавления новых вещей
   private photoUploadManager: PhotoUploadManager;
   private photoUploadHandler: PhotoUploadHandler;
+  
+  // Данные для предпросмотра фото
+  private currentPreviewImage: string | null = null;
+  private currentClassification: any = null;
 
   constructor() {
     logger.info('UICapsulesManager initialized (refactored)');
@@ -140,7 +144,8 @@ export class UICapsulesManager {
         modalId: 'capsules-modal',
         wardrobeItems: this.wardrobeItems,
         onConfirm: (selectedItems) => this.handleClothingConfirmed(selectedItems),
-        onCancel: () => this.handleClothingCancelled()
+        onCancel: () => this.handleClothingCancelled(),
+        handleAdd: () => this.handleAddItemInModal()
       });
       
       logger.info('Clothing selection modal shown');
@@ -149,6 +154,15 @@ export class UICapsulesManager {
         error: error instanceof Error ? error.message : String(error)
       });
     }
+  }
+
+  /**
+   * Обработчик клика по кнопке "Добавить вещь" в модальном окне капсулы
+   */
+  private handleAddItemInModal(): void {
+    logger.info('Add item button clicked in capsules modal');
+    // Запускаем процесс загрузки фото
+    this.photoUploadManager.handlePhotoUpload();
   }
 
   /**
@@ -362,13 +376,28 @@ export class UICapsulesManager {
    * Обработчик сохранения нового элемента гардероба
    */
   private async handleNewItemSaved(item: WardrobeItem): Promise<void> {
-    logger.info('New wardrobe item saved, adding to canvas', { itemId: item.id });
+    logger.info('New wardrobe item saved', { itemId: item.id, mode: this.mode });
     
     // Добавляем элемент в массив wardrobeItems
     this.wardrobeItems.push(item);
     
+    // Если модальное окно выбора открыто - перерисовываем грид
+    if (this.mode === 'selection') {
+      logger.info('Updating clothing selection modal with new item');
+      // Обновляем модальное окно с новым списком вещей
+      uiModalManager.showClothingSelectionModal({
+        type: 'clothing-selection',
+        modalId: 'capsules-modal',
+        wardrobeItems: this.wardrobeItems,
+        onConfirm: (selectedItems) => this.handleClothingConfirmed(selectedItems),
+        onCancel: () => this.handleClothingCancelled(),
+        handleAdd: () => this.handleAddItemInModal()
+      });
+    }
+    
     // Если canvas активен - добавляем элемент на него
     if (this.canvasEditor && this.mode === 'canvas') {
+      logger.info('Adding new item to canvas');
       await this.canvasEditor.addItem({ item });
     }
   }
@@ -697,30 +726,191 @@ export class UICapsulesManager {
         uiModalManager.showLoadingInModal(show);
       },
 
-      processPhotoWithBackgroundRemoval: async (_file: File) => {
-        // Эта логика остается в UIWardrobeManager
-        // Здесь просто заглушка
-        logger.warn('processPhotoWithBackgroundRemoval called in capsules context');
+      processPhotoWithBackgroundRemoval: async (file: File) => {
+        try {
+          // Конвертируем файл в base64
+          const base64 = await this.fileToBase64(file);
+
+          logger.info('Sending photo to classify and remove background...');
+
+          // Вызываем API classify-clothing (который делает и удаление фона и классификацию)
+          const response = await fetch('/api/classify-clothing', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              image_base64: base64
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`Classification failed: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+
+          if (!result.success) {
+            throw new Error(result.error || 'Classification failed');
+          }
+
+          logger.info('Photo classified successfully', {
+            timing: result.timing,
+            classification: result.classification
+          });
+
+          // Преобразуем категорию в enum
+          const categoryEnum = this.stringToClothingCategory(result.classification.category);
+
+          // Скрываем индикатор загрузки
+          uiModalManager.showLoadingInModal(false);
+
+          // Показываем обработанное изображение в модальном окне
+          uiModalManager.showImageInModal(result.processed_image_base64);
+
+          // Показываем информацию о классификации
+          uiModalManager.showClassificationInfo(
+            categoryEnum,
+            result.classification.color,
+            result.classification.material,
+            result.classification.style,
+            result.classification.fit,
+            result.classification.description
+          );
+
+          // Сохраняем текущее изображение и данные классификации для подтверждения
+          this.currentPreviewImage = result.processed_image_base64;
+          this.currentClassification = result.classification;
+
+        } catch (error) {
+          // Скрываем индикатор загрузки при ошибке
+          uiModalManager.showLoadingInModal(false);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          logger.error('Error processing photo with background removal', {
+            error: errorMessage
+          });
+          
+          // Fallback - показываем оригинальное фото
+          try {
+            const base64 = await this.fileToBase64(file);
+            logger.warn('Showing original photo without background removal');
+            uiModalManager.showImageInModal(base64);
+            this.currentPreviewImage = base64;
+          } catch (fallbackError) {
+            logger.error('Error showing original photo', fallbackError);
+            uiModalManager.hide();
+          }
+        }
       },
 
       fileToBase64: async (file: File) => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+        return this.fileToBase64(file);
       }
     };
   }
 
   /**
+   * Преобразовать категорию в enum
+   */
+  private stringToClothingCategory(category: string): any {
+    const normalized = category.toUpperCase().trim();
+    
+    if (normalized in ClothingCategory) {
+      return ClothingCategory[normalized as keyof typeof ClothingCategory];
+    }
+    
+    return ClothingCategory.BODYWEAR;
+  }
+
+  /**
+   * Конвертировать файл в base64
+   */
+  private async fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /**
    * Обработчик подтверждения предпросмотра фото
    */
-  private handlePhotoPreviewConfirm(): void {
-    logger.info('Photo preview confirmed in capsules context');
-    // Логика сохранения будет в UIWardrobeManager
-    // Здесь просто скрываем модалку
+  private async handlePhotoPreviewConfirm(): Promise<void> {
+    if (!this.currentPreviewImage || !this.currentClassification) {
+      logger.warn('No preview image or classification data to confirm');
+      return;
+    }
+
+    logger.info('Confirming preview - adding item to wardrobe');
+
+    // Скрываем модальное окно сразу
+    uiModalManager.hide();
+
+    // Сохраняем данные для отправки на сервер
+    const imageToSave = this.currentPreviewImage;
+    const classificationData = this.currentClassification;
+
+    // Очищаем текущие данные
+    this.currentPreviewImage = null;
+    this.currentClassification = null;
+
+    logger.info('Saving item to server');
+
+    // Сохраняем на сервер
+    try {
+      // Получаем initData из Telegram WebApp
+      const initData = (window as any).Telegram?.WebApp?.initData || '';
+
+      // Отправляем на сервер с данными классификации
+      const response = await fetch('/api/wardrobe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          initData,
+          imageBase64: imageToSave,
+          category: classificationData.category,
+          color: classificationData.color,
+          material: classificationData.material,
+          style: classificationData.style,
+          fit: classificationData.fit,
+          description: classificationData.description
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save item');
+      }
+
+      logger.info('Item saved successfully on server', { id: result.item.id });
+
+      // Отправляем событие о сохранении нового элемента гардероба
+      window.dispatchEvent(new CustomEvent('wardrobe:item-saved', {
+        detail: { item: result.item }
+      }));
+
+      // Показываем сообщение об успехе
+      if ((window as any).Telegram?.WebApp?.showPopup) {
+        (window as any).Telegram.WebApp.showPopup({
+          message: 'Вещь успешно добавлена в гардероб!',
+          buttons: [{ id: 'ok', type: 'close' }]
+        });
+      }
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error saving wardrobe item to server', { error: errorMessage });
+      alert('Ошибка при сохранении предмета на сервер. Предмет не был сохранен.');
+    }
   }
 
   /**
@@ -728,6 +918,9 @@ export class UICapsulesManager {
    */
   private handlePhotoPreviewCancel(): void {
     logger.info('Photo preview cancelled in capsules context');
+    // Очищаем текущие данные
+    this.currentPreviewImage = null;
+    this.currentClassification = null;
   }
 
   /**

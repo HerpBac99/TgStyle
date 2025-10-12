@@ -23,6 +23,7 @@ export interface ClothingSelectionModalConfig extends BaseModalConfig {
   selectedItemIds?: Set<number>;
   onConfirm: (selectedItems: WardrobeItem[]) => void;
   onCancel: () => void;
+  handleAdd?: () => void;
 }
 
 /**
@@ -477,6 +478,12 @@ export class UIModalManager {
     // Фильтруем элементы по текущему фильтру
     const filteredItems = this.getFilteredItems(items);
 
+    // Добавляем кнопку "Добавить элемент" если передан handleAdd
+    if (this.currentModal && this.currentModal.type === 'clothing-selection' && this.currentModal.handleAdd) {
+      const addButton = this.createAddItemButton();
+      grid.appendChild(addButton);
+    }
+
     // Добавляем карточки одежды
     filteredItems.forEach(item => {
       const card = this.createClothingItemCard(item);
@@ -538,6 +545,48 @@ export class UIModalManager {
     });
 
     return card;
+  }
+
+  /**
+   * Создать кнопку "Добавить элемент"
+   */
+  private createAddItemButton(): HTMLElement {
+    const button = document.createElement('div');
+    button.className = 'add-item-btn';
+    button.setAttribute('aria-label', 'Добавить предмет');
+
+    const content = document.createElement('div');
+    content.className = 'add-item-btn-content';
+
+    // Создаем SVG иконку
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M12 5v14M5 12h14');
+
+    svg.appendChild(path);
+    content.appendChild(svg);
+    button.appendChild(content);
+
+    // Обработчик клика
+    const handleClick = () => {
+      logger.info('Add item button clicked in modal');
+      if (this.currentModal && this.currentModal.type === 'clothing-selection' && this.currentModal.handleAdd) {
+        this.currentModal.handleAdd();
+      }
+    };
+
+    button.addEventListener('click', handleClick);
+
+    // Добавляем в cleanup функции
+    this.cleanupFunctions.push(() => {
+      button.removeEventListener('click', handleClick);
+    });
+
+    return button;
   }
 
   /**
