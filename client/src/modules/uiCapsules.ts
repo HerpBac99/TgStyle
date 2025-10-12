@@ -9,6 +9,7 @@ import { navigationManager } from './navigationManager';
 import { UICapsulesGrid, StyleCapsule } from './uiCapsulesGrid';
 import { uiModalManager } from './uiModalManager';
 import { UICanvasEditor, CanvasItem } from './uiCanvasEditor';
+import { dataCacheManager } from './dataCache';
 
 /**
  * Класс для управления Capsules функционалом
@@ -296,6 +297,9 @@ export class UICapsulesManager {
         this.capsules.splice(index, 1);
       }
 
+      // Удаляем из кэша
+      dataCacheManager.removeCapsule(capsuleId);
+
       // Перерисовываем грид
       this.capsulesGrid.render(this.capsules);
 
@@ -447,14 +451,38 @@ export class UICapsulesManager {
   // ============================================
 
   /**
-   * Загрузить капсулы с сервера
+   * Загрузить капсулы (из кэша или с сервера)
    */
   private async loadCapsules(): Promise<void> {
     try {
-      logger.info('Loading capsules from server');
+      // Сначала пробуем получить из кэша
+      if (dataCacheManager.isDataLoaded()) {
+        this.capsules = dataCacheManager.getCapsules() as StyleCapsule[];
+        logger.info(`Loaded ${this.capsules.length} capsules from cache`);
+        return;
+      }
+
+      // Если кэш еще загружается - ждем
+      if (dataCacheManager.isDataLoading()) {
+        logger.info('Waiting for cache to load...');
+        const maxWaitTime = 3000;
+        const startTime = Date.now();
+        
+        while (dataCacheManager.isDataLoading() && (Date.now() - startTime) < maxWaitTime) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        if (dataCacheManager.isDataLoaded()) {
+          this.capsules = dataCacheManager.getCapsules() as StyleCapsule[];
+          logger.info(`Loaded ${this.capsules.length} capsules from cache after waiting`);
+          return;
+        }
+      }
+
+      // Если кэш не загрузился - загружаем напрямую с сервера
+      logger.info('Loading capsules from server (cache not available)');
 
       const initData = (window as any).Telegram?.WebApp?.initData || '';
-
       const response = await fetch(`/api/capsules?initData=${encodeURIComponent(initData)}`, {
         method: 'GET'
       });
@@ -513,14 +541,38 @@ export class UICapsulesManager {
   }
 
   /**
-   * Загрузить элементы гардероба с сервера
+   * Загрузить элементы гардероба (из кэша или с сервера)
    */
   private async loadWardrobeItems(): Promise<void> {
     try {
-      logger.info('Loading wardrobe items from server');
+      // Сначала пробуем получить из кэша
+      if (dataCacheManager.isDataLoaded()) {
+        this.wardrobeItems = dataCacheManager.getWardrobeItems();
+        logger.info(`Loaded ${this.wardrobeItems.length} wardrobe items from cache`);
+        return;
+      }
+
+      // Если кэш еще загружается - ждем
+      if (dataCacheManager.isDataLoading()) {
+        logger.info('Waiting for cache to load...');
+        const maxWaitTime = 3000;
+        const startTime = Date.now();
+        
+        while (dataCacheManager.isDataLoading() && (Date.now() - startTime) < maxWaitTime) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        if (dataCacheManager.isDataLoaded()) {
+          this.wardrobeItems = dataCacheManager.getWardrobeItems();
+          logger.info(`Loaded ${this.wardrobeItems.length} wardrobe items from cache after waiting`);
+          return;
+        }
+      }
+
+      // Если кэш не загрузился - загружаем напрямую с сервера
+      logger.info('Loading wardrobe items from server (cache not available)');
 
       const initData = (window as any).Telegram?.WebApp?.initData || '';
-
       const response = await fetch(`/api/wardrobe?initData=${encodeURIComponent(initData)}`, {
         method: 'GET'
       });
@@ -598,6 +650,9 @@ export class UICapsulesManager {
         this.capsules[index] = result.capsule;
       }
 
+      // Добавляем в кэш
+      dataCacheManager.addCapsule(result.capsule);
+
       // Показываем сообщение об успехе
       if ((window as any).Telegram?.WebApp?.showPopup) {
         (window as any).Telegram.WebApp.showPopup({
@@ -662,6 +717,9 @@ export class UICapsulesManager {
       if (index !== -1) {
         this.capsules[index] = result.capsule;
       }
+
+      // Обновляем в кэше
+      dataCacheManager.updateCapsule(capsuleId, result.capsule);
 
       // Показываем сообщение об успехе
       if ((window as any).Telegram?.WebApp?.showPopup) {

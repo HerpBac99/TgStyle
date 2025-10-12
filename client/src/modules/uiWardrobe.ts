@@ -5,6 +5,7 @@
 
 import { logger } from './logger';
 import { PhotoUploadManager, PhotoUploadHandler, ClothingCategory } from './photoUploadManager';
+import { dataCacheManager } from './dataCache';
 
 
 /**
@@ -567,6 +568,9 @@ export class UIWardrobeManager implements PhotoUploadHandler {
         // Картинка уже отображается, просто обновили id и imageUrl в массиве
       }
 
+      // Добавляем в кэш
+      dataCacheManager.addWardrobeItem(result.item);
+
       // Отправляем событие о сохранении нового элемента гардероба
       window.dispatchEvent(new CustomEvent('wardrobe:item-saved', {
         detail: { item: result.item }
@@ -727,6 +731,9 @@ export class UIWardrobeManager implements PhotoUploadHandler {
         this.wardrobeItems.splice(index, 1);
       }
 
+      // Удаляем из кэша
+      dataCacheManager.removeWardrobeItem(itemId);
+
       // Перерисовываем грид
       this.renderGrid();
 
@@ -741,15 +748,39 @@ export class UIWardrobeManager implements PhotoUploadHandler {
   }
 
   /**
-   * Загрузить элементы гардероба с сервера
+   * Загрузить элементы гардероба (из кэша или с сервера)
    */
   private async loadWardrobeItems(): Promise<void> {
     try {
-      logger.info('Loading wardrobe items from server');
+      // Сначала пробуем получить из кэша
+      if (dataCacheManager.isDataLoaded()) {
+        this.wardrobeItems = dataCacheManager.getWardrobeItems();
+        logger.info(`Loaded ${this.wardrobeItems.length} items from cache`);
+        return;
+      }
 
-      // Получаем initData из Telegram WebApp
+      // Если кэш еще загружается - ждем
+      if (dataCacheManager.isDataLoading()) {
+        logger.info('Waiting for cache to load...');
+        // Ждем максимум 3 секунды
+        const maxWaitTime = 3000;
+        const startTime = Date.now();
+        
+        while (dataCacheManager.isDataLoading() && (Date.now() - startTime) < maxWaitTime) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        if (dataCacheManager.isDataLoaded()) {
+          this.wardrobeItems = dataCacheManager.getWardrobeItems();
+          logger.info(`Loaded ${this.wardrobeItems.length} items from cache after waiting`);
+          return;
+        }
+      }
+
+      // Если кэш не загрузился - загружаем напрямую с сервера
+      logger.info('Loading wardrobe items from server (cache not available)');
+
       const initData = (window as any).Telegram?.WebApp?.initData || '';
-
       const response = await fetch(`/api/wardrobe?initData=${encodeURIComponent(initData)}`, {
         method: 'GET'
       });

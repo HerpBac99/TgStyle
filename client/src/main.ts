@@ -12,6 +12,7 @@ import { authManager } from '@/modules/auth';
 import { uiManager } from '@/modules/uiManager';
 import { historyManager } from '@/modules/history';
 import { api } from '@/modules/api';
+import { dataCacheManager } from '@/modules/dataCache';
 
 /**
  * Класс главного приложения
@@ -131,6 +132,9 @@ class TgStyleApp {
 
       // Выполняем авторизацию
       await this.performAuthentication();
+
+      // Предзагружаем данные гардероба и капсул
+      this.preloadAppData();
 
       // Обрабатываем shared анализы
       this.handleSharedAnalysis();
@@ -322,6 +326,18 @@ class TgStyleApp {
       // В Telegram Mini App не прерываем инициализацию
       logger.info('Continuing despite authentication error');
     }
+  }
+
+  /**
+   * Предзагрузка данных приложения (гардероб, капсулы, изображения)
+   */
+  private preloadAppData(): void {
+    logger.info('Starting app data preload');
+
+    // Запускаем предзагрузку в фоне (не блокируем инициализацию)
+    dataCacheManager.preloadData().catch(error => {
+      logger.error('Error during data preload', error);
+    });
   }
 
   /**
