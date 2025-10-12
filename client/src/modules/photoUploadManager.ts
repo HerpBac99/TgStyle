@@ -4,37 +4,11 @@
  */
 
 import { logger } from './logger';
+import { ClothingCategory } from '@/types/wardrobe';
 
-/**
- * Интерфейс для элемента гардероба
- */
-export interface WardrobeItem {
-  id: number;
-  imageUrl: string;
-  name?: string;
-  category?: string;
-  color?: string;
-  material?: string;
-  style?: string;
-  fit?: string;
-  description?: string;
-  tags?: string[];
-  createdAt: string;
-}
-
-/**
- * Enum категорий одежды
- */
-export enum ClothingCategory {
-  OUTERWEAR = 'OUTERWEAR',
-  INNERWEAR = 'INNERWEAR',
-  BODYWEAR = 'BODYWEAR',
-  FULLBODY = 'FULLBODY',
-  LEGWEAR = 'LEGWEAR',
-  FOOTWEAR = 'FOOTWEAR',
-  HEADWEAR = 'HEADWEAR',
-  ACCESSORIES = 'ACCESSORIES'
-}
+// Реэкспортируем для обратной совместимости
+export type { WardrobeItem } from '@/types/wardrobe';
+export { ClothingCategory };
 
 /**
  * Интерфейс для обработчика результатов загрузки
