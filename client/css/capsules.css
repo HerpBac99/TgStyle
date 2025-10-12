@@ -226,6 +226,52 @@
     stroke-width: 3; /* Толще для галочки */
 }
 
+/* Кнопка поделиться капсулой */
+.canvas-share-capsule-btn {
+    position: absolute;
+    top: 10vh;
+    right: 135px; /* Слева от кнопки сохранения */
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: rgba(33, 150, 243, 0.8) !important; /* Синий цвет для sharing */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: none;
+    cursor: pointer;
+    z-index: 2010;
+}
+
+.canvas-share-capsule-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.canvas-share-capsule-btn:active {
+    transform: scale(0.95);
+}
+
+.canvas-share-capsule-btn-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.canvas-share-capsule-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: white;
+    stroke-width: 2;
+}
+
+.canvas-share-capsule-btn.hidden {
+    display: none;
+}
+
 /* Модальное окно capsules */
 .capsules-modal {
     position: fixed;

@@ -18,6 +18,7 @@ import { UICapsulesGrid } from '../uiCapsulesGrid';
 import { UICanvasEditor } from '../uiCanvasEditor';
 import { uiModalManager } from '../uiModalManager';
 import { navigationManager } from '../navigationManager';
+import { capsulesSharing } from './CapsulesSharing';
 
 /**
  * Менеджер капсул
@@ -274,7 +275,8 @@ export class CapsulesManager implements PhotoUploadHandler {
       containerId: 'capsules-canvas-container',
       canvasId: 'capsules-canvas',
       onAddItem: () => this.handleCanvasAddItem(),
-      onSave: () => this.handleCanvasSave()
+      onSave: () => this.handleCanvasSave(),
+      onShare: () => this.handleCanvasShare()
     });
 
     this.canvasEditor.show();
@@ -400,6 +402,49 @@ export class CapsulesManager implements PhotoUploadHandler {
     } catch (error) {
       logger.error('Error saving capsule', error);
       alert('Ошибка при сохранении капсулы. Попробуйте еще раз.');
+    }
+  }
+
+  /**
+   * Обработчик sharing капсулы
+   */
+  private async handleCanvasShare(): Promise<void> {
+    if (!this.canvasEditor) {
+      logger.error('Canvas editor not available');
+      return;
+    }
+
+    try {
+      // Получаем данные капсулы (если сохранена)
+      const capsule = this.capsules.find(c => c.id === this.currentCapsuleId);
+      const capsuleName = capsule?.name || `Капсула ${new Date().toLocaleDateString()}`;
+      
+      // ИСПОЛЬЗУЕМ ТУ ЖЕ ЛОГИКУ ЧТО И ПРИ СОХРАНЕНИИ!
+      // Получаем актуальное состояние canvas (включая thumbnailImage с правильными пропорциями)
+      const state = await this.canvasEditor.getState();
+      
+      logger.info('Sharing capsule', { 
+        id: this.currentCapsuleId, 
+        name: capsuleName,
+        hasThumbnail: !!state.thumbnailImage 
+      });
+
+      // Вызываем сервис sharing с актуальным thumbnail
+      const success = await capsulesSharing.shareCapsule(
+        this.canvasEditor,
+        capsuleName,
+        this.currentCapsuleId || undefined,
+        state.thumbnailImage  // Используем актуальный thumbnail из canvas
+      );
+
+      if (success) {
+        logger.info('Capsule shared successfully', { id: this.currentCapsuleId });
+      } else {
+        logger.error('Failed to share capsule');
+      }
+
+    } catch (error) {
+      logger.error('Error sharing capsule', error);
     }
   }
 

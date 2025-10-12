@@ -18,6 +18,7 @@ export interface CanvasEditorConfig {
   canvasId: string;     // ID элемента canvas
   onAddItem?: () => void;  // Callback для кнопки "Добавить одежду"
   onSave?: () => void;     // Callback для кнопки "Сохранить"
+  onShare?: () => void;    // Callback для кнопки "Поделиться"
 }
 
 /**
@@ -90,6 +91,12 @@ export class UICanvasEditor {
     const saveBtn = document.getElementById('canvas-save-capsule-btn') as HTMLElement;
     if (saveBtn) {
       saveBtn.classList.add('hidden');
+    }
+
+    // Скрываем кнопку sharing
+    const shareBtn = document.getElementById('canvas-share-capsule-btn') as HTMLElement;
+    if (shareBtn) {
+      shareBtn.classList.add('hidden');
     }
   }
 
@@ -253,6 +260,13 @@ export class UICanvasEditor {
   // ============================================
   // ПУБЛИЧНЫЕ МЕТОДЫ - СОСТОЯНИЕ
   // ============================================
+
+  /**
+   * Получить fabric canvas (для sharing и других операций)
+   */
+  getCanvas(): fabric.Canvas | null {
+    return this.fabricCanvas;
+  }
 
   /**
    * Получить текущее состояние canvas для сохранения
@@ -510,6 +524,23 @@ export class UICanvasEditor {
       saveBtn.addEventListener('click', handleSave);
       this.cleanupFunctions.push(() => {
         saveBtn.removeEventListener('click', handleSave);
+      });
+    }
+
+    // Кнопка "Поделиться капсулой"
+    const shareBtn = document.getElementById('canvas-share-capsule-btn') as HTMLElement;
+    if (shareBtn && this.config.onShare) {
+      // Показываем кнопку
+      shareBtn.classList.remove('hidden');
+
+      const handleShare = () => {
+        logger.info('Canvas share capsule button clicked');
+        this.config.onShare!();
+      };
+
+      shareBtn.addEventListener('click', handleShare);
+      this.cleanupFunctions.push(() => {
+        shareBtn.removeEventListener('click', handleShare);
       });
     }
 
