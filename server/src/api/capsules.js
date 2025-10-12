@@ -34,6 +34,40 @@ function parseBase64Image(dataString) {
 }
 
 /**
+ * Удалить старый файл миниатюры капсулы
+ */
+async function deleteOldCapsuleThumbnail(telegramId, oldFilename) {
+    if (!oldFilename) return;
+    
+    try {
+        const userDir = path.join(CAPSULES_UPLOADS_DIR, telegramId.toString());
+        const oldFilePath = path.join(userDir, oldFilename);
+        
+        // Проверяем существует ли файл
+        try {
+            await fs.access(oldFilePath);
+            // Файл существует - удаляем
+            await fs.unlink(oldFilePath);
+            logger.info('Old capsule thumbnail deleted', {
+                telegramId: telegramId.toString(),
+                filename: oldFilename
+            });
+        } catch (err) {
+            // Файл не существует - ничего не делаем
+            if (err.code !== 'ENOENT') {
+                throw err;
+            }
+        }
+    } catch (error) {
+        logger.error('Error deleting old capsule thumbnail', { 
+            error: error.message,
+            filename: oldFilename 
+        });
+        // Не бросаем ошибку, чтобы не прерывать обновление капсулы
+    }
+}
+
+/**
  * Сохранить thumbnail изображение капсулы на диск
  */
 async function saveCapsuleThumbnail(telegramId, thumbnailImage) {
@@ -371,6 +405,9 @@ async function updateCapsule(req, res) {
     // Сохраняем thumbnail изображение если оно передано
     let thumbnailPath = capsule.thumbnailPath; // сохраняем старый путь по умолчанию
     if (thumbnailImage) {
+      // Удаляем старый файл перед сохранением нового
+      await deleteOldCapsuleThumbnail(telegramId, capsule.thumbnailPath);
+      // Сохраняем новый файл
       thumbnailPath = await saveCapsuleThumbnail(telegramId, thumbnailImage);
     }
 
@@ -490,6 +527,9 @@ async function deleteCapsule(req, res) {
         error: 'Capsule not found or access denied'
       });
     }
+
+    // Удаляем файл миниатюры перед удалением капсулы
+    await deleteOldCapsuleThumbnail(telegramId, capsule.thumbnailPath);
 
     await prisma.capsule.delete({
       where: { id: parseInt(id) }

@@ -9,10 +9,10 @@ TgStyle is a Telegram Mini App for AI-powered clothing style analysis. The proje
 3. **FastVLM Server** (Python/Flask) - AI analysis server using vision-language models
 
 **Key Documentation:**
-- [📚 Knowledge Base Index](./KNOWLEDGE_BASE_INDEX.md) - Main documentation hub
-- [💻 Client Documentation](./KNOWLEDGE_BASE_CLIENT.md) - Frontend modules and methods
-- [🔧 Server Documentation](./KNOWLEDGE_BASE_SERVER.md) - Backend API and database
-- [🤖 FastVLM Documentation](./KNOWLEDGE_BASE_FASTVLM.md) - AI server details
+- [📚 Knowledge Base Index](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_INDEX.md) - Main documentation hub
+- [💻 Client Documentation](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_CLIENT.md) - Frontend modules and methods
+- [🔧 Server Documentation](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md) - Backend API and database
+- [🤖 FastVLM Documentation](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_FASTVLM.md) - AI server details
 
 ## Architecture
 
@@ -79,28 +79,28 @@ function handleLogin() {
 
 | File | Purpose | Documentation |
 |------|---------|---------------|
-| `client/src/main.ts` | Application entry point, initialization | [Client Docs](./KNOWLEDGE_BASE_CLIENT.md#точка-входа---maints) |
-| `client/src/modules/auth.ts` | Telegram authentication manager | [Client Docs](./KNOWLEDGE_BASE_CLIENT.md#модуль-авторизации---authts) |
-| `client/src/modules/api.ts` | HTTP client for API requests | [Client Docs](./KNOWLEDGE_BASE_CLIENT.md#api-клиент---apits) |
-| `client/src/modules/uiManager.ts` | Main UI coordinator | [Client Docs](./KNOWLEDGE_BASE_CLIENT.md#ui-менеджеры) |
-| `client/src/modules/logger.ts` | Client-side logging with server sync | [Client Docs](./KNOWLEDGE_BASE_CLIENT.md#логирование---loggerts) |
+| `client/src/main.ts` | Application entry point, initialization | [Client Docs](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_CLIENT.md#точка-входа---maints) |
+| `client/src/modules/auth.ts` | Telegram authentication manager | [Client Docs](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_CLIENT.md#модуль-авторизации---authts) |
+| `client/src/modules/api.ts` | HTTP client for API requests | [Client Docs](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_CLIENT.md#api-клиент---apits) |
+| `client/src/modules/uiManager.ts` | Main UI coordinator | [Client Docs](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_CLIENT.md#ui-менеджеры) |
+| `client/src/modules/logger.ts` | Client-side logging with server sync | [Client Docs](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_CLIENT.md#логирование---loggerts) |
 
 ### Server Core Files
 
 | File | Purpose | Documentation |
 |------|---------|---------------|
-| `server/server.js` | Main HTTPS server, middleware setup | [Server Docs](./KNOWLEDGE_BASE_SERVER.md#основной-сервер---serverjs) |
-| `server/src/api/auth.js` | Authentication API endpoint | [Server Docs](./KNOWLEDGE_BASE_SERVER.md#авторизация---authjs) |
-| `server/src/api/analyze.js` | Image analysis API endpoint | [Server Docs](./KNOWLEDGE_BASE_SERVER.md#анализ---analyzejs) |
-| `server/src/api/wardrobe.js` | Wardrobe management API | [Server Docs](./KNOWLEDGE_BASE_SERVER.md#гардероб---wardrobejs) |
+| `server/server.js` | Main HTTPS server, middleware setup | [Server Docs](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md#основной-сервер---serverjs) |
+| `server/src/api/auth.js` | Authentication API endpoint | [Server Docs](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md#авторизация---authjs) |
+| `server/src/api/analyze.js` | Image analysis API endpoint | [Server Docs](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md#анализ---analyzejs) |
+| `server/src/api/wardrobe.js` | Wardrobe management API | [Server Docs](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md#гардероб---wardrobejs) |
 
 ### FastVLM Core Files
 
 | File | Purpose | Documentation |
 |------|---------|---------------|
-| `fastvlm-server/server.py` | Flask AI analysis server | [FastVLM Docs](./KNOWLEDGE_BASE_FASTVLM.md#основной-сервер---serverpy) |
-| `fastvlm-server/config.py` | Model and server configuration | [FastVLM Docs](./KNOWLEDGE_BASE_FASTVLM.md#конфигурация---configpy) |
-| `fastvlm-server/background_removal.py` | Background removal using rembg | [FastVLM Docs](./KNOWLEDGE_BASE_FASTVLM.md#удаление-фона---background_removalpy) |
+| `fastvlm-server/server.py` | Flask AI analysis server | [FastVLM Docs](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_FASTVLM.md#основной-сервер---serverpy) |
+| `fastvlm-server/config.py` | Model and server configuration | [FastVLM Docs](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_FASTVLM.md#конфигурация---configpy) |
+| `fastvlm-server/background_removal.py` | Background removal using rembg | [FastVLM Docs](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_FASTVLM.md#удаление-фона---background_removalpy) |
 
 ## Common Tasks
 
@@ -112,7 +112,7 @@ function handleLogin() {
 4. Update types in `client/src/types/`
 5. Document in knowledge base
 
-**Reference:** [Client Module Structure](./KNOWLEDGE_BASE_CLIENT.md#основные-модули)
+**Reference:** [Client Module Structure](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_CLIENT.md#основные-модули)
 
 ### Adding a New API Endpoint
 
@@ -123,7 +123,7 @@ function handleLogin() {
 5. Register route in `server.js`
 6. Document in knowledge base
 
-**Reference:** [Server API Routes](./KNOWLEDGE_BASE_SERVER.md#api-маршруты)
+**Reference:** [Server API Routes](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md#api-маршруты)
 
 ### Modifying AI Analysis
 
@@ -132,7 +132,7 @@ function handleLogin() {
 3. Test with different images
 4. Update documentation
 
-**Reference:** [FastVLM Prompts](./KNOWLEDGE_BASE_FASTVLM.md#промпты-для-анализа)
+**Reference:** [FastVLM Prompts](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_FASTVLM.md#промпты-для-анализа)
 
 ### Database Schema Changes
 
@@ -142,7 +142,7 @@ function handleLogin() {
 4. Update TypeScript types if needed
 5. Document changes
 
-**Reference:** [Database Models](./KNOWLEDGE_BASE_SERVER.md#база-данных---prisma)
+**Reference:** [Database Models](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md#база-данных---prisma)
 
 ## DO's and DON'Ts
 
@@ -288,7 +288,7 @@ const capsule = await prisma.capsule.findUnique({
 });
 ```
 
-**Reference:** [Prisma Usage](./KNOWLEDGE_BASE_SERVER.md#использование-prisma)
+**Reference:** [Prisma Usage](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md#использование-prisma)
 
 ## Security Considerations
 
@@ -320,7 +320,7 @@ FASTVLM_PORT=3001                   # FastVLM server port
 LOG_LEVEL=info                      # Logging level
 ```
 
-**Full list:** [Server Environment](./KNOWLEDGE_BASE_SERVER.md#переменные-окружения) | [FastVLM Environment](./KNOWLEDGE_BASE_FASTVLM.md#переменные-окружения)
+**Full list:** [Server Environment](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md#переменные-окружения) | [FastVLM Environment](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_FASTVLM.md#переменные-окружения)
 
 ## Troubleshooting
 
@@ -342,9 +342,9 @@ LOG_LEVEL=info                      # Logging level
 - Verify Python dependencies
 
 **Full troubleshooting guides:**
-- [Client Issues](./KNOWLEDGE_BASE_CLIENT.md#debugging)
-- [Server Issues](./KNOWLEDGE_BASE_SERVER.md#troubleshooting)
-- [FastVLM Issues](./KNOWLEDGE_BASE_FASTVLM.md#troubleshooting)
+- [Client Issues](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_CLIENT.md#debugging)
+- [Server Issues](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md#troubleshooting)
+- [FastVLM Issues](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_FASTVLM.md#troubleshooting)
 
 ## AI Analysis Flow
 
@@ -361,7 +361,7 @@ Understanding the complete flow helps when debugging or adding features:
 9. **Server**: Updates user counters, returns results to client
 10. **Client**: Displays results, updates UI, saves to localStorage
 
-**Detailed flow:** [Analysis Module](./KNOWLEDGE_BASE_CLIENT.md#анализ-изображений---analysists) | [Analyze API](./KNOWLEDGE_BASE_SERVER.md#анализ---analyzejs) | [FastVLM Analyze](./KNOWLEDGE_BASE_FASTVLM.md#analyze---анализ-изображения)
+**Detailed flow:** [Analysis Module](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_CLIENT.md#анализ-изображений---analysists) | [Analyze API](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md#анализ---analyzejs) | [FastVLM Analyze](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_FASTVLM.md#analyze---анализ-изображения)
 
 ## Module Dependencies
 
@@ -407,12 +407,12 @@ To add localization:
 
 ## Quick Reference Links
 
-- **Project Structure**: [Knowledge Base Index](./KNOWLEDGE_BASE_INDEX.md#структура-базы-знаний)
-- **Client Modules**: [Client Documentation](./KNOWLEDGE_BASE_CLIENT.md#основные-модули)
-- **API Endpoints**: [Server Documentation](./KNOWLEDGE_BASE_SERVER.md#api-маршруты)
-- **Database Models**: [Server Documentation](./KNOWLEDGE_BASE_SERVER.md#модели)
-- **AI Configuration**: [FastVLM Documentation](./KNOWLEDGE_BASE_FASTVLM.md#конфигурация---configpy)
-- **Prompts**: [FastVLM Documentation](./KNOWLEDGE_BASE_FASTVLM.md#промпты-для-анализа)
+- **Project Structure**: [Knowledge Base Index](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_INDEX.md#структура-базы-знаний)
+- **Client Modules**: [Client Documentation](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_CLIENT.md#основные-модули)
+- **API Endpoints**: [Server Documentation](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md#api-маршруты)
+- **Database Models**: [Server Documentation](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_SERVER.md#модели)
+- **AI Configuration**: [FastVLM Documentation](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_FASTVLM.md#конфигурация---configpy)
+- **Prompts**: [FastVLM Documentation](./KNOWLEDGE_BASE/KNOWLEDGE_BASE_FASTVLM.md#промпты-для-анализа)
 
 ## Getting Help
 
