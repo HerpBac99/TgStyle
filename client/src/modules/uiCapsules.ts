@@ -160,8 +160,110 @@ export class UICapsulesManager {
   /**
    * Обработчик клика по кнопке "Добавить вещь" в модальном окне капсулы
    */
-  private handleAddItemInModal(): void {
+  private async handleAddItemInModal(): Promise<void> {
     logger.info('Add item button clicked in capsules modal');
+    
+    try {
+      // Сохраняем текущее состояние выбранных элементов из модального окна
+      const currentlySelectedIds = this.getSelectedItemsFromModal();
+      
+      // Закрываем текущее модальное окно
+      uiModalManager.hide();
+      
+      // Показываем модальное окно выбора из гардероба
+      uiModalManager.showClothingSelectionModal({
+        type: 'clothing-selection',
+        modalId: 'capsules-modal',
+        wardrobeItems: this.wardrobeItems,
+        onConfirm: (selectedItems) => this.handleAddItemFromWardrobeConfirmed(selectedItems, currentlySelectedIds),
+        onCancel: () => this.handleAddItemFromWardrobeCancelled(currentlySelectedIds),
+        handleAdd: () => this.handleAddNewItemFromModal()
+      });
+      
+      logger.info('Add item from wardrobe modal shown');
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error opening add item modal', { error: errorMessage });
+    }
+  }
+  
+  /**
+   * Получить ID выбранных элементов из текущего модального окна
+   */
+  private getSelectedItemsFromModal(): number[] {
+    const selectedIds: number[] = [];
+    const modal = document.getElementById('capsules-modal');
+    
+    if (!modal) {
+      return selectedIds;
+    }
+    
+    const selectedCards = modal.querySelectorAll('.capsules-item-card.selected');
+    selectedCards.forEach(card => {
+      const itemId = parseInt((card as HTMLElement).dataset['itemId'] || '0', 10);
+      if (itemId > 0) {
+        selectedIds.push(itemId);
+      }
+    });
+    
+    return selectedIds;
+  }
+  
+  /**
+   * Обработчик подтверждения выбора вещи из гардероба для добавления в капсулу
+   */
+  private handleAddItemFromWardrobeConfirmed(selectedItems: WardrobeItem[], previouslySelectedIds: number[]): void {
+    logger.info('Item from wardrobe confirmed', { 
+      selectedCount: selectedItems.length,
+      previousCount: previouslySelectedIds.length 
+    });
+    
+    // Закрываем модальное окно выбора из гардероба
+    uiModalManager.hide();
+    
+    // Восстанавливаем исходное модальное окно с обновленным списком выбранных вещей
+    // Объединяем ранее выбранные вещи с новыми
+    const allSelectedIds = new Set([...previouslySelectedIds, ...selectedItems.map(item => item.id)]);
+    
+    // Возвращаемся к модальному окну выбора для капсулы
+    uiModalManager.showClothingSelectionModal({
+      type: 'clothing-selection',
+      modalId: 'capsules-modal',
+      wardrobeItems: this.wardrobeItems,
+      selectedItemIds: allSelectedIds,
+      onConfirm: (finalSelectedItems) => this.handleClothingConfirmed(finalSelectedItems),
+      onCancel: () => this.handleClothingCancelled(),
+      handleAdd: () => this.handleAddItemInModal()
+    });
+  }
+  
+  /**
+   * Обработчик отмены выбора вещи из гардероба
+   */
+  private handleAddItemFromWardrobeCancelled(previouslySelectedIds: number[]): void {
+    logger.info('Item from wardrobe selection cancelled');
+    
+    // Закрываем модальное окно выбора из гардероба
+    uiModalManager.hide();
+    
+    // Возвращаемся к исходному модальному окну с сохраненным состоянием
+    uiModalManager.showClothingSelectionModal({
+      type: 'clothing-selection',
+      modalId: 'capsules-modal',
+      wardrobeItems: this.wardrobeItems,
+      selectedItemIds: new Set(previouslySelectedIds),
+      onConfirm: (selectedItems) => this.handleClothingConfirmed(selectedItems),
+      onCancel: () => this.handleClothingCancelled(),
+      handleAdd: () => this.handleAddItemInModal()
+    });
+  }
+  
+  /**
+   * Обработчик добавления новой вещи через загрузку фото (из модального окна выбора)
+   */
+  private handleAddNewItemFromModal(): void {
+    logger.info('Add new item from photo clicked');
     // Запускаем процесс загрузки фото
     this.photoUploadManager.handlePhotoUpload();
   }
@@ -372,8 +474,102 @@ export class UICapsulesManager {
   private async handleCanvasAddItem(): Promise<void> {
     logger.info('Canvas add item button clicked');
     
-    // Открываем upload фото через photoUploadManager
-    await this.photoUploadManager.handlePhotoUpload();
+    if (!this.canvasEditor) {
+      logger.error('Canvas editor not available');
+      return;
+    }
+    
+    try {
+      // Получаем текущие вещи на canvas
+      const currentItemsOnCanvas = this.getCurrentCanvasItemIds();
+      logger.info('Current items on canvas', { count: currentItemsOnCanvas.length, ids: currentItemsOnCanvas });
+      
+      // Скрываем canvas временно
+      this.canvasEditor.hide();
+      
+      // Показываем модальное окно выбора из гардероба с уже выбранными вещами
+      uiModalManager.showClothingSelectionModal({
+        type: 'clothing-selection',
+        modalId: 'capsules-modal',
+        wardrobeItems: this.wardrobeItems,
+        selectedItemIds: new Set(currentItemsOnCanvas),
+        onConfirm: (selectedItems) => this.handleAddToCanvasConfirmed(selectedItems, currentItemsOnCanvas),
+        onCancel: () => this.handleAddToCanvasCancelled(),
+        handleAdd: () => this.handleAddNewItemFromModal()
+      });
+      
+      logger.info('Add to canvas modal shown');
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error opening add to canvas modal', { error: errorMessage });
+    }
+  }
+  
+  /**
+   * Получить ID текущих вещей на canvas
+   */
+  private getCurrentCanvasItemIds(): number[] {
+    if (!this.canvasEditor) {
+      return [];
+    }
+    
+    return this.canvasEditor.getItemIds();
+  }
+  
+  /**
+   * Обработчик подтверждения добавления вещей на canvas
+   */
+  private async handleAddToCanvasConfirmed(selectedItems: WardrobeItem[], previousItemIds: number[]): Promise<void> {
+    logger.info('Add to canvas confirmed', {
+      selectedCount: selectedItems.length,
+      previousCount: previousItemIds.length
+    });
+    
+    // Закрываем модальное окно
+    uiModalManager.hide();
+    
+    // Показываем canvas обратно
+    if (this.canvasEditor) {
+      this.canvasEditor.show();
+      
+      // Определяем новые вещи (которых не было на canvas)
+      const previousIdsSet = new Set(previousItemIds);
+      const newItems = selectedItems.filter(item => !previousIdsSet.has(item.id));
+      
+      logger.info('Adding new items to canvas', { newItemsCount: newItems.length });
+      
+      // Добавляем только новые вещи в центр canvas
+      for (const item of newItems) {
+        await this.canvasEditor.addItem({ item });
+      }
+      
+      // Удаляем вещи, которые были сняты с выбора
+      const selectedIdsSet = new Set(selectedItems.map(item => item.id));
+      const itemsToRemove = previousItemIds.filter(id => !selectedIdsSet.has(id));
+      
+      if (itemsToRemove.length > 0) {
+        logger.info('Removing unselected items from canvas', { removeCount: itemsToRemove.length });
+        for (const itemId of itemsToRemove) {
+          await this.canvasEditor.removeItemById(itemId);
+        }
+      }
+    }
+  }
+  
+  /**
+   * Обработчик отмены добавления вещей на canvas
+   */
+  private handleAddToCanvasCancelled(): void {
+    logger.info('Add to canvas cancelled');
+    
+    // Закрываем модальное окно
+    uiModalManager.hide();
+    
+    // Показываем canvas обратно
+    if (this.canvasEditor) {
+      this.canvasEditor.show();
+    }
   }
 
   /**
@@ -388,11 +584,16 @@ export class UICapsulesManager {
     // Если модальное окно выбора открыто - перерисовываем грид
     if (this.mode === 'selection') {
       logger.info('Updating clothing selection modal with new item');
-      // Обновляем модальное окно с новым списком вещей
+      
+      // Сохраняем текущие выбранные элементы
+      const currentlySelected = this.getSelectedItemsFromModal();
+      
+      // Обновляем модальное окно с новым списком вещей и сохраненным выбором
       uiModalManager.showClothingSelectionModal({
         type: 'clothing-selection',
         modalId: 'capsules-modal',
         wardrobeItems: this.wardrobeItems,
+        selectedItemIds: new Set(currentlySelected),
         onConfirm: (selectedItems) => this.handleClothingConfirmed(selectedItems),
         onCancel: () => this.handleClothingCancelled(),
         handleAdd: () => this.handleAddItemInModal()

@@ -389,6 +389,58 @@ export class UICanvasEditor {
   // ============================================
 
   /**
+   * Получить ID всех элементов на canvas (синхронно)
+   */
+  getItemIds(): number[] {
+    if (!this.fabricCanvas) {
+      return [];
+    }
+
+    const objects = this.fabricCanvas.getObjects();
+    const itemIds: number[] = [];
+
+    objects.forEach(obj => {
+      const fabricObj = obj as any;
+      const itemData = fabricObj.itemData || fabricObj._element?.itemData;
+      if (itemData && itemData.id) {
+        itemIds.push(itemData.id);
+      }
+    });
+
+    return itemIds;
+  }
+
+  /**
+   * Удалить элемент с canvas по ID
+   */
+  async removeItemById(itemId: number): Promise<boolean> {
+    if (!this.fabricCanvas) {
+      logger.warn('Canvas not initialized');
+      return false;
+    }
+
+    const objects = this.fabricCanvas.getObjects();
+    let removed = false;
+
+    for (const obj of objects) {
+      const fabricObj = obj as any;
+      const itemData = fabricObj.itemData || fabricObj._element?.itemData;
+      
+      if (itemData && itemData.id === itemId) {
+        this.fabricCanvas.remove(obj);
+        removed = true;
+        logger.info('Item removed from canvas', { itemId });
+      }
+    }
+
+    if (removed) {
+      this.fabricCanvas.renderAll();
+    }
+
+    return removed;
+  }
+
+  /**
    * Очистить canvas
    */
   clear(): void {
