@@ -41,7 +41,7 @@ from PIL import Image
 
 SERVER_URL = os.environ.get("FASTVLM_URL", "http://127.0.0.1:3001")
 # Режим анализа: True = многопроходный, False = реальный режим сервера
-TECH_ANALYZE = True
+TECH_ANALYZE = False
 
 def to_base64(img: Image.Image) -> str:
     buf = io.BytesIO()
@@ -163,7 +163,7 @@ def main():
     if len(sys.argv) >= 2:
         image_path = sys.argv[1]
     else:
-        image_path = str(Path(__file__).parent.parent / "14.jpg")
+        image_path = str(Path(__file__).parent.parent / "photo_exampl/14.jpg")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")

@@ -11,6 +11,8 @@ export interface PurchaseRecommendationResult {
   cleanAnalysis: string;
   purchaseRecommendation: string | null;
   lamodaUrl: string | null;
+  recommendationsHtml: string | null;
+  hasRecommendations: boolean;
 }
 
 /**
@@ -27,88 +29,154 @@ class PurchaseRecommendationManager {
       return {
         cleanAnalysis: 'Анализ выполнен, но текст описания недоступен.',
         purchaseRecommendation: null,
-        lamodaUrl: null
+        lamodaUrl: null,
+        recommendationsHtml: null,
+        hasRecommendations: false
       };
     }
 
-    // Ищем раздел "Рекомендация для покупки:"
-    const recommendationMarker = '**Рекомендация для покупки:**';
-    const markerIndex = analysisText.indexOf(recommendationMarker);
+    // Ищем раздел "**Рекомендации**" (с разными вариантами написания и двоеточием)
+    const recommendationMarkers = [
+      '**Рекомендации:**',    // С двоеточием (правильно)
+      '**Рекомендации**',     // Без двоеточия (правильно)
+      'Рекомендации'      // Без двоеточия (с опечаткой)
+    ];
+    let markerIndex = -1;
+    let usedMarker = '';
+
+    for (const marker of recommendationMarkers) {
+      markerIndex = analysisText.indexOf(marker);
+      if (markerIndex !== -1) {
+        usedMarker = marker;
+        logger.info('Found recommendations marker', { marker });
+        break;
+      }
+    }
 
     if (markerIndex === -1) {
       // Если маркер не найден, возвращаем полный текст как анализ
       return {
         cleanAnalysis: analysisText.trim(),
         purchaseRecommendation: null,
-        lamodaUrl: null
+        lamodaUrl: null,
+        recommendationsHtml: null,
+        hasRecommendations: false
       };
     }
 
-    // Разделяем текст на анализ и рекомендацию
+    // Разделяем текст на анализ и рекомендации
     const cleanAnalysis = analysisText.substring(0, markerIndex).trim();
-    const recommendationSection = analysisText.substring(markerIndex + recommendationMarker.length).trim();
+    const recommendationSection = analysisText.substring(markerIndex + usedMarker.length).trim();
 
-    // Извлекаем рекомендацию (первая строка после маркера)
-    const lines = recommendationSection.split('\n');
-    let purchaseRecommendation: string | null = null;
-
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      if (trimmedLine && !trimmedLine.startsWith('[') && !trimmedLine.startsWith('**')) {
-        // Это должна быть рекомендация в формате "*элемент* *пол* *цвет*"
-        purchaseRecommendation = trimmedLine.replace(/^\[|\]$/g, '').trim();
-        break;
-      }
-    }
-
-    let lamodaUrl: string | null = null;
-    if (purchaseRecommendation) {
-      lamodaUrl = this.generateLamodaUrl(purchaseRecommendation);
-    }
+    // Извлекаем HTML рекомендаций с ссылками
+    const recommendationsHtml = this.parseRecommendations(recommendationSection);
 
     return {
       cleanAnalysis,
-      purchaseRecommendation,
-      lamodaUrl
+      purchaseRecommendation: null, // Не используется в новом формате
+      lamodaUrl: null, // Не используется в новом формате
+      recommendationsHtml,
+      hasRecommendations: !!recommendationsHtml
     };
   }
 
   /**
-   * Формирование ссылки на Lamoda из рекомендации
-   * @param recommendation - Рекомендация в формате "элемент пол цвет"
+   * Парсинг рекомендаций и создание HTML с ссылками
+   * Формат: 1. *Брюки* [Брюки широкие коричневые женские]
+   * @param recommendationText - Текст раздела рекомендаций
+   * @returns HTML с рекомендациями и ссылками
+   */
+  private parseRecommendations(recommendationText: string): string | null {
+    if (!recommendationText) return null;
+
+    logger.info('Parsing recommendations', { 
+      textLength: recommendationText.length,
+      textPreview: recommendationText.substring(0, 200)
+    });
+
+    // Паттерн для поиска рекомендаций: 1. *Текст* [содержимое]
+    const pattern = /\d+\.\s*\*([^*]+)\*\s*\[([^\]]+)\]/g;
+    const recommendations: string[] = [];
+    let match;
+
+    while ((match = pattern.exec(recommendationText)) !== null) {
+      const displayText = match[1]?.trim(); // Текст для отображения (например, "Брюки")
+      const searchQuery = match[2]?.trim(); // Поисковый запрос (например, "Брюки широкие коричневые женские")
+
+      logger.info('Found recommendation match', { 
+        displayText, 
+        searchQuery,
+        fullMatch: match[0]
+      });
+
+      if (!displayText || !searchQuery) continue;
+
+      // Генерируем URL для Lamoda
+      const lamodaUrl = this.generateLamodaUrlFromQuery(searchQuery);
+
+      if (lamodaUrl) {
+        // Создаем HTML ссылку с розовым цветом
+        const linkHtml = `<a href="${lamodaUrl}" target="_blank" rel="noopener noreferrer" class="recommendation-link" style="color: #ff6b6b !important; text-decoration: none !important; font-weight: 600 !important; padding: 2px 4px !important; border-radius: 4px !important; transition: all 0.3s ease !important; background: rgba(255, 107, 107, 0.1) !important;">${displayText}</a>`;
+        recommendations.push(linkHtml);
+      } else {
+        // Если не удалось создать ссылку, просто выделяем текст
+        recommendations.push(`<span style="font-weight: 600;">${displayText}</span>`);
+      }
+    }
+
+    if (recommendations.length === 0) {
+      logger.warn('No recommendations found in text', { 
+        textPreview: recommendationText.substring(0, 300) 
+      });
+      return null;
+    }
+
+    logger.info('Successfully parsed recommendations', { 
+      count: recommendations.length,
+      recommendations 
+    });
+
+    // Формируем HTML список
+    const listItems = recommendations.map((rec, index) => `${index + 1}. ${rec}`).join('<br>');
+    return `<div class="recommendations-section" style="margin-top: 16px; padding: 12px; background: rgba(255, 107, 107, 0.05); border-radius: 8px; border-left: 3px solid #ff6b6b;"><strong>Рекомендации:</strong><br>${listItems}</div>`;
+  }
+
+  /**
+   * Формирование ссылки на Lamoda из поискового запроса
+   * @param searchQuery - Поисковый запрос (например, "Брюки широкие коричневые женские")
    * @returns Ссылка на Lamoda или null если формат неверный
    */
-  private generateLamodaUrl(recommendation: string): string | null {
+  private generateLamodaUrlFromQuery(searchQuery: string): string | null {
     try {
-      // Разбираем рекомендацию: "элемент одежды пол цвет"
-      const parts = recommendation.split(' ');
-      if (parts.length < 3) {
-        logger.warn('Recommendation format invalid, expected at least 3 parts', { recommendation });
+      if (!searchQuery || searchQuery.length < 2) {
+        logger.warn('Search query too short', { searchQuery });
         return null;
       }
 
-      const item = parts[0]; // элемент одежды
-      const gender = parts[1]; // пол
-      const color = parts.slice(2).join(' '); // цвет (может быть несколько слов)
-
-      // Определяем gender_section на основе пола
+      // Определяем пол из запроса
       let genderSection = 'women'; // по умолчанию
-      if (gender && (gender.toLowerCase().includes('муж') || gender.toLowerCase() === 'male')) {
+      const lowerQuery = searchQuery.toLowerCase();
+
+      if (lowerQuery.includes('мужск') || lowerQuery.includes('male')) {
         genderSection = 'men';
+      } else if (lowerQuery.includes('женск') || lowerQuery.includes('female')) {
+        genderSection = 'women';
       }
 
       // Формируем поисковый запрос
-      const searchQuery = `${item} ${gender} ${color}`.replace(/\s+/g, '%20').trim();
-      const lamodaUrl = `https://www.lamoda.ru/catalogsearch/result/?q=${searchQuery}&gender_section=${genderSection}`;
+      const encodedQuery = encodeURIComponent(searchQuery);
+      const lamodaUrl = `https://www.lamoda.ru/catalogsearch/result/?q=${encodedQuery}&gender_section=${genderSection}`;
 
-      logger.info('Lamoda URL generated', { recommendation, lamodaUrl });
+      logger.info('Lamoda URL generated from query', { searchQuery, lamodaUrl });
       return lamodaUrl;
 
     } catch (error) {
-      logger.error('Failed to generate Lamoda URL', { recommendation, error });
+      logger.error('Failed to generate Lamoda URL from query', { searchQuery, error });
       return null;
     }
   }
+
+
 
   /**
    * Открытие ссылки на Lamoda

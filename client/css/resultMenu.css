@@ -634,6 +634,47 @@ a.lamoda-link:focus,
     box-shadow: none !important; /* Убираем box-shadow */
 }
 
+/* Ссылки-рекомендации в блоке рекомендаций */
+a.recommendation-link,
+a.recommendation-link:link,
+a.recommendation-link:visited,
+.analysis-text a.recommendation-link,
+.analysis-text a.recommendation-link:link,
+.analysis-text a.recommendation-link:visited {
+    color: #ff6b6b !important; /* Розовый цвет */
+    text-decoration: none !important; /* Убираем подчеркивание */
+    font-weight: 600 !important; /* Полужирный шрифт */
+    padding: 2px 4px !important; /* Небольшой отступ */
+    border-radius: 4px !important; /* Скругление углов */
+    transition: all 0.3s ease !important; /* Плавная анимация */
+    background: rgba(255, 107, 107, 0.1) !important; /* Полупрозрачный розовый фон */
+    outline: none !important; /* Убираем outline */
+    box-shadow: none !important; /* Убираем box-shadow */
+    -webkit-tap-highlight-color: transparent !important; /* Убираем серый квадрат при нажатии на iOS */
+}
+
+/* Hover эффект для ссылок-рекомендаций */
+a.recommendation-link:hover,
+a.recommendation-link:focus,
+a.recommendation-link:active,
+.analysis-text a.recommendation-link:hover,
+.analysis-text a.recommendation-link:focus,
+.analysis-text a.recommendation-link:active {
+    color: #ff4757 !important; /* Более яркий розовый при наведении */
+    background: rgba(255, 107, 107, 0.2) !important; /* Более насыщенный фон */
+    transform: translateY(-1px); /* Небольшой подъём */
+    box-shadow: 0 2px 4px rgba(255, 107, 107, 0.3) !important; /* Тень */
+}
+
+/* Блок рекомендаций */
+.recommendations-section {
+    margin-top: 16px;
+    padding: 12px;
+    background: rgba(255, 107, 107, 0.05);
+    border-radius: 8px;
+    border-left: 3px solid #ff6b6b;
+}
+
 .share-btn svg path {
     stroke: #2481cc; /* Синий цвет обводки (цвет Telegram) */
     stroke-width: 2; /* Толщина обводки */

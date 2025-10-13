@@ -395,18 +395,18 @@ export class UIAnalysisManager {
       return;
     }
 
-    // Обрабатываем ответ и извлекаем рекомендацию для покупки
+    // Обрабатываем ответ и извлекаем рекомендации
     const extracted = purchaseRecommendationManager.extractPurchaseRecommendation(result);
 
-    // Сохраняем ссылку на Lamoda для использования в кнопках
+    // Сохраняем ссылку на Lamoda для использования в кнопках (для обратной совместимости)
     this.currentLamodaUrl = extracted.lamodaUrl;
 
     // Сохраняем текст анализа для отправки
     this.currentAnalysisData.analysisText = extracted.cleanAnalysis;
 
     logger.info('Purchase recommendation processed', {
-      hasRecommendation: !!extracted.purchaseRecommendation,
-      hasUrl: !!extracted.lamodaUrl
+      hasRecommendations: extracted.hasRecommendations,
+      recommendationsHtmlLength: extracted.recommendationsHtml?.length || 0
     });
 
     // Скрываем загрузку, показываем результат
@@ -431,17 +431,15 @@ export class UIAnalysisManager {
       `<div class="analysis-block analysis-block-${index + 1}" style="animation-delay: ${block.delay}s">${block.content}</div>`
     ).join('');
 
-    // Добавляем кнопку рекомендаций в конце (ПОКА ЗАКОММЕНТИРОВАНО)
-    // const recommendationButton = this.currentLamodaUrl
-    //   ? `<div class="recommendation-button-container">
-    //        <button id="find-recommendations-btn" class="recommendation-button">
-    //          Найти рекомендации
-    //        </button>
-    //      </div>`
-    //   : '';
-    const recommendationButton = ''; // Пока скрываем кнопку рекомендаций
+    // Добавляем блок рекомендаций с ссылками, если они есть
+    const recommendationsBlock = extracted.recommendationsHtml 
+      ? `<div class="analysis-block" style="animation-delay: ${textBlocks.length * 0.8}s">${extracted.recommendationsHtml}</div>`
+      : '';
 
-    analysisText.innerHTML = blocksHtml + recommendationButton;
+    analysisText.innerHTML = blocksHtml + recommendationsBlock;
+
+    // Настраиваем обработчики для ссылок-рекомендаций
+    this.setupRecommendationLinks();
 
     // Настраиваем обработчики кнопок
     this.setupResultButtons();
@@ -592,6 +590,35 @@ export class UIAnalysisManager {
       (button as HTMLButtonElement).disabled = false;
       logger.info('Recommendation button reset to original state');
     }
+  }
+
+  /**
+   * Настройка обработчиков для ссылок-рекомендаций
+   */
+  private setupRecommendationLinks(): void {
+    const recommendationLinks = document.querySelectorAll('.recommendation-link');
+    
+    recommendationLinks.forEach(link => {
+      link.addEventListener('click', (event: Event) => {
+        event.preventDefault();
+        
+        const href = (link as HTMLAnchorElement).href;
+        
+        if (href) {
+          // Используем Telegram WebApp API для открытия внешних ссылок
+          if (window.Telegram?.WebApp?.openLink) {
+            window.Telegram.WebApp.openLink(href);
+            logger.info('Recommendation link opened via Telegram', { href });
+          } else {
+            // Fallback на обычное открытие в новой вкладке
+            window.open(href, '_blank');
+            logger.info('Recommendation link opened in new tab', { href });
+          }
+        }
+      });
+    });
+    
+    logger.info('Recommendation links handlers setup', { count: recommendationLinks.length });
   }
 
   /**
