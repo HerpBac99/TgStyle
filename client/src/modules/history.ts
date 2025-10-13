@@ -18,6 +18,7 @@ import {
   ERROR_CODES
 } from '@/utils/helpers';
 import { logger } from './logger';
+import { api } from './api';
 
 /**
  * Класс для управления историей анализов
@@ -102,6 +103,107 @@ class HistoryManager {
         stack: error instanceof Error ? error.stack : undefined
       });
       this.history = this.createEmptyHistory();
+    }
+  }
+
+  /**
+   * Загрузить историю с сервера (основной источник правды)
+   * NEW: Заменяет localStorage как основной источник
+   */
+  async loadHistoryFromServer(): Promise<boolean> {
+    try {
+      logger.info('Loading history from server');
+
+      // Определяем типы для ответа сервера
+      interface ServerHistoryItem {
+        id: number;
+        photoUrl?: string;
+        photoData?: string;
+        analysisText?: string;
+        technicalAnalysis?: string;
+        createdAt: string;
+        isPublic: boolean;
+      }
+
+      interface ServerHistoryResponse {
+        success: boolean;
+        history: ServerHistoryItem[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+        };
+      }
+
+      // Получаем initData для аутентификации
+      const initData = window.Telegram?.WebApp?.initData;
+      if (!initData) {
+        throw new Error('No Telegram initData available');
+      }
+
+      // Запрашиваем историю с сервера (GET с initData в query параметрах)
+      const queryParams = new URLSearchParams({
+        initData,
+        limit: '50',
+        sortBy: 'createdAt',
+        order: 'desc'
+      });
+      
+      const response = await api.get<ServerHistoryResponse>(`/history?${queryParams.toString()}`);
+
+      if (!response.success || !response.history) {
+        throw new Error('Failed to load history from server');
+      }
+
+      logger.info('History loaded from server', {
+        itemsCount: response.history.length,
+        total: response.pagination?.total
+      });
+
+      // Преобразуем серверные данные в формат HistoryItem
+      const serverItems = response.history.map((item: ServerHistoryItem) => {
+        const result: Partial<HistoryItem> & { timestamp: string } = {
+          timestamp: item.createdAt,
+          id: String(item.id),
+          sourceType: 'photo' as const,
+          isEmpty: false
+        };
+        
+        // Добавляем только существующие поля
+        if (item.photoUrl) result.photoUrl = item.photoUrl;
+        if (item.photoData) {
+          result.photoData = item.photoData;
+          result.photo = item.photoData;
+        }
+        if (item.technicalAnalysis) result.analysis = item.technicalAnalysis;
+        else if (item.analysisText) result.analysis = item.analysisText;
+        
+        return result as HistoryItem;
+      });
+
+      // Нормализуем до 50 элементов (добавляем пустые если нужно)
+      this.history = this.normalizeHistory(serverItems);
+
+      // Сохраняем в localStorage как кэш
+      this.saveToStorage();
+
+      logger.info('History synced from server', {
+        filledItems: this.getFilledCount(),
+        totalSlots: this.maxItems
+      });
+
+      // Уведомляем UI об обновлении истории
+      window.dispatchEvent(new CustomEvent('history:updated', {
+        detail: { source: 'server', itemsCount: this.getFilledCount() }
+      }));
+
+      return true;
+
+    } catch (error) {
+      logger.error('Failed to load history from server', error);
+      // Fallback на localStorage уже загружен в constructor
+      logger.info('Using localStorage as fallback');
+      return false;
     }
   }
 
@@ -290,57 +392,32 @@ class HistoryManager {
         item.id = this.generateUniqueId();
       }
 
-      // Найдем позицию для вставки нового элемента
-      if (this.history.length >= this.maxItems) {
-        // Если история полная, удаляем самый старый (первый) элемент
-        const oldFirstItem = this.history[0];
-        this.history.shift();
-        this.history.push({ ...item, isEmpty: false });
-
-        logger.info('Item added, oldest item removed', {
-          removedItem: {
-            hadItem: !!oldFirstItem,
-            wasEmpty: oldFirstItem?.isEmpty,
-            hadPhoto: !!oldFirstItem?.photo
-          },
-          newArrayLength: this.history.length
-        });
-      } else {
-        // Добавляем новый элемент после последнего заполненного элемента
-        const insertPosition = this.findInsertPosition();
-
-        // Если позиция валидна (в пределах массива)
-        if (insertPosition < this.history.length) {
-          // Вставляем элемент на позицию и сдвигаем остальные вправо
-          this.history.splice(insertPosition, 0, { ...item, isEmpty: false });
-          logger.info('Item inserted at position', {
-            position: insertPosition,
-            newLength: this.history.length
-          });
-        } else {
-        // Если массив еще не заполнен, просто добавляем в конец
-        if (this.history.length < this.maxItems) {
-          this.history.push({ ...item, isEmpty: false });
-          logger.info('Item added to end of array', {
-            newLength: this.history.length,
-            maxItems: this.maxItems
-          });
-        } else {
-          // Массив заполнен - удаляем самый старый элемент и добавляем новый
-          const oldFirstItem = this.history.shift();
-          this.history.push({ ...item, isEmpty: false });
-          logger.info('Removed oldest item and added new to end', {
-            removedItem: {
-              hadItem: !!oldFirstItem,
-              wasEmpty: oldFirstItem?.isEmpty,
-              hadPhoto: !!oldFirstItem?.photo
-            },
-            newLength: this.history.length,
-            maxItems: this.maxItems
-          });
-        }
-        }
+      // NEW: Не сохраняем base64 photo если есть photoUrl (экономим место в localStorage!)
+      if (item.photoUrl || item.photoData) {
+        delete item.photo; // Удаляем base64 - на сервере уже есть файл
       }
+
+      // NEW: Находим позицию первого пустого элемента
+      let insertPosition = this.history.findIndex(item => !item || item.isEmpty);
+      
+      // Если не нашли пустых элементов, добавляем в конец
+      if (insertPosition === -1) {
+        insertPosition = this.history.length;
+      }
+
+      // Вставляем ПЕРЕД первым пустым элементом (новые элементы справа в карусели)
+      this.history.splice(insertPosition, 0, { ...item, isEmpty: false });
+
+      // Удаляем лишние элементы с конца если превысили лимит
+      while (this.history.length > this.maxItems) {
+        this.history.pop();
+      }
+
+      logger.info('Item added to history', {
+        position: insertPosition,
+        totalItems: this.history.length,
+        filledItems: this.getFilledCount()
+      });
 
       // Сохраняем в localStorage
       this.saveToStorage();
@@ -355,17 +432,37 @@ class HistoryManager {
   /**
    * Удаление элемента из истории по индексу
    */
-  removeItem(index: number): boolean {
+  async removeItem(index: number): Promise<boolean> {
     try {
       if (index < 0 || index >= this.history.length) {
         logger.error('Invalid history index', { index, maxIndex: this.history.length - 1 });
         return false;
       }
 
-      // Помечаем как пустой
+      const item = this.history[index];
+      
+      // Если элемент имеет ID (серверный элемент), удаляем с сервера
+      if (item && !item.isEmpty && item.id) {
+        try {
+          const initData = window.Telegram?.WebApp?.initData;
+          if (initData) {
+            // Удаляем с сервера (это удалит и файл)
+            const response = await api.delete<{ success: boolean }>(`/history/${item.id}?initData=${encodeURIComponent(initData)}`);
+            
+            if (response.success) {
+              logger.info('History item deleted from server', { id: item.id, index });
+            }
+          }
+        } catch (error) {
+          logger.error('Failed to delete item from server', error);
+          // Продолжаем удаление локально даже если сервер недоступен
+        }
+      }
+
+      // Помечаем как пустой локально
       this.history[index] = { isEmpty: true } as HistoryItem;
       
-      logger.info('History item removed', { index });
+      logger.info('History item removed locally', { index });
       
       // Сохраняем в localStorage
       this.saveToStorage();
@@ -448,23 +545,7 @@ class HistoryManager {
     return this.history.findIndex(item => !item || item.isEmpty);
   }
 
-  /**
-   * Находит позицию для вставки нового элемента (после последнего заполненного)
-   * Оптимизированная версия с поиском с конца массива
-   */
-  private findInsertPosition(): number {
-    // Ищем последний заполненный элемент с конца массива
-    for (let i = this.history.length - 1; i >= 0; i--) {
-      const item = this.history[i];
-      if (item && !item.isEmpty) {
-        // Возвращаем позицию после найденного элемента
-        return i + 1;
-      }
-    }
 
-    // Если не нашли ни одного заполненного элемента, возвращаем 0
-    return 0;
-  }
 
   /**
    * Экспорт истории в JSON

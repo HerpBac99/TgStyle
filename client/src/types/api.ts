@@ -103,7 +103,9 @@ export interface LogResponse {
 // Типы для истории
 export interface HistoryItem {
   id?: string;
-  photo: string; // base64 encoded image
+  photo?: string; // base64 encoded image (legacy)
+  photoUrl?: string; // NEW: URL to file (preferred)
+  photoData?: string; // Legacy alias for photo
   analysis?: string;
   timestamp: string;
   savedAt?: string;

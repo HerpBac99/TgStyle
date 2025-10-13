@@ -3,6 +3,12 @@ const router = express.Router();
 const { validateTelegramWebAppData } = require('../utils/telegram');
 const { logger } = require('../controllers/logsController');
 const sharp = require('sharp');
+const { 
+  saveAnalysisImage, 
+  getAnalysisImageUrl,
+  deleteAnalysisImage,
+  cleanupOldAnalyses 
+} = require('../utils/fileStorage');
 
 // Импортируем Prisma клиент
 const prisma = require('../lib/prisma');
@@ -129,6 +135,7 @@ async function optimizeImageForStorage(base64Image) {
 
         // Оптимизируем изображение с помощью Sharp
         const optimizedBuffer = await sharp(imageBuffer)
+            .rotate() // FIX: Применяет EXIF orientation автоматически
             .resize(800, 800, {
                 fit: 'inside', // сохраняем пропорции
                 withoutEnlargement: true // не увеличиваем маленькие изображения
@@ -165,63 +172,83 @@ async function optimizeImageForStorage(base64Image) {
 
 /**
  * Сохранение результата анализа в истории с оптимизацией изображений и лимитом 50 записей
+ * НОВАЯ ВЕРСИЯ: сохраняет файлы на диск вместо base64 в БД
  */
-async function saveAnalysisToHistory(userId, photoData, technicalAnalysis) {
+async function saveAnalysisToHistory(userId, telegramId, photoData, technicalAnalysis) {
     try {
-        // Оптимизируем изображение перед сохранением
+        // 1. Оптимизируем изображение перед сохранением
         const optimizedPhotoData = await optimizeImageForStorage(photoData);
+        
+        // 2. Сохраняем изображение на диск
+        const photoPath = await saveAnalysisImage(telegramId, `data:image/jpeg;base64,${optimizedPhotoData}`);
+        
+        logger.info('Analysis image saved to disk', {
+            userId,
+            telegramId,
+            photoPath,
+            optimizedSizeKB: Math.round(optimizedPhotoData.length / 1024)
+        });
 
-        // Проверяем количество записей в истории пользователя
+        // 3. Проверяем количество записей в истории пользователя
         const historyCount = await prisma.historyItem.count({
             where: { userId }
         });
 
-        // Если уже 50 записей, удаляем самую старую
+        // 4. Если уже 50 записей, удаляем самую старую
         if (historyCount >= 50) {
             const oldestItem = await prisma.historyItem.findFirst({
                 where: { userId },
-                orderBy: { createdAt: 'asc' }, // самая старая
-                select: { id: true, createdAt: true }
+                orderBy: { createdAt: 'asc' },
+                select: { id: true, createdAt: true, photoPath: true }
             });
 
             if (oldestItem) {
+                // Удаляем старый файл если есть
+                if (oldestItem.photoPath) {
+                    await deleteAnalysisImage(telegramId, oldestItem.photoPath);
+                }
+                
                 await prisma.historyItem.delete({
                     where: { id: oldestItem.id }
                 });
 
-                logger.info('Удалена самая старая запись истории', {
+                logger.info('Deleted oldest history item', {
                     userId,
                     deletedItemId: oldestItem.id,
-                    createdAt: oldestItem.createdAt,
-                    remainingCount: historyCount - 1
+                    photoPath: oldestItem.photoPath
                 });
             }
         }
 
-        // Создаем новую запись
+        // 5. Создаем новую запись в БД (с photoPath вместо photoData!)
         const historyItem = await prisma.historyItem.create({
             data: {
                 userId,
-                photoData: optimizedPhotoData, // оптимизированное base64 изображение
-                technicalAnalysis, // результат FastVLM
-                analysisText: null, // пользовательское описание пока пустое
-                isPublic: true, // по умолчанию публичное
+                photoPath,  // NEW: путь к файлу
+                photoData: null,  // Deprecated: не сохраняем base64
+                technicalAnalysis,
+                analysisText: null,
+                isPublic: true,
                 createdAt: new Date()
             }
         });
 
-        logger.info('Анализ сохранен в историю', {
+        // 6. Очистка старых файлов (дополнительная защита)
+        await cleanupOldAnalyses(telegramId, 50);
+
+        logger.info('Analysis saved to history', {
             historyItemId: historyItem.id,
             userId,
-            originalPhotoSize: Math.round(photoData.length / 1024) + 'KB',
-            optimizedPhotoSize: Math.round(optimizedPhotoData.length / 1024) + 'KB',
-            totalHistoryItems: historyCount >= 50 ? 50 : historyCount + 1
+            photoPath,
+            totalHistoryItems: Math.min(historyCount + 1, 50)
         });
 
         return historyItem;
+        
     } catch (error) {
-        logger.error('Ошибка сохранения анализа в историю', {
+        logger.error('Failed to save analysis to history', {
             userId,
+            telegramId,
             error: error.message,
             stack: error.stack
         });
@@ -498,9 +525,10 @@ router.post('/', async (req, res) => {
             // Сохраняем результат в базе данных и обновляем счетчики
             try {
                 if (dbUser) {
-                    // Сохраняем в историю
+                    // Сохраняем в историю (с telegramId для file storage!)
                     historyItem = await saveAnalysisToHistory(
-                        dbUser.id, 
+                        dbUser.id,
+                        telegramUser.id,  // Используем telegramUser.id
                         photo, // base64 изображения
                         analysisResult.analysis
                     );

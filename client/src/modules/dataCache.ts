@@ -4,6 +4,8 @@
  */
 
 import { logger } from './logger';
+import { historyManager } from './history';
+import type { HistoryItem } from '@/types/api';
 
 /**
  * Интерфейс для элемента гардероба
@@ -175,7 +177,7 @@ class DataCacheManager {
   }
 
   /**
-   * Собрать все URL изображений из wardrobeItems и capsules
+   * Собрать все URL изображений из wardrobeItems, capsules и history
    */
   private collectImageUrls(): string[] {
     const urls = new Set<string>();
@@ -198,6 +200,14 @@ class DataCacheManager {
           urls.add(capsuleItem.wardrobeItem.imageUrl);
         }
       });
+    });
+
+    // NEW: Изображения из истории анализов
+    const historyItems = historyManager.getAllItems();
+    historyItems.forEach((item: HistoryItem) => {
+      if (!item.isEmpty && item.photoUrl) {
+        urls.add(item.photoUrl);
+      }
     });
 
     return Array.from(urls);

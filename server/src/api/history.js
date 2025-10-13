@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { validateTelegramWebAppData } = require('../utils/telegram');
 const { logger } = require('../controllers/logsController');
+const { getAnalysisImageUrl, deleteAnalysisImage } = require('../utils/fileStorage');
 
 // Импортируем Prisma клиент
 const prisma = require('../lib/prisma');
@@ -147,12 +148,15 @@ router.get('/', async (req, res) => {
             }
         });
 
-        // Формируем ответ
+        // Формируем ответ с photoUrl для новых записей
+        const telegramId = telegramUser.id;
         const response = {
             success: true,
             history: historyItems.map(item => ({
                 id: item.id,
-                photoData: item.photoData,
+                // NEW: используем photoUrl если есть photoPath, иначе legacy photoData
+                photoUrl: item.photoPath ? getAnalysisImageUrl(telegramId, item.photoPath) : null,
+                photoData: item.photoPath ? null : item.photoData,  // Legacy fallback
                 analysisText: item.analysisText,
                 technicalAnalysis: item.technicalAnalysis,
                 isPublic: item.isPublic,
@@ -261,11 +265,14 @@ router.get('/:id', async (req, res) => {
             })
         ]);
 
+        const telegramId = historyItem.user.telegramId || telegramUser.id;
         const response = {
             success: true,
             historyItem: {
                 id: historyItem.id,
-                photoData: historyItem.photoData,
+                // NEW: используем photoUrl если есть photoPath
+                photoUrl: historyItem.photoPath ? getAnalysisImageUrl(telegramId, historyItem.photoPath) : null,
+                photoData: historyItem.photoPath ? null : historyItem.photoData,  // Legacy fallback
                 analysisText: historyItem.analysisText,
                 technicalAnalysis: historyItem.technicalAnalysis,
                 isPublic: historyItem.isPublic,
@@ -408,7 +415,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { initData } = req.body;
+        const { initData } = req.query;  // FIX: читаем из query, как в GET
 
         // Валидация Telegram initData
         if (!initData) {
@@ -452,6 +459,24 @@ router.delete('/:id', async (req, res) => {
             });
         }
 
+        // Удаляем файл фотографии с диска если есть photoPath
+        if (historyItem.photoPath) {
+            try {
+                await deleteAnalysisImage(telegramUser.id, historyItem.photoPath);
+                logger.info('Analysis image deleted from disk', {
+                    telegramId: telegramUser.id,
+                    photoPath: historyItem.photoPath
+                });
+            } catch (error) {
+                logger.error('Failed to delete analysis image file', {
+                    telegramId: telegramUser.id,
+                    photoPath: historyItem.photoPath,
+                    error: error.message
+                });
+                // Продолжаем удаление даже если файл не удалось удалить
+            }
+        }
+
         // Удаляем элемент (каскадное удаление комментариев и рейтингов происходит автоматически)
         await prisma.historyItem.delete({
             where: { id: parseInt(id) }
@@ -459,7 +484,8 @@ router.delete('/:id', async (req, res) => {
 
         logger.info('Элемент истории удален', {
             historyItemId: parseInt(id),
-            userId: dbUser.id
+            userId: dbUser.id,
+            photoPathDeleted: !!historyItem.photoPath
         });
 
         return res.json({

@@ -136,6 +136,12 @@ export class UIMenuManager {
    * Настройка обработчиков событий
    */
   private setupEventListeners(): void {
+    // NEW: Обновляем карусель после загрузки истории с сервера
+    window.addEventListener('history:updated', () => {
+      logger.info('History updated from server, refreshing carousel');
+      this.updateHistoryDisplay();
+    });
+
     // Обработчик кнопки камеры
     this.setupCameraButtonListener();
 
@@ -220,7 +226,9 @@ export class UIMenuManager {
   private showSavedAnalysis(analysisData: HistoryItem): void {
     logger.info('Showing saved analysis');
 
-    if (!analysisData.photo) {
+    // NEW: Проверяем наличие фото (photoUrl или base64)
+    const hasPhoto = analysisData.photoUrl || analysisData.photo || analysisData.photoData;
+    if (!hasPhoto) {
       this.logError('Не удалось загрузить данные фотографии');
       return;
     }
@@ -236,8 +244,13 @@ export class UIMenuManager {
       return;
     }
 
-    // Устанавливаем фото
-    savedAnalysisPhoto.src = `data:image/jpeg;base64,${analysisData.photo}`;
+    // NEW: Устанавливаем фото - приоритет photoUrl
+    if (analysisData.photoUrl) {
+      savedAnalysisPhoto.src = analysisData.photoUrl;
+    } else {
+      const photoData = analysisData.photo || analysisData.photoData;
+      savedAnalysisPhoto.src = `data:image/jpeg;base64,${photoData}`;
+    }
 
     // Формируем текст анализа
     let analysisContent = '';
@@ -299,13 +312,17 @@ export class UIMenuManager {
   updateHistoryDisplay(): void {
     const filledItems = historyManager.getFilledItems();
 
+    // NEW: Реверсируем массив - карусель показывает слева направо (старые → новые)
+    // Сервер возвращает в порядке desc (новые первые), а нам нужно asc (старые первые)
+    const sortedItems = [...filledItems].reverse();
+
     logger.info('Updating history display', {
-      filledItems: filledItems.length,
+      filledItems: sortedItems.length,
       currentCenter: this.carouselState.currentCenterIndex
     });
 
     // Создаем карусель динамически
-    this.createCarouselCards(filledItems);
+    this.createCarouselCards(sortedItems);
 
     // Позиционируем карусель
     this.positionCarousel();
@@ -382,8 +399,12 @@ export class UIMenuManager {
   private setupFilledCard(card: HTMLElement, content: HTMLElement, data: HistoryItem): void {
     card.classList.add(CSS_CLASSES.FILLED);
 
-    if (data.photo) {
-      card.style.backgroundImage = `url(data:image/jpeg;base64,${data.photo})`;
+    // NEW: Используем photoUrl (приоритет) или fallback на base64
+    if (data.photoUrl) {
+      card.style.backgroundImage = `url(${data.photoUrl})`;
+    } else if (data.photo || data.photoData) {
+      const photoData = data.photo || data.photoData;
+      card.style.backgroundImage = `url(data:image/jpeg;base64,${photoData})`;
     }
 
     const caption = createElement('div', {
@@ -1117,7 +1138,7 @@ export class UIMenuManager {
    * Выполняет удаление элемента
    */
   private async performDelete(button: HTMLButtonElement, index: number): Promise<void> {
-    const success = historyManager.removeItem(index);
+    const success = await historyManager.removeItem(index);
 
     if (success) {
       logger.info('History item deleted successfully', { index });

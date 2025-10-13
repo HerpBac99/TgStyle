@@ -36,7 +36,8 @@ model User {
 model HistoryItem {
   id                Int            @id @default(autoincrement())
   userId            Int
-  photoData         String
+  photoData         String?        // Deprecated: legacy base64 data
+  photoPath         String?        @map("photo_path") @db.VarChar(500)  // NEW: path to file
   analysisText      String?
   technicalAnalysis String?
   isPublic          Boolean        @default(true)

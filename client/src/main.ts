@@ -133,8 +133,8 @@ class TgStyleApp {
       // Выполняем авторизацию
       await this.performAuthentication();
 
-      // Предзагружаем данные гардероба и капсул
-      this.preloadAppData();
+      // Предзагружаем данные (история, гардероб, капсулы)
+      await this.preloadAppData();
 
       // Обрабатываем shared анализы
       this.handleSharedAnalysis();
@@ -331,8 +331,14 @@ class TgStyleApp {
   /**
    * Предзагрузка данных приложения (гардероб, капсулы, изображения)
    */
-  private preloadAppData(): void {
+  private async preloadAppData(): Promise<void> {
     logger.info('Starting app data preload');
+
+    // NEW: Загружаем историю с сервера (основной источник правды)
+    await historyManager.loadHistoryFromServer().catch(error => {
+      logger.error('Error loading history from server', error);
+      // Fallback на localStorage уже загружен в constructor
+    });
 
     // Запускаем предзагрузку в фоне (не блокируем инициализацию)
     dataCacheManager.preloadData().catch(error => {

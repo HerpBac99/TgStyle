@@ -10,8 +10,8 @@ import type {
 import { logger } from './logger';
 import { api } from './api';
 import { authManager } from './auth';
-import { cameraManager } from './camera';
-import { historyManager } from './history';
+// REMOVED: cameraManager, historyManager - not used anymore
+// History is loaded from server directly in analyzeImage()
 
 /**
  * Класс для управления анализом изображений
@@ -48,72 +48,8 @@ class AnalysisManager {
 
 
 
-  /**
-   * Сохранение результата в историю с оптимизацией размера
-   */
-  private async saveToHistory(response: AnalysisResponse, imageBase64: string): Promise<void> {
-    try {
-      // Получаем изображение для истории
-      let imageForHistory = cameraManager.getImageForAnalysis() || imageBase64;
-
-      // Проверяем валидность base64 перед сохранением
-      if (!imageForHistory || imageForHistory.length < 100) {
-        logger.warn('Invalid image data for history, skipping save');
-        return;
-      }
-
-      // РАСЧЕТ РАЗМЕРА И ОПТИМИЗАЦИЯ
-      const analysisText = response.analysis || '';
-      const currentSizeMB = cameraManager.calculateHistoryItemSize(imageForHistory, analysisText);
-
-      // Всегда делаем resize до 800x800 пикселей для экономии места
-      if (currentSizeMB > 0.5) {
-        try {
-          const resizedImage = await cameraManager.resizeImageForStorage(imageForHistory);
-          const resizedSizeMB = cameraManager.calculateHistoryItemSize(resizedImage, analysisText);
-
-          // Если после resize размер все еще > 1MB, не сохраняем
-          if (resizedSizeMB > 1.0) {
-            logger.warn('Image too large even after resize, skipping save');
-            return;
-          }
-
-          imageForHistory = resizedImage;
-
-        } catch (resizeError) {
-          logger.error('Image resize failed, skipping localStorage save', resizeError);
-          return;
-        }
-      }
-
-      // Создаем элемент истории
-      const historyItem: any = {
-        photo: imageForHistory,
-        timestamp: new Date().toISOString(),
-        sourceType: 'photo' as const,
-      };
-
-      if (response.analysis) {
-        historyItem.analysis = response.analysis;
-      }
-
-      // Сохраняем детальные результаты многопроходного анализа
-      if (response.multi_pass_results) {
-        historyItem.multi_pass_results = response.multi_pass_results;
-      }
-
-      const saved = historyManager.addItem(historyItem);
-
-      if (saved) {
-        logger.info('Analysis result saved to history successfully');
-      } else {
-        logger.warn('Failed to save analysis result to history');
-      }
-    } catch (error) {
-      logger.error('Error saving to history', error);
-      // Не прерываем процесс, просто логируем ошибку
-    }
-  }
+  // REMOVED: saveToHistory() - Сервер уже сохраняет в БД через /api/analyze
+  // Клиент только перезагружает историю через loadHistoryFromServer()
 
   /**
    * Обновление состояния анализа
@@ -214,8 +150,12 @@ class AnalysisManager {
         currentStep: 'Анализ завершен',
       });
 
-      // Сохраняем в историю
-      await this.saveToHistory(response, imageBase64);
+      // Перезагружаем историю с сервера (сервер уже сохранил через /api/analyze)
+      // NEW: Перезагружаем историю с сервера для получения актуальных данных
+      const { historyManager } = await import('./history.js');
+      await historyManager.loadHistoryFromServer().catch(error => {
+        logger.warn('Failed to reload history from server after analysis', error);
+      });
 
       // ОБНОВЛЯЕМ UI ПОСЛЕ СОХРАНЕНИЯ
       const { uiManager } = await import('./uiManager.js');
@@ -226,7 +166,7 @@ class AnalysisManager {
         detail: { imageBase64, analysis: response.analysis }
       }));
 
-      // Обновляем карусель истории
+      // Обновляем карусель истории (event history:updated уже вызовется автоматически)
       uiManager.updateHistoryDisplay();
 
       // Обновляем информацию о подписке (если вернулся новый статус)

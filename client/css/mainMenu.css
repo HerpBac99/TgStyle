@@ -540,7 +540,7 @@ button:active {
     justify-content: center; /* justify-content: center - центрирует элементы по вертикали */
 
     /* ПЕРЕПОЛНЕНИЕ */
-    overflow: hidden; /* overflow: hidden - скрывает контент, выходящий за границы */
+    overflow: visible; /* FIX: overflow: visible - карточки не обрезаются по краям */
 
     /* ПОЗИЦИОНИРОВАНИЕ */
     position: relative; /* position: relative - создает контекст для абсолютно позиционированных детей */

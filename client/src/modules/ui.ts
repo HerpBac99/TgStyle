@@ -2060,7 +2060,7 @@ class UIManager {
    * Выполняет удаление элемента
    */
   private async performDelete(button: HTMLButtonElement, index: number): Promise<void> {
-    const success = historyManager.removeItem(index);
+    const success = await historyManager.removeItem(index);
 
     if (success) {
       logger.info('History item deleted successfully', { index });
