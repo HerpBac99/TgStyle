@@ -90,6 +90,45 @@ export class WardrobeService {
   }
 
   /**
+   * Обновить элемент гардероба
+   */
+  async updateItem(itemId: number, updates: Partial<WardrobeItem>): Promise<void> {
+    try {
+      logger.info('Updating wardrobe item', { itemId, updates });
+
+      const initData = (window as any).Telegram?.WebApp?.initData || '';
+
+      const response = await fetch(`/api/wardrobe/${itemId}?initData=${encodeURIComponent(initData)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updates)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update item');
+      }
+
+      logger.info('Item updated successfully', { itemId });
+
+      // Обновляем кэш
+      dataCacheManager.updateWardrobeItem(itemId, result.item);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error updating wardrobe item', { error: errorMessage, itemId });
+      throw error;
+    }
+  }
+
+  /**
    * Фильтровать вещи по категории
    */
   filterByCategory(items: WardrobeItem[], category: string): WardrobeItem[] {

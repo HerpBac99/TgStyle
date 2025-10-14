@@ -261,6 +261,120 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * PUT /api/wardrobe/:id
+ * Обновить предмет гардероба
+ */
+router.put('/:id', async (req, res) => {
+    try {
+        const { initData } = req.query;
+        const itemId = parseInt(req.params.id);
+        const updates = req.body;
+
+        // Валидация Telegram данных
+        if (!initData) {
+            return res.status(401).json({
+                success: false,
+                error: 'Missing Telegram authentication data'
+            });
+        }
+
+        const validation = validateTelegramWebAppData(initData);
+        if (!validation.isValid) {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid Telegram authentication data'
+            });
+        }
+
+        const userId = validation.data.user.id;
+
+        // Проверяем, что предмет принадлежит пользователю
+        const existingItem = await prisma.wardrobeItem.findFirst({
+            where: {
+                id: itemId,
+                telegramId: BigInt(userId)
+            }
+        });
+
+        if (!existingItem) {
+            return res.status(404).json({
+                success: false,
+                error: 'Item not found or access denied'
+            });
+        }
+
+        logger.info('Updating wardrobe item with data', {
+            itemId,
+            updates,
+            existingCategory: existingItem.category
+        });
+
+        // Готовим данные для обновления
+        const updateData = {
+            updatedAt: new Date()
+        };
+
+        // Проверяем реальные изменения (пока только категория)
+        if (updates.category !== undefined && updates.category !== existingItem.category) {
+            // Конвертируем строку категории в enum значение
+            const validCategories = ['OUTERWEAR', 'INNERWEAR', 'BODYWEAR', 'FULLBODY', 'LEGWEAR', 'FOOTWEAR', 'HEADWEAR', 'ACCESSORIES'];
+            if (validCategories.includes(updates.category)) {
+                updateData.category = updates.category;
+            } else {
+                logger.warn('Invalid category value', { category: updates.category });
+            }
+        }
+
+        // Проверяем, есть ли реальные изменения
+        const hasChanges = Object.keys(updateData).length > 1; // кроме updatedAt
+        if (!hasChanges) {
+            logger.info('No changes detected, skipping update', { itemId });
+            return res.json({
+                success: true,
+                message: 'No changes to update'
+            });
+        }
+
+        logger.info('Final update data', { updateData });
+
+        // Обновляем предмет
+        const updatedItem = await prisma.wardrobeItem.update({
+            where: { id: itemId },
+            data: updateData
+        });
+
+        // Преобразуем BigInt для JSON
+        const result = {
+            ...updatedItem,
+            id: updatedItem.id.toString(),
+            telegramId: updatedItem.telegramId.toString()
+        };
+
+        logger.info('Wardrobe item updated', {
+            itemId,
+            userId,
+            updates: Object.keys(updates)
+        });
+
+        res.json({
+            success: true,
+            item: result
+        });
+
+    } catch (error) {
+        logger.error('Error updating wardrobe item', {
+            error: error.message,
+            itemId: req.params.id
+        });
+
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
+    }
+});
+
+/**
  * DELETE /api/wardrobe/:id
  * Удалить предмет гардероба
  */

@@ -8,7 +8,7 @@ import { WardrobeItem, ClassificationResult } from '@/types/wardrobe';
 import { PhotoUploadHandler } from '../photoUploadManager';
 import { wardrobeService } from './WardrobeService';
 import { photoProcessor } from '../shared/PhotoProcessor';
-import { fileToBase64 } from '../shared/utils';
+import { fileToBase64, stringToClothingCategory } from '../shared/utils';
 import { uiModalManager } from '../uiModalManager';
 
 /**
@@ -19,6 +19,7 @@ export class WardrobeManager implements PhotoUploadHandler {
   private wardrobeItems: WardrobeItem[] = [];
   private currentPreviewImage: string | null = null;
   private currentClassification: ClassificationResult | null = null;
+  private originalItemData: { category?: string; color?: string; material?: string } | null = null; // Оригинальные данные для сравнения изменений
   private currentFilter: string = 'ALL';
 
   constructor() {
@@ -182,10 +183,13 @@ export class WardrobeManager implements PhotoUploadHandler {
     content.appendChild(image);
     card.appendChild(content);
 
-    // Обработчик удаления (долгое нажатие)
+    // Обработчик кликов с разной длительностью
+    let pressStartTime: number;
     let longPressTimer: number;
 
-    const startLongPress = () => {
+    const startPress = () => {
+      pressStartTime = Date.now();
+      // Таймер для долгого нажатия (удаление)
       longPressTimer = window.setTimeout(() => {
         if (confirm('Удалить этот предмет из гардероба?')) {
           this.removeItem(item.id);
@@ -193,13 +197,27 @@ export class WardrobeManager implements PhotoUploadHandler {
       }, 800);
     };
 
-    const cancelLongPress = () => clearTimeout(longPressTimer);
+    const endPress = () => {
+      const pressDuration = Date.now() - pressStartTime;
+      clearTimeout(longPressTimer);
 
-    card.addEventListener('mousedown', startLongPress);
-    card.addEventListener('mouseup', cancelLongPress);
-    card.addEventListener('mouseleave', cancelLongPress);
-    card.addEventListener('touchstart', startLongPress);
-    card.addEventListener('touchend', cancelLongPress);
+      // Короткий клик (< 500ms) - открываем preview
+      if (pressDuration < 500) {
+        this.showPreviewModal(item);
+      }
+      // Долгое нажатие (> 800ms) обрабатывается в таймере выше
+      // Промежуток 500-800ms - ничего не делаем
+    };
+
+    const cancelPress = () => {
+      clearTimeout(longPressTimer);
+    };
+
+    card.addEventListener('mousedown', startPress);
+    card.addEventListener('mouseup', endPress);
+    card.addEventListener('mouseleave', cancelPress);
+    card.addEventListener('touchstart', startPress);
+    card.addEventListener('touchend', endPress);
 
     return card;
   }
@@ -232,21 +250,102 @@ export class WardrobeManager implements PhotoUploadHandler {
 
   /**
    * Показать модальное окно предпросмотра
+   * @param existingItem - существующая вещь из гардероба (опционально)
    */
-  showPreviewModal(): void {
+  showPreviewModal(existingItem?: WardrobeItem): void {
+    // Сохраняем оригинальные данные для сравнения изменений
+    if (existingItem) {
+      this.originalItemData = {};
+      if (existingItem.category !== undefined) this.originalItemData.category = existingItem.category;
+      if (existingItem.color !== undefined) this.originalItemData.color = existingItem.color;
+      if (existingItem.material !== undefined) this.originalItemData.material = existingItem.material;
+    } else {
+      this.originalItemData = null;
+    }
+
     uiModalManager.showWardrobePreviewModal({
       type: 'wardrobe-preview',
       modalId: 'wardrobe-preview-modal',
-      allowManualCategorySelection: true, // ✅ Разрешаем ручной выбор категории
+      allowManualCategorySelection: true,
       onCategoryChange: (newCategory) => {
-        // Обновляем категорию в текущих данных классификации
-        if (this.currentClassification) {
+        // Обновляем категорию в текущих данных
+        if (existingItem) {
+          // Для существующей вещи обновляем локально
+          existingItem.category = newCategory;
+        } else if (this.currentClassification) {
+          // Для новой вещи обновляем классификацию
           this.currentClassification.category = newCategory;
         }
       },
-      onConfirm: () => this.confirmPreview(),
+      onConfirm: () => {
+        if (existingItem) {
+          // Сохраняем изменения существующей вещи
+          this.updateExistingItem(existingItem);
+        } else {
+          // Подтверждаем добавление новой вещи
+          this.confirmPreview();
+        }
+      },
       onCancel: () => this.cancelPreview()
     });
+
+    // Если передана существующая вещь - показываем её данные
+    if (existingItem) {
+      uiModalManager.showImageInModal(existingItem.imageUrl);
+      uiModalManager.showClassificationInfo(
+        existingItem.category ? stringToClothingCategory(existingItem.category) : stringToClothingCategory('BODYWEAR'),
+        existingItem.color || 'Не указано',
+        existingItem.material
+      );
+    }
+  }
+
+  /**
+   * Обновить существующую вещь в гардеробе
+   */
+  private async updateExistingItem(item: WardrobeItem): Promise<void> {
+    try {
+      if (!this.originalItemData) {
+        throw new Error('Original item data not found');
+      }
+
+      const updates: Partial<WardrobeItem> = {};
+      let hasChanges = false;
+
+      // Пока проверяем только категорию (единственное поле, которое можно менять)
+      if (item.category !== this.originalItemData.category && item.category !== undefined) {
+        logger.info(`Category changed: ${this.originalItemData.category} -> ${item.category}`);
+        updates.category = item.category;
+        hasChanges = true;
+      }
+
+      // Если нет изменений - ничего не делаем
+      if (!hasChanges) {
+        logger.info(`No changes detected for item ${item.id}`);
+        return;
+      }
+
+      await wardrobeService.updateItem(item.id, updates);
+
+      // Обновляем локальный массив
+      const index = this.wardrobeItems.findIndex(i => i.id === item.id);
+      if (index !== -1) {
+        this.wardrobeItems[index] = { ...item };
+      }
+
+      // Очищаем оригинальные данные
+      this.originalItemData = null;
+
+      // Перерисовываем
+      this.renderGrid();
+
+      logger.info(`Item updated: ${item.id}`, { changes: updates });
+    } catch (error) {
+      // Очищаем оригинальные данные даже при ошибке
+      this.originalItemData = null;
+      logger.error('Failed to update item', error);
+      alert('Ошибка при сохранении изменений. Попробуйте еще раз.');
+    }
   }
 
   /**

@@ -352,6 +352,17 @@ class DataCacheManager {
   }
 
   /**
+   * Обновить элемент в кэше гардероба
+   */
+  updateWardrobeItem(itemId: number, updatedItem: WardrobeItem): void {
+    const index = this.wardrobeItems.findIndex(item => item.id === itemId);
+    if (index !== -1) {
+      this.wardrobeItems[index] = updatedItem;
+      logger.info('Wardrobe item updated in cache', { itemId });
+    }
+  }
+
+  /**
    * Удалить элемент из кэша гардероба
    */
   removeWardrobeItem(itemId: number): void {
