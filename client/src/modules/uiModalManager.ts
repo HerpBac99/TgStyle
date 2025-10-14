@@ -33,6 +33,8 @@ export interface WardrobePreviewModalConfig extends BaseModalConfig {
   type: 'wardrobe-preview';
   onConfirm: () => void;
   onCancel: () => void;
+  onCategoryChange?: (category: ClothingCategory) => void;
+  allowManualCategorySelection?: boolean;
 }
 
 /**
@@ -51,10 +53,9 @@ export class UIModalManager {
   private selectedItems: Set<number> = new Set();
   private currentFilter: string = 'ALL';
   
-  constructor() {
-    logger.info('UIModalManager initialized');
-  }
-
+  // Для wardrobe-preview модалки
+  private currentCategory: ClothingCategory | null = null;
+  
   // ============================================
   // ПУБЛИЧНЫЕ МЕТОДЫ - CLOTHING SELECTION MODAL
   // ============================================
@@ -199,6 +200,9 @@ export class UIModalManager {
     fit?: string, 
     description?: string
   ): void {
+    // Сохраняем текущую категорию
+    this.currentCategory = category;
+
     // Создаем или находим контейнер для информации
     let infoElement = document.getElementById('wardrobe-preview-info');
 
@@ -214,15 +218,35 @@ export class UIModalManager {
       }
     }
 
-    // Переводим категорию на русский
-    const categoryRu = this.getCategoryNameRu(category);
+    // Проверяем, разрешен ли ручной выбор категории
+    const allowManualSelection = this.currentModal?.type === 'wardrobe-preview' 
+      && this.currentModal.allowManualCategorySelection;
 
     // Формируем HTML с информацией
-    let infoHtml = `
+    let infoHtml = '';
+
+    if (allowManualSelection) {
+      // Создаем селектор категорий
+      infoHtml += `
+      <div class="classification-item">
+        <span class="classification-label">Категория:</span>
+        <select id="category-selector" class="category-selector" data-current="${category}">
+          ${this.getCategoryOptions(category)}
+        </select>
+      </div>
+      `;
+    } else {
+      // Переводим категорию на русский
+      const categoryRu = this.getCategoryNameRu(category);
+      infoHtml += `
       <div class="classification-item">
         <span class="classification-label">Категория:</span>
         <span class="classification-value">${categoryRu}</span>
       </div>
+      `;
+    }
+
+    infoHtml += `
       <div class="classification-item">
         <span class="classification-label">Цвет:</span>
         <span class="classification-value">${color || 'Не определен'}</span>
@@ -271,7 +295,78 @@ export class UIModalManager {
     // Показываем элемент
     infoElement.style.display = 'block';
 
-    logger.info('Classification info shown', { category: categoryRu, color });
+    // Настраиваем обработчик для селектора категорий (если он есть)
+    if (allowManualSelection) {
+      this.setupCategorySelector();
+    }
+
+    logger.info('Classification info shown', { 
+      category: this.getCategoryNameRu(category), 
+      color,
+      manualSelectionAllowed: allowManualSelection 
+    });
+  }
+
+  /**
+   * Получить HTML опции для селектора категорий
+   */
+  getCategoryOptions(currentCategory: ClothingCategory): string {
+    const categories = [
+      { key: ClothingCategory.OUTERWEAR, label: 'Верхняя одежда' },
+      { key: ClothingCategory.INNERWEAR, label: 'Кофты' },
+      { key: ClothingCategory.BODYWEAR, label: 'Футболки и рубашки' },
+      { key: ClothingCategory.FULLBODY, label: 'Платья и костюмы' },
+      { key: ClothingCategory.LEGWEAR, label: 'Штаны' },
+      { key: ClothingCategory.FOOTWEAR, label: 'Обувь' },
+      { key: ClothingCategory.HEADWEAR, label: 'Головные уборы' },
+      { key: ClothingCategory.ACCESSORIES, label: 'Аксессуары' }
+    ];
+
+    return categories
+      .map(cat => `<option value="${cat.key}" ${cat.key === currentCategory ? 'selected' : ''}>${cat.label}</option>`)
+      .join('');
+  }
+
+  /**
+   * Настроить обработчик для селектора категорий
+   */
+  private setupCategorySelector(): void {
+    const selector = document.getElementById('category-selector') as HTMLSelectElement;
+    if (!selector) {
+      return;
+    }
+
+    const handleChange = (event: Event) => {
+      const target = event.target as HTMLSelectElement;
+      const newCategory = target.value as ClothingCategory;
+
+      logger.info('Category manually changed', {
+        oldCategory: this.currentCategory,
+        newCategory
+      });
+
+      // Обновляем текущую категорию
+      this.currentCategory = newCategory;
+
+      // Вызываем callback если он есть
+      if (this.currentModal?.type === 'wardrobe-preview' && this.currentModal.onCategoryChange) {
+        this.currentModal.onCategoryChange(newCategory);
+      }
+    };
+
+    selector.addEventListener('change', handleChange);
+
+    // Добавляем в cleanup
+    this.cleanupFunctions.push(() => {
+      selector.removeEventListener('change', handleChange);
+    });
+  }
+
+  /**
+   * Получить текущую выбранную категорию
+   */
+  getCurrentCategory(): ClothingCategory | null {
+    return this.currentCategory;
   }
 
   // ============================================

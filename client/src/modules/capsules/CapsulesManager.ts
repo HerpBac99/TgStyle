@@ -544,10 +544,7 @@ export class CapsulesManager implements PhotoUploadHandler {
       uiModalManager.showClassificationInfo(
         result.classification.category,
         result.classification.color,
-        result.classification.material,
-        result.classification.style,
-        result.classification.fit,
-        result.classification.description
+        result.classification.material
       );
 
       // Сохраняем для подтверждения

@@ -1313,6 +1313,11 @@ def map_color_to_russian(color_input: str) -> str:
         russian_base = color_map.get(base_color, base_color)
         return f'бледно-{russian_base}'
 
+    if 'navy' in normalized:
+        base_color = normalized.replace('navy', '').strip()
+        russian_base = color_map.get(base_color, base_color)
+        return f'темно-{russian_base}'
+
     # Простые цвета без оттенков
     return color_map.get(normalized, color_input)
 
@@ -1582,7 +1587,6 @@ def classify_clothing():
                         parsed_data[index] = value
 
             parsing_time = time.time() - parsing_start
-            app.logger.info(f"⏱️ Парсинг результата: {parsing_time*1000:.1f}мс")
 
             # Новый формат ответа:
             # 1. Тип одежды (для определения категории)
@@ -1603,19 +1607,16 @@ def classify_clothing():
             mapping_start = time.time()
             normalized_category = map_to_clothing_category(raw_type)
             mapping_time = time.time() - mapping_start
-            app.logger.info(f"⏱️ Маппинг категории: {mapping_time*1000:.1f}мс ({raw_type} -> {normalized_category})")
 
             # Цвет на английском от LLM - переводим на русский
             color_start = time.time()
             color_russian = map_color_to_russian(raw_color) if raw_color != 'Unknown' else 'Неизвестно'
             color_time = time.time() - color_start
-            app.logger.info(f"⏱️ Перевод цвета: {color_time*1000:.1f}мс ({raw_color} -> {color_russian})")
 
             # Материал на английском от LLM - переводим на русский
             material_start = time.time()
             material_russian = map_material_to_russian(raw_material) if raw_material != 'Unknown' else 'Неизвестно'
             material_time = time.time() - material_start
-            app.logger.info(f"⏱️ Перевод материала: {material_time*1000:.1f}мс ({raw_material} -> {material_russian})")
 
             classification = {
                 'category': normalized_category,  # Нормализованная категория (OUTERWEAR, INNERWEAR, etc.)

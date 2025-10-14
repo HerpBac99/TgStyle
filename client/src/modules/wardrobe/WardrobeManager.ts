@@ -96,9 +96,13 @@ export class WardrobeManager implements PhotoUploadHandler {
     const categories = [
       { key: 'ALL', label: 'Все' },
       { key: 'OUTERWEAR', label: 'Верхняя одежда' },
-      { key: 'BODYWEAR', label: 'Верх' },
-      { key: 'LEGWEAR', label: 'Низ' },
-      { key: 'FOOTWEAR', label: 'Обувь' }
+      { key: 'INNERWEAR', label: 'Кофты'},
+      { key: 'BODYWEAR', label: 'Футболки и рубашки' },
+      { key: 'FULLBODY', label: 'Платья и костюмы'},
+      { key: 'LEGWEAR', label: 'Штаны' },
+      { key: 'FOOTWEAR', label: 'Обувь' },
+      { key: 'HEADWEAR', label: 'Головные уборы' },
+      { key: 'ACCESSORIES', label: 'Аксессуары' }
     ];
 
     categories.forEach(cat => {
@@ -233,6 +237,13 @@ export class WardrobeManager implements PhotoUploadHandler {
     uiModalManager.showWardrobePreviewModal({
       type: 'wardrobe-preview',
       modalId: 'wardrobe-preview-modal',
+      allowManualCategorySelection: true, // ✅ Разрешаем ручной выбор категории
+      onCategoryChange: (newCategory) => {
+        // Обновляем категорию в текущих данных классификации
+        if (this.currentClassification) {
+          this.currentClassification.category = newCategory;
+        }
+      },
       onConfirm: () => this.confirmPreview(),
       onCancel: () => this.cancelPreview()
     });
@@ -264,10 +275,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       uiModalManager.showClassificationInfo(
         result.classification.category,
         result.classification.color,
-        result.classification.material,
-        result.classification.style,
-        result.classification.fit,
-        result.classification.description
+        result.classification.material
       );
 
       // Сохраняем для подтверждения
@@ -339,6 +347,13 @@ export class WardrobeManager implements PhotoUploadHandler {
   private async confirmPreview(): Promise<void> {
     if (!this.currentPreviewImage || !this.currentClassification) {
       return;
+    }
+
+    // Получаем финальную категорию (может быть изменена пользователем)
+    const finalCategory = uiModalManager.getCurrentCategory();
+    if (finalCategory) {
+      this.currentClassification.category = finalCategory;
+      logger.info('Using manually selected category', { category: finalCategory });
     }
 
     uiModalManager.hide();
