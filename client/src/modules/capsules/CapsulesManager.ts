@@ -16,9 +16,11 @@ import { fileToBase64 } from '../shared/utils';
 import { dataCacheManager } from '../dataCache';
 import { UICapsulesGrid } from '../uiCapsulesGrid';
 import { UICanvasEditor } from '../uiCanvasEditor';
+import { UICanvasResultScreen } from '../uiCanvasResultScreen';
 import { uiModalManager } from '../uiModalManager';
 import { navigationManager } from '../navigationManager';
 import { capsulesSharing } from './CapsulesSharing';
+import { addWatermark } from '@/utils/watermarkUtils';
 
 /**
  * Менеджер капсул
@@ -27,6 +29,7 @@ export class CapsulesManager implements PhotoUploadHandler {
   // Компоненты UI
   private capsulesGrid: UICapsulesGrid;
   private canvasEditor: UICanvasEditor | null = null;
+  private resultScreen: UICanvasResultScreen | null = null;
 
   // Данные
   private wardrobeItems: WardrobeItem[] = [];
@@ -34,8 +37,9 @@ export class CapsulesManager implements PhotoUploadHandler {
   private currentCapsuleId: number | null = null;
 
   // Состояние
-  private mode: 'grid' | 'selection' | 'canvas' | null = null;
+  private mode: 'grid' | 'selection' | 'canvas' | 'result' | null = null;
   private selectedItems: WardrobeItem[] = [];
+  private currentResultImage: string | null = null;
 
   // Предпросмотр фото
   private currentPreviewImage: string | null = null;
@@ -275,8 +279,7 @@ export class CapsulesManager implements PhotoUploadHandler {
       containerId: 'capsules-canvas-container',
       canvasId: 'capsules-canvas',
       onAddItem: () => this.handleCanvasAddItem(),
-      onSave: () => this.handleCanvasSave(),
-      onShare: () => this.handleCanvasShare()
+      onNext: () => this.handleCanvasNext()
     });
 
     this.canvasEditor.show();
@@ -352,21 +355,192 @@ export class CapsulesManager implements PhotoUploadHandler {
   }
 
   /**
-   * Обработчик сохранения капсулы
+   * Обработчик кнопки "Далее" на canvas
+   * Обрабатывает изображение и показывает экран результата
    */
-  private async handleCanvasSave(): Promise<void> {
+  private async handleCanvasNext(): Promise<void> {
     if (!this.canvasEditor) {
       logger.error('Canvas editor not available');
       return;
     }
 
     try {
+      logger.info('Processing canvas for result screen');
+
       // Получаем состояние canvas с показом модального окна
       const state = await uiModalManager.executeWithLoadingModal({
         modalType: 'canvas',
         loadingText: 'Обрабатываем образ...',
-        asyncOperation: () => this.canvasEditor!.getState()
+        asyncOperation: async () => {
+          // Получаем состояние (включая thumbnailImage с удаленным фоном)
+          const canvasState = await this.canvasEditor!.getState();
+          
+          // Добавляем watermark
+          const imageWithWatermark = await addWatermark(canvasState.thumbnailImage);
+          
+          return {
+            ...canvasState,
+            finalImage: imageWithWatermark
+          };
+        }
       });
+
+      // Сохраняем финальное изображение и состояние
+      this.currentResultImage = (state as any).finalImage;
+
+      // Скрываем canvas
+      this.canvasEditor.hide();
+
+      // Показываем экран результата
+      this.showResultScreen((state as any).finalImage);
+
+      // Меняем mode
+      this.mode = 'result';
+
+    } catch (error) {
+      logger.error('Error processing canvas for result', error);
+      alert('Ошибка при обработке капсулы. Попробуйте еще раз.');
+    }
+  }
+
+  // ============================================
+  // ЭКРАН РЕЗУЛЬТАТА
+  // ============================================
+
+  /**
+   * Показать экран результата с изображением
+   */
+  private showResultScreen(imageBase64: string): void {
+    // Инициализируем экран результата если нужно
+    if (!this.resultScreen) {
+      this.resultScreen = new UICanvasResultScreen({
+        screenId: 'capsule-result-screen',
+        onSave: () => this.handleResultSave(),
+        onShare: () => this.handleResultShare(),
+        onDone: () => this.handleResultDone()
+      });
+    }
+
+    // Показываем экран
+    this.resultScreen.show(imageBase64);
+
+    // Настраиваем BackButton для возврата на canvas
+    navigationManager.push(() => {
+      this.returnToCanvasFromResult();
+    }, 'Return to canvas from result screen');
+
+    logger.info('Result screen shown');
+  }
+
+  /**
+   * Вернуться на canvas с экрана результата
+   */
+  private returnToCanvasFromResult(): void {
+    logger.info('Returning to canvas from result screen');
+
+    // Скрываем экран результата
+    if (this.resultScreen) {
+      this.resultScreen.hide();
+    }
+
+    // Показываем canvas
+    if (this.canvasEditor) {
+      this.canvasEditor.show();
+    }
+
+    // Меняем mode обратно на canvas
+    this.mode = 'canvas';
+
+    // Убираем один уровень из стека навигации
+    navigationManager.pop();
+  }
+
+  /**
+   * Обработчик кнопки "Сохранить в галерею"
+   */
+  private handleResultSave(): void {
+    if (!this.currentResultImage) {
+      logger.warn('No result image to save');
+      return;
+    }
+
+    try {
+      // Открываем изображение через Telegram WebApp
+      const tg = (window as any).Telegram?.WebApp;
+      
+      if (tg && tg.openLink) {
+        // Telegram может открыть data URL, пользователь сможет скачать
+        tg.openLink(this.currentResultImage);
+        logger.info('Opened image for download via Telegram');
+      } else {
+        // Fallback: создаем ссылку для скачивания
+        const link = document.createElement('a');
+        link.href = this.currentResultImage;
+        link.download = `capsule_${Date.now()}.png`;
+        link.click();
+        logger.info('Downloaded image via browser');
+      }
+
+    } catch (error) {
+      logger.error('Error saving image', error);
+      alert('Не удалось сохранить изображение');
+    }
+  }
+
+  /**
+   * Обработчик кнопки "Поделиться в Telegram"
+   */
+  private async handleResultShare(): Promise<void> {
+    if (!this.currentResultImage) {
+      logger.warn('No result image to share');
+      return;
+    }
+
+    try {
+      // Получаем данные капсулы (если сохранена)
+      const capsule = this.capsules.find(c => c.id === this.currentCapsuleId);
+      const capsuleName = capsule?.name || `Капсула ${new Date().toLocaleDateString()}`;
+      
+      logger.info('Sharing capsule from result screen', { 
+        id: this.currentCapsuleId, 
+        name: capsuleName
+      });
+
+      // Используем финальное изображение с watermark
+      const success = await capsulesSharing.shareCapsule(
+        this.canvasEditor!,
+        capsuleName,
+        this.currentCapsuleId || undefined,
+        this.currentResultImage  // Используем готовое изображение с watermark
+      );
+
+      if (success) {
+        logger.info('Capsule shared successfully', { id: this.currentCapsuleId });
+      } else {
+        logger.error('Failed to share capsule');
+      }
+
+    } catch (error) {
+      logger.error('Error sharing capsule from result screen', error);
+      alert('Не удалось поделиться образом');
+    }
+  }
+
+  /**
+   * Обработчик кнопки "Готово"
+   * Сохраняет капсулу и возвращается к гриду
+   */
+  private async handleResultDone(): Promise<void> {
+    if (!this.canvasEditor) {
+      logger.error('Canvas editor not available');
+      return;
+    }
+
+    try {
+      logger.info('Saving capsule from result screen');
+
+      // Получаем состояние canvas
+      const state = await this.canvasEditor.getState();
 
       if (this.currentCapsuleId) {
         // Обновление существующей капсулы
@@ -382,6 +556,8 @@ export class CapsulesManager implements PhotoUploadHandler {
           this.capsules[index] = updated as StyleCapsule;
         }
 
+        logger.info('Capsule updated', { id: this.currentCapsuleId });
+
       } else {
         // Создание новой капсулы
         const created = await capsulesService.createCapsule({
@@ -396,58 +572,31 @@ export class CapsulesManager implements PhotoUploadHandler {
         logger.info('Capsule created', { id: created.id });
       }
 
-      // Возврат к гриду
-      this.returnToCapsulesGrid();
-
-      // Перерисовываем грид
-      this.capsulesGrid.render(this.capsules);
-
-    } catch (error) {
-      logger.error('Error saving capsule', error);
-      alert('Ошибка при сохранении капсулы. Попробуйте еще раз.');
-    }
-  }
-
-  /**
-   * Обработчик sharing капсулы
-   */
-  private async handleCanvasShare(): Promise<void> {
-    if (!this.canvasEditor) {
-      logger.error('Canvas editor not available');
-      return;
-    }
-
-    try {
-      // Получаем данные капсулы (если сохранена)
-      const capsule = this.capsules.find(c => c.id === this.currentCapsuleId);
-      const capsuleName = capsule?.name || `Капсула ${new Date().toLocaleDateString()}`;
-      
-      // ИСПОЛЬЗУЕМ ТУ ЖЕ ЛОГИКУ ЧТО И ПРИ СОХРАНЕНИИ!
-      // Получаем актуальное состояние canvas (включая thumbnailImage с правильными пропорциями)
-      const state = await this.canvasEditor.getState();
-      
-      logger.info('Sharing capsule', { 
-        id: this.currentCapsuleId, 
-        name: capsuleName,
-        hasThumbnail: !!state.thumbnailImage 
-      });
-
-      // Вызываем сервис sharing с актуальным thumbnail
-      const success = await capsulesSharing.shareCapsule(
-        this.canvasEditor,
-        capsuleName,
-        this.currentCapsuleId || undefined,
-        state.thumbnailImage  // Используем актуальный thumbnail из canvas
-      );
-
-      if (success) {
-        logger.info('Capsule shared successfully', { id: this.currentCapsuleId });
-      } else {
-        logger.error('Failed to share capsule');
+      // Скрываем экран результата
+      if (this.resultScreen) {
+        this.resultScreen.hide();
       }
 
+      // Скрываем canvas
+      if (this.canvasEditor) {
+        this.canvasEditor.hide();
+      }
+
+      // Очищаем навигацию (убираем все: result->canvas, canvas->selection)
+      navigationManager.clear();
+
+      // Показываем грид
+      this.mode = 'grid';
+      this.currentCapsuleId = null;
+      this.currentResultImage = null;
+      this.capsulesGrid.show();
+      this.capsulesGrid.render(this.capsules);
+
+      logger.info('Returned to capsules grid after save');
+
     } catch (error) {
-      logger.error('Error sharing capsule', error);
+      logger.error('Error saving capsule from result screen', error);
+      alert('Ошибка при сохранении капсулы. Попробуйте еще раз.');
     }
   }
 
@@ -708,10 +857,16 @@ export class CapsulesManager implements PhotoUploadHandler {
     this.capsules = [];
     this.selectedItems = [];
     this.currentCapsuleId = null;
+    this.currentResultImage = null;
 
     if (this.canvasEditor) {
       this.canvasEditor.destroy();
       this.canvasEditor = null;
+    }
+
+    if (this.resultScreen) {
+      this.resultScreen.destroy();
+      this.resultScreen = null;
     }
 
     this.capsulesGrid.destroy();

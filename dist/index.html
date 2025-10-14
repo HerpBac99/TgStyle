@@ -11,8 +11,8 @@
     <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
     <script src="https://unpkg.com/fabric@6.7.1/dist/fabric.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" crossorigin src="/assets/main-DsU8zW6C.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-Dfo-1bLX.css">
+  <script type="module" crossorigin src="/assets/main-nXpYn0l8.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-BGXpQQWE.css">
 </head>
 <body>
     <div class="app-container">
@@ -328,7 +328,12 @@
             </div>
         </button>
 
-        <!-- Кнопка сохранения капсулы -->
+        <!-- Кнопка "Далее" -->
+        <button id="canvas-next-btn" class="canvas-next-btn" aria-label="Далее">
+            <span>Далее</span>
+        </button>
+
+        <!-- ЗАКОММЕНТИРОВАНЫ: старые кнопки сохранения и sharing
         <button id="canvas-save-capsule-btn" class="canvas-save-capsule-btn" aria-label="Сохранить капсулу">
             <div class="canvas-save-capsule-btn-content">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -337,7 +342,6 @@
             </div>
         </button>
 
-        <!-- Кнопка поделиться капсулой -->
         <button id="canvas-share-capsule-btn" class="canvas-share-capsule-btn hidden" aria-label="Поделиться капсулой">
             <div class="canvas-share-capsule-btn-content">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -347,6 +351,37 @@
                 </svg>
             </div>
         </button>
+        -->
+    </div>
+
+    <!-- Экран результата капсулы -->
+    <div id="capsule-result-screen" class="capsule-result-screen hidden">
+        <!-- Контейнер результата -->
+        <div class="capsule-result-content">
+            <!-- Изображение с watermark (70% экрана) -->
+            <div class="capsule-result-image-container">
+                <img id="capsule-result-image" src="" alt="Результат капсулы" class="capsule-result-image">
+            </div>
+
+            <!-- Кнопки действий (внизу) -->
+            <div class="capsule-result-actions">
+                <button id="capsule-result-share-btn" class="capsule-result-btn" aria-label="Поделиться в Telegram">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                        <polyline points="16 6 12 2 8 6"></polyline>
+                        <line x1="12" y1="2" x2="12" y2="15"></line>
+                    </svg>
+                    <span>Поделиться</span>
+                </button >
+                <!-- Кнопка "Готово" -->
+                <button id="capsule-result-done-btn" class="capsule-result-btn capsule-result-done-btn" aria-label="Готово">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Готово</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Модальное окно capsules -->

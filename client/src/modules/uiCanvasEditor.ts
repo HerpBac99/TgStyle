@@ -17,8 +17,7 @@ export interface CanvasEditorConfig {
   containerId: string;  // ID контейнера canvas
   canvasId: string;     // ID элемента canvas
   onAddItem?: () => void;  // Callback для кнопки "Добавить одежду"
-  onSave?: () => void;     // Callback для кнопки "Сохранить"
-  onShare?: () => void;    // Callback для кнопки "Поделиться"
+  onNext?: () => void;     // Callback для кнопки "Далее"
 }
 
 /**
@@ -85,18 +84,6 @@ export class UICanvasEditor {
       container.classList.add('hidden');
       this.isVisible = false;
       logger.info('Canvas container hidden');
-    }
-
-    // Скрываем кнопку сохранения
-    const saveBtn = document.getElementById('canvas-save-capsule-btn') as HTMLElement;
-    if (saveBtn) {
-      saveBtn.classList.add('hidden');
-    }
-
-    // Скрываем кнопку sharing
-    const shareBtn = document.getElementById('canvas-share-capsule-btn') as HTMLElement;
-    if (shareBtn) {
-      shareBtn.classList.add('hidden');
     }
   }
 
@@ -489,7 +476,7 @@ export class UICanvasEditor {
   // ============================================
 
   /**
-   * Настроить кнопки canvas (Добавить, Сохранить)
+   * Настроить кнопки canvas (Добавить, Далее)
    */
   private setupCanvasButtons(): void {
     // Очищаем старые обработчики перед добавлением новых
@@ -510,37 +497,17 @@ export class UICanvasEditor {
       });
     }
 
-    // Кнопка "Сохранить капсулу"
-    const saveBtn = document.getElementById('canvas-save-capsule-btn') as HTMLElement;
-    if (saveBtn && this.config.onSave) {
-      // Показываем кнопку
-      saveBtn.classList.remove('hidden');
-
-      const handleSave = () => {
-        logger.info('Canvas save capsule button clicked');
-        this.config.onSave!();
+    // Кнопка "Далее"
+    const nextBtn = document.getElementById('canvas-next-btn') as HTMLElement;
+    if (nextBtn && this.config.onNext) {
+      const handleNext = () => {
+        logger.info('Canvas next button clicked');
+        this.config.onNext!();
       };
 
-      saveBtn.addEventListener('click', handleSave);
+      nextBtn.addEventListener('click', handleNext);
       this.cleanupFunctions.push(() => {
-        saveBtn.removeEventListener('click', handleSave);
-      });
-    }
-
-    // Кнопка "Поделиться капсулой"
-    const shareBtn = document.getElementById('canvas-share-capsule-btn') as HTMLElement;
-    if (shareBtn && this.config.onShare) {
-      // Показываем кнопку
-      shareBtn.classList.remove('hidden');
-
-      const handleShare = () => {
-        logger.info('Canvas share capsule button clicked');
-        this.config.onShare!();
-      };
-
-      shareBtn.addEventListener('click', handleShare);
-      this.cleanupFunctions.push(() => {
-        shareBtn.removeEventListener('click', handleShare);
+        nextBtn.removeEventListener('click', handleNext);
       });
     }
 
@@ -813,15 +780,34 @@ export class UICanvasEditor {
 
   /**
    * Конвертировать canvas в изображение base64 с удалением фона
+   * Делаем фон прозрачным перед сохранением для правильной обрезки на сервере
    */
   private async canvasToImage(): Promise<string> {
     if (!this.fabricCanvas) {
       throw new Error('No canvas available');
     }
 
-    // Получаем canvas element
+    // Сохраняем текущий цвет фона
+    const originalBgColor = this.fabricCanvas.backgroundColor;
+
+    // Временно делаем фон прозрачным
+    this.fabricCanvas.backgroundColor = 'transparent';
+    this.fabricCanvas.renderAll();
+
+    logger.info('Canvas size', {
+      width: this.fabricCanvas.width,
+      height: this.fabricCanvas.height,
+      objectsCount: this.fabricCanvas.getObjects().length,
+      backgroundColor: 'transparent (temp)'
+    });
+
+    // Получаем canvas element с прозрачным фоном
     const canvasElement = this.fabricCanvas.getElement() as HTMLCanvasElement;
     const canvasBase64 = canvasElement.toDataURL('image/png');
+
+    // Восстанавливаем оригинальный фон
+    this.fabricCanvas.backgroundColor = originalBgColor;
+    this.fabricCanvas.renderAll();
 
     try {
       logger.info('Sending canvas to background removal');
@@ -847,14 +833,18 @@ export class UICanvasEditor {
         throw new Error(result.error || 'Background removal failed');
       }
 
-      logger.info('Canvas background removed successfully');
+      logger.info('Canvas background removed successfully', {
+        originalSize: result.image_info?.original_size,
+        resultSize: result.image_info?.result_size
+      });
+
       return result.image_base64;
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Error removing canvas background, using original', { error: errorMessage });
 
-      // Fallback: возвращаем оригинальное изображение canvas
+      // Fallback: возвращаем оригинальное изображение без удаления фона
       return canvasBase64;
     }
   }
