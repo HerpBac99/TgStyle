@@ -15,6 +15,23 @@ interface BaseModalConfig {
 }
 
 /**
+ * Типы модальных окон для загрузки
+ */
+export type LoadingModalType = 'wardrobe' | 'canvas';
+
+/**
+ * Конфигурация для выполнения операции с загрузкой
+ */
+export interface LoadingOperationConfig {
+  /** Тип модального окна */
+  modalType: LoadingModalType;
+  /** Текст для показа во время загрузки */
+  loadingText: string;
+  /** Асинхронная функция для выполнения */
+  asyncOperation: () => Promise<any>;
+}
+
+/**
  * Конфиг для модалки выбора одежды (для капсул)
  */
 export interface ClothingSelectionModalConfig extends BaseModalConfig {
@@ -160,7 +177,7 @@ export class UIModalManager {
   showLoadingInModal(show: boolean): void {
     const loadingElement = document.getElementById('wardrobe-preview-loading');
     const actionsElement = document.getElementById('wardrobe-preview-actions');
-    
+
     if (loadingElement) {
       if (show) {
         loadingElement.classList.remove('hidden');
@@ -175,6 +192,76 @@ export class UIModalManager {
       } else {
         actionsElement.style.display = 'flex';
       }
+    }
+  }
+
+  /**
+   * Изменить текст в индикаторе загрузки
+   */
+  setLoadingText(text: string): void {
+    const textElement = document.querySelector('.wardrobe-preview-loading-text') as HTMLElement;
+    if (textElement) {
+      textElement.textContent = text;
+    }
+  }
+
+
+  /**
+   * Выполнить асинхронную операцию с показом модального окна загрузки
+   *
+   * @param config - Конфигурация операции
+   * @returns Promise с результатом выполнения
+   */
+  async executeWithLoadingModal<T = any>(config: LoadingOperationConfig): Promise<T> {
+    const { modalType, loadingText, asyncOperation: operation } = config;
+
+    try {
+      // Устанавливаем текст загрузки в зависимости от типа модального окна
+      if (modalType === 'wardrobe') {
+        this.setLoadingText(loadingText);
+        this.showLoadingInModal(true);
+      } else if (modalType === 'canvas') {
+        this.setCanvasLoadingText(loadingText);
+        this.showCanvasLoadingModal(true);
+      }
+
+      // Выполняем асинхронную операцию
+      const result = await operation();
+
+      return result;
+
+    } finally {
+      // В любом случае скрываем соответствующее модальное окно
+      if (modalType === 'wardrobe') {
+        this.showLoadingInModal(false);
+      } else if (modalType === 'canvas') {
+        this.showCanvasLoadingModal(false);
+      }
+    }
+  }
+
+  /**
+   * Показать/скрыть canvas loading modal
+   */
+  private showCanvasLoadingModal(show: boolean): void {
+    const modal = document.getElementById('canvas-loading-modal');
+
+    if (modal) {
+      if (show) {
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+  }
+
+  /**
+   * Изменить текст в canvas loading modal
+   */
+  private setCanvasLoadingText(text: string): void {
+    const textElement = document.querySelector('.canvas-loading-text') as HTMLElement;
+    if (textElement) {
+      textElement.textContent = text;
     }
   }
 

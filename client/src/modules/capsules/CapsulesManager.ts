@@ -361,9 +361,12 @@ export class CapsulesManager implements PhotoUploadHandler {
     }
 
     try {
-
-      // Получаем состояние canvas
-      const state = await this.canvasEditor.getState();
+      // Получаем состояние canvas с показом модального окна
+      const state = await uiModalManager.executeWithLoadingModal({
+        modalType: 'canvas',
+        loadingText: 'Обрабатываем образ...',
+        asyncOperation: () => this.canvasEditor!.getState()
+      });
 
       if (this.currentCapsuleId) {
         // Обновление существующей капсулы

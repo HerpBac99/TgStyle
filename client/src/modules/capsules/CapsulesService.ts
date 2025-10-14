@@ -123,16 +123,7 @@ export class CapsulesService {
       // Добавляем в кэш
       dataCacheManager.addCapsule(result.capsule);
 
-      // Показываем сообщение об успехе
-      if ((window as any).Telegram?.WebApp?.showPopup) {
-        (window as any).Telegram.WebApp.showPopup({
-          message: 'Капсула успешно сохранена!',
-          buttons: [{ id: 'ok', type: 'close' }]
-        });
-      }
-
       return result.capsule;
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Error saving capsule to server', { error: errorMessage });
@@ -175,16 +166,7 @@ export class CapsulesService {
       // Обновляем в кэше
       dataCacheManager.updateCapsule(capsuleId, result.capsule);
 
-      // Показываем сообщение об успехе
-      if ((window as any).Telegram?.WebApp?.showPopup) {
-        (window as any).Telegram.WebApp.showPopup({
-          message: 'Капсула успешно обновлена!',
-          buttons: [{ id: 'ok', type: 'close' }]
-        });
-      }
-
       return result.capsule;
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Error updating capsule on server', { error: errorMessage, capsuleId });

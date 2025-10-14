@@ -272,7 +272,7 @@
     margin-top: 20px;
     font-size: 16px;
     font-weight: 500;
-    color: #333;
+    color: var(--tg-theme-text-color);
     text-align: center;
 }
 
@@ -353,4 +353,6 @@
     padding: 8px;
     background-color: white;
 }
+
+
 

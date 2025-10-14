@@ -366,9 +366,6 @@ export class WardrobeManager implements PhotoUploadHandler {
       // Классифицируем и удаляем фон
       const result = await photoProcessor.classifyAndRemoveBackground(base64);
 
-      // Скрываем индикатор загрузки
-      this.showLoadingInModal(false);
-
       // Показываем результат
       uiModalManager.showImageInModal(result.processedImage);
       uiModalManager.showClassificationInfo(
@@ -382,7 +379,6 @@ export class WardrobeManager implements PhotoUploadHandler {
       this.currentClassification = result.classification;
 
     } catch (error) {
-      this.showLoadingInModal(false);
       logger.error('Error processing photo', error);
 
       // Fallback - показываем оригинальное фото
@@ -422,8 +418,11 @@ export class WardrobeManager implements PhotoUploadHandler {
 
           if (file) {
             this.showPreviewModal();
-            this.showLoadingInModal(true);
-            await this.processPhotoWithBackgroundRemoval(file);
+            await uiModalManager.executeWithLoadingModal({
+              modalType: 'wardrobe',
+              loadingText: 'Обрабатываем фото...',
+              asyncOperation: () => this.processPhotoWithBackgroundRemoval(file)
+            });
           }
         } catch (error) {
           logger.error('Error in photo upload handler', error);
