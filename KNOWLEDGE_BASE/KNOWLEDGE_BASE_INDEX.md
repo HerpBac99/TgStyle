@@ -13,6 +13,7 @@ TgStyle - это Telegram Mini App для анализа стиля одежды
 - [KNOWLEDGE_BASE_CLIENT.md](./KNOWLEDGE_BASE_CLIENT.md) - документация клиентской части
 - [KNOWLEDGE_BASE_SERVER.md](./KNOWLEDGE_BASE_SERVER.md) - документация серверной части
 - [KNOWLEDGE_BASE_FASTVLM.md](./KNOWLEDGE_BASE_FASTVLM.md) - документация FastVLM сервера
+- [MAIN_TAB_INDEX.md](./MAIN_TAB_INDEX.md) - детальная документация главной закладки
 
 ## Основные функции проекта
 
