@@ -26,7 +26,6 @@ export class UICanvasResultScreen {
 
   constructor(config: CanvasResultScreenConfig) {
     this.config = config;
-    logger.info('UICanvasResultScreen initialized', { screenId: config.screenId });
   }
 
   // ============================================

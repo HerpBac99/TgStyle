@@ -36,7 +36,6 @@ export class UICapsulesGrid {
 
   constructor(config: CapsulesGridConfig) {
     this.config = config;
-    logger.info('UICapsulesGrid initialized');
   }
 
   /**

@@ -239,7 +239,7 @@ class TgStyleApp {
 
     // Обработка изменения размера окна
     window.addEventListener('resize', () => {
-      logger.info('Window resized', {
+      logger.debug('Window resized', {
         width: window.innerWidth,
         height: window.innerHeight,
       });
@@ -247,7 +247,7 @@ class TgStyleApp {
 
     // Обработка изменения ориентации
     window.addEventListener('orientationchange', () => {
-      logger.info('Orientation changed');
+      logger.debug('Orientation changed');
       // Небольшая задержка для корректного получения новых размеров
       setTimeout(() => {
         this.handleOrientationChange();

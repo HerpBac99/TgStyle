@@ -331,12 +331,37 @@
     font-weight: 500;
 }
 
+/* Редактируемые поля для цвета и материала */
+.classification-input {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: var(--tg-theme-text-color);
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(218, 109, 163, 0.3);
+    border-radius: 8px;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.classification-input:focus {
+    border-color: rgba(218, 109, 163, 0.8);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 2px 8px rgba(218, 109, 163, 0.2);
+}
+
+.classification-input::placeholder {
+    color: rgba(0, 0, 0, 0.4);
+}
+
 /* Селектор категорий для ручного выбора */
 .category-selector {
     flex: 1;
     padding: 8px 12px;
     font-size: 14px;
     color: var(--tg-theme-text-color);
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(218, 109, 163, 0.3);
     border-radius: 8px;
     outline: none;
     transition: all 0.3s ease;
@@ -345,7 +370,14 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23DA6DA3' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 12px center;
+    background-color: rgba(255, 255, 255, 0.8);
     padding-right: 36px;
+}
+
+.category-selector:focus {
+    border-color: rgba(218, 109, 163, 0.8);
+    background-color: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 2px 8px rgba(218, 109, 163, 0.2);
 }
 
 /* Опции селектора */

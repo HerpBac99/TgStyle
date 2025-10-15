@@ -44,20 +44,37 @@ export interface ClothingSelectionModalConfig extends BaseModalConfig {
 }
 
 /**
- * Конфиг для модалки предпросмотра (для гардероба)
+ * Данные для модального окна вещи
  */
-export interface WardrobePreviewModalConfig extends BaseModalConfig {
-  type: 'wardrobe-preview';
+export interface ItemModalData {
+  imageUrl: string;
+  category: ClothingCategory;
+  color: string;
+  material?: string;
+  style?: string;
+  fit?: string;
+  description?: string;
+  // Для существующей вещи
+  existingItem?: WardrobeItem;
+}
+
+/**
+ * Конфиг для модального окна вещи
+ */
+export interface ItemModalConfig extends BaseModalConfig {
+  type: 'item-modal';
+  data: ItemModalData;
+  allowEditCategory?: boolean;
+  allowEditColorMaterial?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
-  onCategoryChange?: (category: ClothingCategory) => void;
-  allowManualCategorySelection?: boolean;
+  onDataChange?: (field: 'category' | 'color' | 'material', value: string) => void;
 }
 
 /**
  * Объединенный тип конфигурации
  */
-export type ModalConfig = ClothingSelectionModalConfig | WardrobePreviewModalConfig;
+export type ModalConfig = ClothingSelectionModalConfig | ItemModalConfig;
 
 /**
  * Универсальный менеджер модальных окон
@@ -70,8 +87,8 @@ export class UIModalManager {
   private selectedItems: Set<number> = new Set();
   private currentFilter: string = 'ALL';
   
-  // Для wardrobe-preview модалки
-  private currentCategory: ClothingCategory | null = null;
+  // Для item-modal/wardrobe-preview модалки
+  private currentModalData: ItemModalData | null = null;
   
   // ============================================
   // ПУБЛИЧНЫЕ МЕТОДЫ - CLOTHING SELECTION MODAL
@@ -121,19 +138,26 @@ export class UIModalManager {
   }
 
   // ============================================
-  // ПУБЛИЧНЫЕ МЕТОДЫ - WARDROBE PREVIEW MODAL
+  // ПУБЛИЧНЫЕ МЕТОДЫ - ITEM MODAL (УНИВЕРСАЛЬНОЕ МОДАЛЬНОЕ ОКНО)
   // ============================================
 
   /**
-   * Показать модалку предпросмотра для гардероба
+   * Показать универсальное модальное окно вещи
+   * Объединяет функционал showWardrobePreviewModal и showClassificationInfo
    */
-  showWardrobePreviewModal(config: WardrobePreviewModalConfig): void {
-    logger.info('Showing wardrobe preview modal');
+  showItemModal(config: ItemModalConfig): void {
+    logger.info('Showing item modal', {
+      hasExistingItem: !!config.data.existingItem,
+      category: config.data.category,
+      allowEditCategory: config.allowEditCategory,
+      allowEditColorMaterial: config.allowEditColorMaterial
+    });
 
     // Сохраняем конфиг
     this.currentModal = config;
+    this.currentModalData = config.data;
 
-    // Полностью очищаем модальное окно перед показом
+    // Очищаем модальное окно
     this.clearPreviewModal();
 
     // Показываем модалку
@@ -141,15 +165,32 @@ export class UIModalManager {
     if (modal) {
       modal.classList.remove('hidden');
     } else {
-      logger.error('Wardrobe preview modal not found', { modalId: config.modalId });
+      logger.error('Item modal not found', { modalId: config.modalId });
       return;
     }
 
-    // Настраиваем обработчики
-    this.setupWardrobePreviewListeners(config);
+    // Показываем изображение
+    this.showImageInModal(config.data.imageUrl);
 
-    logger.info('Wardrobe preview modal shown');
+    // Показываем информацию о классификации (БЕЗ style, fit, description)
+    this.showClassificationInfo(
+      config.data.category,
+      config.data.color,
+      config.data.material,
+      undefined, // style - НЕ показываем
+      undefined, // fit - НЕ показываем
+      undefined, // description - НЕ показываем
+      config.allowEditColorMaterial,
+      config.allowEditCategory
+    );
+
+    // Настраиваем обработчики
+    this.setupItemModalListeners(config);
+
+    logger.info('Item modal shown');
   }
+
+
 
   /**
    * Очистить модальное окно предпросмотра
@@ -164,9 +205,12 @@ export class UIModalManager {
     // Очищаем информацию о классификации
     const infoElement = document.getElementById('wardrobe-preview-info');
     if (infoElement) {
-      infoElement.innerHTML = '';
-      infoElement.style.display = 'none';
+      // ПОЛНОСТЬЮ удаляем элемент из DOM
+      infoElement.remove();
     }
+
+    // Очищаем текущие данные
+    this.currentModalData = null;
 
     logger.info('Preview modal cleared');
   }
@@ -285,10 +329,19 @@ export class UIModalManager {
     material?: string, 
     style?: string, 
     fit?: string, 
-    description?: string
+    description?: string,
+    allowEditColorMaterial?: boolean,
+    allowEditCategory?: boolean
   ): void {
-    // Сохраняем текущую категорию
-    this.currentCategory = category;
+    // Обновляем данные в currentModalData если они есть
+    if (this.currentModalData) {
+      this.currentModalData.category = category;
+      this.currentModalData.color = color;
+      if (material !== undefined) this.currentModalData.material = material;
+      if (style !== undefined) this.currentModalData.style = style;
+      if (fit !== undefined) this.currentModalData.fit = fit;
+      if (description !== undefined) this.currentModalData.description = description;
+    }
 
     // Создаем или находим контейнер для информации
     let infoElement = document.getElementById('wardrobe-preview-info');
@@ -306,8 +359,8 @@ export class UIModalManager {
     }
 
     // Проверяем, разрешен ли ручной выбор категории
-    const allowManualSelection = this.currentModal?.type === 'wardrobe-preview' 
-      && this.currentModal.allowManualCategorySelection;
+    const allowManualSelection = allowEditCategory || 
+      (this.currentModal?.type === 'item-modal' && this.currentModal.allowEditCategory);
 
     // Формируем HTML с информацией
     let infoHtml = '';
@@ -333,15 +386,32 @@ export class UIModalManager {
       `;
     }
 
-    infoHtml += `
+    // Цвет - редактируемое поле если разрешено
+    if (allowEditColorMaterial) {
+      infoHtml += `
+      <div class="classification-item">
+        <span class="classification-label">Цвет:</span>
+        <input type="text" id="color-input" class="classification-input" value="${color || ''}" placeholder="Введите цвет" enterkeyhint="done" />
+      </div>
+      `;
+    } else {
+      infoHtml += `
       <div class="classification-item">
         <span class="classification-label">Цвет:</span>
         <span class="classification-value">${color || 'Не определен'}</span>
       </div>
-    `;
+      `;
+    }
 
-    // Добавляем дополнительные поля если они есть
-    if (material) {
+    // Материал - редактируемое поле если разрешено
+    if (allowEditColorMaterial) {
+      infoHtml += `
+      <div class="classification-item">
+        <span class="classification-label">Материал:</span>
+        <input type="text" id="material-input" class="classification-input" value="${material || ''}" placeholder="Введите материал" enterkeyhint="done" />
+      </div>
+      `;
+    } else if (material) {
       infoHtml += `
       <div class="classification-item">
         <span class="classification-label">Материал:</span>
@@ -350,32 +420,7 @@ export class UIModalManager {
       `;
     }
 
-    if (style) {
-      infoHtml += `
-      <div class="classification-item">
-        <span class="classification-label">Стиль:</span>
-        <span class="classification-value">${style}</span>
-      </div>
-      `;
-    }
-
-    if (fit) {
-      infoHtml += `
-      <div class="classification-item">
-        <span class="classification-label">Посадка:</span>
-        <span class="classification-value">${fit}</span>
-      </div>
-      `;
-    }
-
-    if (description) {
-      infoHtml += `
-      <div class="classification-item">
-        <span class="classification-label">Описание:</span>
-        <span class="classification-value">${description}</span>
-      </div>
-      `;
-    }
+    // Стиль, Посадка, Описание - НЕ показываем (системные поля)
 
     infoElement.innerHTML = infoHtml;
 
@@ -387,10 +432,16 @@ export class UIModalManager {
       this.setupCategorySelector();
     }
 
+    // Настраиваем обработчики для редактируемых полей (если они есть)
+    if (allowEditColorMaterial) {
+      this.setupColorMaterialInputs();
+    }
+
     logger.info('Classification info shown', { 
       category: this.getCategoryNameRu(category), 
       color,
-      manualSelectionAllowed: allowManualSelection 
+      manualSelectionAllowed: allowManualSelection,
+      editableColorMaterial: allowEditColorMaterial 
     });
   }
 
@@ -428,16 +479,18 @@ export class UIModalManager {
       const newCategory = target.value as ClothingCategory;
 
       logger.info('Category manually changed', {
-        oldCategory: this.currentCategory,
+        oldCategory: this.currentModalData?.category,
         newCategory
       });
 
-      // Обновляем текущую категорию
-      this.currentCategory = newCategory;
+      // Обновляем текущие данные
+      if (this.currentModalData) {
+        this.currentModalData.category = newCategory;
+      }
 
-      // Вызываем callback если он есть
-      if (this.currentModal?.type === 'wardrobe-preview' && this.currentModal.onCategoryChange) {
-        this.currentModal.onCategoryChange(newCategory);
+      // Вызываем callback
+      if (this.currentModal?.type === 'item-modal' && this.currentModal.onDataChange) {
+        this.currentModal.onDataChange('category', newCategory);
       }
     };
 
@@ -450,11 +503,106 @@ export class UIModalManager {
   }
 
   /**
-   * Получить текущую выбранную категорию
+   * Настроить обработчики для редактируемых полей цвета и материала
    */
-  getCurrentCategory(): ClothingCategory | null {
-    return this.currentCategory;
+  private setupColorMaterialInputs(): void {
+    const colorInput = document.getElementById('color-input') as HTMLInputElement;
+    const materialInput = document.getElementById('material-input') as HTMLInputElement;
+
+    if (colorInput) {
+      const handleColorChange = (event: Event) => {
+        const target = event.target as HTMLInputElement;
+        const newColor = target.value;
+
+        logger.debug('Color manually changed', { newColor });
+
+        // Обновляем текущие данные
+        if (this.currentModalData) {
+          this.currentModalData.color = newColor;
+        }
+
+        // Вызываем callback
+        if (this.currentModal?.type === 'item-modal' && this.currentModal.onDataChange) {
+          this.currentModal.onDataChange('color', newColor);
+        }
+      };
+
+      // Обработчик для закрытия клавиатуры по Enter
+      const handleEnter = (event: KeyboardEvent) => {
+        if (event.key === 'Enter') {
+          colorInput.blur(); // Закрываем клавиатуру
+        }
+      };
+
+      colorInput.addEventListener('input', handleColorChange);
+      colorInput.addEventListener('keydown', handleEnter);
+      this.cleanupFunctions.push(() => {
+        colorInput.removeEventListener('input', handleColorChange);
+        colorInput.removeEventListener('keydown', handleEnter);
+      });
+    }
+
+    if (materialInput) {
+      const handleMaterialChange = (event: Event) => {
+        const target = event.target as HTMLInputElement;
+        const newMaterial = target.value;
+
+        logger.debug('Material manually changed', { newMaterial });
+
+        // Обновляем текущие данные
+        if (this.currentModalData) {
+          this.currentModalData.material = newMaterial;
+        }
+
+        // Вызываем callback
+        if (this.currentModal?.type === 'item-modal' && this.currentModal.onDataChange) {
+          this.currentModal.onDataChange('material', newMaterial);
+        }
+      };
+
+      // Обработчик для закрытия клавиатуры по Enter
+      const handleEnter = (event: KeyboardEvent) => {
+        if (event.key === 'Enter') {
+          materialInput.blur(); // Закрываем клавиатуру
+        }
+      };
+
+      materialInput.addEventListener('input', handleMaterialChange);
+      materialInput.addEventListener('keydown', handleEnter);
+      this.cleanupFunctions.push(() => {
+        materialInput.removeEventListener('input', handleMaterialChange);
+        materialInput.removeEventListener('keydown', handleEnter);
+      });
+    }
   }
+
+  /**
+   * Получить текущие данные модального окна
+   */
+  getCurrentModalData(): ItemModalData | null {
+    if (!this.currentModalData) {
+      return null;
+    }
+
+    // Обновляем данные из inputs если они есть
+    const colorInput = document.getElementById('color-input') as HTMLInputElement;
+    const materialInput = document.getElementById('material-input') as HTMLInputElement;
+    const categorySelector = document.getElementById('category-selector') as HTMLSelectElement;
+
+    if (colorInput) {
+      this.currentModalData.color = colorInput.value;
+    }
+    if (materialInput) {
+      this.currentModalData.material = materialInput.value;
+    }
+    if (categorySelector) {
+      this.currentModalData.category = categorySelector.value as ClothingCategory;
+    }
+
+    return this.currentModalData;
+  }
+
+
 
   // ============================================
   // УНИВЕРСАЛЬНЫЕ МЕТОДЫ
@@ -817,18 +965,18 @@ export class UIModalManager {
   }
 
   // ============================================
-  // ПРИВАТНЫЕ МЕТОДЫ - WARDROBE PREVIEW
+  // ПРИВАТНЫЕ МЕТОДЫ - ITEM MODAL
   // ============================================
 
   /**
-   * Настроить обработчики для модалки предпросмотра
+   * Настроить обработчики для универсального модального окна вещи
    */
-  private setupWardrobePreviewListeners(config: WardrobePreviewModalConfig): void {
+  private setupItemModalListeners(config: ItemModalConfig): void {
     // Кнопка подтверждения
     const confirmBtn = document.getElementById('wardrobe-preview-confirm') as HTMLElement;
     if (confirmBtn) {
       const handleConfirm = () => {
-        logger.info('Wardrobe preview confirm button clicked');
+        logger.info('Item modal confirm button clicked');
         this.hide();
         config.onConfirm();
       };
@@ -843,7 +991,7 @@ export class UIModalManager {
     const cancelBtn = document.getElementById('wardrobe-preview-cancel') as HTMLElement;
     if (cancelBtn) {
       const handleCancel = () => {
-        logger.info('Wardrobe preview cancel button clicked');
+        logger.info('Item modal cancel button clicked');
         this.hide();
         config.onCancel();
       };
@@ -858,7 +1006,7 @@ export class UIModalManager {
     const overlay = document.querySelector('.wardrobe-preview-overlay') as HTMLElement;
     if (overlay) {
       const handleOverlayClick = () => {
-        logger.info('Wardrobe preview overlay clicked');
+        logger.info('Item modal overlay clicked');
         this.hide();
         config.onCancel();
       };
@@ -869,6 +1017,8 @@ export class UIModalManager {
       });
     }
   }
+
+
 
   // ============================================
   // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ

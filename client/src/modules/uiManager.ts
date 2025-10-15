@@ -8,8 +8,8 @@ import { logger } from './logger';
 import { uiMenuManager } from './uiMenu';
 import { uiAnalysisManager } from './uiAnalysis';
 import { uiCoreManager } from './uiCore';
-import { uiWardrobeManager } from './uiWardrobe';
-import { uiCapsulesManager } from './uiCapsules';
+import { wardrobeManager as uiWardrobeManager } from './wardrobe/WardrobeManager';
+import { capsulesManager as uiCapsulesManager } from './capsules/CapsulesManager';
 
 // Объявляем глобальную переменную Telegram
 declare global {
@@ -32,7 +32,6 @@ export class UIManager {
    * Инициализация всех UI модулей
    */
   private initializeAll(): void {
-    logger.info('Initializing main UI Manager');
 
     try {
       // Инициализируем все модули
@@ -47,7 +46,6 @@ export class UIManager {
       // Настраиваем глобальные обработчики событий
       this.setupGlobalEventListeners();
 
-      logger.info('All UI modules initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize UI modules', error);
       throw error;
@@ -66,7 +64,6 @@ export class UIManager {
     // Обработчик видимости страницы (для очистки состояния при сворачивании)
     document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
 
-    logger.info('Global UI event listeners setup');
   }
 
   /**
@@ -76,11 +73,9 @@ export class UIManager {
     // Находим все кнопки закладок
     const tabButtons = document.querySelectorAll('.tab-button');
 
-    logger.info('Setting up tab listeners', { foundButtons: tabButtons.length });
 
     tabButtons.forEach(button => {
       button.addEventListener('click', this.handleTabClick.bind(this));
-      logger.info('Added click listener to tab button', { tab: button.getAttribute('data-tab') });
     });
   }
 
@@ -119,7 +114,6 @@ export class UIManager {
     const capsulesContent = document.querySelector('.capsules-content') as HTMLElement;
     const clothesContainerMain = document.getElementById('wardrobe-clothes-container') as HTMLElement;
 
-    logger.info('Tab switch called', { tabName });
 
     switch (tabName) {
       case 'main':
@@ -144,7 +138,7 @@ export class UIManager {
         if (capsulesContent) capsulesContent.classList.add('hidden');
 
         // Обрабатываем открытие гардероба через специализированный менеджер
-        uiWardrobeManager.handleWardrobeOpen().catch(error => {
+        uiWardrobeManager.handleWardrobeOpen().catch((error: unknown) => {
           logger.error('Error handling wardrobe open', error);
         });
         break;
@@ -159,7 +153,7 @@ export class UIManager {
         if (capsulesContent) capsulesContent.classList.remove('hidden');
 
         // Обрабатываем открытие капсул через специализированный менеджер
-        uiCapsulesManager.handleCapsulesOpen().catch(error => {
+        uiCapsulesManager.handleCapsulesOpen().catch((error: unknown) => {
           logger.error('Error handling capsules open', error);
         });
         break;
@@ -278,7 +272,6 @@ export class UIManager {
    * Очистка всех ресурсов
    */
   destroy(): void {
-    logger.info('Destroying main UI Manager');
 
     try {
       // Очищаем все модули
@@ -288,7 +281,6 @@ export class UIManager {
       uiWardrobeManager.destroy();
       uiCapsulesManager.destroy();
 
-      logger.info('All UI modules destroyed successfully');
     } catch (error) {
       logger.error('Failed to destroy UI modules', error);
     }

@@ -198,13 +198,6 @@ class UIManager {
       appContainer: getElement(DOM_SELECTORS.APP_CONTAINER),
     };
 
-    logger.info('DOM elements initialized', {
-      hasUserName: !!this.elements.userName,
-      hasUserPhoto: !!this.elements.userPhoto,
-      hasCameraBtn: !!this.elements.cameraBtn,
-      historyCellsCount: this.elements.historyCells.length,
-      hasAppContainer: !!this.elements.appContainer,
-    });
   }
 
   /**
@@ -1709,7 +1702,6 @@ class UIManager {
     // Обновляем отображение истории
     this.updateHistoryDisplay();
 
-    logger.info('UI Manager initialized successfully');
   }
 
   /**

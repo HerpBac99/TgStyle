@@ -14,7 +14,6 @@ export { ClothingCategory };
  * Интерфейс для обработчика результатов загрузки
  */
 export interface PhotoUploadHandler {
-  showPreviewModal(): void;
   showLoadingInModal(show: boolean): void;
   processPhotoWithBackgroundRemoval(file: File): Promise<void>;
   fileToBase64(file: File): Promise<string>;
@@ -59,13 +58,7 @@ export class PhotoUploadManager {
           if (file) {
             logger.info('Photo selected for upload', { fileName: file.name, size: file.size });
 
-            // Показываем модальное окно с индикатором загрузки
-            if (this.handler) {
-              this.handler.showPreviewModal();
-              this.handler.showLoadingInModal(true);
-            }
-
-            // Обрабатываем фото с удалением фона
+            // Обрабатываем фото с удалением фона (метод сам управляет модальным окном и индикатором загрузки)
             if (this.handler) {
               await this.handler.processPhotoWithBackgroundRemoval(file);
             }

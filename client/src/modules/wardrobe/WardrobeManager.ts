@@ -9,7 +9,7 @@ import { PhotoUploadHandler } from '../photoUploadManager';
 import { wardrobeService } from './WardrobeService';
 import { photoProcessor } from '../shared/PhotoProcessor';
 import { fileToBase64, stringToClothingCategory } from '../shared/utils';
-import { uiModalManager } from '../uiModalManager';
+import { uiModalManager, ItemModalData } from '../uiModalManager';
 
 /**
  * Менеджер гардероба
@@ -23,7 +23,7 @@ export class WardrobeManager implements PhotoUploadHandler {
   private currentFilter: string = 'ALL';
 
   constructor() {
-    logger.info('WardrobeManager initialized');
+    // WardrobeManager initialized
   }
 
   /**
@@ -263,41 +263,56 @@ export class WardrobeManager implements PhotoUploadHandler {
       this.originalItemData = null;
     }
 
-    uiModalManager.showWardrobePreviewModal({
-      type: 'wardrobe-preview',
+    // Подготавливаем данные для модального окна
+    const modalData: ItemModalData = existingItem ? {
+      imageUrl: existingItem.imageUrl,
+      category: existingItem.category ? stringToClothingCategory(existingItem.category) : stringToClothingCategory('BODYWEAR'),
+      color: existingItem.color || 'Не указано',
+      ...(existingItem.material && { material: existingItem.material }),
+      ...(existingItem.style && { style: existingItem.style }),
+      ...(existingItem.fit && { fit: existingItem.fit }),
+      ...(existingItem.description && { description: existingItem.description }),
+      existingItem
+    } : {
+      imageUrl: this.currentPreviewImage || '',
+      category: this.currentClassification?.category || stringToClothingCategory('BODYWEAR'),
+      color: this.currentClassification?.color || '',
+      ...(this.currentClassification?.material && { material: this.currentClassification.material }),
+      ...(this.currentClassification?.style && { style: this.currentClassification.style }),
+      ...(this.currentClassification?.fit && { fit: this.currentClassification.fit }),
+      ...(this.currentClassification?.description && { description: this.currentClassification.description })
+    };
+
+    // Показываем универсальное модальное окно
+    uiModalManager.showItemModal({
+      type: 'item-modal',
       modalId: 'wardrobe-preview-modal',
-      allowManualCategorySelection: true,
-      onCategoryChange: (newCategory) => {
-        // Обновляем категорию в текущих данных
+      data: modalData,
+      allowEditCategory: true,
+      allowEditColorMaterial: true,
+      onDataChange: (field, value) => {
+        // Обновляем данные в зависимости от того, что редактируем
         if (existingItem) {
-          // Для существующей вещи обновляем локально
-          existingItem.category = newCategory;
+          // Для существующей вещи
+          if (field === 'category') existingItem.category = value;
+          else if (field === 'color') existingItem.color = value;
+          else if (field === 'material') existingItem.material = value;
         } else if (this.currentClassification) {
-          // Для новой вещи обновляем классификацию
-          this.currentClassification.category = newCategory;
+          // Для новой вещи
+          if (field === 'category') this.currentClassification.category = value as any;
+          else if (field === 'color') this.currentClassification.color = value;
+          else if (field === 'material') this.currentClassification.material = value;
         }
       },
       onConfirm: () => {
         if (existingItem) {
-          // Сохраняем изменения существующей вещи
           this.updateExistingItem(existingItem);
         } else {
-          // Подтверждаем добавление новой вещи
           this.confirmPreview();
         }
       },
       onCancel: () => this.cancelPreview()
     });
-
-    // Если передана существующая вещь - показываем её данные
-    if (existingItem) {
-      uiModalManager.showImageInModal(existingItem.imageUrl);
-      uiModalManager.showClassificationInfo(
-        existingItem.category ? stringToClothingCategory(existingItem.category) : stringToClothingCategory('BODYWEAR'),
-        existingItem.color || 'Не указано',
-        existingItem.material
-      );
-    }
   }
 
   /**
@@ -312,10 +327,24 @@ export class WardrobeManager implements PhotoUploadHandler {
       const updates: Partial<WardrobeItem> = {};
       let hasChanges = false;
 
-      // Пока проверяем только категорию (единственное поле, которое можно менять)
+      // Проверяем категорию
       if (item.category !== this.originalItemData.category && item.category !== undefined) {
         logger.info(`Category changed: ${this.originalItemData.category} -> ${item.category}`);
         updates.category = item.category;
+        hasChanges = true;
+      }
+
+      // Проверяем цвет
+      if (item.color !== this.originalItemData.color && item.color !== undefined) {
+        logger.info(`Color changed: ${this.originalItemData.color} -> ${item.color}`);
+        updates.color = item.color;
+        hasChanges = true;
+      }
+
+      // Проверяем материал
+      if (item.material !== this.originalItemData.material && item.material !== undefined) {
+        logger.info(`Material changed: ${this.originalItemData.material} -> ${item.material}`);
+        updates.material = item.material;
         hasChanges = true;
       }
 
@@ -366,17 +395,12 @@ export class WardrobeManager implements PhotoUploadHandler {
       // Классифицируем и удаляем фон
       const result = await photoProcessor.classifyAndRemoveBackground(base64);
 
-      // Показываем результат
-      uiModalManager.showImageInModal(result.processedImage);
-      uiModalManager.showClassificationInfo(
-        result.classification.category,
-        result.classification.color,
-        result.classification.material
-      );
-
       // Сохраняем для подтверждения
       this.currentPreviewImage = result.processedImage;
       this.currentClassification = result.classification;
+
+      // ТЕПЕРЬ показываем модальное окно с ГОТОВЫМИ данными
+      this.showPreviewModal();
 
     } catch (error) {
       logger.error('Error processing photo', error);
@@ -384,8 +408,8 @@ export class WardrobeManager implements PhotoUploadHandler {
       // Fallback - показываем оригинальное фото
       try {
         const base64 = await fileToBase64(file);
-        uiModalManager.showImageInModal(base64);
         this.currentPreviewImage = base64;
+        this.showPreviewModal();
       } catch (fallbackError) {
         logger.error('Error showing original photo', fallbackError);
         uiModalManager.hide();
@@ -417,15 +441,30 @@ export class WardrobeManager implements PhotoUploadHandler {
           const file = target.files?.[0];
 
           if (file) {
-            this.showPreviewModal();
-            await uiModalManager.executeWithLoadingModal({
-              modalType: 'wardrobe',
-              loadingText: 'Обрабатываем фото...',
-              asyncOperation: () => this.processPhotoWithBackgroundRemoval(file)
-            });
+            // Показываем loading БЕЗ модального окна
+            const loadingModal = document.getElementById('canvas-loading-modal');
+            const loadingText = document.querySelector('.canvas-loading-text') as HTMLElement;
+            
+            if (loadingModal && loadingText) {
+              loadingText.textContent = 'Обрабатываем фото...';
+              loadingModal.classList.remove('hidden');
+            }
+
+            // Обрабатываем фото (внутри вызовется showPreviewModal)
+            await this.processPhotoWithBackgroundRemoval(file);
+
+            // Скрываем loading
+            if (loadingModal) {
+              loadingModal.classList.add('hidden');
+            }
           }
         } catch (error) {
           logger.error('Error in photo upload handler', error);
+          // Скрываем loading при ошибке
+          const loadingModal = document.getElementById('canvas-loading-modal');
+          if (loadingModal) {
+            loadingModal.classList.add('hidden');
+          }
         }
       };
 
@@ -447,11 +486,17 @@ export class WardrobeManager implements PhotoUploadHandler {
       return;
     }
 
-    // Получаем финальную категорию (может быть изменена пользователем)
-    const finalCategory = uiModalManager.getCurrentCategory();
-    if (finalCategory) {
-      this.currentClassification.category = finalCategory;
-      logger.info('Using manually selected category', { category: finalCategory });
+    // Получаем финальные данные из модального окна (могут быть изменены пользователем)
+    const finalData = uiModalManager.getCurrentModalData();
+    if (finalData) {
+      this.currentClassification.category = finalData.category;
+      this.currentClassification.color = finalData.color;
+      if (finalData.material) this.currentClassification.material = finalData.material;
+      logger.info('Using modal data', { 
+        category: finalData.category,
+        color: finalData.color,
+        material: finalData.material
+      });
     }
 
     uiModalManager.hide();

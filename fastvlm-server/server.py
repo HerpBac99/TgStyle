@@ -1253,70 +1253,70 @@ def map_color_to_russian(color_input: str) -> str:
     # Color mapping dictionary
     color_map = {
         # Основные цвета
-        'black': 'черный',
-        'white': 'белый',
-        'red': 'красный',
-        'blue': 'синий',
-        'green': 'зеленый',
-        'yellow': 'желтый',
-        'orange': 'оранжевый',
-        'purple': 'фиолетовый',
-        'pink': 'розовый',
-        'brown': 'коричневый',
-        'gray': 'серый',
-        'grey': 'серый',
-        'beige': 'бежевый',
-        'navy': 'темно-синий',
-        'maroon': 'бордовый',
-        'turquoise': 'бирюзовый',
-        'olive': 'оливковый',
-        'cream': 'кремовый',
-        'gold': 'золотой',
-        'silver': 'серебряный',
-        'bronze': 'бронзовый',
-        'khaki': 'хаки',
-        'coral': 'коралловый',
-        'lavender': 'лавандовый',
-        'mint': 'мятный',
-        'peach': 'персиковый',
-        'burgundy': 'бургунди',
-        'teal': 'сине-зеленый',
-        'indigo': 'индиго',
-        'violet': 'фиолетовый',
-        'magenta': 'пурпурный',
-        'cyan': 'голубой',
-        'tan': 'желтовато-коричневый',
-        'ivory': 'слоновая кость',
-        'coral': 'коралловый',
-        'olive green': 'оливково-зеленый',
-        'greenish-grey': 'серо-зеленый'
+        'black': 'Черный',
+        'white': 'Белый',
+        'red': 'Красный',
+        'blue': 'Синий',
+        'green': 'Зеленый',
+        'yellow': 'Желтый',
+        'orange': 'Оранжевый',
+        'purple': 'Фиолетовый',
+        'pink': 'Розовый',
+        'brown': 'Коричневый',
+        'gray': 'Серый',
+        'grey': 'Серый',
+        'beige': 'Бежевый',
+        'navy': 'Темно-синий',
+        'maroon': 'Бордовый',
+        'turquoise': 'Бирюзовый',
+        'olive': 'Оливковый',
+        'cream': 'Кремовый',
+        'gold': 'Золотый',
+        'silver': 'Серебряный',
+        'bronze': 'Бронзовый',
+        'khaki': 'Хаки',
+        'coral': 'Коралловый',
+        'lavender': 'Лавандовый',
+        'mint': 'Мятный',
+        'peach': 'Персиковый',
+        'burgundy': 'Бургунди',
+        'teal': 'Сине-зеленый',
+        'indigo': 'Индиго',
+        'violet': 'Фиолетовый',
+        'magenta': 'Пурпурный',
+        'cyan': 'Голубой',
+        'tan': 'Желтовато-коричневый',
+        'ivory': 'Слоновая кость',
+        'coral': 'Коралловый',
+        'olive green': 'Оливково-зеленый',
+        'greenish-grey': 'Серо-зеленый'
     }
 
     # Паттерны с оттенками (dark, light, bright, pale)
     if 'dark' in normalized:
         base_color = normalized.replace('dark', '').strip()
         russian_base = color_map.get(base_color, base_color)
-        return f'темно-{russian_base}'
+        return f'Темно-{russian_base}'
 
     if 'light' in normalized:
         base_color = normalized.replace('light', '').strip()
         russian_base = color_map.get(base_color, base_color)
-        return f'светло-{russian_base}'
+        return f'Светло-{russian_base}'
 
     if 'bright' in normalized:
         base_color = normalized.replace('bright', '').strip()
         russian_base = color_map.get(base_color, base_color)
-        return f'ярко-{russian_base}'
+        return f'Ярко-{russian_base}'
 
     if 'pale' in normalized:
         base_color = normalized.replace('pale', '').strip()
         russian_base = color_map.get(base_color, base_color)
-        return f'бледно-{russian_base}'
+        return f'Бледно-{russian_base}'
 
     if 'navy' in normalized:
         base_color = normalized.replace('navy', '').strip()
         russian_base = color_map.get(base_color, base_color)
-        return f'темно-{russian_base}'
+        return f'Темно-{russian_base}'
 
     # Простые цвета без оттенков
     return color_map.get(normalized, color_input)
@@ -1337,73 +1337,73 @@ def map_material_to_russian(material_input: str) -> str:
     # Material mapping dictionary
     material_map = {
         # Ткани и материалы одежды
-        'cotton': 'хлопок',
-        'wool': 'шерсть',
-        'silk': 'шелк',
-        'linen': 'лен',
-        'polyester': 'полиэстер',
-        'nylon': 'нейлон',
-        'spandex': 'спандекс',
-        'elastane': 'эластан',
-        'lycra': 'лайкра',
-        'rayon': 'вискоза',
-        'viscose': 'вискоза',
-        'acetate': 'ацетат',
-        'acrylic': 'акрил',
-        'cashmere': 'кашемир',
-        'angora': 'ангора',
-        'mohair': 'мохер',
-        'alpaca': 'альпака',
-        'merino': 'меринос',
-        'bamboo': 'бамбук',
-        'modal': 'модал',
-        'tencel': 'тенсел',
-        'lyocell': 'лиоцел',
+        'cotton': 'Хлопок',
+        'wool': 'Шерсть',
+        'silk': 'Шелк',
+        'linen': 'Лен',
+        'polyester': 'Полиэстер',
+        'nylon': 'Нейлон',
+        'spandex': 'Спандекс',
+        'elastane': 'Эластан',
+        'lycra': 'Лайкра',
+        'rayon': 'Вискоза',
+        'viscose': 'Вискоза',
+        'acetate': 'Ацетат',
+        'acrylic': 'Акрил',
+        'cashmere': 'Кашемир',
+        'angora': 'Ангora',
+        'mohair': 'Мохер',
+        'alpaca': 'Альпака',
+        'merino': 'Мерино',
+        'bamboo': 'Бамбук',
+        'modal': 'Модал',
+        'tencel': 'Тенсел',
+        'lyocell': 'Лиоцел',
 
         # Кожа и замша
-        'leather': 'кожа',
-        'genuine leather': 'натуральная кожа',
-        'faux leather': 'искусственная кожа',
-        'suede': 'замша',
-        'velvet': 'бархат',
-        'velour': 'велюр',
-        'fur': 'мех',
-        'faux fur': 'искусственный мех',
+        'leather': 'Кожа',
+        'genuine leather': 'Натуральная кожа',
+        'faux leather': 'Искусственная кожа',
+        'suede': 'Замша',
+        'velvet': 'Бархат',
+        'velour': 'Велюр',
+        'fur': 'Мех',
+        'faux fur': 'Искусственный мех',
 
         # Джинс и деним
-        'denim': 'деним',
-        'jean': 'джинсовая ткань',
-        'jeans': 'джинсы',
+        'denim': 'Деним',
+        'jean': 'Джинсовая ткань',
+        'jeans': 'Джинсы',
 
         # Трикотаж
-        'knit': 'трикотаж',
-        'knit fabric': 'трикотаж',
-        'jersey': 'джерси',
-        'sweater knit': 'трикотаж для свитеров',
-        'rib knit': 'ребристый трикотаж',
-        'interlock': 'интерлок',
-        'fleece': 'флис',
-        'polar fleece': 'полар флис',
+        'knit': 'Трикотаж',
+        'knit fabric': 'Трикотаж',
+        'jersey': 'Джерси',
+        'sweater knit': 'Трикотаж для свитеров',
+        'rib knit': 'Ребристый трикотаж',
+        'interlock': 'Интерлок',
+        'fleece': 'Флис',
+        'polar fleece': 'Полар флис',
 
         # Другие материалы
-        'chiffon': 'шифон',
-        'satin': 'сатин',
-        'taffeta': 'тафта',
-        'organza': 'органза',
-        'lace': 'кружево',
-        'mesh': 'сетка',
-        'tulle': 'фатин',
-        'crepe': 'креп',
-        'poplin': 'поплин',
-        'broadcloth': 'батист',
-        'oxford': 'оксфорд',
-        'twill': 'твил',
-        'canvas': 'холст',
-        'gabardine': 'габардин',
-        'corduroy': 'вельвет',
-        'plush': 'плюш',
-        'chenille': 'шенилл',
-        'boucle': 'букле'
+        'chiffon': 'Шифон',
+        'satin': 'Сатин',
+        'taffeta': 'Тафта',
+        'organza': 'Органза',
+        'lace': 'Кружево',
+        'mesh': 'Сетка',
+        'tulle': 'Фатин',
+        'crepe': 'Креп',
+        'poplin': 'Поплин',
+        'broadcloth': 'Батист',
+        'oxford': 'Оксфорд',
+        'twill': 'Твил',
+        'canvas': 'Холст',
+        'gabardine': 'Габардин',
+        'corduroy': 'Вельвет',
+        'plush': 'Плюш',
+        'chenille': 'Шенилл',
+        'boucle': 'Букле'
     }
 
     # Простые материалы без модификаторов

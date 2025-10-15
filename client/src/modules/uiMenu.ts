@@ -123,13 +123,6 @@ export class UIMenuManager {
       appContainer: getElement(DOM_SELECTORS.APP_CONTAINER),
     };
 
-    logger.info('Menu DOM elements initialized', {
-      hasUserName: !!this.elements.userName,
-      hasUserPhoto: !!this.elements.userPhoto,
-      hasCameraBtn: !!this.elements.cameraBtn,
-      historyCellsCount: this.elements.historyCells.length,
-      hasAppContainer: !!this.elements.appContainer,
-    });
   }
 
   /**
@@ -150,7 +143,6 @@ export class UIMenuManager {
 
     // Обработчики ячеек истории добавляются динамически в updateHistoryDisplay
 
-    logger.info('Menu event listeners setup completed');
   }
 
   /**
@@ -316,11 +308,6 @@ export class UIMenuManager {
     // Сервер возвращает в порядке desc (новые первые), а нам нужно asc (старые первые)
     const sortedItems = [...filledItems].reverse();
 
-    logger.info('Updating history display', {
-      filledItems: sortedItems.length,
-      currentCenter: this.carouselState.currentCenterIndex
-    });
-
     // Создаем карусель динамически
     this.createCarouselCards(sortedItems);
 
@@ -354,7 +341,6 @@ export class UIMenuManager {
     // Обновляем ссылку на карты
     this.elements.historyCells = getElements(DOM_SELECTORS.HISTORY_CARDS);
 
-    logger.info('Carousel cards created', { totalCards, filledItems: filledItems.length });
   }
 
   /**
@@ -514,11 +500,6 @@ export class UIMenuManager {
     // Обновляем центральную карту
     this.updateCenterCard();
 
-    logger.info('Carousel positioned', {
-      centerIndex: this.carouselState.currentCenterIndex,
-      offset,
-      filledCount
-    });
   }
 
   /**
@@ -561,10 +542,6 @@ export class UIMenuManager {
       }
     }
 
-    logger.info('Carousel navigation updated', {
-      totalCards: this.carouselState.totalCards,
-      currentCenter: this.carouselState.currentCenterIndex
-    });
   }
 
   /**
@@ -627,7 +604,6 @@ export class UIMenuManager {
     // Настройка свайп-управления карусели
     this.setupCarouselSwipe();
 
-    logger.info('Carousel navigation handlers setup');
   }
 
   /**
@@ -661,7 +637,6 @@ export class UIMenuManager {
 
     this.cleanupFunctions.push(touchStartCleanup, touchMoveCleanup, touchEndCleanup);
 
-    logger.info('Carousel swipe handlers setup');
   }
 
   /**
@@ -752,7 +727,6 @@ export class UIMenuManager {
    * Инициализация UI
    */
   init(): void {
-    logger.info('Initializing Menu UI Manager');
 
     // Настраиваем навигацию карусели
     this.setupCarouselNavigation();
@@ -760,14 +734,12 @@ export class UIMenuManager {
     // Обновляем отображение истории
     this.updateHistoryDisplay();
 
-    logger.info('Menu UI Manager initialized successfully');
   }
 
   /**
    * Очистка ресурсов
    */
   destroy(): void {
-    logger.info('Destroying Menu UI Manager');
 
     // Закрываем предпросмотр если открыт
     this.closePreview();

@@ -325,22 +325,15 @@ export class UICoreManager {
    * Инициализация
    */
   init(): void {
-    logger.info('Initializing Core UI Manager');
-    // Здесь можно добавить дополнительную инициализацию если нужно
-    logger.info('Core UI Manager initialized successfully');
   }
 
   /**
    * Очистка ресурсов
    */
   destroy(): void {
-    logger.info('Destroying Core UI Manager');
-
     // Очищаем обработчики событий
     this.cleanupFunctions.forEach(cleanup => cleanup());
     this.cleanupFunctions = [];
-
-    logger.info('Core UI Manager destroyed');
   }
 }
 

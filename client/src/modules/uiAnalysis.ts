@@ -895,9 +895,6 @@ export class UIAnalysisManager {
    * Инициализация
    */
   init(): void {
-    logger.info('Initializing Analysis UI Manager');
-    // Здесь можно добавить дополнительную инициализацию если нужно
-    logger.info('Analysis UI Manager initialized successfully');
   }
 
   /**

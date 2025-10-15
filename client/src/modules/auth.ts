@@ -42,12 +42,6 @@ class AuthManager {
       return;
     }
 
-    logger.info('Telegram WebApp initialized', {
-      version: this.tg.version,
-      platform: this.tg.platform,
-      colorScheme: this.tg.colorScheme,
-      isExpanded: this.tg.isExpanded,
-    });
 
     // Настраиваем Telegram WebApp
     this.setupTelegramApp();
@@ -68,7 +62,6 @@ class AuthManager {
 
       // Входим в полноэкранный режим если поддерживается
       if (this.tg.isVersionAtLeast('6.9') && this.tg.requestFullscreen) {
-        logger.info('Requesting fullscreen mode');
         this.tg.requestFullscreen();
       }
 
@@ -78,7 +71,6 @@ class AuthManager {
       // Уведомляем Telegram что приложение готово
       this.tg.ready();
 
-      logger.info('Telegram WebApp configured successfully');
     } catch (error) {
       logger.error('Error configuring Telegram WebApp', error);
     }
@@ -96,7 +88,6 @@ class AuthManager {
       this.tg.setHeaderColor('#81D8D0');
       this.tg.setBackgroundColor('#81D8D0');
 
-      logger.info('Telegram header minimized successfully');
     } catch (error) {
       logger.warn('Error minimizing Telegram header', error);
     }
@@ -112,11 +103,6 @@ class AuthManager {
     }
 
     const user = this.tg.initDataUnsafe.user;
-    logger.info('User data extracted', {
-      id: user.id,
-      firstName: user.first_name,
-      hasPhoto: !!user.photo_url,
-    });
 
     return user;
   }
@@ -142,7 +128,6 @@ class AuthManager {
       // Отображение информации о подписке
       this.displaySubscriptionInfo();
 
-      logger.info('User profile displayed');
     } catch (error) {
       logger.error('Error displaying user profile', error);
     }
@@ -180,10 +165,6 @@ class AuthManager {
         }
       }
 
-      logger.info('Subscription info displayed', {
-        type: this.userSubscription.type,
-        analysesLeft: this.userSubscription.analysesLeft
-      });
     } catch (error) {
       logger.error('Error displaying subscription info', error);
     }
@@ -193,7 +174,6 @@ class AuthManager {
    * Основной метод авторизации
    */
   async authenticate(): Promise<AuthResponse> {
-    logger.info('Starting authentication process');
 
     try {
       // Извлекаем данные пользователя
@@ -248,7 +228,6 @@ class AuthManager {
       }
 
       // Отправляем на сервер для валидации
-      logger.info('Sending initData to server for validation');
       const response = await api.authenticate(initData);
 
       if (response.success) {

@@ -49,7 +49,6 @@ export class UICanvasEditor {
 
   constructor(config: CanvasEditorConfig) {
     this.config = config;
-    logger.info('UICanvasEditor initialized', { config });
   }
 
   // ============================================
@@ -98,7 +97,6 @@ export class UICanvasEditor {
   initializeCanvas(): void {
     // Если canvas уже инициализирован - просто показываем
     if (this.fabricCanvas) {
-      logger.info('Canvas already initialized, reusing existing instance');
       return;
     }
 
@@ -139,7 +137,6 @@ export class UICanvasEditor {
         enableRetinaScaling: true
       });
 
-      logger.info('Fabric.js canvas initialized', { width: canvasWidth, height: canvasHeight });
 
       // Настраиваем кнопки
       this.setupCanvasButtons();

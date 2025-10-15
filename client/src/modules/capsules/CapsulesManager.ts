@@ -7,7 +7,7 @@ import { logger } from '../logger';
 import { WardrobeItem } from '@/types/wardrobe';
 import { CanvasItem } from '@/types/capsules';
 import { StyleCapsule } from '../uiCapsulesGrid';
-import { PhotoUploadHandler } from '../photoUploadManager';
+import { PhotoUploadHandler, ClothingCategory } from '../photoUploadManager';
 import { capsulesService } from './CapsulesService';
 import { photoProcessor } from '../shared/PhotoProcessor';
 import { itemSelector } from '../shared/ItemSelector';
@@ -46,7 +46,7 @@ export class CapsulesManager implements PhotoUploadHandler {
   private currentClassification: any = null;
 
   constructor() {
-    logger.info('CapsulesManager initialized');
+    // CapsulesManager initialized
 
     // Инициализируем грид капсул
     this.capsulesGrid = new UICapsulesGrid({
@@ -658,17 +658,7 @@ export class CapsulesManager implements PhotoUploadHandler {
   // PhotoUploadHandler интерфейс
   // ============================================
 
-  /**
-   * Показать модальное окно предпросмотра
-   */
-  showPreviewModal(): void {
-    uiModalManager.showWardrobePreviewModal({
-      type: 'wardrobe-preview',
-      modalId: 'wardrobe-preview-modal',
-      onConfirm: () => this.confirmPreview(),
-      onCancel: () => this.cancelPreview()
-    });
-  }
+
 
   /**
    * Показать/скрыть индикатор загрузки
@@ -685,23 +675,34 @@ export class CapsulesManager implements PhotoUploadHandler {
       const base64 = await fileToBase64(file);
       logger.info('Processing photo with background removal');
 
+      // Показываем лоадинг
+      this.showLoadingInModal(true);
+
       // Классифицируем и удаляем фон
       const result = await photoProcessor.classifyAndRemoveBackground(base64);
 
       // Скрываем индикатор загрузки
       this.showLoadingInModal(false);
 
-      // Показываем результат
-      uiModalManager.showImageInModal(result.processedImage);
-      uiModalManager.showClassificationInfo(
-        result.classification.category,
-        result.classification.color,
-        result.classification.material
-      );
-
       // Сохраняем для подтверждения
       this.currentPreviewImage = result.processedImage;
       this.currentClassification = result.classification;
+
+      // Показываем модальное окно с результатом
+      uiModalManager.showItemModal({
+        type: 'item-modal',
+        modalId: 'wardrobe-preview-modal',
+        data: {
+          imageUrl: result.processedImage,
+          category: result.classification.category,
+          color: result.classification.color || '',
+          material: result.classification.material
+        },
+        allowEditCategory: false,
+        allowEditColorMaterial: false,
+        onConfirm: () => this.confirmPreview(),
+        onCancel: () => this.cancelPreview()
+      });
 
     } catch (error) {
       this.showLoadingInModal(false);
@@ -710,8 +711,21 @@ export class CapsulesManager implements PhotoUploadHandler {
       // Fallback - показываем оригинальное фото
       try {
         const base64 = await fileToBase64(file);
-        uiModalManager.showImageInModal(base64);
         this.currentPreviewImage = base64;
+        
+        uiModalManager.showItemModal({
+          type: 'item-modal',
+          modalId: 'wardrobe-preview-modal',
+          data: {
+            imageUrl: base64,
+            category: ClothingCategory.ACCESSORIES, // default
+            color: ''
+          },
+          allowEditCategory: true,
+          allowEditColorMaterial: true,
+          onConfirm: () => this.confirmPreview(),
+          onCancel: () => this.cancelPreview()
+        });
       } catch (fallbackError) {
         logger.error('Error showing original photo', fallbackError);
         uiModalManager.hide();
@@ -746,8 +760,6 @@ export class CapsulesManager implements PhotoUploadHandler {
           if (file) {
             logger.info('Photo selected for upload', { fileName: file.name });
 
-            this.showPreviewModal();
-            this.showLoadingInModal(true);
             await this.processPhotoWithBackgroundRemoval(file);
           }
         } catch (error) {

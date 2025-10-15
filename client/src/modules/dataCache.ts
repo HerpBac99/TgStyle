@@ -50,7 +50,6 @@ class DataCacheManager {
   private isLoaded = false;
 
   constructor() {
-    logger.info('DataCacheManager initialized');
   }
 
   /**
@@ -58,10 +57,6 @@ class DataCacheManager {
    */
   async preloadData(): Promise<void> {
     if (this.isLoading || this.isLoaded) {
-      logger.info('Data already loading or loaded', {
-        isLoading: this.isLoading,
-        isLoaded: this.isLoaded
-      });
       return;
     }
 
@@ -94,10 +89,6 @@ class DataCacheManager {
 
       // Собираем все URL изображений для кэширования
       const imageUrls = this.collectImageUrls();
-      logger.info('Collected image URLs', { 
-        count: imageUrls.length,
-        sample: imageUrls.slice(0, 3) // Показываем первые 3 URL для отладки
-      });
 
       // Кэшируем изображения в фоне (не блокируем)
       this.cacheImages(imageUrls).catch(error => {
@@ -244,19 +235,13 @@ class DataCacheManager {
    */
   private async cacheImages(imageUrls: string[]): Promise<void> {
     if (imageUrls.length === 0) {
-      logger.info('No images to cache');
       return;
     }
 
     try {
-      const startTime = Date.now();
       let cachedCount = 0;
       let failedCount = 0;
 
-      logger.info('Starting image caching', { 
-        totalCount: imageUrls.length,
-        sampleUrl: imageUrls[0] ? this.makeAbsoluteUrl(imageUrls[0]) : 'none'
-      });
 
       // Кэшируем изображения порциями по 5 для контроля нагрузки
       const batchSize = 5;
@@ -309,13 +294,6 @@ class DataCacheManager {
         }
       }
 
-      const cacheTime = Date.now() - startTime;
-      logger.info('Image caching completed', {
-        totalCount: imageUrls.length,
-        cached: cachedCount,
-        failed: failedCount,
-        cacheTime: cacheTime + 'ms'
-      });
 
     } catch (error) {
       logger.error('Error caching images', error);
@@ -341,7 +319,6 @@ class DataCacheManager {
    */
   addWardrobeItem(item: WardrobeItem): void {
     this.wardrobeItems.push(item);
-    logger.info('Wardrobe item added to cache', { itemId: item.id });
 
     // Кэшируем изображение нового элемента
     if (item.imageUrl) {
@@ -358,7 +335,6 @@ class DataCacheManager {
     const index = this.wardrobeItems.findIndex(item => item.id === itemId);
     if (index !== -1) {
       this.wardrobeItems[index] = updatedItem;
-      logger.info('Wardrobe item updated in cache', { itemId });
     }
   }
 
@@ -369,7 +345,6 @@ class DataCacheManager {
     const index = this.wardrobeItems.findIndex(item => item.id === itemId);
     if (index !== -1) {
       this.wardrobeItems.splice(index, 1);
-      logger.info('Wardrobe item removed from cache', { itemId });
     }
   }
 
@@ -378,7 +353,6 @@ class DataCacheManager {
    */
   addCapsule(capsule: Capsule): void {
     this.capsules.push(capsule);
-    logger.info('Capsule added to cache', { capsuleId: capsule.id });
 
     // Кэшируем миниатюру
     if (capsule.thumbnailUrl) {
@@ -395,7 +369,6 @@ class DataCacheManager {
     const index = this.capsules.findIndex(c => c.id === capsuleId);
     if (index !== -1) {
       this.capsules[index] = updatedCapsule;
-      logger.info('Capsule updated in cache', { capsuleId });
 
       // Кэшируем новую миниатюру если изменилась
       if (updatedCapsule.thumbnailUrl) {
@@ -413,7 +386,6 @@ class DataCacheManager {
     const index = this.capsules.findIndex(c => c.id === capsuleId);
     if (index !== -1) {
       this.capsules.splice(index, 1);
-      logger.info('Capsule removed from cache', { capsuleId });
     }
   }
 

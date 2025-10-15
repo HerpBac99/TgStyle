@@ -33,7 +33,6 @@ export class NavigationManager {
   private currentHandler: (() => void) | null = null;
 
   constructor() {
-    logger.info('NavigationManager initialized');
   }
 
   /**
@@ -52,10 +51,6 @@ export class NavigationManager {
   push(handler: NavigationHandler, description: string = 'Unknown'): void {
     this.stack.push({ handler, description });
     
-    logger.info('Navigation handler pushed', {
-      description,
-      stackSize: this.stack.length
-    });
 
     // Показываем BackButton если еще не показан
     if (!this.isBackButtonVisible) {
@@ -71,10 +66,6 @@ export class NavigationManager {
     const removed = this.stack.pop();
     
     if (removed) {
-      logger.info('Navigation handler popped', {
-        description: removed.description,
-        stackSize: this.stack.length
-      });
     }
 
     // Скрываем BackButton если стек пуст
@@ -88,12 +79,8 @@ export class NavigationManager {
    * Скрывает BackButton
    */
   clear(): void {
-    const stackSize = this.stack.length;
     this.stack = [];
     
-    logger.info('Navigation stack cleared', {
-      removedHandlers: stackSize
-    });
 
     if (this.isBackButtonVisible) {
       this.hideBackButton();
@@ -224,7 +211,6 @@ export class NavigationManager {
    * Очистка ресурсов
    */
   destroy(): void {
-    logger.info('Destroying NavigationManager');
     
     this.clear();
     

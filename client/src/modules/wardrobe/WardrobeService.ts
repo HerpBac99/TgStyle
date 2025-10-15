@@ -118,8 +118,10 @@ export class WardrobeService {
 
       logger.info('Item updated successfully', { itemId });
 
-      // Обновляем кэш
-      dataCacheManager.updateWardrobeItem(itemId, result.item);
+      // Обновляем кэш если сервер вернул обновленный элемент
+      if (result.item) {
+        dataCacheManager.updateWardrobeItem(itemId, result.item);
+      }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
