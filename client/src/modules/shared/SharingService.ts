@@ -5,7 +5,6 @@
 
 import { logger } from '../logger';
 import { ShareConfig, ShareOptions, ShareResult } from '@/types/sharing';
-import { storageService } from './StorageService';
 import { APP_CONFIG } from '@/utils/constants';
 
 /**
@@ -35,9 +34,9 @@ export class SharingService {
       const shareId = this.generateShareId(config.type);
       const shareLink = this.createShareLink(shareId);
 
-      // 2. Сохраняем данные локально и на сервер
-      if (opts.saveToServer) {
-        await this.saveShareData(shareId, config);
+      // 2. Отправляем на сервер
+      if (opts.saveToServer && config.type === 'analysis') {
+        await this.sendAnalysisToServer(shareId, config);
       }
 
       // 3. Пытаемся поделиться через Web Share API
@@ -212,74 +211,57 @@ export class SharingService {
   }
 
   /**
-   * Сохранение данных для sharing
+   * Отправка анализа на сервер
+   * Теперь передаем только shareId и historyItemId, сервер загрузит данные из БД
    */
-  private async saveShareData(shareId: string, config: ShareConfig): Promise<void> {
+  private async sendAnalysisToServer(shareId: string, config: ShareConfig): Promise<void> {
     try {
-      // 1. Сохраняем в localStorage
-      await storageService.saveShareData(shareId, {
-        type: config.type,
-        image: config.image,
-        text: config.text,
-        metadata: config.metadata || {},
-        timestamp: new Date().toISOString(),
-        sharedAt: new Date().toISOString()
-      });
+      const historyItemId = config.metadata?.['historyItemId'];
 
-      logger.info('Share data saved to localStorage', { shareId });
-
-      // 2. Отправка на сервер (опционально, пока не реализовано)
-      // TODO: Использовать api.fetch вместо прямого fetch
-      // await this.sendToServer(shareId, config);
-
-    } catch (error) {
-      logger.error('Failed to save share data', { shareId, error });
-      // Не бросаем ошибку - sharing может продолжиться без сохранения
-    }
-  }
-
-  /**
-   * TODO: Отправка на сервер (реализовать позже)
-   * Пока закомментировано, так как не используется
-   */
-  /*
-  private async sendToServer(shareId: string, config: ShareConfig): Promise<void> {
-    try {
-      // TODO: использовать api.fetch() после интеграции
-      const response = await fetch('/api/shared-content', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          shareId,
-          type: config.type,
-          image: config.image,
-          text: config.text,
-          metadata: config.metadata,
-          timestamp: new Date().toISOString()
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}`);
+      if (!historyItemId) {
+        logger.warn('No historyItemId for sharing, skipping server save', { shareId });
+        return;
       }
 
-      const result = await response.json();
+      // Удаляем префикс "analysis_" для хранения в БД
+      // В БД храним чистый ID, префикс только для Telegram ссылок
+      const cleanShareId = shareId.startsWith('analysis_') 
+        ? shareId.replace('analysis_', '') 
+        : shareId;
 
-      if (result.success) {
-        logger.info('Share data sent to server', { shareId });
+      // Импортируем api динамически
+      const { api } = await import('../api.js');
+
+      const requestBody = {
+        analysisId: cleanShareId,  // Отправляем БЕЗ префикса
+        historyItemId: historyItemId
+      };
+
+      logger.info('Sending analysis to server', { 
+        originalShareId: shareId, 
+        cleanShareId, 
+        historyItemId 
+      });
+
+      const response = await api.post('/shared-analysis', requestBody) as any;
+
+      if (response.success) {
+        logger.info('Analysis shared successfully (DB mapping created)', { 
+          cleanShareId, 
+          historyItemId 
+        });
+      } else {
+        logger.warn('Server save failed', { error: response.error });
       }
 
     } catch (error) {
-      logger.warn('Server save failed, data saved locally only', {
+      logger.warn('Failed to send analysis to server', {
         shareId,
         error
       });
-      // Не бросаем ошибку - localStorage уже сохранен
+      throw error; // Пробрасываем ошибку наверх
     }
   }
-  */
 
   /**
    * Конвертация data URL в Blob
@@ -287,27 +269,6 @@ export class SharingService {
   private async dataUrlToBlob(dataUrl: string): Promise<Blob> {
     const response = await fetch(dataUrl);
     return response.blob();
-  }
-
-  /**
-   * Получить информацию о хранилище
-   */
-  getStorageInfo() {
-    return storageService.checkAvailableSpace();
-  }
-
-  /**
-   * Получить все shared элементы
-   */
-  getAllSharedItems() {
-    return storageService.getAllSharedItems();
-  }
-
-  /**
-   * Удалить shared элемент
-   */
-  removeSharedItem(shareId: string): void {
-    storageService.removeShareData(shareId);
   }
 }
 

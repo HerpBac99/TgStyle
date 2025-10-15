@@ -21,6 +21,7 @@ import { purchaseRecommendationManager } from './purchaseRecommendation';
 import { cameraManager } from './camera';
 import { sharingService } from './shared/SharingService';
 import type { ShareConfig } from '@/types/sharing';
+import { analysisLikesService } from './analysis/AnalysisLikesService';
 
 // Объявляем глобальную переменную Telegram
 declare global {
@@ -112,9 +113,20 @@ export class UIAnalysisManager {
   private currentAnalysisData: {
     imageSrc: string | null;
     analysisText: string | null;
+    historyItemId: number | null;
   } = {
     imageSrc: null,
     analysisText: null,
+    historyItemId: null,
+  };
+
+  // Текущее состояние лайка
+  private currentLikeState: {
+    isLiked: boolean;
+    likesCount: number;
+  } = {
+    isLiked: false,
+    likesCount: 0,
   };
 
   // Ссылка на Lamoda для текущей рекомендации
@@ -380,8 +392,13 @@ export class UIAnalysisManager {
   /**
    * Показать результат анализа
    */
-  showAnalysisResult(result: string): void {
-    logger.info('Showing analysis result');
+  showAnalysisResult(result: string, historyItemId?: number): void {
+    logger.info('Showing analysis result', { historyItemId });
+
+    // Сохраняем historyItemId если передан
+    if (historyItemId) {
+      this.currentAnalysisData.historyItemId = historyItemId;
+    }
 
     // Останавливаем анимацию текста загрузки
     loadingTextAnimator.stop();
@@ -444,11 +461,41 @@ export class UIAnalysisManager {
     // Настраиваем обработчики кнопок
     this.setupResultButtons();
 
+    // Загружаем статус лайка если есть historyItemId
+    if (historyItemId) {
+      this.loadLikeStatus(historyItemId);
+    }
+
     logger.info('Analysis result displayed with cascade animation', {
       blocksCount: textBlocks.length,
       blocksHtml: blocksHtml.substring(0, 200) + '...',
-      hasRecommendationButton: !!this.currentLamodaUrl
+      hasRecommendationButton: !!this.currentLamodaUrl,
+      historyItemId
     });
+  }
+
+  /**
+   * Загрузить статус лайка для анализа
+   */
+  private async loadLikeStatus(historyItemId: number): Promise<void> {
+    try {
+      const status = await analysisLikesService.getLikeStatus(historyItemId);
+      
+      // Обновляем локальное состояние
+      this.currentLikeState.isLiked = status.isLiked;
+      this.currentLikeState.likesCount = status.likesCount;
+
+      // Обновляем UI кнопки если она уже существует
+      const likeBtn = document.getElementById('like-btn');
+      if (likeBtn) {
+        this.updateLikeButtonUI(likeBtn, status.isLiked);
+      }
+
+      logger.info('Like status loaded', { historyItemId, isLiked: status.isLiked, likesCount: status.likesCount });
+    } catch (error) {
+      logger.error('Error loading like status', error);
+      // Не показываем ошибку пользователю - просто не будет лайка
+    }
   }
 
   /**
@@ -661,7 +708,7 @@ export class UIAnalysisManager {
   /**
    * Обработчик клика по кнопке лайк
    */
-  private handleLikeClick(): void {
+  private async handleLikeClick(): Promise<void> {
     logger.info('=== LIKE BUTTON CLICKED ===');
 
     const likeBtn = getElement('#like-btn');
@@ -676,8 +723,14 @@ export class UIAnalysisManager {
     const rect = likeBtn.getBoundingClientRect();
     logger.info(`Like button position: x=${rect.left}, y=${rect.top}, visible=${rect.width > 0 && rect.height > 0}`);
 
+    // Проверяем наличие historyItemId
+    if (!this.currentAnalysisData.historyItemId) {
+      logger.warn('No historyItemId available for like');
+      return;
+    }
+
     // Переключаем состояние лайка
-    const isLiked = likeBtn.classList.contains('liked');
+    const isLiked = this.currentLikeState.isLiked;
     logger.info(`Like button current state: isLiked=${isLiked}`);
 
     // Находим SVG path элемент
@@ -703,70 +756,91 @@ export class UIAnalysisManager {
       });
     }
 
+    try {
+      // Отправляем запрос на сервер
+      const result = await analysisLikesService.toggleLike(
+        this.currentAnalysisData.historyItemId,
+        isLiked
+      );
+
+      // Обновляем локальное состояние
+      this.currentLikeState.isLiked = result.isLiked;
+      this.currentLikeState.likesCount = result.likesCount;
+
+      logger.info('Like toggled successfully', result);
+
+      // Обновляем UI
+      this.updateLikeButtonUI(likeBtn, result.isLiked);
+
+      // Тактильная обратная связь
+      authManager.vibrate('light');
+
+    } catch (error) {
+      logger.error('Error toggling like', error);
+      // Показываем ошибку пользователю (опционально)
+      return;
+    }
+  }
+
+  /**
+   * Обновление UI кнопки лайка
+   */
+  private updateLikeButtonUI(likeBtn: HTMLElement, isLiked: boolean): void {
+    // Находим SVG path элемент
+    const svgPath = likeBtn.querySelector('svg path') as SVGPathElement;
+
     if (isLiked) {
-      // Убираем лайк - заменяем SVG на пустое сердце
-      likeBtn.classList.remove('liked');
-
-      if (svgPath) {
-        // ЗАМЕНЯЕМ ВЕСЬ SVG ЭЛЕМЕНТ НА НОВЫЙ С НУЖНЫМИ СТИЛЯМИ
-        const newSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        newSvg.setAttribute('width', '24');
-        newSvg.setAttribute('height', '24');
-        newSvg.setAttribute('viewBox', '0 0 24 24');
-
-        const newPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        newPath.setAttribute('d', 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z');
-        newPath.setAttribute('fill', 'none');
-        newPath.setAttribute('stroke', '#eb858d');
-        newPath.setAttribute('stroke-width', '3');
-
-        newSvg.appendChild(newPath);
-        const svgElement = svgPath.parentElement;
-        if (svgElement && svgElement.parentElement) {
-          svgElement.parentElement.replaceChild(newSvg, svgElement);
-        }
-
-        logger.info('Like removed - SVG replaced with empty heart');
-      }
-
-      logger.info('Like removed successfully');
-    } else {
       // Добавляем лайк - заменяем SVG на закрашенное сердце
       likeBtn.classList.add('liked');
 
-      if (svgPath) {
-        // ЗАМЕНЯЕМ ВЕСЬ SVG ЭЛЕМЕНТ НА НОВЫЙ С НУЖНЫМИ СТИЛЯМИ
-        const newSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        newSvg.setAttribute('width', '24');
-        newSvg.setAttribute('height', '24');
-        newSvg.setAttribute('viewBox', '0 0 24 24');
+      const newSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      newSvg.setAttribute('width', '24');
+      newSvg.setAttribute('height', '24');
+      newSvg.setAttribute('viewBox', '0 0 24 24');
 
-        const newPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        newPath.setAttribute('d', 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z');
-        newPath.setAttribute('fill', '#eb858d');
-        newPath.setAttribute('stroke', '#eb858d');
-        newPath.setAttribute('stroke-width', '3');
+      const newPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      newPath.setAttribute('d', 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z');
+      newPath.setAttribute('fill', '#eb858d');
+      newPath.setAttribute('stroke', '#eb858d');
+      newPath.setAttribute('stroke-width', '3');
 
-        newSvg.appendChild(newPath);
-        const svgElement = svgPath.parentElement;
-        if (svgElement && svgElement.parentElement) {
-          svgElement.parentElement.replaceChild(newSvg, svgElement);
-        }
-
-        logger.info('Like added - SVG replaced with filled heart');
+      newSvg.appendChild(newPath);
+      const svgElement = svgPath?.parentElement;
+      if (svgElement && svgElement.parentElement) {
+        svgElement.parentElement.replaceChild(newSvg, svgElement);
       }
 
-      logger.info('Like added successfully');
+      logger.info('Like added - SVG updated to filled heart');
 
-      // Анимация нажатия
-      likeBtn.style.transform = 'scale(0.8)';
-      setTimeout(() => {
-        likeBtn.style.transform = 'scale(1)';
-      }, 150);
+    } else {
+      // Убираем лайк - заменяем SVG на пустое сердце
+      likeBtn.classList.remove('liked');
+
+      const newSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      newSvg.setAttribute('width', '24');
+      newSvg.setAttribute('height', '24');
+      newSvg.setAttribute('viewBox', '0 0 24 24');
+
+      const newPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      newPath.setAttribute('d', 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z');
+      newPath.setAttribute('fill', 'none');
+      newPath.setAttribute('stroke', '#eb858d');
+      newPath.setAttribute('stroke-width', '3');
+
+      newSvg.appendChild(newPath);
+      const svgElement = svgPath?.parentElement;
+      if (svgElement && svgElement.parentElement) {
+        svgElement.parentElement.replaceChild(newSvg, svgElement);
+      }
+
+      logger.info('Like removed - SVG updated to empty heart');
     }
 
-    // Тактильная обратная связь
-    authManager.vibrate('light');
+    // Анимация нажатия
+    likeBtn.style.transform = 'scale(0.8)';
+    setTimeout(() => {
+      likeBtn.style.transform = 'scale(1)';
+    }, 150);
   }
 
   /**
@@ -787,7 +861,10 @@ export class UIAnalysisManager {
         type: 'analysis',
         image: this.currentAnalysisData.imageSrc,  // Оригинальное фото!
         text: this.currentAnalysisData.analysisText,  // Текст отдельно
-        title: '🤖 AI Анализ стиля'
+        title: '🤖 AI Анализ стиля',
+        metadata: {
+          historyItemId: this.currentAnalysisData.historyItemId  // Для лайков
+        }
       };
 
       // 3. Делимся через универсальный SharingService

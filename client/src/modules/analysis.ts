@@ -176,7 +176,7 @@ class AnalysisManager {
 
       // Показываем результат в UI
       if (response.analysis) {
-        uiManager.showAnalysisResult(response.analysis);
+        uiManager.showAnalysisResult(response.analysis, response.historyItemId);
       }
 
       logger.info('Automatic image analysis completed successfully');

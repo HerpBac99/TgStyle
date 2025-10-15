@@ -10,6 +10,7 @@ import {
 } from '@/utils/helpers';
 import { logger } from './logger';
 import { authManager } from './auth';
+import { uiAnalysisManager } from './uiAnalysis';
 
 // Объявляем глобальную переменную Telegram
 declare global {
@@ -222,8 +223,8 @@ export class UICoreManager {
   /**
    * Показать shared анализ другого пользователя
    */
-  async showSharedAnalysis(photoBase64: string, analysisText: string, timestamp: string): Promise<void> {
-    logger.info('Showing shared analysis');
+  async showSharedAnalysis(photoBase64: string, analysisText: string, timestamp: string, historyItemId?: number): Promise<void> {
+    logger.info('Showing shared analysis', { historyItemId });
 
     try {
       // Имитируем загрузку
@@ -232,8 +233,8 @@ export class UICoreManager {
       // Показываем экран анализа
       this.showFullscreenPreview(photoBase64);
 
-      // Показываем результат анализа
-      this.showAnalysisResult(analysisText);
+      // Показываем результат анализа с historyItemId для лайков
+      this.showAnalysisResult(analysisText, historyItemId);
 
       // Добавляем индикацию что это shared анализ
       const resultHeader = getElement('.result-header h3');
@@ -264,8 +265,17 @@ export class UICoreManager {
       return;
     }
 
-    // Устанавливаем фото
-    analysisPhoto.src = `data:image/jpeg;base64,${imageBase64}`;
+    // Устанавливаем фото (проверяем есть ли уже data URL префикс)
+    if (imageBase64.startsWith('data:image')) {
+      analysisPhoto.src = imageBase64;
+    } else {
+      analysisPhoto.src = `data:image/jpeg;base64,${imageBase64}`;
+    }
+
+    logger.info('Photo src set', { 
+      hasPrefix: imageBase64.startsWith('data:image'),
+      srcLength: analysisPhoto.src.length 
+    });
 
     // Скрываем результат, показываем загрузку
     resultContainer.classList.add('hidden');
@@ -280,24 +290,11 @@ export class UICoreManager {
   /**
    * Показать результат анализа (для shared анализа)
    */
-  private showAnalysisResult(result: string): void {
-    logger.info('Showing shared analysis result');
+  private showAnalysisResult(result: string, historyItemId?: number): void {
+    logger.info('Showing shared analysis result', { historyItemId });
 
-    const loadingIndicator = getElement('#analysis-loading');
-    const resultContainer = getElement('#analysis-result-container');
-    const analysisText = getElement('#analysis-text');
-
-    if (!loadingIndicator || !resultContainer || !analysisText) {
-      logger.error('Analysis result elements not found');
-      return;
-    }
-
-    // Скрываем загрузку, показываем результат
-    loadingIndicator.classList.add('hidden');
-    resultContainer.classList.remove('hidden');
-
-    // Показываем текст анализа
-    analysisText.innerHTML = result;
+    // Используем uiAnalysisManager для показа результата (унифицированный подход)
+    uiAnalysisManager.showAnalysisResult(result, historyItemId);
   }
 
   /**

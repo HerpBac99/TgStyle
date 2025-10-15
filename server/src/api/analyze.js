@@ -173,8 +173,13 @@ async function optimizeImageForStorage(base64Image) {
 /**
  * Сохранение результата анализа в истории с оптимизацией изображений и лимитом 50 записей
  * НОВАЯ ВЕРСИЯ: сохраняет файлы на диск вместо base64 в БД
+ * @param {number} userId - ID пользователя в БД
+ * @param {string} telegramId - Telegram ID пользователя
+ * @param {string} photoData - Base64 изображения
+ * @param {string} analysisText - Креативный ответ стилиста (для пользователя)
+ * @param {string} technicalAnalysis - Технический анализ (ЧЕЛОВЕК, ОДЕЖДА...)
  */
-async function saveAnalysisToHistory(userId, telegramId, photoData, technicalAnalysis) {
+async function saveAnalysisToHistory(userId, telegramId, photoData, analysisText, technicalAnalysis) {
     try {
         // 1. Оптимизируем изображение перед сохранением
         const optimizedPhotoData = await optimizeImageForStorage(photoData);
@@ -226,9 +231,9 @@ async function saveAnalysisToHistory(userId, telegramId, photoData, technicalAna
                 userId,
                 photoPath,  // NEW: путь к файлу
                 photoData: null,  // Deprecated: не сохраняем base64
-                technicalAnalysis,
-                analysisText: null,
-                isPublic: true,
+                analysisText,  // Креативный ответ стилиста (для пользователя)
+                technicalAnalysis,  // Технический анализ (ЧЕЛОВЕК, ОДЕЖДА...)
+                isPublic: false,  // По умолчанию приватный, станет true при sharing
                 createdAt: new Date()
             }
         });
@@ -310,15 +315,18 @@ async function analyzeImage(imageBuffer, nickname, theme) {
 
             if (result.success && result.analysis) {
                 logger.info('FastVLM анализ успешен', {
-                    analysisLength: result.analysis.length
+                    analysisLength: result.analysis.length,
+                    technicalAnalysisLength: result.technical_analysis?.length || 0
                 });
 
                 // Обрабатываем и очищаем текст анализа
-                let analysisText = cleanAnalysisText(result.analysis);
+                let analysisText = cleanAnalysisText(result.analysis);  // Пользовательский ответ
+                let technicalAnalysis = result.technical_analysis || '';  // Технический анализ
 
                 return {
                     success: true,
-                    analysis: analysisText,
+                    analysis: analysisText,  // Креативный ответ стилиста
+                    technical_analysis: technicalAnalysis,  // Технический анализ (ЧЕЛОВЕК, ОДЕЖДА...)
                     fastvlm: true,
                     model: result.model_used || 'llava'
                 };
@@ -530,7 +538,8 @@ router.post('/', async (req, res) => {
                         dbUser.id,
                         telegramUser.id,  // Используем telegramUser.id
                         photo, // base64 изображения
-                        analysisResult.analysis
+                        analysisResult.analysis,  // Креативный ответ стилиста
+                        analysisResult.technical_analysis  // Технический анализ
                     );
 
                     // Обновляем счетчики только для free пользователей

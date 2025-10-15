@@ -93,8 +93,6 @@ class ApiClient {
       }
 
       const data = await response.json() as T;
-      logger.info('API Response Data', data);
-
       return data;
     } catch (error) {
       const duration = Date.now() - startTime;

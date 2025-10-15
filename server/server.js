@@ -24,6 +24,7 @@ const historyRoutes = require('./src/api/history');
 const subscriptionRoutes = require('./src/api/subscription');
 const wardrobeRoutes = require('./src/api/wardrobe');
 const capsulesRoutes = require('./src/api/capsules');
+const analysisLikesRoutes = require('./src/api/analysisLikes');
 const apiRoutes = require('./routes/api');
 
 // Импорт логгера
@@ -53,6 +54,7 @@ app.use('/api/history', historyRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/wardrobe', wardrobeRoutes);
 app.use('/api/capsules', capsulesRoutes);
+app.use('/api/analysis-likes', analysisLikesRoutes);
 app.use('/api', apiRoutes);
 
 // Роут для главной страницы

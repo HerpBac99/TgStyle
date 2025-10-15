@@ -28,42 +28,81 @@ class TgStyleApp {
   private handleSharedAnalysis(): void {
     const hash = window.location.hash;
     const urlParams = new URLSearchParams(window.location.search);
+    const tgStartParam = this.tg?.initDataUnsafe?.start_param;
+
+    logger.info('Checking for shared analysis', {
+      hash,
+      startapp: urlParams.get('startapp'),
+      start: urlParams.get('start'),
+      tgStartParam
+    });
 
     // Проверяем хэш (для прямых ссылок)
     if (hash.startsWith('#shared-analysis-')) {
       const analysisId = hash.replace('#shared-analysis-', '');
+      logger.info('Found shared analysis in hash', { analysisId });
       this.showSharedAnalysis(analysisId);
       return;
     }
 
     // Проверяем параметры URL (для ссылок из бота через Mini App)
     const startAppParam = urlParams.get('startapp');
-    if (startAppParam && startAppParam.startsWith('shared_')) {
-      const analysisId = startAppParam.replace('shared_', '');
-      // Устанавливаем хэш для корректной работы и показываем анализ
-      window.location.hash = `shared-analysis-${analysisId}`;
-      this.showSharedAnalysis(analysisId);
-      return;
+    if (startAppParam) {
+      // Новый формат: analysis_xxx
+      if (startAppParam.startsWith('analysis_')) {
+        const analysisId = startAppParam.replace('analysis_', '');
+        logger.info('Found shared analysis in startapp param', { analysisId });
+        window.location.hash = `shared-analysis-${analysisId}`;
+        this.showSharedAnalysis(analysisId);
+        return;
+      }
+      // Старый формат: shared_xxx (для обратной совместимости)
+      if (startAppParam.startsWith('shared_')) {
+        const analysisId = startAppParam.replace('shared_', '');
+        logger.info('Found shared analysis in startapp param (old format)', { analysisId });
+        window.location.hash = `shared-analysis-${analysisId}`;
+        this.showSharedAnalysis(analysisId);
+        return;
+      }
     }
 
     // Проверяем Telegram WebApp start_param (для Mini App ссылок)
-    const tgStartParam = this.tg?.initDataUnsafe?.start_param;
-    if (tgStartParam && tgStartParam.startsWith('shared_')) {
-      const analysisId = tgStartParam.replace('shared_', '');
-      // Устанавливаем хэш для корректной работы и показываем анализ
-      window.location.hash = `shared-analysis-${analysisId}`;
-      this.showSharedAnalysis(analysisId);
-      return;
+    if (tgStartParam) {
+      // Новый формат: analysis_xxx
+      if (tgStartParam.startsWith('analysis_')) {
+        const analysisId = tgStartParam.replace('analysis_', '');
+        logger.info('Found shared analysis in Telegram start_param', { analysisId });
+        window.location.hash = `shared-analysis-${analysisId}`;
+        this.showSharedAnalysis(analysisId);
+        return;
+      }
+      // Старый формат: shared_xxx (для обратной совместимости)
+      if (tgStartParam.startsWith('shared_')) {
+        const analysisId = tgStartParam.replace('shared_', '');
+        logger.info('Found shared analysis in Telegram start_param (old format)', { analysisId });
+        window.location.hash = `shared-analysis-${analysisId}`;
+        this.showSharedAnalysis(analysisId);
+        return;
+      }
     }
 
     // Для обратной совместимости проверяем start параметр
     const startParam = urlParams.get('start');
-    if (startParam && startParam.startsWith('shared_')) {
-      const analysisId = startParam.replace('shared_', '');
-      // Устанавливаем хэш для корректной работы и показываем анализ
-      window.location.hash = `shared-analysis-${analysisId}`;
-      this.showSharedAnalysis(analysisId);
-      return;
+    if (startParam) {
+      // Новый формат: analysis_xxx
+      if (startParam.startsWith('analysis_')) {
+        const analysisId = startParam.replace('analysis_', '');
+        window.location.hash = `shared-analysis-${analysisId}`;
+        this.showSharedAnalysis(analysisId);
+        return;
+      }
+      // Старый формат: shared_xxx
+      if (startParam.startsWith('shared_')) {
+        const analysisId = startParam.replace('shared_', '');
+        window.location.hash = `shared-analysis-${analysisId}`;
+        this.showSharedAnalysis(analysisId);
+        return;
+      }
     }
   }
 
@@ -72,37 +111,44 @@ class TgStyleApp {
    */
   private async showSharedAnalysis(analysisId: string): Promise<void> {
     try {
-      // Сначала пробуем найти в localStorage
-      let sharedData = localStorage.getItem(`shared_analysis_${analysisId}`);
+      logger.info('Loading shared analysis from server', { analysisId });
 
-      // Если не нашли в localStorage, пробуем получить с сервера
-      if (!sharedData) {
-        try {
-          const { api } = await import('./modules/api.js');
-          const response = await api.get(`/shared-analysis/${analysisId}`);
+      const { api } = await import('./modules/api.js');
+      const apiUrl = `/shared-analysis/${analysisId}`;
+      logger.info('Fetching from API', { apiUrl });
+      
+      const response = await api.get(apiUrl);
 
-          if ((response as any).success && (response as any).data) {
-            sharedData = JSON.stringify({
-              photo: (response as any).data.photo,
-              analysis: (response as any).data.analysis,
-              timestamp: (response as any).data.timestamp
-            });
+      if ((response as any).success && (response as any).data) {
+        logger.info('Shared analysis loaded from server', { 
+          analysisId,
+          hasPhoto: !!(response as any).data.photo,
+          hasAnalysis: !!(response as any).data.analysis,
+          historyItemId: (response as any).data.historyItemId
+        });
 
-            localStorage.setItem(`shared_analysis_${analysisId}`, sharedData);
-          }
-        } catch (serverError) {
-          logger.warn('Failed to load shared analysis from server', serverError);
-        }
+        const data = (response as any).data;
+        
+        logger.info('Showing shared analysis modal', { 
+          analysisId,
+          hasPhoto: !!data.photo,
+          historyItemId: data.historyItemId 
+        });
+        
+        await uiManager.showSharedAnalysis(
+          data.photo, 
+          data.analysis, 
+          data.timestamp, 
+          data.historyItemId
+        );
+      } else {
+        logger.warn('Server returned no data for shared analysis', { 
+          analysisId,
+          response 
+        });
       }
-
-      if (!sharedData) {
-        return;
-      }
-
-      const analysis: { photo: string; analysis: string; timestamp: string } = JSON.parse(sharedData);
-      await uiManager.showSharedAnalysis(analysis.photo, analysis.analysis, analysis.timestamp);
     } catch (error) {
-      logger.error('Failed to show shared analysis', error);
+      logger.error('Failed to show shared analysis', { analysisId, error });
     }
   }
 

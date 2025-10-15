@@ -50,6 +50,7 @@ export interface AnalysisResponse {
   success: boolean;
   analysis?: string;
   error?: string;
+  historyItemId?: number;
   subscription?: {
     type: 'free' | 'premium';
     analysesLeft: number;

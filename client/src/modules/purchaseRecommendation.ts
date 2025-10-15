@@ -94,14 +94,19 @@ class PurchaseRecommendationManager {
       textPreview: recommendationText.substring(0, 200)
     });
 
-    // Паттерн для поиска рекомендаций: 1. *Текст* [содержимое]
-    const pattern = /\d+\.\s*\*([^*]+)\*\s*\[([^\]]+)\]/g;
+    // Паттерн для поиска рекомендаций:
+    // Вариант 1: 1. *Текст* [содержимое]
+    // Вариант 2: 1.  Текст [содержимое] (без звездочек, может быть несколько пробелов)
+    const pattern = /\d+\.\s+(?:\*([^*]+)\*|([^\[]+))\s*\[([^\]]+)\]/g;
     const recommendations: string[] = [];
     let match;
 
     while ((match = pattern.exec(recommendationText)) !== null) {
-      const displayText = match[1]?.trim(); // Текст для отображения (например, "Брюки")
-      const searchQuery = match[2]?.trim(); // Поисковый запрос (например, "Брюки широкие коричневые женские")
+      // match[1] - текст в звездочках (если есть)
+      // match[2] - текст без звездочек (если нет звездочек)
+      // match[3] - поисковый запрос в квадратных скобках
+      const displayText = (match[1] || match[2])?.trim(); // Текст для отображения
+      const searchQuery = match[3]?.trim(); // Поисковый запрос
 
       logger.info('Found recommendation match', { 
         displayText, 

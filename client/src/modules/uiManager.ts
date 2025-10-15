@@ -218,8 +218,8 @@ export class UIManager {
   /**
    * Показать shared анализ
    */
-  async showSharedAnalysis(photoBase64: string, analysisText: string, timestamp: string): Promise<void> {
-    await uiCoreManager.showSharedAnalysis(photoBase64, analysisText, timestamp);
+  async showSharedAnalysis(photoBase64: string, analysisText: string, timestamp: string, historyItemId?: number): Promise<void> {
+    await uiCoreManager.showSharedAnalysis(photoBase64, analysisText, timestamp, historyItemId);
   }
 
   /**
@@ -240,8 +240,8 @@ export class UIManager {
   /**
    * Показать результат анализа
    */
-  showAnalysisResult(result: string): void {
-    uiAnalysisManager.showAnalysisResult(result);
+  showAnalysisResult(result: string, historyItemId?: number): void {
+    uiAnalysisManager.showAnalysisResult(result, historyItemId);
   }
 
   /**

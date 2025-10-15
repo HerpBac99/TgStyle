@@ -9,7 +9,6 @@ export { authManager } from './auth';
 export { cameraManager } from './camera';
 export { historyManager } from './history';
 export { analysisManager } from './analysis';
-export { uiManager } from './ui';
 
 // Экспорт типов
 export type * from '@/types/index';
@@ -46,7 +45,6 @@ declare global {
     cameraManager: typeof import('./camera.js').cameraManager;
     historyManager: typeof import('./history.js').historyManager;
     analysisManager: typeof import('./analysis.js').analysisManager;
-    uiManager: typeof import('./ui.js').uiManager;
     
     // API
     api: typeof import('./api.js').api;
