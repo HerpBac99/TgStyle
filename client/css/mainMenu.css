@@ -794,7 +794,71 @@ button:active {
     font-size: 11px; /* Размер шрифта */
     font-weight: 500; /* Жирность шрифта */
     font-family: 'Manrope', sans-serif; /* Основной шрифт приложения */
+
+    /* Flexbox для выравнивания даты и лайка */
+    display: flex; /* Включает flexbox */
+    justify-content: space-between; /* Дата слева, лайк справа */
+    align-items: center; /* Центрирует по вертикали */
+    gap: 6px; /* Расстояние между элементами */
+}
+
+/* Дата в карточке карусели */
+.history-card-date {
+    flex: 1; /* Растягивает дату */
+    min-width: 0; /* Для корректной работы overflow */
+}
+
+/* Контейнер лайков в карточке карусели */
+.carousel-likes-container {
+    display: flex; /* Включает flexbox */
+    align-items: center; /* Центрирует элементы */
+    justify-content: center; /* Центрирует элементы */
+    gap: 4px; /* Расстояние между кнопкой и счетчиком */
+    flex-shrink: 0; /* Запрещает сжатие */
+}
+
+/* Кнопка лайка на карусели */
+.carousel-like-btn {
+    background: transparent; /* Прозрачный фон */
+    border: none; /* Без границы */
+    padding: 4px 6px; /* Внутренние отступы */
+    cursor: pointer; /* Курсор в виде руки */
+    display: flex; /* Включает flexbox */
+    align-items: center; /* Центрирует элементы */
+    justify-content: center; /* Центрирует элементы */
+    outline: none; /* Убирает контур при фокусе */
+    -webkit-tap-highlight-color: transparent; /* Убирает серый квадрат на iOS */
+    border-radius: 12px; /* Скругление углов */
+    transition: all 0.3s ease; /* Плавная анимация */
+}
+
+/* SVG сердечко в кнопке лайка */
+.carousel-like-btn svg {
+    stroke: white; /* Белый цвет обводки по умолчанию */
+    fill: none; /* Не заполнено по умолчанию */
+    flex-shrink: 0; /* Запрещает сжатие иконки */
+}
+
+/* Состояние лайка */
+.carousel-like-btn.liked svg {
+    fill: #ff4957; /* Заполнен красным */
+    stroke: #ff4957; /* Обводка красная */
+}
+
+/* При нажатии */
+.carousel-like-btn:active {
+    transform: scale(0.9); /* Небольшое уменьшение */
+    opacity: 0.8; /* Полупрозрачность */
+}
+
+/* Счетчик лайков на карусели */
+.carousel-likes-count {
+    color: white; /* Белый цвет текста */
+    font-size: 10px; /* Размер шрифта */
+    font-weight: 500; /* Жирность шрифта */
+    min-width: 16px; /* Минимальная ширина */
     text-align: center; /* Центрирование текста */
+    opacity: 0.95; /* Полупрозрачность */
 }
 
 /* =======================================

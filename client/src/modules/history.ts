@@ -82,21 +82,6 @@ class HistoryManager {
 
       // Дополняем до нужного размера если необходимо
       this.history = this.normalizeHistory(parsedHistory);
-
-      const filledCount = this.history.filter(item => item && !item.isEmpty).length;
-
-      logger.info('History loaded from storage successfully', {
-        totalItems: this.history.length,
-        filledItems: filledCount,
-        emptyItems: this.history.length - filledCount,
-        sampleItem: this.history[0] ? {
-          hasPhoto: !!this.history[0].photo,
-          photoSize: this.history[0].photo ? Math.round(this.history[0].photo.length / 1024) + 'KB' : 'no photo',
-          hasAnalysis: !!this.history[0].analysis,
-          timestamp: this.history[0].timestamp
-        } : 'no items'
-      });
-
     } catch (error) {
       logger.error('Error loading history from storage', {
         error: error instanceof Error ? error.message : String(error),

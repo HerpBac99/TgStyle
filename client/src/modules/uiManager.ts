@@ -230,7 +230,9 @@ export class UIManager {
   }
 
   /**
-   * Обновить отображение истории
+   * @description Обновить отображение истории в главном меню
+   * вызываем метод updateHistoryDisplay из uiMenuManager
+   * #UPDATE-HISTORY-DISPLAY #UI-MANAGER #UI-UPDATE-HISTORY-DISPLAY
    */
   updateHistoryDisplay(): void {
     uiMenuManager.updateHistoryDisplay();
@@ -261,7 +263,8 @@ export class UIManager {
   }
 
   /**
-   * Инициализация UI после загрузки
+   * @description Инициализация UI после загрузки
+   * #INIT #UI-MANAGER #UI-INIT
    */
   init(): void {
     // Обновляем отображение истории

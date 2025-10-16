@@ -282,6 +282,97 @@ export class UIMenuManager {
   }
 
   /**
+   * Загружает статус лайка для карточки в карусели
+   */
+  private async loadCarouselLikeStatus(
+    historyItemId: number,
+    likeBtn: HTMLElement,
+    likesCountEl: HTMLElement
+  ): Promise<void> {
+    try {
+      logger.info('Loading carousel like status', { historyItemId });
+      const { api } = await import('./api');
+      const { authManager } = await import('./auth');
+
+      const initData = authManager.getInitData();
+      if (!initData) {
+        logger.warn('No initData for carousel like status');
+        likesCountEl.textContent = '0';
+        return;
+      }
+
+      const endpoint = `/analysis-likes/${historyItemId}/status?initData=${encodeURIComponent(initData)}`;
+      const response = await api.get(endpoint) as any;
+      logger.info('Carousel like status loaded', { historyItemId, ...response });
+
+      if (response?.success) {
+        likesCountEl.textContent = String(response.likesCount || 0);
+
+        if (response.isLiked) {
+          likeBtn.classList.add('liked');
+        } else {
+          likeBtn.classList.remove('liked');
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to load carousel like status', error);
+      likesCountEl.textContent = '0';
+    }
+  }
+
+  /**
+   * Обработчик клика по кнопке лайка на карусели
+   */
+  private async handleCarouselLikeClick(
+    historyItemId: number,
+    likeBtn: HTMLElement,
+    likesCountEl: HTMLElement
+  ): Promise<void> {
+    try {
+      logger.info('Carousel like button clicked', { historyItemId });
+      const isCurrentlyLiked = likeBtn.classList.contains('liked');
+      logger.info('Current like state', { historyItemId, isCurrentlyLiked });
+
+      const { api } = await import('./api');
+      const { authManager } = await import('./auth');
+
+      const initData = authManager.getInitData();
+      if (!initData) {
+        logger.warn('No initData available for carousel like action');
+        return;
+      }
+
+      let response;
+
+      if (isCurrentlyLiked) {
+        // Удаляем лайк
+        const endpoint = `/analysis-likes/${historyItemId}?initData=${encodeURIComponent(initData)}`;
+        response = await api.delete(endpoint) as any;
+      } else {
+        // Добавляем лайк
+        response = await api.post(`/analysis-likes/${historyItemId}`, { initData }) as any;
+      }
+
+      if (response?.success) {
+        // Обновляем UI
+        likesCountEl.textContent = String(response.likesCount || 0);
+
+        if (response.isLiked) {
+          likeBtn.classList.add('liked');
+        } else {
+          likeBtn.classList.remove('liked');
+        }
+
+        logger.info('Carousel like updated', { historyItemId, isLiked: response.isLiked });
+      } else {
+        logger.warn('Failed to update carousel like', response);
+      }
+    } catch (error) {
+      logger.error('Error handling carousel like click', error);
+    }
+  }
+
+  /**
    * Закрытие экрана анализа
    */
   private closePreview(): void {
@@ -299,7 +390,11 @@ export class UIMenuManager {
   }
 
   /**
-   * Обновление отображения истории
+   * @description Обновление отображения истории
+   * вызываем метод createCarouselCards из uiMenuManager
+   * вызываем метод positionCarousel из uiMenuManager
+   * вызываем метод updateCarouselNavigation из uiMenuManager
+   * #UPDATE-HISTORY-DISPLAY #UI-MENU #UI-UPDATE-HISTORY-DISPLAY
    */
   updateHistoryDisplay(): void {
     const filledItems = historyManager.getFilledItems();
@@ -320,6 +415,7 @@ export class UIMenuManager {
 
   /**
    * Создание карт карусели динамически
+   * #uiMenu #MainMenu #Carousel #createCarouselCards #createCards #Card
    */
   private createCarouselCards(filledItems: HistoryItem[]): void {
     const carousel = getElement(DOM_SELECTORS.HISTORY_CAROUSEL);
@@ -395,16 +491,70 @@ export class UIMenuManager {
 
     const caption = createElement('div', {
       class: 'history-card-caption',
+    });
+
+    // Добавляем дату
+    const dateElement = createElement('div', {
+      class: 'history-card-date',
     }, formatHistoryDate(data.timestamp));
+    caption.appendChild(dateElement);
+
+    // NEW: Добавляем кнопку лайка в caption
+    const likesContainer = createElement('div', {
+      class: 'carousel-likes-container',
+    });
+
+    const likeBtn = createElement('button', {
+      class: 'carousel-like-btn',
+      'aria-label': 'Поставить лайк',
+    });
+    likeBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      </svg>
+    `;
+
+    const likesCount = createElement('span', {
+      class: 'carousel-likes-count',
+    }, '0');
+
+    likesContainer.appendChild(likeBtn);
+    likesContainer.appendChild(likesCount);
+    caption.appendChild(likesContainer);
 
     content.appendChild(caption);
+
+    // NEW: Загружаем статус лайка для карточки
+    if (data.id) {
+      const historyItemId: number = typeof data.id === 'string' ? parseInt(data.id, 10) : data.id;
+      logger.info('Setting up carousel like button', { historyItemId, originalId: data.id });
+      this.loadCarouselLikeStatus(historyItemId, likeBtn, likesCount);
+
+      // Обработчик клика на кнопку лайка
+      const likeClickHandler = async (e: Event) => {
+        logger.info('Like button event fired', { historyItemId });
+        e.stopPropagation(); // Запрещаем открытие подробной истории
+        e.preventDefault();
+        await this.handleCarouselLikeClick(historyItemId, likeBtn, likesCount);
+      };
+      likeBtn.addEventListener('click', likeClickHandler);
+      logger.info('Like button listener added', { historyItemId });
+    }
 
     // Находим реальный индекс элемента в общем массиве истории
     const realIndex = this.findRealHistoryIndex(data);
 
     // Обработчики
     this.addLongPressHandlers(card, realIndex);
-    card.onclick = () => this.showSavedAnalysis(data);
+    
+    // Обработчик клика на карточку - НО не на лайк!
+    card.addEventListener('click', (e: Event) => {
+      const target = e.target as HTMLElement;
+      // Проверяем что клик НЕ на кнопку лайка или её содержимое
+      if (!target.closest('.carousel-like-btn')) {
+        this.showSavedAnalysis(data);
+      }
+    });
   }
 
   /**

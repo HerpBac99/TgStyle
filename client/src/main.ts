@@ -153,7 +153,9 @@ class TgStyleApp {
   }
 
   /**
-   * Основной метод инициализации приложения
+   * Основной метод инициализации 
+   * @description Основной метод инициализации приложения
+   * 
    */
   async initialize(): Promise<void> {
     logger.info('Starting TgStyle application', {
@@ -205,6 +207,9 @@ class TgStyleApp {
 
   /**
    * Инициализация Telegram WebApp
+   * 
+   * @description Инициализация Telegram WebApp
+   * создаем глобальную переменную API для доступа из других модулей
    */
   private initializeTelegram(): void {
     logger.info('Initializing Telegram WebApp', {
@@ -323,11 +328,10 @@ class TgStyleApp {
   }
 
   /**
-   * Инициализация UI
+   * @description Инициализация UI
+   * вызываем метод init из uiManager
    */
   private initializeUI(): void {
-    logger.info('Initializing UI');
-    
     try {
       uiManager.init();
       logger.info('UI initialized successfully');
