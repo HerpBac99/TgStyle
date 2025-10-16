@@ -80,17 +80,10 @@
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.theme-card:hover {
-    /* НЕОМОРФНЫЙ HOVER - ЭФФЕКТ НАЖАТИЯ */
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 16px 16px 32px #c7cbd1, -16px -16px 32px #ffffff, inset 2px 2px 4px rgba(255,255,255,0.2);
-    filter: brightness(1.02);
-}
-
+/* Active состояние для theme cards (только touch) */
 .theme-card:active {
-    /* ЭФФЕКТ НАЖАТИЯ - ВДАВЛЕННОСТЬ */
-    transform: translateY(1px) scale(0.98);
-    box-shadow: inset 6px 6px 12px #c7cbd1, inset -6px -6px 12px #ffffff;
+    transform: scale(0.95);
+    opacity: 0.8;
     transition-duration: 0.1s;
 }
 
@@ -478,18 +471,13 @@
 
 /* Кнопки действий */
 .result-actions {
-    padding: 8px 12px; /* Увеличенные отступы */
-    border: none; /* Убираем границу */
-
-    /* НЕОМОРФНЫЙ ФОН */
+    padding: 8px 12px;
+    border: none;
     background: var(--neumorph-bg);
-
-    /* НЕОМОРФНЫЕ ТЕНИ - ЛЕГКИЙ ВЫПУКЛЫЙ ЭФФЕКТ */
     box-shadow: inset 4px 4px 8px rgba(199, 203, 209, 0.2), inset -4px -4px 8px rgba(255, 255, 255, 0.4);
-
-    display: flex; /* Включает flexbox */
-    gap: 12px; /* Расстояние между кнопками */
-    border-radius: 0 0 20px 20px; /* Увеличенное скругление для неоморфизма */
+    display: flex;
+    gap: 12px;
+    border-radius: 0 0 20px 20px;
 }
 
 /* Базовые стили для кнопок действий - НЕОМОРФНЫЙ СТИЛЬ */
@@ -517,70 +505,51 @@
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.action-btn:hover {
-    /* НЕОМОРФНЫЙ HOVER */
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 16px 16px 32px #c7cbd1, -16px -16px 32px #ffffff, inset 2px 2px 4px rgba(255,255,255,0.2);
-}
-
+/* Убираем hover/focus/active для touch интерфейса */
+.action-btn:focus,
 .action-btn:active {
-    /* ЭФФЕКТ НАЖАТИЯ - ВДАВЛЕННОСТЬ */
-    transform: translateY(1px) scale(0.98);
-    box-shadow: inset 6px 6px 12px #c7cbd1, inset -6px -6px 12px #ffffff;
-}
-
-.action-btn:focus {
-    outline: none; /* Убирает контур при фокусе */
-}
-
-.action-btn:active {
-    outline: none; /* Убирает контур при нажатии */
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* Кнопка лайк */
 .like-btn {
-    flex: 1; /* Занимает равную часть доступного пространства */
-    background: transparent !important; /* Прозрачный фон */
-    border: none !important; /* Убирает рамку */
-    color: white; /* Белый цвет текста */
-    display: flex; /* Включает flexbox */
-    align-items: center; /* Центрирует по вертикали */
-    justify-content: center; /* Центрирует по горизонтали */
-    transition: all 0.2s ease; /* Анимация при взаимодействии */
-    box-shadow: none !important; /* Убирает тень */
-    border-radius: 0 !important; /* Убирает скругление углов */
-    outline: none !important; /* Убирает контур */
-
-    /* ВОТ ГЛАВНЫЙ ФИКС: Убирает серый квадрат при нажатии на iOS/WebKit */
-    -webkit-tap-highlight-color: transparent !important; 
-}
-
-/* Мы ДОЛЖНЫ определить :focus и :active, чтобы переопределить стили браузера */
-.like-btn:focus,
-.like-btn:focus-visible {
-    outline: none !important;
-    background: transparent !important; /* Убираем фон при фокусе */
-    box-shadow: none !important;
-}
-
-.like-btn:active {
-    outline: none !important;
-    background: transparent !important; /* Убираем фон при нажатии */
-    box-shadow: none !important;
-    transform: scale(0.8) !important; /* Возвращаем анимацию нажатия */
-    -webkit-tap-highlight-color: transparent !important;
-}
-
-/* Стили для кнопки лайк - базовые */
-.like-btn {
-    background: transparent;
-    border: none;
+    background: transparent !important;
     cursor: pointer;
-    padding: 8px;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.2s ease;
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    border: none !important;
+}
+
+/* Убираем все ненужные состояния для touch интерфейса */
+.like-btn:focus,
+.like-btn:focus-visible,
+.like-btn:active {
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Анимация bounce как в Instagram */
+@keyframes likeHeartBounce {
+    0% {
+        transform: scale(1);
+    }
+    25% {
+        transform: scale(0.2);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
 }
 
 /* SVG сердечка - базовые стили */
@@ -588,26 +557,73 @@
     width: 24px;
     height: 24px;
     display: block;
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+/* Дефолтное состояние - черное сердечко с обводкой */
+.like-btn svg path {
+    fill: none;
+    stroke: #2c2c2c;
+    stroke-width: 2;
+    transition: fill 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), stroke 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Состояние лайка - алое заполненное сердечко как в Instagram */
+.like-btn.liked svg path {
+    fill: #ed4956;
+    stroke: #ed4956;
+    stroke-width: 2;
+}
+
+/* Анимация при добавлении like - только на кнопку */
+.like-btn.liked svg {
+    animation: likeHeartBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 /* SVG стили теперь управляются JS - полная замена элементов */
 
+/* Контейнер лайков (кнопка + счетчик) */
+.like-container {
+    flex: 1;
+    flex-basis: 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid red;
+}
+
+/* Счетчик лайков */
+.likes-count {
+    color: #2c2c2c;
+    font-size: 16px;
+    font-weight: 500;
+    min-width: 20px;
+    text-align: left;
+    opacity: 0.9;
+    transition: color 0.2s ease;
+}
+
 /* Кнопка поделиться */
 .share-btn {
-    flex: 1; /* Занимает равную часть доступного пространства */
-    background: transparent !important; /* Прозрачный фон */
-    border: none !important; /* Убирает рамку */
-    color: white; /* Белый цвет текста */
-    display: flex; /* Включает flexbox */
-    align-items: center; /* Центрирует по вертикали */
-    justify-content: center; /* Центрирует по горизонтали */
-    transition: all 0.2s ease; /* Анимация при взаимодействии */
-    box-shadow: none !important; /* Убирает тень */
-    border-radius: 0 !important; /* Убирает скругление углов */
-    outline: none !important; /* Убирает контур */
-
-   /* ВОТ ГЛАВНЫЙ ФИКС: Убирает серый квадрат при нажатии на iOS/WebKit */
-   -webkit-tap-highlight-color: transparent !important;
+    flex: 1;
+    flex-basis: 0;
+    min-width: 0;
+    padding: 12px;
+    background: transparent !important;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    outline: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    border: 1px solid blue;
 }
 
 /* Ссылки на Lamoda в тексте анализа */
@@ -653,17 +669,12 @@ a.recommendation-link:visited,
     -webkit-tap-highlight-color: transparent !important; /* Убираем серый квадрат при нажатии на iOS */
 }
 
-/* Hover эффект для ссылок-рекомендаций */
-a.recommendation-link:hover,
-a.recommendation-link:focus,
+/* Active состояние для ссылок-рекомендаций (только touch) */
 a.recommendation-link:active,
-.analysis-text a.recommendation-link:hover,
-.analysis-text a.recommendation-link:focus,
 .analysis-text a.recommendation-link:active {
-    color: #ff4757 !important; /* Более яркий розовый при наведении */
-    background: rgba(255, 107, 107, 0.2) !important; /* Более насыщенный фон */
-    transform: translateY(-1px); /* Небольшой подъём */
-    box-shadow: 0 2px 4px rgba(255, 107, 107, 0.3) !important; /* Тень */
+    color: #ff4757 !important;
+    background: rgba(255, 107, 107, 0.2) !important;
+    opacity: 0.8;
 }
 
 /* Блок рекомендаций */
@@ -676,50 +687,38 @@ a.recommendation-link:active,
 }
 
 .share-btn svg path {
-    stroke: #2481cc; /* Синий цвет обводки (цвет Telegram) */
+    fill: #2c2c2c;
+    stroke-width: 2;
+    stroke:#2c2c2c;
     stroke-width: 2; /* Толщина обводки */
-    fill: none; /* Без заливки по умолчанию */
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Анимация изменений */
-}
-
-.share-btn.shared svg path {
-    fill: #2481cc; /* Синяя заливка для состояния "поделился" */
-    stroke: #2481cc; /* Синяя обводка для состояния "поделился" */
 }
 
 /* Кнопка закрыть */
 .close-btn {
-    flex: 1; /* Занимает равную часть доступного пространства */
-    background: transparent !important; /* Прозрачный фон */
-    border: none !important; /* Убирает рамку */
-    color: #2481cc; /* Белый цвет текста */
-    display: flex; /* Включает flexbox */
-    align-items: center; /* Центрирует по вертикали */
-    justify-content: center; /* Центрирует по горизонтали */
-    transition: all 0.2s ease; /* Анимация при взаимодействии */
-    box-shadow: none !important; /* Убирает тень */
-    border-radius: 0 !important; /* Убирает скругление углов */
-    outline: none !important; /* Убирает контур */
-
-    /* ВОТ ГЛАВНЫЙ ФИКС: Убирает серый квадрат при нажатии на iOS/WebKit */
+    flex: 1;
+    flex-basis: 0;
+    min-width: 0;
+    padding: 12px;
+    background: transparent !important;
+    color: #2c2c2c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    outline: none !important;
     -webkit-tap-highlight-color: transparent !important;
+    border: 1px solid green;
 }
 
-.close-btn:hover {
-    transform: translateY(-2px); /* Поднимает кнопку вверх при наведении */
-    box-shadow: 0 6px 16px rgba(129, 216, 208, 0.4); /* Увеличивает тень при наведении */
-}
-
-/* Анимация нажатия - переопределена выше для неоморфного стиля */
-
-
-
-/* Переопределяем для кнопки лайк */
-.like-btn.action-btn:active {
-    transform: scale(0.8) !important; /* Уменьшает кнопку лайк при нажатии */
-    background: transparent !important; /* Сохраняет прозрачный фон */
-    outline: none !important; /* Убирает контур */
-    box-shadow: none !important; /* Убирает тень */
+.close-btn svg path {
+    fill: #2c2c2c;
+    stroke-width: 2;
+    stroke:#2c2c2c;
+    stroke-width: 2; /* Толщина обводки */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Анимация изменений */
 }
 
 /* Кнопка "Найти рекомендации" */

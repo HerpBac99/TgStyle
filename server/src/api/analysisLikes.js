@@ -70,32 +70,30 @@ router.post('/:historyItemId', async (req, res) => {
     });
 
     if (existingLike) {
-      // Получаем текущее количество лайков
-      const likesCount = await prisma.rating.count({
-        where: { historyItemId: parseInt(historyItemId) }
-      });
-
       return res.status(400).json({
         success: false,
         error: 'Already liked',
         isLiked: true,
-        likesCount
+        likesCount: historyItem.likesCount
       });
     }
 
-    // Создаем лайк
-    await prisma.rating.create({
-      data: {
-        userId: user.id,
-        historyItemId: parseInt(historyItemId),
-        ratingType: 'like'
-      }
-    });
+    // Атомарно: создаем лайк + увеличиваем счетчик
+    const [_, updatedItem] = await prisma.$transaction([
+      prisma.rating.create({
+        data: {
+          userId: user.id,
+          historyItemId: parseInt(historyItemId),
+          ratingType: 'like'
+        }
+      }),
+      prisma.historyItem.update({
+        where: { id: parseInt(historyItemId) },
+        data: { likesCount: { increment: 1 } }
+      })
+    ]);
 
-    // Получаем общее количество лайков
-    const likesCount = await prisma.rating.count({
-      where: { historyItemId: parseInt(historyItemId) }
-    });
+    const likesCount = updatedItem.likesCount;
 
     logger.info('Analysis liked', {
       userId: user.id,
@@ -168,33 +166,37 @@ router.delete('/:historyItemId', async (req, res) => {
     });
 
     if (!like) {
-      // Получаем текущее количество лайков
-      const likesCount = await prisma.rating.count({
-        where: { historyItemId: parseInt(historyItemId) }
+      // Получаем текущий счетчик из HistoryItem
+      const historyItem = await prisma.historyItem.findUnique({
+        where: { id: parseInt(historyItemId) },
+        select: { likesCount: true }
       });
 
       return res.status(404).json({
         success: false,
         error: 'Like not found',
         isLiked: false,
-        likesCount
+        likesCount: historyItem?.likesCount || 0
       });
     }
 
-    // Удаляем лайк
-    await prisma.rating.delete({
-      where: {
-        userId_historyItemId: {
-          userId: user.id,
-          historyItemId: parseInt(historyItemId)
+    // Атомарно: удаляем лайк + уменьшаем счетчик
+    const [_, updatedItem] = await prisma.$transaction([
+      prisma.rating.delete({
+        where: {
+          userId_historyItemId: {
+            userId: user.id,
+            historyItemId: parseInt(historyItemId)
+          }
         }
-      }
-    });
+      }),
+      prisma.historyItem.update({
+        where: { id: parseInt(historyItemId) },
+        data: { likesCount: { decrement: 1 } }
+      })
+    ]);
 
-    // Получаем обновленное количество лайков
-    const likesCount = await prisma.rating.count({
-      where: { historyItemId: parseInt(historyItemId) }
-    });
+    const likesCount = updatedItem.likesCount;
 
     logger.info('Analysis unliked', {
       userId: user.id,
@@ -226,31 +228,36 @@ router.get('/:historyItemId/status', async (req, res) => {
     const { historyItemId } = req.params;
     const { initData } = req.query;
 
+    // Получаем HistoryItem с счетчиком
+    const historyItem = await prisma.historyItem.findUnique({
+      where: { id: parseInt(historyItemId) },
+      select: { likesCount: true }
+    });
+
+    if (!historyItem) {
+      return res.status(404).json({
+        success: false,
+        error: 'Analysis not found'
+      });
+    }
+
     // Валидация
     if (!initData) {
       // Если нет auth data - возвращаем не лайкнуто
-      const likesCount = await prisma.rating.count({
-        where: { historyItemId: parseInt(historyItemId) }
-      });
-
       return res.json({
         success: true,
         isLiked: false,
-        likesCount
+        likesCount: historyItem.likesCount
       });
     }
 
     const validation = validateTelegramWebAppData(initData);
     if (!validation.isValid) {
       // Если невалидно - возвращаем не лайкнуто
-      const likesCount = await prisma.rating.count({
-        where: { historyItemId: parseInt(historyItemId) }
-      });
-
       return res.json({
         success: true,
         isLiked: false,
-        likesCount
+        likesCount: historyItem.likesCount
       });
     }
 
@@ -261,14 +268,10 @@ router.get('/:historyItemId/status', async (req, res) => {
     });
 
     if (!user) {
-      const likesCount = await prisma.rating.count({
-        where: { historyItemId: parseInt(historyItemId) }
-      });
-
       return res.json({
         success: true,
         isLiked: false,
-        likesCount
+        likesCount: historyItem.likesCount
       });
     }
 
@@ -282,10 +285,7 @@ router.get('/:historyItemId/status', async (req, res) => {
       }
     });
 
-    // Получаем общее количество лайков
-    const likesCount = await prisma.rating.count({
-      where: { historyItemId: parseInt(historyItemId) }
-    });
+    const likesCount = historyItem.likesCount;
 
     res.json({
       success: true,
