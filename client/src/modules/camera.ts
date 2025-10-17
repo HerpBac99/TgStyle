@@ -132,9 +132,6 @@ class CameraManager {
       throw new Error(validation.errors.join('; '));
     }
 
-    // Сжатие отключено для сохранения качества изображений
-    logger.info('Сжатие изображений отключено для сохранения качества');
-
     return imageData;
   }
 

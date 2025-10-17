@@ -327,6 +327,18 @@ class TgStyleLogger implements Logger {
 
     if (!this.isEnabled) return;
 
+    // FILTER: Исключаем шумные Telegram.WebView события которые загромождают логи
+    const messageStr = String(message || '');
+    if (messageStr.includes('[Telegram.WebView]') || 
+        messageStr.includes('receiveEvent') ||
+        messageStr.includes('fullscreen_changed') ||
+        messageStr.includes('viewport_changed') ||
+        messageStr.includes('safe_area_changed') ||
+        messageStr.includes('content_safe_area_changed') ||
+        messageStr.includes('fullscreen_failed')) {
+      return; // Пропускаем эти логи
+    }
+
     this.isLoggingInProgress = true;
 
     try {

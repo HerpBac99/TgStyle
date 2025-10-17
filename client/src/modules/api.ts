@@ -23,6 +23,18 @@ import {
 import { logger } from './logger';
 
 /**
+ * Получить initData из Telegram WebApp
+ * Вынесено в отдельную функцию чтобы избежать circular dependencies
+ */
+function getInitData(): string {
+  try {
+    return (window as any).Telegram?.WebApp?.initData || '';
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Базовый класс для API запросов
  */
 class ApiClient {
@@ -40,7 +52,8 @@ class ApiClient {
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
-    timeout = this.defaultTimeout
+    timeout = this.defaultTimeout,
+    skipInitData = false
   ): Promise<T> {
     // Проверяем доступность сети
     if (!isOnline()) {
@@ -51,29 +64,25 @@ class ApiClient {
     const startTime = Date.now();
 
     try {
-      logger.info(`API Request: ${options.method || 'GET'} ${url}`);
+
+      // OPTIMIZED: Автоматически добавляем initData если не помечено как skipInitData
+      let finalHeaders = {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      } as Record<string, string>;
+
+      if (!skipInitData) {
+        const initData = getInitData();
+        if (initData) {
+          finalHeaders['X-Init-Data'] = initData;
+        }
+      }
 
       const response = await fetch(url, {
         ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
+        headers: finalHeaders,
         signal: AbortSignal.timeout(timeout),
       });
-
-      const duration = Date.now() - startTime;
-      logger.info(`API Response: ${response.status} ${response.statusText} (${duration}ms)`);
-
-      // Логируем API запрос
-      if (window.appLogger) {
-        window.appLogger.info(`API Request`, {
-          method: options.method || 'GET',
-          url: endpoint,
-          status: response.status,
-          duration,
-        });
-      }
 
       // Обработка статусов ошибок
       if (!response.ok) {
@@ -108,13 +117,6 @@ class ApiClient {
           throw createError(ERROR_CODES.NETWORK_ERROR, 'Ошибка сети');
         }
       }
-
-      logger.error('API Request Failed', {
-        url,
-        duration,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
       throw error;
     }
   }
@@ -154,43 +156,45 @@ class ApiClient {
   /**
    * GET запрос
    */
-  async get<T>(endpoint: string, timeout?: number): Promise<T> {
-    return this.request<T>(endpoint, { method: 'GET' }, timeout);
+  async get<T>(endpoint: string, timeout?: number, skipInitData = false): Promise<T> {
+    return this.request<T>(endpoint, { method: 'GET' }, timeout, skipInitData);
   }
 
   /**
    * POST запрос
    */
-  async post<T>(endpoint: string, data?: any, timeout?: number): Promise<T> {
+  async post<T>(endpoint: string, data?: any, timeout?: number, skipInitData = false): Promise<T> {
     return this.request<T>(
       endpoint,
       {
         method: 'POST',
         ...(data && { body: JSON.stringify(data) }),
       },
-      timeout
+      timeout,
+      skipInitData
     );
   }
 
   /**
    * PUT запрос
    */
-  async put<T>(endpoint: string, data?: any, timeout?: number): Promise<T> {
+  async put<T>(endpoint: string, data?: any, timeout?: number, skipInitData = false): Promise<T> {
     return this.request<T>(
       endpoint,
       {
         method: 'PUT',
         ...(data && { body: JSON.stringify(data) }),
       },
-      timeout
+      timeout,
+      skipInitData
     );
   }
 
   /**
    * DELETE запрос
    */
-  async delete<T>(endpoint: string, timeout?: number): Promise<T> {
-    return this.request<T>(endpoint, { method: 'DELETE' }, timeout);
+  async delete<T>(endpoint: string, timeout?: number, skipInitData = false): Promise<T> {
+    return this.request<T>(endpoint, { method: 'DELETE' }, timeout, skipInitData);
   }
 
   /**
@@ -218,9 +222,7 @@ class TgStyleApi extends ApiClient {
     const request: AuthRequest = { initData };
     const response = await this.post<AuthResponse>('/auth', request, TIMEOUTS.AUTH_REQUEST);
     
-    if (response.success) {
-      logger.info('Authentication successful', { userId: response.user?.id });
-    } else {
+    if (!response.success) {
       logger.error('Authentication failed', { error: response.error });
     }
     
@@ -263,18 +265,146 @@ class TgStyleApi extends ApiClient {
   }
 
   /**
-   * Проверка здоровья FastVLM сервера
+   * BATCH: Загрузка всех начальных данных
+   * Оптимизация: вместо 3-5 запросов делаем 1 батч запрос
    */
-  async checkFastVLMHealth(): Promise<boolean> {
-    try {
-      // В production FastVLM недоступен напрямую с клиента
-      // Проверяем через основной API
-      const response = await this.get('/health', TIMEOUTS.HEALTH_CHECK);
-      return Boolean(response && typeof response === 'object');
-    } catch (error) {
-      logger.info('FastVLM health check failed', error);
-      return false;
-    }
+  async getInitialData(): Promise<{
+    history: any[];
+    wardrobe: any[];
+    capsules: any[];
+    user: any;
+    subscription: any;
+  }> {
+    logger.info('Loading initial data batch');
+    return this.get('/initial-data', TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Получение гардероба пользователя
+   */
+  async getWardrobe(): Promise<any> {
+    logger.info('Loading wardrobe items');
+    return this.get('/wardrobe', TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Получение капсул пользователя
+   */
+  async getCapsules(): Promise<any> {
+    logger.info('Loading capsules');
+    return this.get('/capsules', TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Получение истории анализов
+   */
+  async getHistory(limit = 50, page = 1): Promise<any> {
+    logger.info('Loading history', { limit, page });
+    return this.get(`/history?limit=${limit}&page=${page}`, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Удаление фона с изображения
+   */
+  async removeBackground(image: string): Promise<any> {
+    logger.info('Removing background from image');
+    return this.post('/remove-background', { image }, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Классификация одежды на изображении
+   */
+  async classifyClothing(image: string): Promise<any> {
+    logger.info('Classifying clothing in image');
+    return this.post('/classify-clothing', { image }, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Создание нового предмета гардероба
+   */
+  async createWardrobeItem(data: any): Promise<any> {
+    logger.info('Creating wardrobe item');
+    return this.post('/wardrobe', data, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Удаление предмета гардероба
+   */
+  async deleteWardrobeItem(itemId: number): Promise<any> {
+    logger.info('Deleting wardrobe item', { itemId });
+    return this.delete(`/wardrobe/${itemId}`, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Обновление предмета гардероба
+   */
+  async updateWardrobeItem(itemId: number, data: any): Promise<any> {
+    logger.info('Updating wardrobe item', { itemId });
+    return this.put(`/wardrobe/${itemId}`, data, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Создание капсулы
+   */
+  async createCapsule(data: any): Promise<any> {
+    logger.info('Creating capsule');
+    return this.post('/capsules', data, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Удаление капсулы
+   */
+  async deleteCapsule(capsuleId: number): Promise<any> {
+    logger.info('Deleting capsule', { capsuleId });
+    return this.delete(`/capsules/${capsuleId}`, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Обновление капсулы
+   */
+  async updateCapsule(capsuleId: number, data: any): Promise<any> {
+    logger.info('Updating capsule', { capsuleId });
+    return this.put(`/capsules/${capsuleId}`, data, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Удаление элемента истории
+   */
+  async deleteHistoryItem(itemId: number): Promise<any> {
+    logger.info('Deleting history item', { itemId });
+    return this.delete(`/history/${itemId}`, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Обновление элемента истории
+   */
+  async updateHistoryItem(itemId: number, data: any): Promise<any> {
+    logger.info('Updating history item', { itemId });
+    return this.put(`/history/${itemId}`, data, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Добавление лайка к анализу
+   */
+  async likeAnalysis(historyItemId: number): Promise<any> {
+    logger.info('Liking analysis', { historyItemId });
+    return this.post(`/analysis-likes/${historyItemId}`, {}, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Удаление лайка с анализа
+   */
+  async unlikeAnalysis(historyItemId: number): Promise<any> {
+    logger.info('Unliking analysis', { historyItemId });
+    return this.delete(`/analysis-likes/${historyItemId}`, TIMEOUTS.ANALYSIS_REQUEST);
+  }
+
+  /**
+   * Проверка статуса лайка (DEPRECATED: используй isLiked из истории)
+   */
+  async checkLikeStatus(historyItemId: number): Promise<any> {
+    logger.info('Checking like status', { historyItemId });
+    return this.get(`/analysis-likes/${historyItemId}/status`, TIMEOUTS.ANALYSIS_REQUEST);
   }
 }
 

@@ -4,6 +4,7 @@
  */
 
 import { logger } from '../logger';
+import { api } from '../api';
 import { WardrobeItem } from '@/types/wardrobe';
 import { dataLoader } from '../shared/DataLoader';
 import { dataCacheManager } from '../dataCache';
@@ -28,17 +29,7 @@ export class WardrobeService {
    */
   private async loadFromServer(): Promise<WardrobeItem[]> {
     try {
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
-
-      const response = await fetch(`/api/wardrobe?initData=${encodeURIComponent(initData)}`, {
-        method: 'GET'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await api.getWardrobe();
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to load items');
@@ -61,17 +52,7 @@ export class WardrobeService {
     try {
       logger.info('Deleting wardrobe item', { itemId });
 
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
-
-      const response = await fetch(`/api/wardrobe/${itemId}?initData=${encodeURIComponent(initData)}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await api.deleteWardrobeItem(itemId);
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to delete item');
@@ -96,21 +77,7 @@ export class WardrobeService {
     try {
       logger.info('Updating wardrobe item', { itemId, updates });
 
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
-
-      const response = await fetch(`/api/wardrobe/${itemId}?initData=${encodeURIComponent(initData)}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(updates)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await api.updateWardrobeItem(itemId, updates);
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to update item');

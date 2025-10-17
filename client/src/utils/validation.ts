@@ -71,23 +71,26 @@ export function validateHistoryItem(item: HistoryItem): ValidationResult {
     return { isValid: false, errors, warnings };
   }
 
-  // Для пустых элементов проверяем только базовую структуру
-  if (item.isEmpty) {
-    return { isValid: true, errors: [], warnings: [] };
-  }
-
-  // Проверяем обязательные поля для заполненных элементов
-  if (!item.photo && !item.isEmpty) {
+  // Проверяем обязательные поля
+  
+  if (!item.photoPath) {
     warnings.push('Отсутствует изображение в элементе истории');
   }
 
-  if (!item.timestamp) {
-    warnings.push('Отсутствует временная метка в элементе истории');
+  if (!item.createdAt) {
+    warnings.push('Отсутствует временная метка создания');
   }
 
-  // Проверяем валидность timestamp если он есть
-  if (item.timestamp && isNaN(new Date(item.timestamp).getTime())) {
-    warnings.push('Некорректная временная метка в элементе истории');
+  // Проверяем валидность createdAt если он есть
+  if (item.createdAt && isNaN(new Date(item.createdAt).getTime())) {
+    warnings.push('Некорректная временная метка createdAt');
+  }
+
+  // updatedAt должен быть >= createdAt
+  if (item.updatedAt && item.createdAt) {
+    if (new Date(item.updatedAt) < new Date(item.createdAt)) {
+      warnings.push('Дата обновления раньше даты создания');
+    }
   }
 
   return {
@@ -118,7 +121,7 @@ export function validateHistory(history: HistoryItem[]): ValidationResult {
   let itemsWithWarnings = 0;
 
   history.forEach((item, index) => {
-    if (item && !item.isEmpty) {
+    if (item) {
       const itemValidation = validateHistoryItem(item);
 
       // Если элемент критически поврежден - добавляем ошибку

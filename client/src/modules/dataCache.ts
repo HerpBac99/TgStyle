@@ -5,6 +5,7 @@
 
 import { logger } from './logger';
 import { historyManager } from './history';
+import { api } from './api';
 import type { HistoryItem } from '@/types/api';
 
 /**
@@ -113,20 +114,11 @@ class DataCacheManager {
 
   /**
    * Загрузка элементов гардероба из API
+   * REFACTORED: используем api клиент вместо fetch
    */
   private async loadWardrobeItems(): Promise<WardrobeItem[]> {
     try {
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
-      
-      const response = await fetch(`/api/wardrobe?initData=${encodeURIComponent(initData)}`, {
-        method: 'GET'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await api.getWardrobe();
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to load wardrobe items');
@@ -141,20 +133,11 @@ class DataCacheManager {
 
   /**
    * Загрузка капсул из API
+   * REFACTORED: используем api клиент вместо fetch
    */
   private async loadCapsules(): Promise<Capsule[]> {
     try {
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
-      
-      const response = await fetch(`/api/capsules?initData=${encodeURIComponent(initData)}`, {
-        method: 'GET'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await api.getCapsules();
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to load capsules');
@@ -193,11 +176,16 @@ class DataCacheManager {
       });
     });
 
-    // NEW: Изображения из истории анализов
+    // Изображения из истории анализов
+    // FIXED: используем telegramId вместо userId для построения правильного пути
     const historyItems = historyManager.getAllItems();
     historyItems.forEach((item: HistoryItem) => {
-      if (!item.isEmpty && item.photoUrl) {
-        urls.add(item.photoUrl);
+      if (item.photoPath) {
+        // Используем telegramId если есть, иначе пытаемся получить из альтернативного источника
+        const tgId = item.telegramId || '';
+        if (tgId) {
+          urls.add(`/uploads/analysis/${tgId}/${item.photoPath}`);
+        }
       }
     });
 
@@ -259,12 +247,11 @@ class DataCacheManager {
                 const img = new Image();
                 
                 img.onload = () => {
-                  logger.debug('Image preloaded successfully', { url: absoluteUrl });
                   resolve({ url: absoluteUrl, success: true });
                 };
                 
                 img.onerror = (error) => {
-                  logger.warn('Failed to preload image', { url: absoluteUrl, error });
+                  logger.error('Failed to preload image', { url: absoluteUrl, error });
                   reject(new Error(`Failed to load: ${absoluteUrl}`));
                 };
                 

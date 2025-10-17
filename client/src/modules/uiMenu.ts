@@ -129,12 +129,6 @@ export class UIMenuManager {
    * Настройка обработчиков событий
    */
   private setupEventListeners(): void {
-    // NEW: Обновляем карусель после загрузки истории с сервера
-    window.addEventListener('history:updated', () => {
-      logger.info('History updated from server, refreshing carousel');
-      this.updateHistoryDisplay();
-    });
-
     // Обработчик кнопки камеры
     this.setupCameraButtonListener();
 
@@ -214,13 +208,28 @@ export class UIMenuManager {
 
   /**
    * Показать сохраненный анализ
+   * #showSavedAnalysis #UI-MENU #UI-SHOW-SAVED-ANALYSIS
    */
   private showSavedAnalysis(analysisData: HistoryItem): void {
-    logger.info('Showing saved analysis');
+    logger.info('Showing saved analysis', {
+      itemId: analysisData.id,
+      photoPath: analysisData.photoPath,
+      userId: analysisData.telegramId
+    });
 
-    // NEW: Проверяем наличие фото (photoUrl или base64)
-    const hasPhoto = analysisData.photoUrl || analysisData.photo || analysisData.photoData;
+    // DEBUG: логируем все поля
+    logger.info('DEBUG: showSavedAnalysis full data', {
+      analysisData: JSON.stringify(analysisData).substring(0, 500)
+    });
+
+    // Проверяем наличие фото (photoPath или base64)
+    const hasPhoto = analysisData.photoPath;
     if (!hasPhoto) {
+      logger.warn('DEBUG: photoPath is missing!', {
+        itemId: analysisData.id,
+        hasPhotoPath: !!analysisData.photoPath,
+        photoPath: analysisData.photoPath
+      });
       this.logError('Не удалось загрузить данные фотографии');
       return;
     }
@@ -236,27 +245,33 @@ export class UIMenuManager {
       return;
     }
 
-    // NEW: Устанавливаем фото - приоритет photoUrl
-    if (analysisData.photoUrl) {
-      savedAnalysisPhoto.src = analysisData.photoUrl;
-    } else {
-      const photoData = analysisData.photo || analysisData.photoData;
-      savedAnalysisPhoto.src = `data:image/jpeg;base64,${photoData}`;
-    }
+    // Устанавливаем фото - приоритет photoPath (URL), затем base64
+    if (analysisData.photoPath) {
+      // photoPath это имя файла, нужно составить URL с использованием telegramId
+      const photoUrl = `/uploads/analysis/${analysisData.telegramId}/${analysisData.photoPath}`;
+      logger.info('DEBUG: Setting photo URL', {
+        itemId: analysisData.id,
+        url: photoUrl,
+        photoPath: analysisData.photoPath,
+        userId: analysisData.telegramId
+      });
+      savedAnalysisPhoto.src = photoUrl;
+    } 
 
     // Формируем текст анализа
     let analysisContent = '';
 
-    // Текст анализа LLM
-    if (analysisData.analysis) {
-      const processedAnalysis = analysisData.analysis.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Текст анализа LLM (приоритет analysisText)
+    const analysisText = analysisData.analysisText || analysisData.technicalAnalysis;
+    if (analysisText) {
+      const processedAnalysis = analysisText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
       analysisContent += `<strong>Анализ стиля:</strong><br>${processedAnalysis}`;
     } else {
       analysisContent += '<em>Текст анализа недоступен</em>';
     }
 
     savedAnalysisData.innerHTML = analysisContent;
-    savedAnalysisDate.textContent = formatHistoryDate(analysisData.timestamp);
+    savedAnalysisDate.textContent = formatHistoryDate(new Date(analysisData.createdAt).toISOString());
 
     // Добавляем обработчик клика для закрытия
     savedAnalysisScreen.addEventListener('click', () => this.closeSavedAnalysis());
@@ -272,52 +287,19 @@ export class UIMenuManager {
    * Закрытие экрана сохраненного анализа
    */
   private closeSavedAnalysis(): void {
+    logger.info('[CLOSE-SAVED-ANALYSIS] closeSavedAnalysis() STARTED');
+    
     const savedAnalysisScreen = getElement('#saved-analysis-screen');
-    if (!savedAnalysisScreen) return;
+    if (!savedAnalysisScreen) {
+      logger.info('[CLOSE-SAVED-ANALYSIS] saved-analysis-screen not found, returning');
+      return;
+    }
 
-    logger.info('Closing saved analysis screen');
-
+    logger.info('[CLOSE-SAVED-ANALYSIS] Hiding saved analysis screen');
     savedAnalysisScreen.classList.add('hidden');
     this.currentPreview = null;
-  }
-
-  /**
-   * Загружает статус лайка для карточки в карусели
-   */
-  private async loadCarouselLikeStatus(
-    historyItemId: number,
-    likeBtn: HTMLElement,
-    likesCountEl: HTMLElement
-  ): Promise<void> {
-    try {
-      logger.info('Loading carousel like status', { historyItemId });
-      const { api } = await import('./api');
-      const { authManager } = await import('./auth');
-
-      const initData = authManager.getInitData();
-      if (!initData) {
-        logger.warn('No initData for carousel like status');
-        likesCountEl.textContent = '0';
-        return;
-      }
-
-      const endpoint = `/analysis-likes/${historyItemId}/status?initData=${encodeURIComponent(initData)}`;
-      const response = await api.get(endpoint) as any;
-      logger.info('Carousel like status loaded', { historyItemId, ...response });
-
-      if (response?.success) {
-        likesCountEl.textContent = String(response.likesCount || 0);
-
-        if (response.isLiked) {
-          likeBtn.classList.add('liked');
-        } else {
-          likeBtn.classList.remove('liked');
-        }
-      }
-    } catch (error) {
-      logger.warn('Failed to load carousel like status', error);
-      likesCountEl.textContent = '0';
-    }
+    
+    logger.info('[CLOSE-SAVED-ANALYSIS] closeSavedAnalysis() COMPLETED');
   }
 
   /**
@@ -376,17 +358,28 @@ export class UIMenuManager {
    * Закрытие экрана анализа
    */
   private closePreview(): void {
+    logger.info('[CLOSE-PREVIEW] closePreview() STARTED');
+    
     // Закрываем экран анализа
     const analysisScreen = getElement('#analysis-screen');
     if (analysisScreen) {
+      logger.info('[CLOSE-PREVIEW] Hiding analysis screen');
       analysisScreen.classList.add('hidden');
     }
 
     // Закрываем экран сохраненного анализа
+    logger.info('[CLOSE-PREVIEW] Calling closeSavedAnalysis()');
     this.closeSavedAnalysis();
 
     // Очищаем текущее изображение в менеджере камеры
+    logger.info('[CLOSE-PREVIEW] Clearing camera image');
     cameraManager.clearCurrentImage();
+    
+    // FIXED: Пересчитываем карусель после закрытия экрана (для обновления лайков)
+    logger.info('[CLOSE-PREVIEW] Calling updateHistoryDisplay()');
+    this.updateHistoryDisplay();
+    
+    logger.info('[CLOSE-PREVIEW] closePreview() COMPLETED');
   }
 
   /**
@@ -397,9 +390,8 @@ export class UIMenuManager {
    * #UPDATE-HISTORY-DISPLAY #UI-MENU #UI-UPDATE-HISTORY-DISPLAY
    */
   updateHistoryDisplay(): void {
-    const filledItems = historyManager.getFilledItems();
+    const filledItems = historyManager.getAllItems();
 
-    // NEW: Реверсируем массив - карусель показывает слева направо (старые → новые)
     // Сервер возвращает в порядке desc (новые первые), а нам нужно asc (старые первые)
     const sortedItems = [...filledItems].reverse();
 
@@ -440,13 +432,15 @@ export class UIMenuManager {
   }
 
   /**
-   * Создание одной карты
+   * @description Метод создания одной карты
+   * #createCard #UI-MENU #UI-CREATE-CARD
    */
   private createCard(index: number, data: HistoryItem | null): HTMLElement {
     const card = this.createCardElement(index);
     const content = this.createCardContent();
 
-    if (data && !data.isEmpty) {
+    if (data && data.id) {
+      // Все элементы в истории теперь заполнены (нет isEmpty)
       this.setupFilledCard(card, content, data);
     } else {
       this.setupEmptyCard(card, content, index);
@@ -457,7 +451,8 @@ export class UIMenuManager {
   }
 
   /**
-   * Создает базовый элемент карты
+   * @description Метод создания базового элемента карты
+   * #createCardElement #UI-MENU #UI-CREATE-CARD-ELEMENT
    */
   private createCardElement(index: number): HTMLElement {
     return createElement('div', {
@@ -467,7 +462,8 @@ export class UIMenuManager {
   }
 
   /**
-   * Создает контейнер контента карты
+   * @description Метод создания контейнера контента карты
+   * #createCardContent #UI-MENU #UI-CREATE-CARD-CONTENT
    */
   private createCardContent(): HTMLElement {
     return createElement('div', {
@@ -481,13 +477,16 @@ export class UIMenuManager {
   private setupFilledCard(card: HTMLElement, content: HTMLElement, data: HistoryItem): void {
     card.classList.add(CSS_CLASSES.FILLED);
 
-    // NEW: Используем photoUrl (приоритет) или fallback на base64
-    if (data.photoUrl) {
-      card.style.backgroundImage = `url(${data.photoUrl})`;
-    } else if (data.photo || data.photoData) {
-      const photoData = data.photo || data.photoData;
-      card.style.backgroundImage = `url(data:image/jpeg;base64,${photoData})`;
-    }
+    // Устанавливаем фон - приоритет photoPath (URL), затем base64
+    if (data.photoPath) {
+      const backgroundUrl = `/uploads/analysis/${data.telegramId}/${data.photoPath}`;
+      card.style.backgroundImage = `url(${backgroundUrl})`;
+    } else {
+      logger.warn('DEBUG: photoPath is empty or null!', {
+        itemId: data.id,
+        allData: JSON.stringify(data).substring(0, 300)
+      });
+    } 
 
     const caption = createElement('div', {
       class: 'history-card-caption',
@@ -496,10 +495,10 @@ export class UIMenuManager {
     // Добавляем дату
     const dateElement = createElement('div', {
       class: 'history-card-date',
-    }, formatHistoryDate(data.timestamp));
+    }, formatHistoryDate(new Date(data.createdAt).toISOString()));
     caption.appendChild(dateElement);
 
-    // NEW: Добавляем кнопку лайка в caption
+    // Добавляем кнопку лайка в caption
     const likesContainer = createElement('div', {
       class: 'carousel-likes-container',
     });
@@ -516,7 +515,7 @@ export class UIMenuManager {
 
     const likesCount = createElement('span', {
       class: 'carousel-likes-count',
-    }, '0');
+    }, String(data.likesCount || 0));
 
     likesContainer.appendChild(likeBtn);
     likesContainer.appendChild(likesCount);
@@ -524,11 +523,13 @@ export class UIMenuManager {
 
     content.appendChild(caption);
 
-    // NEW: Загружаем статус лайка для карточки
+    // OPTIMIZED: Используем isLiked из HistoryItem (уже пришла с сервера, без доп запросов!)
     if (data.id) {
-      const historyItemId: number = typeof data.id === 'string' ? parseInt(data.id, 10) : data.id;
-      logger.info('Setting up carousel like button', { historyItemId, originalId: data.id });
-      this.loadCarouselLikeStatus(historyItemId, likeBtn, likesCount);
+      const historyItemId: number = data.id;
+
+      if (data.isLiked) {
+        likeBtn.classList.add('liked');
+      }
 
       // Обработчик клика на кнопку лайка
       const likeClickHandler = async (e: Event) => {
@@ -538,7 +539,6 @@ export class UIMenuManager {
         await this.handleCarouselLikeClick(historyItemId, likeBtn, likesCount);
       };
       likeBtn.addEventListener('click', likeClickHandler);
-      logger.info('Like button listener added', { historyItemId });
     }
 
     // Находим реальный индекс элемента в общем массиве истории
@@ -583,44 +583,21 @@ export class UIMenuManager {
 
   /**
    * Находит реальный индекс элемента в общем массиве истории
-   * Оптимизированная версия с использованием Map для быстрого поиска
+   * #HISTORY #CAROUSEL #findRealHistoryIndex
+   * Теперь просто ищет по ID (БЕЗ isEmpty элементов!)
    */
   private findRealHistoryIndex(data: HistoryItem): number {
     const allItems = historyManager.getAllItems();
 
-    // Создаем композитный ключ для быстрого поиска
-    const searchKey = `${data.timestamp}_${data.photo?.substring(0, 50) || ''}`;
-
-    // Создаем Map для быстрого поиска (если элементов много)
-    const itemMap = new Map<string, number>();
-
-    for (let i = 0; i < allItems.length; i++) {
-      const item = allItems[i];
-      if (item && !item.isEmpty) {
-        const key = `${item.timestamp}_${item.photo?.substring(0, 50) || ''}`;
-        itemMap.set(key, i);
-      }
+    // Ищем по ID (самый надежный способ)
+    const index = allItems.findIndex(item => item && item.id === data.id);
+    
+    if (index === -1) {
+      logger.warn('Could not find history item by ID', { id: data.id });
+      return -1;
     }
 
-    // Быстрый поиск по ключу
-    const foundIndex = itemMap.get(searchKey);
-    if (foundIndex !== undefined) {
-      return foundIndex;
-    }
-
-    // Fallback на линейный поиск (на случай если композитный ключ не сработал)
-    for (let i = 0; i < allItems.length; i++) {
-      const item = allItems[i];
-      if (item &&
-          !item.isEmpty &&
-          item.timestamp === data.timestamp &&
-          item.photo === data.photo) {
-        return i;
-      }
-    }
-
-    logger.warn('Could not find real history index for item', { timestamp: data.timestamp });
-    return -1; // Не нашли
+    return index;
   }
 
   /**
@@ -724,12 +701,6 @@ export class UIMenuManager {
     // Обновляем центральную карту и точки
     this.updateCenterCard();
     this.updateActiveDot(position);
-
-    logger.info('Carousel moved to position', {
-      position,
-      offset,
-      totalCards: this.carouselState.totalCards
-    });
   }
 
   /**
@@ -854,7 +825,6 @@ export class UIMenuManager {
   private moveToPreviousCarouselItem(): void {
     const newPosition = Math.max(0, this.carouselState.currentCenterIndex - 1);
     this.moveCarouselToPosition(newPosition);
-    logger.info('Carousel moved to previous item', { position: newPosition });
   }
 
   /**

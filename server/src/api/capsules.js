@@ -10,6 +10,7 @@ const path = require('path');
 const { logger } = require('../controllers/logsController');
 const prisma = require('../lib/prisma');
 const { validateTelegramWebAppData } = require('../utils/telegram');
+const { getInitData } = require('../utils/authHelper');
 
 /**
  * Папка для хранения изображений капсул
@@ -218,10 +219,12 @@ async function createCapsule(req, res) {
 
 /**
  * Получить капсулы пользователя
+ * FIXED: поддержка initData из headers (X-Init-Data)
  */
 async function getUserCapsules(req, res) {
   try {
-    const { initData } = req.query;
+    // FIXED: получаем initData из header или query
+    const initData = getInitData(req);
 
     // Валидация Telegram данных
     if (!initData) {

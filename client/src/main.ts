@@ -30,13 +30,6 @@ class TgStyleApp {
     const urlParams = new URLSearchParams(window.location.search);
     const tgStartParam = this.tg?.initDataUnsafe?.start_param;
 
-    logger.info('Checking for shared analysis', {
-      hash,
-      startapp: urlParams.get('startapp'),
-      start: urlParams.get('start'),
-      tgStartParam
-    });
-
     // Проверяем хэш (для прямых ссылок)
     if (hash.startsWith('#shared-analysis-')) {
       const analysisId = hash.replace('#shared-analysis-', '');
@@ -115,7 +108,6 @@ class TgStyleApp {
 
       const { api } = await import('./modules/api.js');
       const apiUrl = `/shared-analysis/${analysisId}`;
-      logger.info('Fetching from API', { apiUrl });
       
       const response = await api.get(apiUrl);
 
@@ -128,13 +120,7 @@ class TgStyleApp {
         });
 
         const data = (response as any).data;
-        
-        logger.info('Showing shared analysis modal', { 
-          analysisId,
-          hasPhoto: !!data.photo,
-          historyItemId: data.historyItemId 
-        });
-        
+
         await uiManager.showSharedAnalysis(
           data.photo, 
           data.analysis, 
@@ -158,16 +144,6 @@ class TgStyleApp {
    * 
    */
   async initialize(): Promise<void> {
-    logger.info('Starting TgStyle application', {
-      version: APP_CONFIG.version,
-      environment: APP_CONFIG.environment,
-      userAgent: navigator.userAgent,
-      viewport: {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      },
-    });
-
     try {
       // Инициализируем Telegram WebApp
       this.initializeTelegram();
@@ -212,11 +188,6 @@ class TgStyleApp {
    * создаем глобальную переменную API для доступа из других модулей
    */
   private initializeTelegram(): void {
-    logger.info('Initializing Telegram WebApp', {
-      isWebApp: !!window.Telegram?.WebApp,
-      userAgent: navigator.userAgent.split(' ')[0]
-    });
-
     this.tg = window.Telegram?.WebApp || null;
 
     // Создаем глобальную переменную API для доступа из других модулей
@@ -242,17 +213,6 @@ class TgStyleApp {
       if (this.tg.isVersionAtLeast('6.9') && this.tg.requestFullscreen) {
         this.tg.requestFullscreen();
       }
-
-      // Уведомляем Telegram что приложение готово
-      this.tg.ready();
-
-      logger.info('Telegram WebApp configured', {
-        version: this.tg.version,
-        platform: this.tg.platform,
-        colorScheme: this.tg.colorScheme,
-        isExpanded: this.tg.isExpanded,
-      });
-
     } catch (error) {
       logger.error('Error configuring Telegram WebApp', error);
     }
@@ -351,30 +311,19 @@ class TgStyleApp {
       const authResponse = await authManager.authenticate();
       
       if (authResponse.success) {
-        logger.info('Authentication successful', {
-          userId: authResponse.user?.id,
-          hasUser: !!authResponse.user,
-        });
-        
         // Отправляем событие успешной авторизации
         this.dispatchAppEvent(APP_EVENTS.AUTH_SUCCESS, authResponse.user);
       } else {
-        logger.warn('Authentication failed', { error: authResponse.error });
+        logger.error('Authentication failed', { error: authResponse.error });
         
         // Отправляем событие неудачной авторизации
         this.dispatchAppEvent(APP_EVENTS.AUTH_FAILURE, { error: authResponse.error });
-        
-        // В Telegram Mini App продолжаем работу даже без авторизации
-        logger.info('Continuing without server authentication');
       }
     } catch (error) {
       logger.error('Authentication error', error);
       
       // Отправляем событие ошибки авторизации
       this.dispatchAppEvent(APP_EVENTS.AUTH_FAILURE, { error: error instanceof Error ? error.message : 'Unknown error' });
-      
-      // В Telegram Mini App не прерываем инициализацию
-      logger.info('Continuing despite authentication error');
     }
   }
 
@@ -384,16 +333,15 @@ class TgStyleApp {
   private async preloadAppData(): Promise<void> {
     logger.info('Starting app data preload');
 
-    // NEW: Загружаем историю с сервера (основной источник правды)
-    await historyManager.loadHistoryFromServer().catch(error => {
-      logger.error('Error loading history from server', error);
-      // Fallback на localStorage уже загружен в constructor
-    });
-
-    // Запускаем предзагрузку в фоне (не блокируем инициализацию)
-    dataCacheManager.preloadData().catch(error => {
-      logger.error('Error during data preload', error);
-    });
+    // Батчинг endpoint /api/initial-data доступен, но параллельные запросы быстрее
+    await Promise.allSettled([
+      historyManager.loadHistoryFromServer().catch(err => {
+        logger.error('Error loading history from server', err);
+      }),
+      dataCacheManager.preloadData().catch(err => {
+        logger.error('Error during data preload', err);
+      })
+    ]);
   }
 
   /**
@@ -401,6 +349,10 @@ class TgStyleApp {
    */
   private completeInitialization(): void {
     this.isInitialized = true;
+
+    if (this.tg) {
+      this.tg.ready();
+    }
 
     // Отправляем событие готовности приложения
     this.dispatchAppEvent(APP_EVENTS.READY, {
@@ -447,11 +399,6 @@ class TgStyleApp {
   private refreshAppState(): void {
     // Обновляем отображение истории
     uiManager.updateHistoryDisplay();
-    
-    // Принудительно применяем цвет фона
-    const targetColor = '#81D8D0';
-    document.body.style.backgroundColor = targetColor;
-    
     logger.info('App state refreshed');
   }
 
@@ -468,7 +415,6 @@ class TgStyleApp {
     });
     
     window.dispatchEvent(event);
-    logger.info('App event dispatched', { type, payload });
   }
 
   /**
@@ -546,14 +492,5 @@ if (document.readyState === 'loading') {
   // DOM уже готов
   app.initialize();
 }
-
-// Экспортируем экземпляр приложения для отладки
-declare global {
-  interface Window {
-    tgStyleApp: TgStyleApp;
-  }
-}
-
-window.tgStyleApp = app;
 
 export default app;

@@ -59,13 +59,12 @@ router.post('/:historyItemId', async (req, res) => {
       });
     }
 
-    // Проверяем не лайкнул ли уже
-    const existingLike = await prisma.rating.findUnique({
+    // Проверяем не лайкнул ли уже (ищем лайк именно с ratingType 'like')
+    const existingLike = await prisma.rating.findFirst({
       where: {
-        userId_historyItemId: {
-          userId: user.id,
-          historyItemId: parseInt(historyItemId)
-        }
+        userId: user.id,
+        historyItemId: parseInt(historyItemId),
+        ratingType: 'like'
       }
     });
 
@@ -77,9 +76,8 @@ router.post('/:historyItemId', async (req, res) => {
         likesCount: historyItem.likesCount
       });
     }
-
-    // Атомарно: создаем лайк + увеличиваем счетчик
-    const [_, updatedItem] = await prisma.$transaction([
+    
+    const [ratingResult, updatedItem] = await prisma.$transaction([
       prisma.rating.create({
         data: {
           userId: user.id,
@@ -95,23 +93,16 @@ router.post('/:historyItemId', async (req, res) => {
 
     const likesCount = updatedItem.likesCount;
 
-    logger.info('Analysis liked', {
-      userId: user.id,
-      historyItemId: parseInt(historyItemId),
-      likesCount
-    });
-
     res.json({
       success: true,
       isLiked: true,
       likesCount
     });
-
   } catch (error) {
-    logger.error('Error liking analysis', error);
     res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: 'Internal server error',
+      details: error.message
     });
   }
 });
@@ -155,13 +146,12 @@ router.delete('/:historyItemId', async (req, res) => {
       });
     }
 
-    // Проверяем существование лайка
-    const like = await prisma.rating.findUnique({
+    // Проверяем существование лайка (ищем лайк именно с ratingType 'like')
+    const like = await prisma.rating.findFirst({
       where: {
-        userId_historyItemId: {
-          userId: user.id,
-          historyItemId: parseInt(historyItemId)
-        }
+        userId: user.id,
+        historyItemId: parseInt(historyItemId),
+        ratingType: 'like'
       }
     });
 
@@ -182,12 +172,11 @@ router.delete('/:historyItemId', async (req, res) => {
 
     // Атомарно: удаляем лайк + уменьшаем счетчик
     const [_, updatedItem] = await prisma.$transaction([
-      prisma.rating.delete({
+      prisma.rating.deleteMany({
         where: {
-          userId_historyItemId: {
-            userId: user.id,
-            historyItemId: parseInt(historyItemId)
-          }
+          userId: user.id,
+          historyItemId: parseInt(historyItemId),
+          ratingType: 'like'
         }
       }),
       prisma.historyItem.update({

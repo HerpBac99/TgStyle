@@ -102,16 +102,30 @@ export interface LogResponse {
 }
 
 // Типы для истории
+// #HISTORY #TYPE-HISTORY-ITEM #DATABASE
 export interface HistoryItem {
-  id?: string;
-  photo?: string; // base64 encoded image (legacy)
-  photoUrl?: string; // NEW: URL to file (preferred)
-  photoData?: string; // Legacy alias for photo
-  analysis?: string;
-  timestamp: string;
-  savedAt?: string;
-  sourceType?: 'photo' | 'pinterest';
-  isEmpty?: boolean;
+  id: number;                      // PRIMARY KEY из БД
+  telegramId: string;              // Telegram ID (для путей к файлам: /uploads/analysis/251053908/...)
+  
+  // Фото (photoPath - основное из БД, photoData - legacy)
+  photoPath?: string;              // Имя файла (analysis_1760550855869.jpg)
+  
+  // Анализ
+  analysisText?: string;           // Основной анализ (из БД)
+  technicalAnalysis?: string;      // Технический анализ (из БД)
+  
+  // Социал и sharing
+  isPublic: boolean;               // Опубликовано ли
+  shareId?: string;                // Уникальный ID для sharing
+  likesCount: number;              // Денормализованный счётчик лайков
+  viewsCount: number;              // Денормализованный счётчик просмотров
+  
+  // Лайк статус текущего пользователя (OPTIMIZED: от сервера, без доп запросов)
+  isLiked?: boolean;               // OPTIMIZED: Лайкнул ли текущий пользователь
+  
+  // Даты (ISO 8601 strings)
+  createdAt: string;               // Дата создания (из БД)
+  updatedAt: string;               // Дата обновления (из БД)
 }
 
 // Пагинация для API

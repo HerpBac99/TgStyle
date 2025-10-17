@@ -58,7 +58,6 @@ export class UIManager {
   private setupGlobalEventListeners(): void {
     // Обработчик изменения состояния анализа
     window.addEventListener('analysisStateChange', this.handleAnalysisStateChange.bind(this) as EventListener);
-    window.addEventListener('showAnalysisScreen', this.handleShowAnalysisScreen.bind(this) as EventListener);
     window.addEventListener('photo:captured', this.handlePhotoCaptured.bind(this) as EventListener);
 
     // Обработчик видимости страницы (для очистки состояния при сворачивании)
@@ -183,22 +182,6 @@ export class UIManager {
 
     // Обработка состояния ошибки теперь происходит в самом UI анализа
     // При ошибке UI анализа покажет сообщение об ошибке вместо результата
-  }
-
-  /**
-   * Обработчик показа экрана анализа
-   */
-  private handleShowAnalysisScreen(event: CustomEvent): void {
-    const { imageBase64, analysis } = event.detail;
-    logger.info('Showing analysis screen from event', { hasImage: !!imageBase64, hasAnalysis: !!analysis });
-
-    // Показываем экран анализа
-    uiAnalysisManager.showFullscreenPreview(imageBase64);
-
-    // Показываем результат анализа
-    if (analysis) {
-      uiAnalysisManager.showAnalysisResult(analysis);
-    }
   }
 
   /**

@@ -67,10 +67,6 @@ class AuthManager {
 
       // Минимизируем заголовок для экономии места
       this.minimizeHeader();
-
-      // Уведомляем Telegram что приложение готово
-      this.tg.ready();
-
     } catch (error) {
       logger.error('Error configuring Telegram WebApp', error);
     }
@@ -236,11 +232,6 @@ class AuthManager {
         // Сохраняем информацию о подписке если доступна
         if (response.user?.subscription) {
           this.userSubscription = response.user.subscription;
-          logger.info('Subscription info received', {
-            type: this.userSubscription.type,
-            analysesLeft: this.userSubscription.analysesLeft,
-            totalAnalyses: this.userSubscription.totalAnalyses
-          });
         } else {
           // Graceful fallback - создаем базовую подписку для совместимости
           this.userSubscription = {

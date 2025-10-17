@@ -237,10 +237,6 @@ export class UIAnalysisManager {
    */
   handlePhotoCaptured(event: CustomEvent): void {
     const { imageData } = event.detail;
-    logger.info('Photo captured, showing analysis screen with theme selection', {
-      hasImageData: !!imageData,
-      imageSize: imageData ? Math.round(imageData.originalSize / 1024) + 'KB' : 'unknown'
-    });
 
     if (imageData) {
       this.currentThemeImage = imageData;
@@ -320,8 +316,6 @@ export class UIAnalysisManager {
       if (bottomSection) {
         bottomSection.style.display = 'none';
       }
-
-      logger.info('Theme selection displayed');
     } else {
       // Показываем загрузку (для случаев когда тема уже выбрана)
       themeSelection.classList.add('hidden');
@@ -361,8 +355,8 @@ export class UIAnalysisManager {
           dimensions: `${result.image.width}x${result.image.height}`
         });
 
-        // Показываем единый экран анализа с выбором темы
-        this.showFullscreenPreview(result.image.base64, true);
+        // Показ экрана анализа будет через событие photo:captured (избегаем дубликатов)
+        // this.showFullscreenPreview() вызовется в handlePhotoCaptured()
 
         // Вибрация успеха
         authManager.vibrate('light');
@@ -380,7 +374,6 @@ export class UIAnalysisManager {
    */
   private handleAnalysisStateChange(event: CustomEvent): void {
     const state = event.detail;
-    logger.info('Analysis state changed in UI', state);
 
     // Обрабатываем состояние ошибки
     if (state.status === 'error' && state.error) {
@@ -432,16 +425,6 @@ export class UIAnalysisManager {
 
     // Парсим текст на блоки для каскадной анимации
     const textBlocks = this.parseAnalysisText(extracted.cleanAnalysis);
-
-    logger.info('Parsed text blocks', {
-      totalBlocks: textBlocks.length,
-      blocks: textBlocks.map((block, index) => ({
-        blockIndex: index + 1,
-        delay: block.delay,
-        contentLength: block.content.length,
-        contentPreview: block.content.substring(0, 100) + (block.content.length > 100 ? '...' : '')
-      }))
-    });
 
     // Создаем HTML для блоков с анимацией
     const blocksHtml = textBlocks.map((block, index) =>
@@ -673,12 +656,15 @@ export class UIAnalysisManager {
 
   /**
    * Настройка обработчиков кнопок в результате анализа
+   * FIXED: Удаляем старые обработчики перед привязкой новых чтобы избежать дублирования
    */
   private setupResultButtons(): void {
     // Кнопка лайк
     const likeBtn = getElement('#like-btn');
     if (likeBtn) {
-      likeBtn.addEventListener('click', () => {
+      const clonedLikeBtn = likeBtn.cloneNode(true) as HTMLElement;
+      likeBtn.replaceWith(clonedLikeBtn);
+      clonedLikeBtn.addEventListener('click', () => {
         this.handleLikeClick();
       });
     }
@@ -686,15 +672,20 @@ export class UIAnalysisManager {
     // Кнопка поделиться
     const shareBtn = getElement('#share-btn');
     if (shareBtn) {
-      shareBtn.addEventListener('click', () => {
+      const clonedShareBtn = shareBtn.cloneNode(true) as HTMLElement;
+      shareBtn.replaceWith(clonedShareBtn);
+      clonedShareBtn.addEventListener('click', () => {
         this.handleShareClick();
       });
     }
 
-    // Кнопка закрыть - просто закрывает результат
+    // Кнопка закрыть
     const closeBtn = getElement('#close-analysis-btn');
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
+      const clonedCloseBtn = closeBtn.cloneNode(true) as HTMLElement;
+      closeBtn.replaceWith(clonedCloseBtn);
+      clonedCloseBtn.addEventListener('click', () => {
+        logger.info('[CLOSE-BTN] Close analysis button clicked');
         this.closePreview();
       });
     }
@@ -702,7 +693,9 @@ export class UIAnalysisManager {
     // Обработчик кнопки рекомендаций с спиннером
     const recommendationBtn = getElement('#find-recommendations-btn');
     if (recommendationBtn) {
-      recommendationBtn.addEventListener('click', () => {
+      const clonedRecommendationBtn = recommendationBtn.cloneNode(true) as HTMLElement;
+      recommendationBtn.replaceWith(clonedRecommendationBtn);
+      clonedRecommendationBtn.addEventListener('click', () => {
         this.handleRecommendationClick();
       });
     }
@@ -761,6 +754,9 @@ export class UIAnalysisManager {
 
       // Тактильная обратная связь
       authManager.vibrate('light');
+      
+      const { uiManager } = await import('./uiManager.js');
+      uiManager.updateHistoryDisplay();
 
     } catch (error) {
       logger.error('Error toggling like', error);

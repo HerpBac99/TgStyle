@@ -4,6 +4,7 @@
  */
 
 import { logger } from '../logger';
+import { api } from '../api';
 import { Capsule, StyleCapsule, CreateCapsuleDto, UpdateCapsuleDto } from '@/types/capsules';
 import { WardrobeItem } from '@/types/wardrobe';
 import { dataLoader } from '../shared/DataLoader';
@@ -29,17 +30,7 @@ export class CapsulesService {
    */
   private async loadCapsulesFromServer(): Promise<StyleCapsule[]> {
     try {
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
-
-      const response = await fetch(`/api/capsules?initData=${encodeURIComponent(initData)}`, {
-        method: 'GET'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await api.getCapsules();
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to load capsules');
@@ -62,24 +53,14 @@ export class CapsulesService {
     try {
       logger.info('Loading capsule data from server', { capsuleId });
 
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
+      const response = await api.get(`/capsules/${capsuleId}`) as any;
 
-      const response = await fetch(`/api/capsules/${capsuleId}?initData=${encodeURIComponent(initData)}`, {
-        method: 'GET'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to load capsule data');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to load capsule data');
       }
 
       logger.info('Capsule data loaded successfully', { capsuleId });
-      return result.capsule;
+      return response.capsule;
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -95,24 +76,7 @@ export class CapsulesService {
     try {
       logger.info('Creating new capsule on server');
 
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
-
-      const response = await fetch('/api/capsules', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          initData,
-          ...data
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await api.createCapsule(data) as any;
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to save capsule');
@@ -138,24 +102,7 @@ export class CapsulesService {
     try {
       logger.info('Updating capsule on server', { capsuleId });
 
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
-
-      const response = await fetch(`/api/capsules/${capsuleId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          initData,
-          ...data
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await api.updateCapsule(capsuleId, data) as any;
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to update capsule');
@@ -181,17 +128,7 @@ export class CapsulesService {
     try {
       logger.info('Deleting capsule', { capsuleId });
 
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
-
-      const response = await fetch(`/api/capsules/${capsuleId}?initData=${encodeURIComponent(initData)}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await api.deleteCapsule(capsuleId) as any;
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to delete capsule');

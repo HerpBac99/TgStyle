@@ -4,6 +4,7 @@
  */
 
 import { logger } from '../logger';
+import { api } from '../api';
 import { WardrobeItem, ClassificationResult, CreateWardrobeItemDto } from '@/types/wardrobe';
 import { fileToBase64, stringToClothingCategory } from './utils';
 import { dataCacheManager } from '../dataCache';
@@ -22,21 +23,7 @@ export class PhotoProcessor {
     try {
       logger.info('Sending photo to classify and remove background...');
 
-      const response = await fetch('/api/classify-clothing', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          image_base64: imageBase64
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Classification failed: ${response.statusText}`);
-      }
-
-      const result = await response.json();
+      const result = await api.classifyClothing(imageBase64) as any;
 
       if (!result.success) {
         throw new Error(result.error || 'Classification failed');
@@ -78,10 +65,7 @@ export class PhotoProcessor {
     try {
       logger.info('Saving item to wardrobe');
 
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
-
-      const requestData: CreateWardrobeItemDto & { initData: string } = {
-        initData,
+      const requestData: CreateWardrobeItemDto = {
         imageBase64,
         category: classification.category,
         color: classification.color,
@@ -91,19 +75,7 @@ export class PhotoProcessor {
         description: classification.description
       };
 
-      const response = await fetch('/api/wardrobe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await api.createWardrobeItem(requestData) as any;
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to save item');

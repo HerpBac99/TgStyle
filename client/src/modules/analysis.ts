@@ -161,11 +161,6 @@ class AnalysisManager {
       const { uiManager } = await import('./uiManager.js');
       const { authManager } = await import('./auth.js');
 
-      // Показываем экран анализа с изображением
-      window.dispatchEvent(new CustomEvent('showAnalysisScreen', {
-        detail: { imageBase64, analysis: response.analysis }
-      }));
-
       // Обновляем карусель истории (event history:updated уже вызовется автоматически)
       uiManager.updateHistoryDisplay();
 
@@ -174,7 +169,7 @@ class AnalysisManager {
         authManager.updateSubscription(response.subscription);
       }
 
-      // Показываем результат в UI
+      // Показываем результат в UI (один раз, напрямую - избегаем дубликатов через события)
       if (response.analysis) {
         uiManager.showAnalysisResult(response.analysis, response.historyItemId);
       }

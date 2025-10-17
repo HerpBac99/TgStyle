@@ -5,6 +5,7 @@ const path = require('path');
 const { logger } = require('../controllers/logsController');
 const prisma = require('../lib/prisma');
 const { validateTelegramWebAppData } = require('../utils/telegram');
+const { getInitData } = require('../utils/authHelper');
 
 /**
  * Папка для хранения изображений гардероба
@@ -90,10 +91,14 @@ async function deleteImageFromDisk(imagePath) {
 /**
  * POST /api/wardrobe
  * Создать новый предмет гардероба
+ * FIXED: поддержка initData из headers (X-Init-Data) и request body
  */
 router.post('/', async (req, res) => {
     try {
-        const { initData, imageBase64, name, category, color, material, style, fit, description, tags } = req.body;
+        const { imageBase64, name, category, color, material, style, fit, description, tags } = req.body;
+        
+        // FIXED: получаем initData из header или body
+        const initData = getInitData(req);
         
         // Валидация Telegram данных
         if (!initData) {
@@ -187,10 +192,12 @@ router.post('/', async (req, res) => {
 /**
  * GET /api/wardrobe
  * Получить все предметы гардероба пользователя
+ * FIXED: поддержка initData из headers (X-Init-Data) и query параметров
  */
 router.get('/', async (req, res) => {
     try {
-        const { initData } = req.query;
+        // FIXED: получаем initData из header или query параметра
+        const initData = getInitData(req);
         
         // Валидация Telegram данных
         if (!initData) {
@@ -263,12 +270,15 @@ router.get('/', async (req, res) => {
 /**
  * PUT /api/wardrobe/:id
  * Обновить предмет гардероба
+ * FIXED: поддержка initData из headers (X-Init-Data)
  */
 router.put('/:id', async (req, res) => {
     try {
-        const { initData } = req.query;
         const itemId = parseInt(req.params.id);
         const updates = req.body;
+
+        // FIXED: получаем initData из header или query
+        const initData = getInitData(req);
 
         // Валидация Telegram данных
         if (!initData) {
@@ -377,11 +387,14 @@ router.put('/:id', async (req, res) => {
 /**
  * DELETE /api/wardrobe/:id
  * Удалить предмет гардероба
+ * FIXED: поддержка initData из headers (X-Init-Data)
  */
 router.delete('/:id', async (req, res) => {
     try {
-        const { initData } = req.query;
         const itemId = parseInt(req.params.id);
+        
+        // FIXED: получаем initData из header или query
+        const initData = getInitData(req);
         
         // Валидация Telegram данных
         if (!initData) {

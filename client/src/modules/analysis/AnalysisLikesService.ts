@@ -4,6 +4,7 @@
 
 import { logger } from '../logger';
 import { api } from '../api';
+import { historyManager } from '../history';
 
 export interface AnalysisLikeStatus {
   isLiked: boolean;
@@ -24,9 +25,6 @@ export class AnalysisLikesService {
   async likeAnalysis(historyItemId: number): Promise<AnalysisLikeStatus> {
     try {
       const initData = (window as any).Telegram?.WebApp?.initData || '';
-
-      logger.info('Liking analysis', { historyItemId });
-
       const response = await api.post(`/analysis-likes/${historyItemId}`, {
         initData
       }) as LikeApiResponse;
@@ -39,6 +37,15 @@ export class AnalysisLikesService {
         historyItemId,
         likesCount: response.likesCount
       });
+
+      const historyItem = historyManager.getItemById(historyItemId);
+
+      if (historyItem) {
+        historyItem.isLiked = true;
+        historyItem.likesCount = response.likesCount || 0;
+      } else {
+        logger.error('History item NOT FOUND in cache!', { historyItemId });
+      }
 
       return {
         isLiked: true,
@@ -72,6 +79,14 @@ export class AnalysisLikesService {
         historyItemId,
         likesCount: response.likesCount
       });
+
+      // FIXED: Обновляем локальный кэш истории чтобы удаление лайка сразу отобразилось
+      const historyItem = historyManager.getItemById(historyItemId);
+      if (historyItem) {
+        historyItem.isLiked = false;
+        historyItem.likesCount = response.likesCount || 0;
+        logger.info('History item updated in cache', { historyItemId, isLiked: false });
+      }
 
       return {
         isLiked: false,

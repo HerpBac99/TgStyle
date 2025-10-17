@@ -4,6 +4,7 @@
  */
 
 import { logger } from './logger';
+import { api } from './api';
 import { WardrobeItem } from './photoUploadManager';
 import * as fabric from 'fabric';
 
@@ -809,22 +810,8 @@ export class UICanvasEditor {
     try {
       logger.info('Sending canvas to background removal');
 
-      // Отправляем на сервер для удаления фона
-      const response = await fetch('/api/remove-background', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          image_base64: canvasBase64
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Background removal failed: ${response.status}`);
-      }
-
-      const result = await response.json();
+      // REFACTORED: используем api клиент вместо fetch
+      const result = await api.removeBackground(canvasBase64) as any;
 
       if (!result.success) {
         throw new Error(result.error || 'Background removal failed');

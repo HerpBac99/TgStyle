@@ -31,34 +31,26 @@ class HistoryManager {
     this.loadFromStorage();
   }
 
-  /**
-   * Генерация уникального ID для анализа
-   */
-  private generateUniqueId(): string {
-    const timestamp = Date.now().toString(36);
-    const randomPart = Math.random().toString(36).substr(2, 9);
-    return `analysis_${timestamp}_${randomPart}`;
-  }
-
+  
   /**
    * Загрузка истории из localStorage
+   * #HISTORY #HISTORY-LOAD #Cache 
    */
   private loadFromStorage(): void {
     try {
       const storedHistory = localStorage.getItem(STORAGE_KEYS.HISTORY);
 
-
       if (!storedHistory) {
-        this.history = this.createEmptyHistory();
-        logger.info('Created empty history - no data in localStorage');
+        this.history = [];
+        logger.info('No history in localStorage, starting with empty');
         return;
       }
 
       const parsedHistory = safeJsonParse<HistoryItem[]>(storedHistory, []);
 
       if (!Array.isArray(parsedHistory)) {
-        logger.warn('Invalid history format, creating new');
-        this.history = this.createEmptyHistory();
+        logger.warn('Invalid history format, resetting');
+        this.history = [];
         return;
       }
 
@@ -69,45 +61,50 @@ class HistoryManager {
           errors: validation.errors,
           errorCount: validation.errors.length
         });
-        this.history = this.createEmptyHistory();
+        this.history = [];
         return;
       }
 
       if (validation.warnings.length > 0) {
-        logger.warn('History warnings', {
-          warnings: validation.warnings,
-          warningCount: validation.warnings.length
-        });
+        logger.warn('History warnings', { warningCount: validation.warnings.length });
       }
 
-      // Дополняем до нужного размера если необходимо
-      this.history = this.normalizeHistory(parsedHistory);
-    } catch (error) {
-      logger.error('Error loading history from storage', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
+      // Фильтруем только валидные заполненные элементы (NO пустые слоты!)
+      this.history = parsedHistory.filter(item => item && !('isEmpty' in item));
+
+      logger.info('History loaded from storage', {
+        itemsCount: this.history.length,
+        maxItems: this.maxItems
       });
-      this.history = this.createEmptyHistory();
+    } catch (error) {
+      logger.error('Error loading history from storage', error);
+      this.history = [];
     }
   }
 
   /**
    * Загрузить историю с сервера (основной источник правды)
-   * NEW: Заменяет localStorage как основной источник
+   * #HISTORY #HISTORY-LOAD #DATABASE
    */
   async loadHistoryFromServer(): Promise<boolean> {
     try {
       logger.info('Loading history from server');
 
       // Определяем типы для ответа сервера
+      // FIXED: сервер отправляет только telegramId для путей
       interface ServerHistoryItem {
         id: number;
-        photoUrl?: string;
-        photoData?: string;
+        telegramId: string;  // Telegram ID для путей к файлам
+        photoPath?: string;
         analysisText?: string;
         technicalAnalysis?: string;
-        createdAt: string;
         isPublic: boolean;
+        shareId?: string;
+        likesCount: number;
+        viewsCount: number;
+        isLiked?: boolean;
+        createdAt: string;
+        updatedAt?: string;
       }
 
       interface ServerHistoryResponse {
@@ -146,36 +143,31 @@ class HistoryManager {
       });
 
       // Преобразуем серверные данные в формат HistoryItem
+      // FIXED: сервер отправляет только telegramId
       const serverItems = response.history.map((item: ServerHistoryItem) => {
-        const result: Partial<HistoryItem> & { timestamp: string } = {
-          timestamp: item.createdAt,
-          id: String(item.id),
-          sourceType: 'photo' as const,
-          isEmpty: false
-        };
+        const transformed = {
+          id: item.id,
+          telegramId: item.telegramId || '',  // Telegram ID для путей к файлам
+          photoPath: item.photoPath,
+          analysisText: item.analysisText || item.technicalAnalysis,
+          technicalAnalysis: item.technicalAnalysis,
+          isPublic: item.isPublic || false,
+          shareId: item.shareId,
+          likesCount: item.likesCount || 0,
+          viewsCount: item.viewsCount || 0,
+          isLiked: item.isLiked,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt || item.createdAt
+        } as HistoryItem;
         
-        // Добавляем только существующие поля
-        if (item.photoUrl) result.photoUrl = item.photoUrl;
-        if (item.photoData) {
-          result.photoData = item.photoData;
-          result.photo = item.photoData;
-        }
-        if (item.technicalAnalysis) result.analysis = item.technicalAnalysis;
-        else if (item.analysisText) result.analysis = item.analysisText;
-        
-        return result as HistoryItem;
+        return transformed;
       });
 
-      // Нормализуем до 50 элементов (добавляем пустые если нужно)
-      this.history = this.normalizeHistory(serverItems);
+      // НЕ нормализуем! Просто сохраняем что пришло с сервера
+      this.history = serverItems.slice(0, this.maxItems);
 
       // Сохраняем в localStorage как кэш
       this.saveToStorage();
-
-      logger.info('History synced from server', {
-        filledItems: this.getFilledCount(),
-        totalSlots: this.maxItems
-      });
 
       // Уведомляем UI об обновлении истории
       window.dispatchEvent(new CustomEvent('history:updated', {
@@ -193,166 +185,29 @@ class HistoryManager {
   }
 
   /**
-   * Сохранение истории в localStorage с проверкой размера
+   * Сохранение истории в localStorage
+   * #HISTORY #HISTORY-SAVE
    */
   private saveToStorage(): void {
     try {
-      // Проверяем и очищаем localStorage если необходимо
-      this.ensureStorageSpace();
-
-      // Сохраняем историю как есть, без оптимизации размера
+      // Сохраняем историю в localStorage (максимум 50 элементов)
       const historyJson = safeJsonStringify(this.history);
       localStorage.setItem(STORAGE_KEYS.HISTORY, historyJson);
 
-      logger.debug('History saved to storage');
     } catch (error) {
       logger.error('Error saving history to storage', error);
       throw createError(ERROR_CODES.STORAGE_ERROR, 'Не удалось сохранить историю');
     }
   }
 
-  /**
-   * Проверяет и обеспечивает свободное место в localStorage
-   */
-  private ensureStorageSpace(): void {
-    try {
-      // Рассчитываем размер текущей истории
-      const currentHistorySize = this.calculateHistorySize();
 
-      // Получаем размер других данных в localStorage
-      const otherDataSize = this.getOtherStorageSize();
-
-      // Общий размер после добавления новой истории
-      const totalEstimatedSize = otherDataSize + currentHistorySize;
-
-      // Лимит localStorage (примерно 5MB)
-      const storageLimit = 4.5 * 1024 * 1024; // 4.5MB для безопасности
-
-      if (totalEstimatedSize > storageLimit) {
-        logger.warn('localStorage limit approaching, cleaning up old items');
-
-        // Удаляем старые элементы, оставляя место для одного элемента (1MB)
-        this.cleanupOldItems(storageLimit - otherDataSize - 1024 * 1024);
-      }
-    } catch (error) {
-      logger.warn('Error checking storage space', error);
-    }
-  }
-
-  /**
-   * Рассчитывает размер текущей истории в байтах
-   */
-  private calculateHistorySize(): number {
-    try {
-      const historyJson = safeJsonStringify(this.history);
-      // Примерный размер в байтах (base64 примерно в 1.37 раза больше JSON)
-      return historyJson.length * 1.37;
-    } catch (error) {
-      logger.warn('Error calculating history size', error);
-      return 0;
-    }
-  }
-
-  /**
-   * Получает размер других данных в localStorage (кроме истории)
-   */
-  private getOtherStorageSize(): number {
-    let totalSize = 0;
-    try {
-      for (let key in localStorage) {
-        if (key !== STORAGE_KEYS.HISTORY && localStorage.hasOwnProperty(key)) {
-          const value = localStorage.getItem(key);
-          if (value) {
-            totalSize += value.length * 1.37; // Примерный размер в байтах
-          }
-        }
-      }
-    } catch (error) {
-      logger.warn('Error calculating other storage size', error);
-    }
-    return totalSize;
-  }
-
-
-  /**
-   * Удаляет старые элементы истории чтобы уложиться в лимит
-   */
-  private cleanupOldItems(maxAllowedSize: number): void {
-    try {
-      const filledItems = this.getFilledItems();
-      if (filledItems.length <= 1) {
-        logger.warn('Cannot cleanup: only one item left');
-        return;
-      }
-
-      // Сортируем по времени (старые первые)
-      filledItems.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-      // Удаляем старые элементы пока не уложимся в лимит
-      let currentSize = this.calculateHistorySize();
-      let removedCount = 0;
-
-      while (currentSize > maxAllowedSize && filledItems.length > 1) {
-        const oldestItem = filledItems.shift();
-        if (oldestItem) {
-          // Находим индекс этого элемента в основной истории
-          const index = this.history.findIndex(item =>
-            item && !item.isEmpty && item.timestamp === oldestItem.timestamp
-          );
-          if (index >= 0) {
-            this.history[index] = { isEmpty: true } as HistoryItem;
-            removedCount++;
-            currentSize = this.calculateHistorySize();
-          }
-        }
-      }
-
-      if (removedCount > 0) {
-        logger.info('Cleaned up old history items', {
-          removedCount,
-          remainingItems: filledItems.length,
-          newSize: Math.round(currentSize / 1024) + 'KB'
-        });
-      }
-    } catch (error) {
-      logger.warn('Error cleaning up old items', error);
-    }
-  }
-
-  /**
-   * Создание пустой истории
-   */
-  private createEmptyHistory(): HistoryItem[] {
-    return new Array(this.maxItems).fill(null).map(() => ({ isEmpty: true } as HistoryItem));
-  }
-
-  /**
-   * Нормализация истории до нужного размера
-   */
-  private normalizeHistory(history: HistoryItem[]): HistoryItem[] {
-    const result = [...history];
-
-    // Если массив больше максимального размера, обрезаем его
-    // Но сохраняем лишние элементы в конце (они могут быть важными)
-    if (result.length > this.maxItems) {
-      logger.warn('History array larger than maxItems, truncating', {
-        currentLength: result.length,
-        maxItems: this.maxItems
-      });
-      result.splice(this.maxItems);
-    }
-
-    // Дополняем пустыми элементами если необходимо
-    while (result.length < this.maxItems) {
-      result.push({ isEmpty: true } as HistoryItem);
-    }
-
-    return result;
-  }
 
 
   /**
    * Добавление нового элемента в историю
+   * #HISTORY #HISTORY-ADD
+   * 
+   * Если уже 50 элементов, удаляет самый старый
    */
   addItem(item: HistoryItem): boolean {
     try {
@@ -367,41 +222,31 @@ class HistoryManager {
         logger.warn('History item warnings', { warnings: validation.warnings });
       }
 
-      // Добавляем timestamp если отсутствует
-      if (!item.timestamp) {
-        item.timestamp = new Date().toISOString();
+      // Убедимся что все необходимые поля есть
+      if (!item.id || typeof item.id !== 'number') {
+        logger.error('Invalid item ID', { id: item.id });
+        return false;
       }
 
-      // Генерируем уникальный ID если отсутствует
-      if (!item.id) {
-        item.id = this.generateUniqueId();
+      const now = new Date().toISOString();
+      item.createdAt = item.createdAt || now;
+      item.updatedAt = item.updatedAt || now;
+
+      // Если история уже полна (50 элементов), удаляем самый старый
+      if (this.history.length >= this.maxItems) {
+        const removed = this.history.shift();
+        logger.info('Removed oldest history item', { 
+          removedId: removed?.id,
+          remainingCount: this.history.length
+        });
       }
 
-      // NEW: Не сохраняем base64 photo если есть photoUrl (экономим место в localStorage!)
-      if (item.photoUrl || item.photoData) {
-        delete item.photo; // Удаляем base64 - на сервере уже есть файл
-      }
-
-      // NEW: Находим позицию первого пустого элемента
-      let insertPosition = this.history.findIndex(item => !item || item.isEmpty);
-      
-      // Если не нашли пустых элементов, добавляем в конец
-      if (insertPosition === -1) {
-        insertPosition = this.history.length;
-      }
-
-      // Вставляем ПЕРЕД первым пустым элементом (новые элементы справа в карусели)
-      this.history.splice(insertPosition, 0, { ...item, isEmpty: false });
-
-      // Удаляем лишние элементы с конца если превысили лимит
-      while (this.history.length > this.maxItems) {
-        this.history.pop();
-      }
+      // Добавляем новый элемент в конец
+      this.history.push(item);
 
       logger.info('Item added to history', {
-        position: insertPosition,
-        totalItems: this.history.length,
-        filledItems: this.getFilledCount()
+        itemId: item.id,
+        totalItems: this.history.length
       });
 
       // Сохраняем в localStorage
@@ -416,6 +261,9 @@ class HistoryManager {
 
   /**
    * Удаление элемента из истории по индексу
+   * #HISTORY #HISTORY-REMOVE
+   * 
+   * Удаляет с сервера если есть ID, затем из локального массива
    */
   async removeItem(index: number): Promise<boolean> {
     try {
@@ -426,28 +274,29 @@ class HistoryManager {
 
       const item = this.history[index];
       
-      // Если элемент имеет ID (серверный элемент), удаляем с сервера
-      if (item && !item.isEmpty && item.id) {
+      // Удаляем с сервера если есть ID (для серверных элементов)
+      if (item && item.id) {
         try {
           const initData = window.Telegram?.WebApp?.initData;
           if (initData) {
-            // Удаляем с сервера (это удалит и файл)
             const response = await api.delete<{ success: boolean }>(`/history/${item.id}?initData=${encodeURIComponent(initData)}`);
-            
             if (response.success) {
-              logger.info('History item deleted from server', { id: item.id, index });
+              logger.info('History item deleted from server', { id: item.id });
             }
           }
         } catch (error) {
-          logger.error('Failed to delete item from server', error);
+          logger.warn('Failed to delete item from server', { id: item.id, error });
           // Продолжаем удаление локально даже если сервер недоступен
         }
       }
 
-      // Помечаем как пустой локально
-      this.history[index] = { isEmpty: true } as HistoryItem;
+      // Удаляем из локального массива
+      const removed = this.history.splice(index, 1);
       
-      logger.info('History item removed locally', { index });
+      logger.info('History item removed', { 
+        removedId: removed[0]?.id,
+        remainingCount: this.history.length
+      });
       
       // Сохраняем в localStorage
       this.saveToStorage();
@@ -461,47 +310,54 @@ class HistoryManager {
 
   /**
    * Получение элемента истории по индексу
+   * #HISTORY #HISTORY-GET-ITEM
    */
   getItem(index: number): HistoryItem | null {
     if (index < 0 || index >= this.history.length) {
       return null;
     }
-    
-    const item = this.history[index];
-    return (item && !item.isEmpty) ? item : null;
+    return this.history[index] || null;
   }
 
   /**
    * Получение всей истории
+   * #HISTORY #HISTORY-GET-ALL
    */
   getAllItems(): HistoryItem[] {
     return [...this.history];
   }
 
   /**
-   * Получение только заполненных элементов истории
+   * Получить элемент истории по ID (не по индексу!)
+   * FIXED: используется для обновления лайков в кэше без перезагрузки
    */
-  getFilledItems(): HistoryItem[] {
-    return this.history.filter(item => item && !item.isEmpty);
+  getItemById(historyItemId: number): HistoryItem | undefined {
+    return this.history.find(item => item.id === historyItemId);
   }
 
   /**
-   * Получение заполненного элемента по индексу в массиве заполненных элементов
+   * Получение только заполненных элементов (в данном случае = все элементы)
+   * #HISTORY #HISTORY-GET-FILLED
+   */
+  getFilledItems(): HistoryItem[] {
+    return [...this.history];
+  }
+
+  /**
+   * Получение элемента по индексу в массиве (= getItem)
+   * #HISTORY #HISTORY-GET-FILLED-ITEM
    */
   getFilledItem(index: number): HistoryItem | null {
-    const filledItems = this.getFilledItems();
-    if (index < 0 || index >= filledItems.length) {
-      return null;
-    }
-    return filledItems[index] || null;
+    return this.getItem(index);
   }
 
   /**
    * Очистка всей истории
+   * #HISTORY #HISTORY-CLEAR
    */
   clear(): void {
     try {
-      this.history = this.createEmptyHistory();
+      this.history = [];
       this.saveToStorage();
       logger.info('History cleared');
     } catch (error) {
@@ -510,24 +366,27 @@ class HistoryManager {
   }
 
   /**
-   * Получение количества заполненных элементов
+   * Получение количества элементов в истории
+   * #HISTORY #HISTORY-COUNT
    */
   getFilledCount(): number {
-    return this.history.filter(item => item && !item.isEmpty).length;
+    return this.history.length;
   }
 
   /**
-   * Проверка, есть ли свободные слоты
+   * Проверка, есть ли место для нового элемента
+   * #HISTORY #HISTORY-HAS-SLOTS
    */
   hasEmptySlots(): boolean {
-    return this.history.some(item => !item || item.isEmpty);
+    return this.history.length < this.maxItems;
   }
 
   /**
-   * Получение индекса первого пустого слота
+   * Получение позиции для нового элемента (= текущая длина)
+   * #HISTORY #HISTORY-FIRST-EMPTY
    */
   getFirstEmptySlotIndex(): number {
-    return this.history.findIndex(item => !item || item.isEmpty);
+    return this.history.length;
   }
 
 
@@ -570,8 +429,9 @@ class HistoryManager {
         throw new Error('Invalid history data: ' + validation.errors.join('; '));
       }
 
-      // Заменяем текущую историю
-      this.history = this.normalizeHistory(data.items);
+      // Заменяем текущую историю (макс 50 элементов)
+      // #HISTORY #HISTORY-IMPORT
+      this.history = data.items.slice(0, this.maxItems);
       this.saveToStorage();
 
       logger.info('History imported successfully', {
@@ -588,26 +448,23 @@ class HistoryManager {
 
   /**
    * Получение статистики истории
+   * #HISTORY #HISTORY-STATS
    */
   getStats() {
     const filledItems = this.getFilledItems();
-    const totalSize = filledItems.reduce((size, item) => {
-      return size + (item.photo?.length || 0);
-    }, 0);
 
     return {
       totalSlots: this.maxItems,
       filledSlots: filledItems.length,
       emptySlots: this.maxItems - filledItems.length,
-      totalDataSize: Math.round(totalSize / 1024) + 'KB',
       oldestItem: filledItems.length > 0 ?
         filledItems.reduce((oldest, item) =>
-          new Date(item.timestamp) < new Date(oldest.timestamp) ? item : oldest
-        ).timestamp : null,
+          new Date(item.createdAt) < new Date(oldest.createdAt) ? item : oldest
+        ).createdAt : null,
       newestItem: filledItems.length > 0 ?
         filledItems.reduce((newest, item) =>
-          new Date(item.timestamp) > new Date(newest.timestamp) ? item : newest
-        ).timestamp : null,
+          new Date(item.createdAt) > new Date(newest.createdAt) ? item : newest
+        ).createdAt : null,
     };
   }
 }

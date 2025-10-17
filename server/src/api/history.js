@@ -132,13 +132,19 @@ router.get('/', async (req, res) => {
             where: { userId: dbUser.id }
         });
 
-        // Получаем элементы истории с пагинацией
+        // Получаем элементы истории с пагинацией (с User для telegramId)
         const historyItems = await prisma.historyItem.findMany({
             where: { userId: dbUser.id },
             orderBy: { [sortBy]: order },
             skip: pagination.offset,
             take: pagination.limit,
             include: {
+                user: {
+                    select: {
+                        id: true,
+                        telegramId: true  // FIXED: получаем telegramId для правильного пути к файлам
+                    }
+                },
                 _count: {
                     select: {
                         ratings: true,
@@ -148,23 +154,54 @@ router.get('/', async (req, res) => {
             }
         });
 
-        // Формируем ответ с photoUrl для новых записей
-        const telegramId = telegramUser.id;
+        // OPTIMIZED: Получаем лайки текущего пользователя для всех элементов в ОДИН запрос
+        const userLikedIds = new Set(
+            (await prisma.rating.findMany({
+                where: {
+                    userId: dbUser.id,
+                    historyItemId: { in: historyItems.map(item => item.id) },
+                    ratingType: 'like'
+                },
+                select: { historyItemId: true }
+            })).map(like => like.historyItemId)
+        );
+
+        // Формируем ответ с photoPath для правильной работы с фотографиями
+        const historyResponse = historyItems.map(item => ({
+            id: item.id,
+            // FIXED: отправляем telegramId для путей к файлам, userId не нужен на клиенте
+            telegramId: item.user.telegramId.toString(),  // Telegram ID для путей к файлам
+            // FIXED: отправляем photoPath (имя файла) вместо photoUrl
+            photoPath: item.photoPath || null,  // Имя файла из БД
+            // Legacy fallback если нет photoPath
+            photoData: item.photoPath ? null : item.photoData,
+            analysisText: item.analysisText,
+            technicalAnalysis: item.technicalAnalysis,
+            isPublic: item.isPublic,
+            shareId: item.shareId || null,  // Для sharing функционала
+            likesCount: item.likesCount || 0,  // Денормализованный счётчик лайков
+            viewsCount: item.viewsCount || 0,  // Денормализованный счётчик просмотров
+            // OPTIMIZED: isLiked текущего пользователя - без доп запросов!
+            isLiked: userLikedIds.has(item.id),
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt,
+            ratingsCount: item._count.ratings,
+            commentsCount: item._count.comments
+        }));
+
+        // FIXED: Логируем для диагностики лайков
+        logger.info('[HISTORY] Sending to client', {
+            count: historyResponse.length,
+            sample: historyResponse.slice(0, 3).map(item => ({
+                id: item.id,
+                isLiked: item.isLiked,
+                likesCount: item.likesCount
+            }))
+        });
+
         const response = {
             success: true,
-            history: historyItems.map(item => ({
-                id: item.id,
-                // NEW: используем photoUrl если есть photoPath, иначе legacy photoData
-                photoUrl: item.photoPath ? getAnalysisImageUrl(telegramId, item.photoPath) : null,
-                photoData: item.photoPath ? null : item.photoData,  // Legacy fallback
-                analysisText: item.analysisText,
-                technicalAnalysis: item.technicalAnalysis,
-                isPublic: item.isPublic,
-                createdAt: item.createdAt,
-                updatedAt: item.updatedAt,
-                ratingsCount: item._count.ratings,
-                commentsCount: item._count.comments
-            })),
+            history: historyResponse,
             pagination: {
                 page: pagination.page,
                 limit: pagination.limit,
@@ -224,8 +261,29 @@ router.get('/:id', async (req, res) => {
             });
         }
 
-        // Проверяем доступ к элементу истории
-        const historyItem = await checkHistoryItemAccess(id, dbUser.id);
+        // Проверяем доступ к элементу истории (с User для telegramId)
+        const historyItem = await prisma.historyItem.findFirst({
+            where: {
+                id: parseInt(id),
+                OR: [
+                    { userId: dbUser.id }, // Владелец
+                    { isPublic: true }  // Публичный доступ
+                ]
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        telegramId: true,  // FIXED: получаем telegramId
+                        firstName: true,
+                        lastName: true,
+                        username: true,
+                        avatarUrl: true
+                    }
+                }
+            }
+        });
+        
         if (!historyItem) {
             return res.status(404).json({
                 success: false,
@@ -265,17 +323,23 @@ router.get('/:id', async (req, res) => {
             })
         ]);
 
-        const telegramId = historyItem.user.telegramId || telegramUser.id;
         const response = {
             success: true,
             historyItem: {
                 id: historyItem.id,
-                // NEW: используем photoUrl если есть photoPath
-                photoUrl: historyItem.photoPath ? getAnalysisImageUrl(telegramId, historyItem.photoPath) : null,
-                photoData: historyItem.photoPath ? null : historyItem.photoData,  // Legacy fallback
+                // FIXED: отправляем оба ID для правильной работы на клиенте
+                userId: historyItem.userId,  // ID пользователя в БД (для логики)
+                telegramId: historyItem.user.telegramId.toString(),  // Telegram ID для путей к файлам
+                // FIXED: отправляем photoPath (имя файла) вместо photoUrl
+                photoPath: historyItem.photoPath || null,  // Имя файла из БД
+                // Legacy fallback если нет photoPath
+                photoData: historyItem.photoPath ? null : historyItem.photoData,
                 analysisText: historyItem.analysisText,
                 technicalAnalysis: historyItem.technicalAnalysis,
                 isPublic: historyItem.isPublic,
+                shareId: historyItem.shareId || null,  // Для sharing функционала
+                likesCount: historyItem.likesCount || 0,  // Денормализованный счётчик лайков
+                viewsCount: historyItem.viewsCount || 0,  // Денормализованный счётчик просмотров
                 createdAt: historyItem.createdAt,
                 updatedAt: historyItem.updatedAt,
                 user: historyItem.user,
@@ -537,6 +601,7 @@ router.get('/public', async (req, res) => {
                 user: {
                     select: {
                         id: true,
+                        telegramId: true,  // FIXED: нужен для правильного пути к файлам
                         firstName: true,
                         lastName: true,
                         username: true,
@@ -557,9 +622,15 @@ router.get('/public', async (req, res) => {
             success: true,
             history: historyItems.map(item => ({
                 id: item.id,
-                photoData: item.photoData,
+                // FIXED: отправляем telegramId для путей к файлам, userId не нужен на клиенте
+                telegramId: item.user.telegramId.toString(),  // Telegram ID для путей к файлам
+                // FIXED: отправляем photoPath (имя файла) вместо photoUrl
+                photoPath: item.photoPath || null,  // Имя файла из БД
+                // Legacy fallback если нет photoPath
+                photoData: item.photoPath ? null : item.photoData,
                 analysisText: item.analysisText,
                 technicalAnalysis: item.technicalAnalysis,
+                isPublic: item.isPublic,
                 createdAt: item.createdAt,
                 user: item.user,
                 ratingsCount: item._count.ratings,
