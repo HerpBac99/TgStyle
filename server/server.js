@@ -25,6 +25,7 @@ const subscriptionRoutes = require('./src/api/subscription');
 const wardrobeRoutes = require('./src/api/wardrobe');
 const capsulesRoutes = require('./src/api/capsules');
 const analysisLikesRoutes = require('./src/api/analysisLikes');
+const capsuleLikesRoutes = require('./src/api/capsuleLikes');
 const initialDataRoutes = require('./src/api/initialData');
 const apiRoutes = require('./routes/api');
 
@@ -56,6 +57,7 @@ app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/wardrobe', wardrobeRoutes);
 app.use('/api/capsules', capsulesRoutes);
 app.use('/api/analysis-likes', analysisLikesRoutes);
+app.use('/api/capsule-likes', capsuleLikesRoutes);
 app.use('/api/initial-data', initialDataRoutes);  // BATCH: Загрузка всех начальных данных
 app.use('/api', apiRoutes);
 

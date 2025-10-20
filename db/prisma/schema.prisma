@@ -23,6 +23,7 @@ model User {
   totalAnalyses        Int            @default(0)
   weeklyResetDate      DateTime       @default(now())
   capsules             Capsule[]
+  capsuleLikes         CapsuleLike[]
   comments             Comment[]
   historyItems         HistoryItem[]
   relatedNotifications Notification[] @relation("NotificationRelatedUser")
@@ -165,14 +166,31 @@ model Capsule {
   analysisDate DateTime? @map("analysis_date")
 
   isPublic    Boolean  @default(false) @map("is_public")  // Можно ли делиться капсулой
+  shareId     String?  @unique @map("share_id") @db.VarChar(100)  // Для shared капсул
+  likesCount  Int      @default(0) @map("likes_count")  // Денормализованный счетчик лайков
+  viewsCount  Int      @default(0) @map("views_count")  // Денормализованный счетчик просмотров
 
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
   items       WardrobeItem[]
+  capsuleLikes CapsuleLike[]
 
   @@index([telegramId], map: "idx_capsule_telegram_id")
   @@index([createdAt(sort: Desc)], map: "idx_capsule_created_at")
   @@index([isPublic], map: "idx_capsule_is_public")
+  @@index([shareId], map: "idx_capsule_share_id")
   @@map("capsules")
+}
+
+model CapsuleLike {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  capsuleId Int
+  createdAt DateTime @default(now())
+  capsule   Capsule  @relation(fields: [capsuleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, capsuleId])
+  @@map("capsule_likes")
 }

@@ -88,8 +88,6 @@ class HistoryManager {
    */
   async loadHistoryFromServer(): Promise<boolean> {
     try {
-      logger.info('Loading history from server');
-
       // Определяем типы для ответа сервера
       // FIXED: сервер отправляет только telegramId для путей
       interface ServerHistoryItem {

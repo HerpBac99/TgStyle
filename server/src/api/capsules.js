@@ -243,6 +243,19 @@ async function getUserCapsules(req, res) {
     }
 
     const telegramId = BigInt(validationResult.data.user.id);
+    
+    // Получаем пользователя для проверки лайков
+    const user = await prisma.user.findUnique({
+      where: { telegramId }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
     const { page = 1, limit = 10 } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -276,6 +289,18 @@ async function getUserCapsules(req, res) {
       where: { telegramId: telegramId }
     });
 
+    // Получаем лайки текущего пользователя для этих капсул
+    const userLikes = await prisma.capsuleLike.findMany({
+      where: {
+        userId: user.id,
+        capsuleId: {
+          in: capsules.map(c => c.id)
+        }
+      }
+    });
+
+    const likedCapsuleIds = new Set(userLikes.map(like => like.capsuleId));
+
     res.json({
       success: true,
       capsules: capsules.map(capsule => ({
@@ -286,6 +311,8 @@ async function getUserCapsules(req, res) {
         canvasData: capsule.canvasData,
         analysis: capsule.analysis,
         createdAt: capsule.createdAt,
+        likesCount: capsule.likesCount || 0,
+        isLiked: likedCapsuleIds.has(capsule.id),
         itemCount: capsule.items.length,
         items: capsule.items
       })),

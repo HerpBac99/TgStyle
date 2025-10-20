@@ -46,7 +46,7 @@
 /* Грид с карточками капсул */
 .capsules-clothes-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 12px;
     padding: 20px 0;
     width: 100%;
@@ -416,7 +416,7 @@
 /* Грид с элементами */
 .capsules-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 12px; /* Тот же gap что в wardrobe */
     padding: 20px 0; /* Тот же padding что в wardrobe */
     width: 100%;
@@ -730,4 +730,38 @@
     font-size: 0.8rem;
     font-weight: 600;
     color: #2c2c30;
+}
+
+/* =======================================
+   СТИЛИ ЛАЙКОВ И SHARING НА КАРТОЧКАХ КАПСУЛ
+   ======================================= */
+
+/* Footer карточки капсулы с лайками и sharing */
+.capsules-item-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    gap: 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.4) 100%);
+    padding: 8px;
+    backdrop-filter: blur(5px);
+}
+
+/* Контейнеры лайков и sharing в карточках капсул (равны по ширине) */
+/* SVG сердечка в кнопке лайка карусели */
+.capsule-like-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.capsule-like-count {
+    font-size: 12px;
+    min-width: 16px;
+}
+
+.capsule-share-btn svg {
+    width: 12px;
+    height: 12px;
 }

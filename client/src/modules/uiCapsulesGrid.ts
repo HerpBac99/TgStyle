@@ -4,6 +4,8 @@
  */
 
 import { logger } from './logger';
+import { capsuleLikesService } from './capsules/CapsuleLikesService';
+import { sharingService } from './shared/SharingService';
 
 /**
  * Интерфейс для капсулы стиля
@@ -14,6 +16,9 @@ export interface StyleCapsule {
   description?: string;
   thumbnailUrl: string;
   createdAt: string;
+  likesCount?: number;
+  viewsCount?: number;
+  isLiked?: boolean;
   items?: any[]; // Элементы одежды в капсуле (опционально для грида)
 }
 
@@ -115,12 +120,48 @@ export class UICapsulesGrid {
     image.alt = capsule.name;
 
     content.appendChild(image);
+
+    // Создаем footer с лайками и sharing
+    const footer = document.createElement('div');
+    footer.className = 'capsules-item-footer';
+
+    // Добавляем лайки через сервис
+    capsuleLikesService.createLikeComponent(
+      footer,
+      capsule.id,
+      {
+        isLiked: !!capsule.isLiked,
+        likesCount: capsule.likesCount || 0
+      },
+      'capsule'
+    );
+
+    // Добавляем sharing через сервис
+    sharingService.createShareButton(
+      footer,
+      {
+        type: 'capsule',
+        image: capsule.thumbnailUrl,
+        text: capsule.description || capsule.name || 'Моя капсула стиля',
+        title: '👗 Капсула стиля',
+        metadata: {
+          capsuleId: capsule.id
+        }
+      },
+      'capsule'
+    );
+
+    content.appendChild(footer);
     card.appendChild(content);
 
-    // Обработчик клика для просмотра капсулы
-    const handleClick = () => {
-      logger.info('Capsule card clicked', { capsuleId: capsule.id });
-      this.config.onView(capsule.id);
+    // Обработчик клика для просмотра капсулы (исключаем лайки и sharing)
+    const handleClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      // Проверяем что клик НЕ на кнопку лайка, share или их содержимое
+      if (!target.closest('.like-container') && !target.closest('.share-container')) {
+        logger.info('Capsule card clicked', { capsuleId: capsule.id });
+        this.config.onView(capsule.id);
+      }
     };
 
     card.addEventListener('click', handleClick);
