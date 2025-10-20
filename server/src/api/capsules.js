@@ -107,9 +107,10 @@ async function saveCapsuleThumbnail(telegramId, thumbnailImage) {
  */
 async function createCapsule(req, res) {
   try {
-    const { initData, name, canvasData, thumbnailImage, itemIds } = req.body;
+    const { name, canvasData, thumbnailImage, itemIds } = req.body;
 
-    // Валидация Telegram данных
+    // Валидация Telegram данных из headers (как в других эндпоинтах)
+    const initData = getInitData(req);
     if (!initData) {
         return res.status(401).json({
             success: false,
@@ -368,6 +369,26 @@ async function getCapsule(req, res) {
       });
     }
 
+    // Проверяем лайк текущего пользователя на эту капсулу
+    let isLiked = false;
+    if (telegramId) {
+      const user = await prisma.user.findUnique({
+        where: { telegramId: BigInt(telegramId) }
+      });
+      
+      if (user) {
+        const userLike = await prisma.capsuleLike.findUnique({
+          where: {
+            userId_capsuleId: {
+              userId: user.id,
+              capsuleId: parseInt(id)
+            }
+          }
+        });
+        isLiked = !!userLike;
+      }
+    }
+
     res.json({
       success: true,
       capsule: {
@@ -378,6 +399,8 @@ async function getCapsule(req, res) {
         analysis: capsule.analysis,
         analysisDate: capsule.analysisDate,
         createdAt: capsule.createdAt,
+        likesCount: capsule.likesCount || 0,
+        isLiked: isLiked,
         itemCount: capsule.items.length,
         items: capsule.items
       }
@@ -398,9 +421,10 @@ async function getCapsule(req, res) {
 async function updateCapsule(req, res) {
   try {
     const { id } = req.params;
-    const { initData, canvasData, thumbnailImage, itemIds } = req.body;
+    const { canvasData, thumbnailImage, itemIds } = req.body;
 
-    // Валидация Telegram данных
+    // Валидация Telegram данных из headers (как в других эндпоинтах)
+    const initData = getInitData(req);
     if (!initData) {
         return res.status(401).json({
             success: false,
@@ -417,6 +441,11 @@ async function updateCapsule(req, res) {
     }
 
     const telegramId = BigInt(validationResult.data.user.id);
+
+    // Получаем пользователя для проверки лайков
+    const user = await prisma.user.findUnique({
+      where: { telegramId }
+    });
 
     const capsule = await prisma.capsule.findFirst({
       where: {
@@ -491,6 +520,20 @@ async function updateCapsule(req, res) {
       }
     });
 
+    // Проверяем лайк текущего пользователя на эту капсулу
+    let isLiked = false;
+    if (user) {
+      const userLike = await prisma.capsuleLike.findUnique({
+        where: {
+          userId_capsuleId: {
+            userId: user.id,
+            capsuleId: parseInt(id)
+          }
+        }
+      });
+      isLiked = !!userLike;
+    }
+
     logger.info(`Capsule updated: ${updatedCapsule.id} for user ${telegramId}`, {
       thumbnailPath: thumbnailPath,
       itemCount: updatedCapsule.items.length
@@ -504,6 +547,8 @@ async function updateCapsule(req, res) {
         thumbnailUrl: updatedCapsule.thumbnailPath ? `/uploads/capsules/${telegramId}/${updatedCapsule.thumbnailPath}` : null,
         canvasData: updatedCapsule.canvasData,
         createdAt: updatedCapsule.createdAt,
+        likesCount: updatedCapsule.likesCount || 0,
+        isLiked: isLiked,
         itemCount: updatedCapsule.items.length,
         items: updatedCapsule.items
       }

@@ -309,10 +309,11 @@
     padding: 8px; /* Уменьшен padding */
     display: flex;
     flex-direction: column;
-    gap: 8px; /* Уменьшен gap между элементами */
+    /* gap: 8px; - убираю gap снова, он мешает гриду */
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
     margin-top: 10vh; /* Отступ сверху 10vh */
     z-index: 1001; /* Выше чем overlay */
+    border: 1px solid red;
 }
 
 /* Анимация убрана - модальное окно сразу позиционируется правильно */
@@ -325,6 +326,7 @@
     padding-bottom: 6px; /* Уменьшен отступ снизу */
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     background: transparent !important;
+    border: 1px solid blue;
 }
 
 .capsules-modal-header h2 {
@@ -351,6 +353,7 @@
     opacity: 1;
     filter: none;
     backdrop-filter: none;
+    border: 1px solid green;
 }
 
 .capsules-modal-close-btn:hover {
@@ -371,14 +374,18 @@
 .capsules-filters {
     display: flex;
     flex-wrap: nowrap;
-    gap: 8px;
-    padding: 0;
+    gap: 5px;
+    margin: 10px 0 16px 0; /* Увеличиваем верхний отступ на 4px для учета подъема активных кнопок */
     width: 100%;
+    height: 50px; /* ФИКСИРОВАННАЯ минимальная высота */
+    padding: 5px;
+    flex-shrink: 0; /* НЕ СЖИМАТЬ контейнер */
     overflow-x: auto;
     overflow-y: hidden;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
     -webkit-overflow-scrolling: touch;
+    border: 1px solid yellow;
 }
 
 .capsules-filters::-webkit-scrollbar {
@@ -393,12 +400,14 @@
     border-radius: 12px;
     font-size: 0.85rem;
     font-weight: 500;
+    height: 40px;
     cursor: pointer;
     transition: all 0.2s ease;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     backdrop-filter: blur(10px);
     -webkit-tap-highlight-color: transparent;
     white-space: nowrap;
+    flex-shrink: 0; /* НЕ СЖИМАТЬ кнопки */
 }
 
 .capsules-filter-btn:hover {
@@ -416,17 +425,23 @@
 /* Грид с элементами */
 .capsules-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px; /* Тот же gap что в wardrobe */
-    padding: 20px 0; /* Тот же padding что в wardrobe */
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    padding: 10px 0;
     width: 100%;
+    height: calc(100vh - 250px); /* Фиксированная высота */
+    overflow-y: auto;
+    margin-top: 8px; /* Отступ от фильтров */
+    border: 1px solid orange;
 }
 
 /* Карточка элемента в capsules */
 .capsules-item-card {
     position: relative;
     width: 100%;
-    padding-bottom: 100%; /* Квадратная карточка как в wardrobe */
+    min-height: 80px; /* Минимальная высота */
+    height: auto; /* Автоматическая высота */
+    aspect-ratio: 1; /* Квадратная форма */
     background: rgba(255, 255, 255, 0.9);
     border-radius: 12px;
     overflow: hidden;
@@ -757,11 +772,11 @@
 }
 
 .capsule-like-count {
-    font-size: 12px;
+    font-size: 16px;
     min-width: 16px;
 }
 
 .capsule-share-btn svg {
-    width: 12px;
-    height: 12px;
+    width: 16px;
+    height: 16px;
 }

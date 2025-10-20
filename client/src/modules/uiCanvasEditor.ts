@@ -370,13 +370,23 @@ export class UICanvasEditor {
         continue;
       }
 
-      // Добавляем элемент с сохраненными параметрами
-      await this.addItem({
-        item: wardrobeItem,
-        position: { x: objData.left, y: objData.top },
-        scale: objData.scaleX, // используем scaleX как единый масштаб
-        angle: objData.angle || 0
-      });
+      // Добавляем элемент с сохраненными параметрами (с обработкой ошибок)
+      try {
+        await this.addItem({
+          item: wardrobeItem,
+          position: { x: objData.left, y: objData.top },
+          scale: objData.scaleX, // используем scaleX как единый масштаб
+          angle: objData.angle || 0
+        });
+      } catch (error) {
+        logger.warn('Failed to restore canvas item, skipping', {
+          index: i,
+          itemId: wardrobeItem.id,
+          error: error instanceof Error ? error.message : String(error)
+        });
+        // Продолжаем с остальными элементами
+        continue;
+      }
     }
 
     this.fabricCanvas.renderAll();

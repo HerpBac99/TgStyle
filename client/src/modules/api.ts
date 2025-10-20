@@ -308,7 +308,7 @@ class TgStyleApi extends ApiClient {
    */
   async removeBackground(image: string): Promise<any> {
     logger.info('Removing background from image');
-    return this.post('/remove-background', { image }, TIMEOUTS.ANALYSIS_REQUEST);
+    return this.post('/remove-background', { image_base64: image }, TIMEOUTS.ANALYSIS_REQUEST);
   }
 
   /**
@@ -316,7 +316,7 @@ class TgStyleApi extends ApiClient {
    */
   async classifyClothing(image: string): Promise<any> {
     logger.info('Classifying clothing in image');
-    return this.post('/classify-clothing', { image }, TIMEOUTS.ANALYSIS_REQUEST);
+    return this.post('/classify-clothing', { image_base64: image }, TIMEOUTS.ANALYSIS_REQUEST);
   }
 
   /**

@@ -216,7 +216,11 @@ export class CapsulesManager implements PhotoUploadHandler {
       }, 'Return to capsules grid from edit');
     } catch (error) {
       logger.error('Error viewing capsule', error);
-      alert('Ошибка при просмотре капсулы. Попробуйте еще раз.');
+      // Даже если некоторые изображения не загружаются, canvas восстанавливает остальные
+      // Поэтому показываем alert только для серьезных ошибок
+      if (error instanceof Error && error.message.includes('Canvas')) {
+        alert('Ошибка при просмотре капсулы. Попробуйте еще раз.');
+      }
       this.returnToCapsulesGrid();
     }
   }
