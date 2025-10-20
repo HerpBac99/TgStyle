@@ -686,20 +686,6 @@ button:active {
     position: relative; /* Создает контекст позиционирования */
 }
 
-/* Стили для индикатора даты в карте */
-.history-date {
-    position: absolute; /* Абсолютное позиционирование */
-    bottom: 8px; /* Отступ снизу */
-    left: 8px; /* Отступ слева */
-    background-color: rgba(0, 0, 0, 0.7); /* Полупрозрачный черный фон */
-    color: white; /* Белый цвет текста */
-    padding: 4px 8px; /* Внутренние отступы */
-    border-radius: 12px; /* Скругление углов */
-    font-size: 10px; /* Размер шрифта */
-    user-select: none; /* Запрещает выделение текста */
-    backdrop-filter: blur(5px); /* Размытие фона */
-}
-
 
 /*
  * Стили для кнопки добавления анализа
@@ -777,7 +763,7 @@ button:active {
     right: 0; /* Прижимает к правому краю */
 
     /* Полупрозрачный черный фон с размытием */
-    background-color: rgba(0, 0, 0, 0.7); /* Полупрозрачный черный фон */
+    background-color: transparent !important; /* Полупрозрачный черный фон */
     backdrop-filter: blur(5px); /* Размытие фона */
 
     /* Цвет текста белый */
@@ -808,57 +794,100 @@ button:active {
     min-width: 0; /* Для корректной работы overflow */
 }
 
-/* Контейнер лайков в карточке карусели */
-.carousel-likes-container {
-    display: flex; /* Включает flexbox */
-    align-items: center; /* Центрирует элементы */
-    justify-content: center; /* Центрирует элементы */
-    gap: 4px; /* Расстояние между кнопкой и счетчиком */
-    flex-shrink: 0; /* Запрещает сжатие */
+/* =======================================
+   СТИЛИ КОМПОНЕНТА ЛАЙКОВ (ОБЩИЕ)
+   ======================================= */
+
+/* Общий контейнер */
+.like-container {
+    flex: 1;
+    flex-basis: 0;
+    min-width: 0;
+    background: transparent !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 5px;
 }
 
-/* Кнопка лайка на карусели */
-.carousel-like-btn {
-    background: transparent; /* Прозрачный фон */
-    border: none; /* Без границы */
-    padding: 4px 6px; /* Внутренние отступы */
-    cursor: pointer; /* Курсор в виде руки */
-    display: flex; /* Включает flexbox */
-    align-items: center; /* Центрирует элементы */
-    justify-content: center; /* Центрирует элементы */
-    outline: none; /* Убирает контур при фокусе */
-    -webkit-tap-highlight-color: transparent; /* Убирает серый квадрат на iOS */
-    border-radius: 12px; /* Скругление углов */
-    transition: all 0.3s ease; /* Плавная анимация */
+/* Общая кнопка лайка */
+.like-btn {
+    background: transparent !important;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    border: none !important;
 }
 
-/* SVG сердечко в кнопке лайка */
+.like-btn:focus,
+.like-btn:focus-visible,
+.like-btn:active {
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+.like-btn svg {
+    display: block;
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+.like-btn svg path {
+    fill: none;
+    stroke: var(--tg-theme-text-color);
+    stroke-width: 2;
+    transition: fill 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), stroke 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.like-btn.liked svg path {
+    fill: #ed4956;
+    stroke: #ed4956;
+}
+
+.like-btn.liked svg {
+    animation: likeHeartBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes likeHeartBounce {
+    0% { transform: scale(1); }
+    25% { transform: scale(0.2); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+/* Общий счетчик лайков */
+.like-count {
+    color: var(--tg-theme-text-color);
+    font-weight: 500;
+    min-width: 20px;
+    text-align: left;
+    opacity: 0.9;
+    transition: color 0.2s ease;
+}
+
+
+/* =======================================
+   СПЕЦИФИЧНЫЕ СТИЛИ ЛАЙКОВ (КАРУСЕЛЬ)
+   ======================================= */
+
+/* SVG сердечка в кнопке лайка карусели */
 .carousel-like-btn svg {
-    stroke: white; /* Белый цвет обводки по умолчанию */
-    fill: none; /* Не заполнено по умолчанию */
-    flex-shrink: 0; /* Запрещает сжатие иконки */
-}
-
-/* Состояние лайка */
-.carousel-like-btn.liked svg {
-    fill: #ff4957; /* Заполнен красным */
-    stroke: #ff4957; /* Обводка красная */
-}
-
-/* При нажатии */
-.carousel-like-btn:active {
-    transform: scale(0.9); /* Небольшое уменьшение */
-    opacity: 0.8; /* Полупрозрачность */
+    width: 16px;
+    height: 16px;
 }
 
 /* Счетчик лайков на карусели */
-.carousel-likes-count {
-    color: white; /* Белый цвет текста */
-    font-size: 10px; /* Размер шрифта */
-    font-weight: 500; /* Жирность шрифта */
-    min-width: 16px; /* Минимальная ширина */
-    text-align: center; /* Центрирование текста */
-    opacity: 0.95; /* Полупрозрачность */
+.carousel-like-count {
+    font-size: 12px;
+    min-width: 16px;
 }
 
 /* =======================================

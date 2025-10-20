@@ -22,6 +22,8 @@ import { cameraManager } from './camera';
 import { sharingService } from './shared/SharingService';
 import type { ShareConfig } from '@/types/sharing';
 import { analysisLikesService } from './analysis/AnalysisLikesService';
+import { historyManager } from './history';
+import { uiMenuManager } from './uiMenu';
 
 // Объявляем глобальную переменную Telegram
 declare global {
@@ -118,15 +120,6 @@ export class UIAnalysisManager {
     imageSrc: null,
     analysisText: null,
     historyItemId: null,
-  };
-
-  // Текущее состояние лайка
-  private currentLikeState: {
-    isLiked: boolean;
-    likesCount: number;
-  } = {
-    isLiked: false,
-    likesCount: 0,
   };
 
   // Ссылка на Lamoda для текущей рекомендации
@@ -444,9 +437,26 @@ export class UIAnalysisManager {
     // Настраиваем обработчики кнопок
     this.setupResultButtons();
 
-    // Загружаем статус лайка если есть historyItemId
+    // Интегрируем новый компонент лайков
     if (historyItemId) {
-      this.loadLikeStatus(historyItemId);
+      const resultActions = getElement('.result-actions');
+      if (resultActions) {
+        // Удаляем старый компонент лайка для экрана результата, если он существует, чтобы избежать дублирования
+        const existingResultLikeComponent = resultActions.querySelector('.result-like-btn');
+        if (existingResultLikeComponent) {
+          existingResultLikeComponent.remove();
+        }
+
+        const historyItem = historyManager.getItemById(historyItemId);
+        if (historyItem) {
+          analysisLikesService.createLikeComponent(
+            resultActions,
+            historyItemId,
+            { isLiked: !!historyItem.isLiked, likesCount: historyItem.likesCount || 0 },
+            'result' // Добавляем класс для экрана результата
+          );
+        }
+      }
     }
 
     logger.info('Analysis result displayed with cascade animation', {
@@ -455,33 +465,6 @@ export class UIAnalysisManager {
       hasRecommendationButton: !!this.currentLamodaUrl,
       historyItemId
     });
-  }
-
-  /**
-   * Загрузить статус лайка для анализа
-   */
-  private async loadLikeStatus(historyItemId: number): Promise<void> {
-    try {
-      const status = await analysisLikesService.getLikeStatus(historyItemId);
-      
-      // Обновляем локальное состояние
-      this.currentLikeState.isLiked = status.isLiked;
-      this.currentLikeState.likesCount = status.likesCount;
-
-      // Обновляем UI кнопки если она уже существует
-      const likeBtn = document.getElementById('like-btn');
-      if (likeBtn) {
-        this.updateLikeButtonUI(likeBtn, status.isLiked);
-      }
-
-      // Обновляем счетчик лайков
-      this.updateLikesCount(status.likesCount);
-
-      logger.info('Like status loaded', { historyItemId, isLiked: status.isLiked, likesCount: status.likesCount });
-    } catch (error) {
-      logger.error('Error loading like status', error);
-      // Не показываем ошибку пользователю - просто не будет лайка
-    }
   }
 
   /**
@@ -659,16 +642,6 @@ export class UIAnalysisManager {
    * FIXED: Удаляем старые обработчики перед привязкой новых чтобы избежать дублирования
    */
   private setupResultButtons(): void {
-    // Кнопка лайк
-    const likeBtn = getElement('#like-btn');
-    if (likeBtn) {
-      const clonedLikeBtn = likeBtn.cloneNode(true) as HTMLElement;
-      likeBtn.replaceWith(clonedLikeBtn);
-      clonedLikeBtn.addEventListener('click', () => {
-        this.handleLikeClick();
-      });
-    }
-
     // Кнопка поделиться
     const shareBtn = getElement('#share-btn');
     if (shareBtn) {
@@ -698,94 +671,6 @@ export class UIAnalysisManager {
       clonedRecommendationBtn.addEventListener('click', () => {
         this.handleRecommendationClick();
       });
-    }
-  }
-
-  /**
-   * Обработчик клика по кнопке лайк
-   */
-  private async handleLikeClick(): Promise<void> {
-    logger.info('=== LIKE BUTTON CLICKED ===');
-
-    const likeBtn = getElement('#like-btn');
-    logger.info(`Like button element found: ${!!likeBtn}`);
-
-    if (!likeBtn) {
-      logger.error('Like button not found in DOM!');
-      return;
-    }
-
-    // Проверяем, что элемент видимый и кликабельный
-    const rect = likeBtn.getBoundingClientRect();
-    logger.info(`Like button position: x=${rect.left}, y=${rect.top}, visible=${rect.width > 0 && rect.height > 0}`);
-
-    // Проверяем наличие historyItemId
-    if (!this.currentAnalysisData.historyItemId) {
-      logger.warn('No historyItemId available for like');
-      return;
-    }
-
-    // Переключаем состояние лайка
-    const isLiked = this.currentLikeState.isLiked;
-    logger.info(`Like button current state: isLiked=${isLiked}`);
-
-    // Находим SVG path элемент
-    const svgPath = likeBtn.querySelector('svg path') as SVGPathElement;
-    logger.info(`SVG path element found: ${!!svgPath}`);
-
-    try {
-      // Отправляем запрос на сервер
-      const result = await analysisLikesService.toggleLike(
-        this.currentAnalysisData.historyItemId,
-        isLiked
-      );
-
-      // Обновляем локальное состояние
-      this.currentLikeState.isLiked = result.isLiked;
-      this.currentLikeState.likesCount = result.likesCount;
-
-      logger.info('Like toggled successfully', result);
-
-      // Обновляем UI
-      this.updateLikeButtonUI(likeBtn, result.isLiked);
-
-      // Обновляем счетчик лайков
-      this.updateLikesCount(result.likesCount);
-
-      // Тактильная обратная связь
-      authManager.vibrate('light');
-      
-      const { uiManager } = await import('./uiManager.js');
-      uiManager.updateHistoryDisplay();
-
-    } catch (error) {
-      logger.error('Error toggling like', error);
-      // Показываем ошибку пользователю (опционально)
-      return;
-    }
-  }
-
-  /**
-   * Обновление счетчика лайков
-   */
-  private updateLikesCount(count: number): void {
-    const likesCountEl = document.getElementById('likes-count');
-    if (likesCountEl) {
-      likesCountEl.textContent = count > 0 ? String(count) : '0';
-      logger.info('Likes count updated', { count });
-    }
-  }
-
-  /**
-   * Обновление UI кнопки лайка
-   */
-  private updateLikeButtonUI(likeBtn: HTMLElement, isLiked: boolean): void {
-    if (isLiked) {
-      likeBtn.classList.add('liked');
-      logger.info('Like added - CSS animation triggered');
-    } else {
-      likeBtn.classList.remove('liked');
-      logger.info('Like removed - class updated');
     }
   }
 
@@ -876,6 +761,11 @@ export class UIAnalysisManager {
     const analysisScreen = getElement('#analysis-screen');
     if (analysisScreen) {
       analysisScreen.classList.add('hidden');
+    }
+
+    // Обновляем только что проанализированную карточку в карусели
+    if (this.currentAnalysisData.historyItemId) {
+      uiMenuManager.updateCardDisplay(this.currentAnalysisData.historyItemId);
     }
   }
 

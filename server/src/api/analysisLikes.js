@@ -93,6 +93,12 @@ router.post('/:historyItemId', async (req, res) => {
 
     const likesCount = updatedItem.likesCount;
 
+    logger.info('Analysis liked', {
+      userId: user.id,
+      historyItemId: parseInt(historyItemId),
+      likesCount
+    });
+
     res.json({
       success: true,
       isLiked: true,

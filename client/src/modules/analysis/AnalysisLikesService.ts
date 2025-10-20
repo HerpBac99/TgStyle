@@ -5,6 +5,7 @@
 import { logger } from '../logger';
 import { api } from '../api';
 import { historyManager } from '../history';
+import { createElement } from '@/utils/helpers';
 
 export interface AnalysisLikeStatus {
   isLiked: boolean;
@@ -19,6 +20,77 @@ interface LikeApiResponse {
 }
 
 export class AnalysisLikesService {
+
+  /**
+   * Создает и управляет полнофункциональным компонентом лайков.
+   * @param parentElement - DOM-элемент, куда будет встроен компонент.
+   * @param entityId - ID сущности (historyItemId).
+   * @param initialData - Начальные данные для мгновенной отрисовки.
+   */
+  public createLikeComponent(
+    parentElement: HTMLElement,
+    entityId: number,
+    initialData: AnalysisLikeStatus,
+    componentClass: string = '' // Новый параметр
+  ): void {
+    const container = createElement('div', { class: `like-container` });
+    const likeBtnClass = componentClass ? `like-btn ${componentClass}-like-btn` : 'like-btn';
+    const likeBtn = createElement('button', { class: likeBtnClass, 'aria-label': 'Поставить лайк' });
+    likeBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      </svg>
+    `;
+    const likesCountClass = componentClass ? `like-count ${componentClass}-like-count` : 'like-count';
+    const likesCountEl = createElement('span', { class: likesCountClass }, String(initialData.likesCount || 0));
+    logger.info(`Like count element created. Element classes: "${likesCountEl.className}"`);
+    container.appendChild(likeBtn);
+    container.appendChild(likesCountEl);
+
+    // 2. Начальная отрисовка
+    let currentState = { ...initialData };
+    if (currentState.isLiked) {
+      likeBtn.classList.add('liked');
+    }
+
+    // 3. Обработчик клика с оптимистичным UI
+    likeBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      const previousState = { ...currentState };
+      const isLiking = !currentState.isLiked;
+
+      // Оптимистичное обновление UI
+      currentState.isLiked = isLiking;
+      currentState.likesCount += isLiking ? 1 : -1;
+      likeBtn.classList.toggle('liked', isLiking);
+      likesCountEl.textContent = String(currentState.likesCount);
+
+      try {
+        // Асинхронный запрос к API
+        const updatedStatus = await this.toggleLike(entityId, !isLiking);
+        
+        // Корректировка UI, если ответ сервера отличается
+        currentState = updatedStatus;
+        likesCountEl.textContent = String(currentState.likesCount);
+        if (currentState.isLiked !== isLiking) {
+           likeBtn.classList.toggle('liked', currentState.isLiked);
+        }
+
+      } catch (error) {
+        logger.error('Failed to toggle like, rolling back UI', { entityId, error });
+        // Молчаливый откат UI в случае ошибки
+        currentState = previousState;
+        likeBtn.classList.toggle('liked', currentState.isLiked);
+        likesCountEl.textContent = String(currentState.likesCount);
+      }
+    });
+
+    // 4. Добавление в DOM
+    parentElement.prepend(container);
+  }
+
   /**
    * Поставить лайк анализу
    */
@@ -38,14 +110,11 @@ export class AnalysisLikesService {
         likesCount: response.likesCount
       });
 
-      const historyItem = historyManager.getItemById(historyItemId);
-
-      if (historyItem) {
-        historyItem.isLiked = true;
-        historyItem.likesCount = response.likesCount || 0;
-      } else {
-        logger.error('History item NOT FOUND in cache!', { historyItemId });
-      }
+      // Обновляем состояние в historyManager, который сохранит его в localStorage
+      historyManager.updateItemLikeStatus(historyItemId, {
+        isLiked: true,
+        likesCount: response.likesCount || 0
+      });
 
       return {
         isLiked: true,
@@ -80,13 +149,11 @@ export class AnalysisLikesService {
         likesCount: response.likesCount
       });
 
-      // FIXED: Обновляем локальный кэш истории чтобы удаление лайка сразу отобразилось
-      const historyItem = historyManager.getItemById(historyItemId);
-      if (historyItem) {
-        historyItem.isLiked = false;
-        historyItem.likesCount = response.likesCount || 0;
-        logger.info('History item updated in cache', { historyItemId, isLiked: false });
-      }
+      // Обновляем состояние в historyManager, который сохранит его в localStorage
+      historyManager.updateItemLikeStatus(historyItemId, {
+        isLiked: false,
+        likesCount: response.likesCount || 0
+      });
 
       return {
         isLiked: false,

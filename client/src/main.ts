@@ -151,14 +151,17 @@ class TgStyleApp {
       // Настраиваем базовые стили и поведение
       this.setupAppBehavior();
 
-      // Инициализируем UI
+      // Инициализируем UI (создает менеджеры, historyManager загружает кэш)
       this.initializeUI();
+
+      // Мгновенно отрисовываем UI из кэша localStorage
+      this.optimisticUIRender();
 
       // Выполняем авторизацию
       await this.performAuthentication();
 
-      // Предзагружаем данные (история, гардероб, капсулы)
-      await this.preloadAppData();
+      // Предзагружаем данные в фоне
+      this.preloadAppData();
 
       // Обрабатываем shared анализы
       this.handleSharedAnalysis();
@@ -272,6 +275,14 @@ class TgStyleApp {
         this.refreshAppState();
       }
     });
+
+    // Слушатель для обновления истории после фоновой загрузки
+    window.addEventListener('history:updated', (event: any) => {
+      if (event.detail?.source === 'server') {
+        logger.info('History updated from server, refreshing UI with position preservation');
+        uiManager.updateHistoryDisplay({ preservePosition: true });
+      }
+    });
   }
 
   /**
@@ -298,6 +309,20 @@ class TgStyleApp {
     } catch (error) {
       logger.error('Error initializing UI', error);
       throw error;
+    }
+  }
+
+  /**
+   * Оптимистичная отрисовка UI из кэша
+   */
+  private optimisticUIRender(): void {
+    try {
+      // Мгновенно отрисовываем карусель, используя данные из localStorage,
+      // которые уже были загружены в конструкторе historyManager.
+      uiManager.updateHistoryDisplay();
+      logger.info('Optimistic UI render completed from cache.');
+    } catch (error) {
+      logger.warn('Failed to perform optimistic UI render', error);
     }
   }
 
@@ -330,14 +355,14 @@ class TgStyleApp {
   /**
    * Предзагрузка данных приложения (гардероб, капсулы, изображения)
    */
-  private async preloadAppData(): Promise<void> {
-    logger.info('Starting app data preload');
+  private preloadAppData(): void {
+    logger.info('Starting app data preload in background');
 
     // Батчинг endpoint /api/initial-data доступен, но параллельные запросы быстрее
-    await Promise.allSettled([
+    Promise.allSettled([
       historyManager.loadHistoryFromServer().catch(err => {
-        logger.error('Error loading history from server', err);
-      }),
+         logger.error('Error loading history from server', err);
+       }),
       dataCacheManager.preloadData().catch(err => {
         logger.error('Error during data preload', err);
       })

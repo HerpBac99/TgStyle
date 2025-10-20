@@ -24,6 +24,7 @@ import { authManager } from './auth';
 import { cameraManager } from './camera';
 import { historyManager } from './history';
 import { uiCoreManager } from './uiCore';
+import { analysisLikesService } from './analysis/AnalysisLikesService';
 import { uiAnalysisManager } from './uiAnalysis';
 
 // Объявляем глобальную переменную Telegram
@@ -303,58 +304,6 @@ export class UIMenuManager {
   }
 
   /**
-   * Обработчик клика по кнопке лайка на карусели
-   */
-  private async handleCarouselLikeClick(
-    historyItemId: number,
-    likeBtn: HTMLElement,
-    likesCountEl: HTMLElement
-  ): Promise<void> {
-    try {
-      logger.info('Carousel like button clicked', { historyItemId });
-      const isCurrentlyLiked = likeBtn.classList.contains('liked');
-      logger.info('Current like state', { historyItemId, isCurrentlyLiked });
-
-      const { api } = await import('./api');
-      const { authManager } = await import('./auth');
-
-      const initData = authManager.getInitData();
-      if (!initData) {
-        logger.warn('No initData available for carousel like action');
-        return;
-      }
-
-      let response;
-
-      if (isCurrentlyLiked) {
-        // Удаляем лайк
-        const endpoint = `/analysis-likes/${historyItemId}?initData=${encodeURIComponent(initData)}`;
-        response = await api.delete(endpoint) as any;
-      } else {
-        // Добавляем лайк
-        response = await api.post(`/analysis-likes/${historyItemId}`, { initData }) as any;
-      }
-
-      if (response?.success) {
-        // Обновляем UI
-        likesCountEl.textContent = String(response.likesCount || 0);
-
-        if (response.isLiked) {
-          likeBtn.classList.add('liked');
-        } else {
-          likeBtn.classList.remove('liked');
-        }
-
-        logger.info('Carousel like updated', { historyItemId, isLiked: response.isLiked });
-      } else {
-        logger.warn('Failed to update carousel like', response);
-      }
-    } catch (error) {
-      logger.error('Error handling carousel like click', error);
-    }
-  }
-
-  /**
    * Закрытие экрана анализа
    */
   private closePreview(): void {
@@ -382,180 +331,153 @@ export class UIMenuManager {
     logger.info('[CLOSE-PREVIEW] closePreview() COMPLETED');
   }
 
-  /**
-   * @description Обновление отображения истории
-   * вызываем метод createCarouselCards из uiMenuManager
-   * вызываем метод positionCarousel из uiMenuManager
-   * вызываем метод updateCarouselNavigation из uiMenuManager
-   * #UPDATE-HISTORY-DISPLAY #UI-MENU #UI-UPDATE-HISTORY-DISPLAY
-   */
-  updateHistoryDisplay(): void {
-    const filledItems = historyManager.getAllItems();
+    /**
+     * @description Обновление отображения истории
+     * @param {object} options - Опции обновления.
+     * @param {boolean} [options.preservePosition=false] - Сохранить ли текущую позицию карусели.
+     * #UPDATE-HISTORY-DISPLAY #UI-MENU #UI-UPDATE-HISTORY-DISPLAY
+     */
+    updateHistoryDisplay(options: { preservePosition?: boolean } = {}): void {
+      const { preservePosition = false } = options;
+      const filledItems = historyManager.getAllItems();
 
-    // Сервер возвращает в порядке desc (новые первые), а нам нужно asc (старые первые)
-    const sortedItems = [...filledItems].reverse();
+      // Сервер возвращает в порядке desc (новые первые), а нам нужно asc (старые первые)
+      const sortedItems = [...filledItems].reverse();
 
-    // Создаем карусель динамически
-    this.createCarouselCards(sortedItems);
+      // Создаем карусель динамически
+      this.createCarouselCards(sortedItems);
 
-    // Позиционируем карусель
-    this.positionCarousel();
+      // Позиционируем карусель
+      this.positionCarousel(preservePosition);
 
-    // Обновляем навигацию
-    this.updateCarouselNavigation();
-  }
-
-  /**
-   * Создание карт карусели динамически
-   * #uiMenu #MainMenu #Carousel #createCarouselCards #createCards #Card
-   */
-  private createCarouselCards(filledItems: HistoryItem[]): void {
-    const carousel = getElement(DOM_SELECTORS.HISTORY_CAROUSEL);
-    if (!carousel) return;
-
-    // Очищаем карусель
-    carousel.innerHTML = '';
-
-    // Всегда создаем минимум одну карту (пустую для новых фото)
-    const totalCards = Math.max(1, filledItems.length + 1);
-    this.carouselState.totalCards = totalCards;
-
-    // Создаем карты
-    for (let i = 0; i < totalCards; i++) {
-      const card = this.createCard(i, filledItems[i] || null);
-      carousel.appendChild(card);
+      // Обновляем навигацию
+      this.updateCarouselNavigation();
     }
 
-    // Обновляем ссылку на карты
-    this.elements.historyCells = getElements(DOM_SELECTORS.HISTORY_CARDS);
+    /**
+     * Создание карт карусели динамически
+     * #uiMenu #MainMenu #Carousel #createCarouselCards #createCards #Card
+     */
+    private createCarouselCards(filledItems: HistoryItem[]): void {
+      const carousel = getElement(DOM_SELECTORS.HISTORY_CAROUSEL);
+      if (!carousel) return;
 
-  }
+      // Очищаем карусель
+      carousel.innerHTML = '';
 
-  /**
-   * @description Метод создания одной карты
-   * #createCard #UI-MENU #UI-CREATE-CARD
-   */
-  private createCard(index: number, data: HistoryItem | null): HTMLElement {
-    const card = this.createCardElement(index);
-    const content = this.createCardContent();
+      // Всегда создаем минимум одну карту (пустую для новых фото)
+      const totalCards = Math.max(1, filledItems.length + 1);
+      this.carouselState.totalCards = totalCards;
 
-    if (data && data.id) {
-      // Все элементы в истории теперь заполнены (нет isEmpty)
-      this.setupFilledCard(card, content, data);
-    } else {
-      this.setupEmptyCard(card, content, index);
+      // Создаем карты
+      for (let i = 0; i < totalCards; i++) {
+        const card = this.createCard(i, filledItems[i] || null);
+        carousel.appendChild(card);
+      }
+
+      // Обновляем ссылку на карты
+      this.elements.historyCells = getElements(DOM_SELECTORS.HISTORY_CARDS);
+
     }
 
-    card.appendChild(content);
-    return card;
-  }
+    /**
+     * @description Метод создания одной карты
+     * #createCard #UI-MENU #UI-CREATE-CARD
+     */
+    private createCard(index: number, data: HistoryItem | null): HTMLElement {
+      const card = this.createCardElement(index);
+      const content = this.createCardContent();
 
-  /**
-   * @description Метод создания базового элемента карты
-   * #createCardElement #UI-MENU #UI-CREATE-CARD-ELEMENT
-   */
-  private createCardElement(index: number): HTMLElement {
-    return createElement('div', {
-      class: 'history-card',
-      'data-index': index.toString(),
-    });
-  }
+      if (data && data.id) {
+        // Все элементы в истории теперь заполнены (нет isEmpty)
+        this.setupFilledCard(card, content, data);
+      } else {
+        this.setupEmptyCard(card, content, index);
+      }
 
-  /**
-   * @description Метод создания контейнера контента карты
-   * #createCardContent #UI-MENU #UI-CREATE-CARD-CONTENT
-   */
-  private createCardContent(): HTMLElement {
-    return createElement('div', {
-      class: 'history-card-content',
-    });
-  }
+      card.appendChild(content);
+      return card;
+    }
 
-  /**
-   * Настраивает заполненную карту
-   */
-  private setupFilledCard(card: HTMLElement, content: HTMLElement, data: HistoryItem): void {
-    card.classList.add(CSS_CLASSES.FILLED);
-
-    // Устанавливаем фон - приоритет photoPath (URL), затем base64
-    if (data.photoPath) {
-      const backgroundUrl = `/uploads/analysis/${data.telegramId}/${data.photoPath}`;
-      card.style.backgroundImage = `url(${backgroundUrl})`;
-    } else {
-      logger.warn('DEBUG: photoPath is empty or null!', {
-        itemId: data.id,
-        allData: JSON.stringify(data).substring(0, 300)
+    /**
+     * @description Метод создания базового элемента карты
+     * #createCardElement #UI-MENU #UI-CREATE-CARD-ELEMENT
+     */
+    private createCardElement(index: number): HTMLElement {
+      return createElement('div', {
+        class: 'history-card',
+        'data-index': index.toString(),
       });
-    } 
-
-    const caption = createElement('div', {
-      class: 'history-card-caption',
-    });
-
-    // Добавляем дату
-    const dateElement = createElement('div', {
-      class: 'history-card-date',
-    }, formatHistoryDate(new Date(data.createdAt).toISOString()));
-    caption.appendChild(dateElement);
-
-    // Добавляем кнопку лайка в caption
-    const likesContainer = createElement('div', {
-      class: 'carousel-likes-container',
-    });
-
-    const likeBtn = createElement('button', {
-      class: 'carousel-like-btn',
-      'aria-label': 'Поставить лайк',
-    });
-    likeBtn.innerHTML = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-      </svg>
-    `;
-
-    const likesCount = createElement('span', {
-      class: 'carousel-likes-count',
-    }, String(data.likesCount || 0));
-
-    likesContainer.appendChild(likeBtn);
-    likesContainer.appendChild(likesCount);
-    caption.appendChild(likesContainer);
-
-    content.appendChild(caption);
-
-    // OPTIMIZED: Используем isLiked из HistoryItem (уже пришла с сервера, без доп запросов!)
-    if (data.id) {
-      const historyItemId: number = data.id;
-
-      if (data.isLiked) {
-        likeBtn.classList.add('liked');
-      }
-
-      // Обработчик клика на кнопку лайка
-      const likeClickHandler = async (e: Event) => {
-        logger.info('Like button event fired', { historyItemId });
-        e.stopPropagation(); // Запрещаем открытие подробной истории
-        e.preventDefault();
-        await this.handleCarouselLikeClick(historyItemId, likeBtn, likesCount);
-      };
-      likeBtn.addEventListener('click', likeClickHandler);
     }
 
-    // Находим реальный индекс элемента в общем массиве истории
-    const realIndex = this.findRealHistoryIndex(data);
+    /**
+     * @description Метод создания контейнера контента карты
+     * #createCardContent #UI-MENU #UI-CREATE-CARD-CONTENT
+     */
+    private createCardContent(): HTMLElement {
+      return createElement('div', {
+        class: 'history-card-content',
+      });
+    }
 
-    // Обработчики
-    this.addLongPressHandlers(card, realIndex);
-    
-    // Обработчик клика на карточку - НО не на лайк!
-    card.addEventListener('click', (e: Event) => {
-      const target = e.target as HTMLElement;
-      // Проверяем что клик НЕ на кнопку лайка или её содержимое
-      if (!target.closest('.carousel-like-btn')) {
-        this.showSavedAnalysis(data);
+    /**
+     * Настраивает заполненную карту
+     */
+    private setupFilledCard(card: HTMLElement, content: HTMLElement, data: HistoryItem): void {
+      card.classList.add(CSS_CLASSES.FILLED);
+
+      // Устанавливаем фон - приоритет photoPath (URL), затем base64
+      if (data.photoPath) {
+        const backgroundUrl = `/uploads/analysis/${data.telegramId}/${data.photoPath}`;
+        card.style.backgroundImage = `url(${backgroundUrl})`;
+      } else {
+        logger.warn('DEBUG: photoPath is empty or null!', {
+          itemId: data.id,
+          allData: JSON.stringify(data).substring(0, 300)
+        });
+      } 
+
+      const caption = createElement('div', {
+        class: 'history-card-caption',
+      });
+
+      // Добавляем дату
+      const dateElement = createElement('div', {
+        class: 'history-card-date',
+      }, formatHistoryDate(new Date(data.createdAt).toISOString()));
+      caption.appendChild(dateElement);
+
+      content.appendChild(caption);
+
+      // Используем единый сервис для создания компонента лайков
+      // #REFACTOR #UNIFIED-LIKES-SERVICE
+      if (data.id) {
+        analysisLikesService.createLikeComponent(
+          caption,
+          data.id,
+          {
+            isLiked: !!data.isLiked,
+            likesCount: data.likesCount || 0
+          },
+          'carousel' // Добавляем класс для карусели
+        );
       }
-    });
-  }
+
+      // Находим реальный индекс элемента в общем массиве истории
+      const realIndex = this.findRealHistoryIndex(data);
+
+      // Обработчики
+      this.addLongPressHandlers(card, realIndex);
+
+      // Обработчик клика на карточку - НО не на лайк!
+      card.addEventListener('click', (e: Event) => {
+        const target = e.target as HTMLElement;
+        // Проверяем что клик НЕ на кнопку лайка или её содержимое
+        if (!target.closest('.like-container')) {
+          this.showSavedAnalysis(data);
+        }
+      });
+    }
 
   /**
    * Настраивает пустую карту
@@ -601,21 +523,66 @@ export class UIMenuManager {
   }
 
   /**
+   * Обновление отображения одной карты в карусели по ID элемента истории
+   * #UI-MENU #UPDATE-CARD-DISPLAY
+   */
+  public updateCardDisplay(historyItemId: number): void {
+    logger.info('Updating single card display', { historyItemId });
+
+    const historyItem = historyManager.getItemById(historyItemId);
+    if (!historyItem) {
+      logger.warn('History item not found for update', { historyItemId });
+      return;
+    }
+
+    // Находим индекс элемента в текущем отсортированном массиве истории
+    const sortedItems = [...historyManager.getAllItems()].reverse();
+    const indexInSorted = sortedItems.findIndex(item => item.id === historyItemId);
+
+    if (indexInSorted === -1) {
+      logger.warn('Card not found in sorted history for update', { historyItemId });
+      return;
+    }
+
+    // Находим DOM-элемент карты по его data-index
+    const cardElement = getElement(`.history-card[data-index="${indexInSorted}"]`);
+
+    if (cardElement) {
+      // Очищаем текущее содержимое карты
+      cardElement.innerHTML = '';
+      const content = this.createCardContent();
+      this.setupFilledCard(cardElement, content, historyItem);
+      cardElement.appendChild(content);
+      logger.info('Card display updated successfully', { historyItemId, indexInSorted });
+    } else {
+      logger.warn('DOM card element not found for update', { historyItemId, indexInSorted });
+    }
+  }
+
+  /**
    * Позиционирование карусели для отображения центральной карты
    */
-  private positionCarousel(): void {
+  private positionCarousel(preservePosition: boolean = false): void {
     const carousel = getElement(DOM_SELECTORS.HISTORY_CAROUSEL);
     if (!carousel) return;
 
-    // Для первого запуска показываем пустую карту по центру
-    const filledCount = historyManager.getFilledCount();
+    // Сбрасываем позицию только если это не фоновое обновление
+    if (!preservePosition) {
+      // Для первого запуска показываем пустую карту по центру
+      const filledCount = historyManager.getFilledCount();
 
-    if (filledCount === 0) {
-      // Первый запуск - пустая карта в центре
-      this.carouselState.currentCenterIndex = 0;
-    } else {
-      // Показываем самую новую (правую) карту, но центральная остается пустой
-      this.carouselState.currentCenterIndex = Math.min(filledCount, this.carouselState.totalCards - 1);
+      if (filledCount === 0) {
+        // Первый запуск - пустая карта в центре
+        this.carouselState.currentCenterIndex = 0;
+      } else {
+        // Показываем самую новую (правую) карту, но центральная остается пустой
+        this.carouselState.currentCenterIndex = Math.min(filledCount, this.carouselState.totalCards - 1);
+      }
+
+      logger.info('Carousel position updated', { currentCenterIndex: this.carouselState.currentCenterIndex });
+    }
+    else {
+      logger.info('Carousel position preserved', { currentCenterIndex: this.carouselState.currentCenterIndex });
     }
 
     // Рассчитываем трансформацию для новых размеров карт

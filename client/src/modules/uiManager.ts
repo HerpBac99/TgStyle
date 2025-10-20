@@ -25,14 +25,14 @@ declare global {
  */
 export class UIManager {
   constructor() {
-    this.initializeAll();
+    // Инициализация перемещена в init() для избежания дублирования при импорте
   }
 
   /**
-   * Инициализация всех UI модулей
+   * Основная инициализация всех UI модулей
+   * Вызывается один раз из main.ts после загрузки страницы
    */
   private initializeAll(): void {
-
     try {
       // Инициализируем все модули
       uiMenuManager.init();
@@ -43,8 +43,8 @@ export class UIManager {
       // Настраиваем обработчики закладок
       this.setupTabsListeners();
 
-      // Настраиваем глобальные обработчики событий
-      this.setupGlobalEventListeners();
+      // Настраиваем глобальные обработчики событий (только события, не инициализация)
+      this.setupUIEventListeners();
 
     } catch (error) {
       logger.error('Failed to initialize UI modules', error);
@@ -53,16 +53,16 @@ export class UIManager {
   }
 
   /**
-   * Настройка глобальных обработчиков событий
+   * Настройка обработчиков событий (не инициализация модулей)
+   * ВАЖНО: slushatel для 'history:updated' находится в main.ts для избежания дублирования
    */
-  private setupGlobalEventListeners(): void {
+  private setupUIEventListeners(): void {
     // Обработчик изменения состояния анализа
     window.addEventListener('analysisStateChange', this.handleAnalysisStateChange.bind(this) as EventListener);
     window.addEventListener('photo:captured', this.handlePhotoCaptured.bind(this) as EventListener);
 
     // Обработчик видимости страницы (для очистки состояния при сворачивании)
     document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
-
   }
 
   /**
@@ -217,8 +217,8 @@ export class UIManager {
    * вызываем метод updateHistoryDisplay из uiMenuManager
    * #UPDATE-HISTORY-DISPLAY #UI-MANAGER #UI-UPDATE-HISTORY-DISPLAY
    */
-  updateHistoryDisplay(): void {
-    uiMenuManager.updateHistoryDisplay();
+  updateHistoryDisplay(options: { preservePosition?: boolean } = {}): void {
+    uiMenuManager.updateHistoryDisplay(options);
   }
 
 
@@ -250,8 +250,8 @@ export class UIManager {
    * #INIT #UI-MANAGER #UI-INIT
    */
   init(): void {
-    // Обновляем отображение истории
-    this.updateHistoryDisplay();
+    // Инициализируем все модули и устанавливаем обработчики событий
+    this.initializeAll();
   }
 
   /**

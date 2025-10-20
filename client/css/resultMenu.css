@@ -471,140 +471,36 @@
 
 /* Кнопки действий */
 .result-actions {
-    padding: 8px 12px;
+    padding: 8px 8px;
     border: none;
     background: var(--neumorph-bg);
     box-shadow: inset 4px 4px 8px rgba(199, 203, 209, 0.2), inset -4px -4px 8px rgba(255, 255, 255, 0.4);
     display: flex;
-    gap: 12px;
+    gap: 8px;
     border-radius: 0 0 20px 20px;
-}
-
-/* Базовые стили для кнопок действий - НЕОМОРФНЫЙ СТИЛЬ */
-.action-btn {
-    /* НЕОМОРФНЫЙ ФОН */
-    background: var(--neumorph-bg);
-    border: none;
-
-    /* НЕОМОРФНЫЕ ТЕНИ */
-    box-shadow: 12px 12px 20px #c7cbd1, -12px -12px 20px #ffffff;
-
-    /* РАЗМЕТКА */
-    padding: 14px 20px;
-    border-radius: 16px;
-    font-size: 16px;
-    font-weight: 500;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    outline: none;
-
-    /* СОВРЕМЕННЫЕ АНИМАЦИИ */
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Убираем hover/focus/active для touch интерфейса */
-.action-btn:focus,
-.action-btn:active {
-    outline: none;
-    -webkit-tap-highlight-color: transparent;
-}
-
-/* Кнопка лайк */
-.like-btn {
-    background: transparent !important;
-    cursor: pointer;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    outline: none !important;
-    box-shadow: none !important;
-    -webkit-tap-highlight-color: transparent !important;
-    border: none !important;
-}
-
-/* Убираем все ненужные состояния для touch интерфейса */
-.like-btn:focus,
-.like-btn:focus-visible,
-.like-btn:active {
-    outline: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    -webkit-tap-highlight-color: transparent !important;
-}
-
-/* Анимация bounce как в Instagram */
-@keyframes likeHeartBounce {
-    0% {
-        transform: scale(1);
-    }
-    25% {
-        transform: scale(0.2);
-    }
-    50% {
-        transform: scale(1.2);
-    }
-    100% {
-        transform: scale(1);
-    }
-}
-
-/* SVG сердечка - базовые стили */
-.like-btn svg {
-    width: 24px;
-    height: 24px;
-    display: block;
-    will-change: transform;
-    transform: translateZ(0);
-}
-
-/* Дефолтное состояние - черное сердечко с обводкой */
-.like-btn svg path {
-    fill: none;
-    stroke: #2c2c2c;
-    stroke-width: 2;
-    transition: fill 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), stroke 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* Состояние лайка - алое заполненное сердечко как в Instagram */
-.like-btn.liked svg path {
-    fill: #ed4956;
-    stroke: #ed4956;
-    stroke-width: 2;
-}
-
-/* Анимация при добавлении like - только на кнопку */
-.like-btn.liked svg {
-    animation: likeHeartBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-/* SVG стили теперь управляются JS - полная замена элементов */
-
-/* Контейнер лайков (кнопка + счетчик) */
-.like-container {
-    flex: 1;
-    flex-basis: 0;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 12px;
     border: 1px solid red;
 }
 
-/* Счетчик лайков */
-.likes-count {
-    color: #2c2c2c;
+/* =======================================
+   СПЕЦИФИЧНЫЕ СТИЛИ ЛАЙКОВ (РЕЗУЛЬТАТЫ)
+   ======================================= */
+
+/* Контейнер лайков на экране результатов */
+.result-like-container {
+    flex: 1;
+    flex-basis: 0;
+    min-width: 0;
+}
+
+/* SVG сердечка в кнопке лайка на экране результатов */
+.result-like-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Счетчик лайков на экране результатов */
+.result-like-count {
     font-size: 16px;
-    font-weight: 500;
-    min-width: 20px;
-    text-align: left;
-    opacity: 0.9;
-    transition: color 0.2s ease;
 }
 
 /* Кнопка поделиться */
@@ -686,6 +582,14 @@ a.recommendation-link:active,
     border-left: 3px solid #ff6b6b;
 }
 
+.share-btn svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+    will-change: transform;
+    transform: translateZ(0);
+}
+
 .share-btn svg path {
     fill: #2c2c2c;
     stroke-width: 2;
@@ -711,6 +615,14 @@ a.recommendation-link:active,
     outline: none !important;
     -webkit-tap-highlight-color: transparent !important;
     border: 1px solid green;
+}
+
+.close-btn svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+    will-change: transform;
+    transform: translateZ(0);
 }
 
 .close-btn svg path {

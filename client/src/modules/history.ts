@@ -336,6 +336,33 @@ class HistoryManager {
   }
 
   /**
+   * Обновление статуса лайка для элемента истории и сохранение в localStorage
+   * #HISTORY #HISTORY-UPDATE-LIKE
+   */
+  updateItemLikeStatus(itemId: number, likeStatus: { isLiked: boolean; likesCount: number }): void {
+    try {
+      const item = this.getItemById(itemId);
+      if (item) {
+        item.isLiked = likeStatus.isLiked;
+        item.likesCount = likeStatus.likesCount;
+        
+        logger.info('Updated like status in memory and saving to storage', {
+          itemId,
+          isLiked: item.isLiked,
+          likesCount: item.likesCount
+        });
+
+        // Сохраняем все изменения в localStorage
+        this.saveToStorage();
+      } else {
+        logger.warn('Attempted to update like status for a non-existent history item', { itemId });
+      }
+    } catch (error) {
+      logger.error('Error updating like status', { itemId, error });
+    }
+  }
+
+  /**
    * Получение только заполненных элементов (в данном случае = все элементы)
    * #HISTORY #HISTORY-GET-FILLED
    */
