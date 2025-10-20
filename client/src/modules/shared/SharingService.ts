@@ -6,11 +6,80 @@
 import { logger } from '../logger';
 import { ShareConfig, ShareOptions, ShareResult } from '@/types/sharing';
 import { APP_CONFIG } from '@/utils/constants';
+import { createElement } from '@/utils/helpers';
 
 /**
  * Универсальный сервис для sharing
  */
 export class SharingService {
+  /**
+   * Создает и управляет кнопкой sharing.
+   * @param parentElement - DOM-элемент, куда будет встроена кнопка.
+   * @param shareConfig - Конфигурация для sharing.
+   * @param componentClass - Класс для специфичных стилей (напр. 'carousel' или 'result').
+   */
+  public createShareButton(
+    parentElement: HTMLElement,
+    shareConfig: ShareConfig,
+    componentClass: string = ''
+  ): void {
+    const container = createElement('div', { class: `share-container` });
+    const shareBtnClass = componentClass ? `share-btn ${componentClass}-share-btn` : 'share-btn';
+    const shareBtn = createElement('button', { class: shareBtnClass, 'aria-label': 'Поделиться анализом' });
+    
+    shareBtn.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 90 90">
+        <path d="M 31.121 43.543 c -0.852 0 -1.689 -0.362 -2.275 -1.042 L 0.727 9.836 C -0.051 8.934 -0.22 7.656 0.295 6.581 c 0.516 -1.074 1.607 -1.748 2.81 -1.7 l 84 2.952 c 1.356 0.047 2.513 1 2.817 2.324 c 0.306 1.323 -0.315 2.686 -1.515 3.323 l -55.88 29.712 C 32.083 43.429 31.6 43.543 31.121 43.543 z M 9.747 11.118 l 22.082 25.65 L 75.71 13.436 L 9.747 11.118 z"/>
+        <path d="M 42.475 85.121 c -0.145 0 -0.291 -0.011 -0.437 -0.032 c -1.179 -0.173 -2.144 -1.027 -2.458 -2.178 L 28.226 41.333 c -0.37 -1.353 0.248 -2.781 1.486 -3.439 l 55.88 -29.712 c 1.196 -0.637 2.676 -0.39 3.602 0.603 c 0.927 0.993 1.07 2.484 0.352 3.636 L 45.019 83.71 C 44.466 84.596 43.5 85.121 42.475 85.121 z M 34.646 42.066 l 8.917 32.651 l 34.965 -55.983 L 34.646 42.066 z"/>
+      </svg>
+    `;
+
+    container.appendChild(shareBtn);
+
+    // Добавление в DOM ПОСЛЕ like-контейнера
+    const likeContainer = parentElement.querySelector('.like-container');
+    if (likeContainer && likeContainer.nextSibling) {
+      // Если есть элемент после like-контейнера, вставляем перед ним
+      parentElement.insertBefore(container, likeContainer.nextSibling);
+    } else if (likeContainer) {
+      // Если like-контейнер последний, добавляем после него
+      likeContainer.after(container);
+    } else {
+      // Если like-контейнера нет, добавляем в конец
+      parentElement.appendChild(container);
+    }
+
+    // Обработчик клика
+    shareBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      try {
+        logger.info('Share button clicked', { componentClass });
+        
+        // Выполняем sharing с дефолтными опциями
+        const result = await this.share(shareConfig, {
+          includeImage: true,
+          includeLink: true,
+          saveToServer: true
+        });
+
+        if (result.success) {
+          logger.info('Sharing completed successfully', { method: result.method });
+          // Добавляем визуальную обратную связь (например, изменение иконки)
+          shareBtn.classList.add('shared');
+          setTimeout(() => {
+            shareBtn.classList.remove('shared');
+          }, 2000);
+        } else {
+          logger.warn('Sharing failed', { error: result.error });
+        }
+      } catch (error) {
+        logger.error('Error in share button click handler', error);
+      }
+    });
+  }
+
   /**
    * Главный метод - поделиться контентом
    */

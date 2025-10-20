@@ -875,6 +875,68 @@ button:active {
 
 
 /* =======================================
+   БАЗОВЫЕ СТИЛИ КНОПКИ SHARE (ОБЩИЕ)
+   ======================================= */
+
+/* Общий контейнер share */
+.share-container {
+    flex: 1;
+    flex-basis: 0;
+    min-width: 0;
+    background: transparent !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 5px;
+}
+
+/* Общая кнопка share */
+.share-btn {
+    background: transparent !important;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    border: none !important;
+}
+
+.share-btn:focus,
+.share-btn:focus-visible,
+.share-btn:active {
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+.share-btn svg {
+    display: block;
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+.share-btn svg path {
+    fill: #2c2c2c;
+    transition: fill 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.share-btn.shared svg {
+    animation: shareScale 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes shareScale {
+    0% { transform: scale(1); }
+    25% { transform: scale(0.8); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+/* =======================================
    СПЕЦИФИЧНЫЕ СТИЛИ ЛАЙКОВ (КАРУСЕЛЬ)
    ======================================= */
 
@@ -888,6 +950,16 @@ button:active {
 .carousel-like-count {
     font-size: 12px;
     min-width: 16px;
+}
+
+/* =======================================
+   СПЕЦИФИЧНЫЕ СТИЛИ SHARE (КАРУСЕЛЬ)
+   ======================================= */
+
+/* SVG иконки share в кнопке карусели */
+.carousel-share-btn svg {
+    width: 12px;
+    height: 12px;
 }
 
 /* =======================================

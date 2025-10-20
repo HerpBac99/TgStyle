@@ -478,7 +478,6 @@
     display: flex;
     gap: 8px;
     border-radius: 0 0 20px 20px;
-    border: 1px solid red;
 }
 
 /* =======================================
@@ -490,6 +489,10 @@
     flex: 1;
     flex-basis: 0;
     min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
 /* SVG сердечка в кнопке лайка на экране результатов */
@@ -503,23 +506,25 @@
     font-size: 16px;
 }
 
-/* Кнопка поделиться */
-.share-btn {
+/* =======================================
+   СПЕЦИФИЧНЫЕ СТИЛИ SHARE (РЕЗУЛЬТАТЫ)
+   ======================================= */
+
+/* Контейнер share на экране результатов */
+.result-share-container {
     flex: 1;
     flex-basis: 0;
     min-width: 0;
-    padding: 12px;
-    background: transparent !important;
-    color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    outline: none !important;
-    -webkit-tap-highlight-color: transparent !important;
-    border: 1px solid blue;
+    gap: 8px;
+}
+
+/* SVG иконки share в кнопке результатов */
+.result-share-btn svg {
+    width: 20px;
+    height: 20px;
 }
 
 /* Ссылки на Lamoda в тексте анализа */
@@ -614,7 +619,6 @@ a.recommendation-link:active,
     border-radius: 0 !important;
     outline: none !important;
     -webkit-tap-highlight-color: transparent !important;
-    border: 1px solid green;
 }
 
 .close-btn svg {

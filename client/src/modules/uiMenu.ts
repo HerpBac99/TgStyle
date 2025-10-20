@@ -25,6 +25,7 @@ import { cameraManager } from './camera';
 import { historyManager } from './history';
 import { uiCoreManager } from './uiCore';
 import { analysisLikesService } from './analysis/AnalysisLikesService';
+import { sharingService } from './shared/SharingService';
 import { uiAnalysisManager } from './uiAnalysis';
 
 // Объявляем глобальную переменную Telegram
@@ -442,11 +443,12 @@ export class UIMenuManager {
       });
 
       // Добавляем дату
+      /*
       const dateElement = createElement('div', {
         class: 'history-card-date',
       }, formatHistoryDate(new Date(data.createdAt).toISOString()));
       caption.appendChild(dateElement);
-
+      */
       content.appendChild(caption);
 
       // Используем единый сервис для создания компонента лайков
@@ -461,6 +463,21 @@ export class UIMenuManager {
           },
           'carousel' // Добавляем класс для карусели
         );
+
+        // Создаем кнопку share в карусели
+        sharingService.createShareButton(
+          caption,
+          {
+            type: 'analysis',
+            image: data.photoPath ? `/uploads/analysis/${data.telegramId}/${data.photoPath}` : '',
+            text: data.analysisText || data.technicalAnalysis || 'Анализ стиля',
+            title: '🤖 AI Анализ стиля',
+            metadata: {
+              historyItemId: data.id
+            }
+          },
+          'carousel' // Добавляем класс для карусели
+        );
       }
 
       // Находим реальный индекс элемента в общем массиве истории
@@ -469,11 +486,11 @@ export class UIMenuManager {
       // Обработчики
       this.addLongPressHandlers(card, realIndex);
 
-      // Обработчик клика на карточку - НО не на лайк!
+      // Обработчик клика на карточку - НО не на лайк или share!
       card.addEventListener('click', (e: Event) => {
         const target = e.target as HTMLElement;
-        // Проверяем что клик НЕ на кнопку лайка или её содержимое
-        if (!target.closest('.like-container')) {
+        // Проверяем что клик НЕ на кнопку лайка, share или их содержимое
+        if (!target.closest('.like-container') && !target.closest('.share-container')) {
           this.showSavedAnalysis(data);
         }
       });

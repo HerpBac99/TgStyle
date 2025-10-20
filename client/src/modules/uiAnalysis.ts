@@ -20,7 +20,6 @@ import { authManager } from './auth';
 import { purchaseRecommendationManager } from './purchaseRecommendation';
 import { cameraManager } from './camera';
 import { sharingService } from './shared/SharingService';
-import type { ShareConfig } from '@/types/sharing';
 import { analysisLikesService } from './analysis/AnalysisLikesService';
 import { historyManager } from './history';
 import { uiMenuManager } from './uiMenu';
@@ -437,22 +436,43 @@ export class UIAnalysisManager {
     // Настраиваем обработчики кнопок
     this.setupResultButtons();
 
-    // Интегрируем новый компонент лайков
+    // Интегрируем новые компоненты лайков и sharing
     if (historyItemId) {
       const resultActions = getElement('.result-actions');
       if (resultActions) {
-        // Удаляем старый компонент лайка для экрана результата, если он существует, чтобы избежать дублирования
+        // Удаляем старые компоненты для экрана результата, если они существуют, чтобы избежать дублирования
         const existingResultLikeComponent = resultActions.querySelector('.result-like-btn');
         if (existingResultLikeComponent) {
-          existingResultLikeComponent.remove();
+          existingResultLikeComponent.parentElement?.remove();
+        }
+
+        const existingResultShareComponent = resultActions.querySelector('.result-share-btn');
+        if (existingResultShareComponent) {
+          existingResultShareComponent.parentElement?.remove();
         }
 
         const historyItem = historyManager.getItemById(historyItemId);
         if (historyItem) {
+          // Создаем компонент лайков
           analysisLikesService.createLikeComponent(
             resultActions,
             historyItemId,
             { isLiked: !!historyItem.isLiked, likesCount: historyItem.likesCount || 0 },
+            'result' // Добавляем класс для экрана результата
+          );
+
+          // Создаем кнопку share в результатах
+          sharingService.createShareButton(
+            resultActions,
+            {
+              type: 'analysis',
+              image: this.currentAnalysisData.imageSrc || '',
+              text: this.currentAnalysisData.analysisText || '',
+              title: '🤖 AI Анализ стиля',
+              metadata: {
+                historyItemId: historyItemId
+              }
+            },
             'result' // Добавляем класс для экрана результата
           );
         }
@@ -639,19 +659,9 @@ export class UIAnalysisManager {
 
   /**
    * Настройка обработчиков кнопок в результате анализа
-   * FIXED: Удаляем старые обработчики перед привязкой новых чтобы избежать дублирования
+   * Share-кнопка теперь создается через sharingService.createShareButton()
    */
   private setupResultButtons(): void {
-    // Кнопка поделиться
-    const shareBtn = getElement('#share-btn');
-    if (shareBtn) {
-      const clonedShareBtn = shareBtn.cloneNode(true) as HTMLElement;
-      shareBtn.replaceWith(clonedShareBtn);
-      clonedShareBtn.addEventListener('click', () => {
-        this.handleShareClick();
-      });
-    }
-
     // Кнопка закрыть
     const closeBtn = getElement('#close-analysis-btn');
     if (closeBtn) {
@@ -672,85 +682,6 @@ export class UIAnalysisManager {
         this.handleRecommendationClick();
       });
     }
-  }
-
-  /**
-   * Поделиться результатом анализа
-   */
-  private async shareAnalysisImage(): Promise<void> {
-    try {
-      if (!this.currentAnalysisData.imageSrc || !this.currentAnalysisData.analysisText) {
-        logger.warn('No analysis data available for sharing');
-        return;
-      }
-
-      // 1. Используем оригинальное фото без обработки (как с капсулой!)
-      // Текст пойдет в description, изображение в оригинальном качестве
-      
-      // 2. Конфигурация для sharing
-      const shareConfig: ShareConfig = {
-        type: 'analysis',
-        image: this.currentAnalysisData.imageSrc,  // Оригинальное фото!
-        text: this.currentAnalysisData.analysisText,  // Текст отдельно
-        title: '🤖 AI Анализ стиля',
-        metadata: {
-          historyItemId: this.currentAnalysisData.historyItemId  // Для лайков
-        }
-      };
-
-      // 3. Делимся через универсальный SharingService
-      const result = await sharingService.share(shareConfig, {
-        includeImage: true,
-        includeLink: true,
-        saveToServer: true
-      });
-
-      if (result.success) {
-        logger.info('Analysis shared successfully', { method: result.method });
-      } else {
-        logger.error('Failed to share analysis', { error: result.error });
-      }
-
-    } catch (error) {
-      logger.error('Share analysis error', error);
-    }
-  }
-
-  /**
-   * Обработчик клика по кнопке поделиться
-   */
-  private handleShareClick(): void {
-    logger.info('Share button clicked');
-
-    const shareBtn = getElement('#share-btn');
-    if (shareBtn) {
-      // Переключаем состояние поделиться
-      const isShared = shareBtn.classList.contains('shared');
-
-      if (isShared) {
-        // Убираем состояние "поделился"
-        shareBtn.classList.remove('shared');
-        logger.info('Share state removed');
-      } else {
-        // Добавляем состояние "поделился"
-        shareBtn.classList.add('shared');
-        logger.info('Share state added');
-
-        // Выполняем действие поделиться - отправляем фотографию разбора
-        this.shareAnalysisImage().catch((error) => {
-          logger.warn('Failed to share analysis image', error);
-        });
-
-        // Анимация нажатия
-        shareBtn.style.transform = 'scale(0.8)';
-        setTimeout(() => {
-          shareBtn.style.transform = 'scale(1)';
-        }, 150);
-      }
-    }
-
-    // Тактильная обратная связь
-    authManager.vibrate('light');
   }
 
   /**
