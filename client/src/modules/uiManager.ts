@@ -10,6 +10,7 @@ import { uiAnalysisManager } from './uiAnalysis';
 import { uiCoreManager } from './uiCore';
 import { wardrobeManager as uiWardrobeManager } from './wardrobe/WardrobeManager';
 import { capsulesManager as uiCapsulesManager } from './capsules/CapsulesManager';
+import { publicFeedManager } from './publicFeed/PublicFeedManager';
 
 // Объявляем глобальную переменную Telegram
 declare global {
@@ -111,6 +112,7 @@ export class UIManager {
     const mainContent = document.querySelector('.main-content') as HTMLElement;
     const wardrobeContent = document.querySelector('.wardrobe-content') as HTMLElement;
     const capsulesContent = document.querySelector('.capsules-content') as HTMLElement;
+    const feedContent = document.getElementById('feed-content') as HTMLElement;
     const clothesContainerMain = document.getElementById('wardrobe-clothes-container') as HTMLElement;
 
 
@@ -123,8 +125,27 @@ export class UIManager {
         if (clothesContainerMain) clothesContainerMain.classList.add('hidden');
         // Скрываем экран капсул
         if (capsulesContent) capsulesContent.classList.add('hidden');
+        // Скрываем ленту
+        if (feedContent) feedContent.classList.add('hidden');
 
         uiMenuManager.updateHistoryDisplay();
+        break;
+
+      case 'feed':
+        // Скрываем главный экран с анализом
+        if (mainContent) mainContent.classList.add('hidden');
+        // Скрываем экран гардероба
+        if (wardrobeContent) wardrobeContent.classList.add('hidden');
+        if (clothesContainerMain) clothesContainerMain.classList.add('hidden');
+        // Скрываем экран капсул
+        if (capsulesContent) capsulesContent.classList.add('hidden');
+        // Показываем ленту
+        if (feedContent) feedContent.classList.remove('hidden');
+
+        // Обрабатываем открытие ленты через специализированный менеджер
+        publicFeedManager.open().catch((error: unknown) => {
+          logger.error('Error handling feed open', error);
+        });
         break;
 
       case 'wardrobe':
@@ -135,6 +156,8 @@ export class UIManager {
         if (clothesContainerMain) clothesContainerMain.classList.remove('hidden');
         // Скрываем экран капсул
         if (capsulesContent) capsulesContent.classList.add('hidden');
+        // Скрываем ленту
+        if (feedContent) feedContent.classList.add('hidden');
 
         // Обрабатываем открытие гардероба через специализированный менеджер
         uiWardrobeManager.handleWardrobeOpen().catch((error: unknown) => {
@@ -150,6 +173,8 @@ export class UIManager {
         if (clothesContainerMain) clothesContainerMain.classList.add('hidden');
         // Показываем экран капсул
         if (capsulesContent) capsulesContent.classList.remove('hidden');
+        // Скрываем ленту
+        if (feedContent) feedContent.classList.add('hidden');
 
         // Обрабатываем открытие капсул через специализированный менеджер
         uiCapsulesManager.handleCapsulesOpen().catch((error: unknown) => {

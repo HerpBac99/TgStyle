@@ -631,15 +631,33 @@ async function deleteCapsule(req, res) {
  */
 async function getPublicCapsules(req, res) {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 20 } = req.query;
+    const initData = getInitData(req) || '';
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
 
+    // Получаем текущего пользователя для проверки лайков и исключения его капсул
+    let currentUser = null;
+    let currentUserTelegramId = null;
+    if (initData) {
+      const validation = validateTelegramWebAppData(initData);
+      if (validation.isValid) {
+        const telegramId = BigInt(validation.data.user.id);
+        currentUserTelegramId = telegramId;
+        currentUser = await prisma.user.findUnique({
+          where: { telegramId }
+        });
+      }
+    }
+
+    // Загружаем капсулы всех пользователей, КРОМЕ текущего
     const capsules = await prisma.capsule.findMany({
-      where: {
-        isPublic: true
-      },
+      where: currentUserTelegramId ? {
+        telegramId: {
+          not: currentUserTelegramId
+        }
+      } : undefined,
       include: {
         items: {
           select: {
@@ -657,20 +675,41 @@ async function getPublicCapsules(req, res) {
             firstName: true,
             lastName: true,
             username: true,
-            avatarUrl: true
+            avatarUrl: true,
+            telegramId: true
           }
         }
       },
-      orderBy: {
-        createdAt: 'desc'
-      },
+      orderBy: [
+        { likesCount: 'desc' },  // Сначала по популярности
+        { createdAt: 'desc' }     // Потом по новизне
+      ],
       skip,
       take
     });
 
     const total = await prisma.capsule.count({
-      where: { isPublic: true }
+      where: currentUserTelegramId ? {
+        telegramId: {
+          not: currentUserTelegramId
+        }
+      } : undefined
     });
+
+    // Получаем лайки текущего пользователя если он авторизован
+    let userLikes = [];
+    if (currentUser) {
+      userLikes = await prisma.capsuleLike.findMany({
+        where: {
+          userId: currentUser.id,
+          capsuleId: {
+            in: capsules.map(c => c.id)
+          }
+        }
+      });
+    }
+
+    const likedCapsuleIds = new Set(userLikes.map(like => like.capsuleId));
 
     res.json({
       success: true,
@@ -678,22 +717,32 @@ async function getPublicCapsules(req, res) {
         id: capsule.id,
         name: capsule.name,
         description: capsule.description,
+        thumbnailUrl: capsule.thumbnailPath ?
+          `/uploads/capsules/${capsule.user.telegramId}/${capsule.thumbnailPath}` : null,
         canvasData: capsule.canvasData,
         analysis: capsule.analysis,
         createdAt: capsule.createdAt,
+        likesCount: capsule.likesCount || 0,
+        isLiked: likedCapsuleIds.has(capsule.id),
         itemCount: capsule.items.length,
-        author: capsule.user
+        items: capsule.items,
+        author: {
+          firstName: capsule.user.firstName,
+          lastName: capsule.user.lastName,
+          username: capsule.user.username
+        }
       })),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / parseInt(limit))
+        pages: Math.ceil(total / parseInt(limit)),
+        hasMore: skip + take < total
       }
     });
 
   } catch (error) {
-    console.error('Error getting public capsules:', error);
+    logger.error('Error getting public capsules', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -716,6 +765,12 @@ router.post('/', createCapsule);
 router.get('/', getUserCapsules);
 
 /**
+ * GET /api/capsules/public
+ * Получить публичные капсулы (ДОЛЖЕН БЫТЬ ПЕРЕД /:id)
+ */
+router.get('/public', getPublicCapsules);
+
+/**
  * GET /api/capsules/:id
  * Получить капсулу по ID
  */
@@ -732,11 +787,5 @@ router.put('/:id', updateCapsule);
  * Удалить капсулу
  */
 router.delete('/:id', deleteCapsule);
-
-/**
- * GET /api/capsules/public
- * Получить публичные капсулы
- */
-router.get('/public', getPublicCapsules);
 
 module.exports = router;

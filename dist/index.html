@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TgStyle</title>
+    <title>TgStyle</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -11,8 +11,8 @@
     <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
     <script src="https://unpkg.com/fabric@6.7.1/dist/fabric.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" crossorigin src="/assets/main-CVqwsPXb.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-aDsg5f77.css">
+  <script type="module" crossorigin src="/assets/main-B27FPKeC.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-Btv6uuFD.css">
 </head>
 <body>
     <div class="app-container">
@@ -94,6 +94,11 @@
                 </div>
             </div>
         </div>
+
+        <!-- Контент публичной ленты -->
+        <div id="feed-content" class="feed-content hidden" style="display: none;">
+            <!-- Лента будет заполняться через UIPublicFeed.ts -->
+        </div>
         
         <!-- Camera button at the bottom -->
         <!-- Индикатор загрузки карусели 
@@ -115,6 +120,15 @@
                         <path d="m21 21-4.35-4.35"></path>
                     </svg>
                     <span class="tab-label">Разбор стиля</span>
+                </button>
+                <button class="tab-button" data-tab="feed">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span class="tab-label">Лента</span>
                 </button>
                 <button class="tab-button" data-tab="capsules">
                     <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

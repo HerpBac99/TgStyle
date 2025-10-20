@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="css/mainMenu.css">
     <link rel="stylesheet" href="css/wardrobe.css">
     <link rel="stylesheet" href="css/capsules.css">
+    <link rel="stylesheet" href="css/publicFeed.css">
     <link rel="stylesheet" href="css/resultMenu.css">
     <link rel="stylesheet" href="css/animations.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -98,6 +99,11 @@
                 </div>
             </div>
         </div>
+
+        <!-- Контент публичной ленты -->
+        <div id="feed-content" class="feed-content hidden" style="display: none;">
+            <!-- Лента будет заполняться через UIPublicFeed.ts -->
+        </div>
         
         <!-- Camera button at the bottom -->
         <!-- Индикатор загрузки карусели 
@@ -119,6 +125,15 @@
                         <path d="m21 21-4.35-4.35"></path>
                     </svg>
                     <span class="tab-label">Разбор стиля</span>
+                </button>
+                <button class="tab-button" data-tab="feed">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span class="tab-label">Лента</span>
                 </button>
                 <button class="tab-button" data-tab="capsules">
                     <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

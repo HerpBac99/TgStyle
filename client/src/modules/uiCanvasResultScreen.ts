@@ -36,8 +36,9 @@ export class UICanvasResultScreen {
    * Показать экран результата с изображением
    * 
    * @param imageBase64 - Base64 изображение с watermark
+   * @param showButtons - Показывать ли кнопки действий (по умолчанию true)
    */
-  show(imageBase64: string): void {
+  show(imageBase64: string, showButtons: boolean = true): void {
     const screen = document.getElementById(this.config.screenId);
     if (!screen) {
       logger.error('Result screen not found', { screenId: this.config.screenId });
@@ -55,14 +56,37 @@ export class UICanvasResultScreen {
       logger.error('Result image element not found');
     }
 
-    // Показываем экран
+    // ВАЖНО: Сбрасываем inline стили на imageContainer (остаются после swipe)
+    const imageContainer = screen.querySelector('.capsule-result-image-container') as HTMLElement;
+    if (imageContainer) {
+      imageContainer.style.transform = '';
+      imageContainer.style.opacity = '';
+      imageContainer.style.transition = '';
+    }
+
+    // Показываем/скрываем кнопки действий
+    const actionsContainer = screen.querySelector('.capsule-result-actions') as HTMLElement;
+    if (actionsContainer) {
+      actionsContainer.style.display = showButtons ? 'flex' : 'none';
+    }
+
+    // Показываем экран с анимацией
     screen.classList.remove('hidden');
+    // Небольшая задержка для запуска анимации
+    requestAnimationFrame(() => {
+      screen.classList.add('show');
+    });
     this.isVisible = true;
 
-    // Настраиваем кнопки
-    this.setupButtons();
+    // Настраиваем кнопки только если нужно показывать
+    if (showButtons) {
+      this.setupButtons();
+    } else {
+      // Если кнопки не показываем, добавляем обработчик закрытия по клику на экран
+      this.setupPreviewMode();
+    }
 
-    logger.info('Result screen shown');
+    logger.info('Result screen shown', { showButtons });
   }
 
   /**
@@ -71,8 +95,22 @@ export class UICanvasResultScreen {
   hide(): void {
     const screen = document.getElementById(this.config.screenId);
     if (screen) {
-      screen.classList.add('hidden');
-      this.isVisible = false;
+      // Убираем класс show для анимации исчезновения
+      screen.classList.remove('show');
+      
+      // Сбрасываем inline стили на imageContainer перед закрытием
+      const imageContainer = screen.querySelector('.capsule-result-image-container') as HTMLElement;
+      if (imageContainer) {
+        imageContainer.style.transform = '';
+        imageContainer.style.opacity = '';
+        imageContainer.style.transition = '';
+      }
+      
+      // После завершения анимации скрываем экран
+      setTimeout(() => {
+        screen.classList.add('hidden');
+        this.isVisible = false;
+      }, 300); // Длительность transition из CSS
     }
 
     // Очищаем обработчики
@@ -105,6 +143,97 @@ export class UICanvasResultScreen {
   // ============================================
   // ПРИВАТНЫЕ МЕТОДЫ - НАСТРОЙКА
   // ============================================
+
+  /**
+   * Настроить режим предпросмотра (без кнопок, закрытие по клику и swipe)
+   */
+  private setupPreviewMode(): void {
+    const screen = document.getElementById(this.config.screenId);
+    if (!screen) return;
+
+    const imageContainer = screen.querySelector('.capsule-result-image-container') as HTMLElement;
+    if (!imageContainer) return;
+
+    // Обработчик закрытия по клику на экран (но не на изображение)
+    const handleScreenClick = (e: MouseEvent) => {
+      // Закрываем только если клик был по экрану, а не по изображению
+      if (e.target === screen || (imageContainer && !imageContainer.contains(e.target as Node))) {
+        logger.info('Preview screen clicked, closing');
+        this.hide();
+        // Вызываем onDone callback если он есть
+        if (this.config.onDone) {
+          this.config.onDone();
+        }
+      }
+    };
+
+    // Swipe-to-close gesture
+    let startY = 0;
+    let currentY = 0;
+    let isDragging = false;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      // Начинаем отслеживать только если касание на изображении
+      if (e.touches[0] && imageContainer.contains(e.target as Node)) {
+        startY = e.touches[0].clientY;
+        currentY = startY;
+        isDragging = true;
+        imageContainer.style.transition = 'none';
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDragging || !e.touches[0]) return;
+
+      currentY = e.touches[0].clientY;
+      const deltaY = currentY - startY;
+
+      // Разрешаем свайп только вниз
+      if (deltaY > 0) {
+        e.preventDefault();
+        const opacity = Math.max(0, 1 - deltaY / 400);
+        imageContainer.style.transform = `translateY(${deltaY}px)`;
+        imageContainer.style.opacity = String(opacity);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (!isDragging) return;
+
+      const deltaY = currentY - startY;
+      isDragging = false;
+      imageContainer.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+
+      // Если свайп больше 100px вниз - закрываем
+      if (deltaY > 100) {
+        logger.info('Swipe down detected, closing preview');
+        this.hide();
+        if (this.config.onDone) {
+          this.config.onDone();
+        }
+      } else {
+        // Возвращаем на место
+        imageContainer.style.transform = 'translateY(0)';
+        imageContainer.style.opacity = '1';
+      }
+    };
+
+    screen.addEventListener('click', handleScreenClick);
+    screen.addEventListener('touchstart', handleTouchStart, { passive: false });
+    screen.addEventListener('touchmove', handleTouchMove, { passive: false });
+    screen.addEventListener('touchend', handleTouchEnd);
+    screen.addEventListener('touchcancel', handleTouchEnd);
+
+    this.cleanupFunctions.push(() => {
+      screen.removeEventListener('click', handleScreenClick);
+      screen.removeEventListener('touchstart', handleTouchStart);
+      screen.removeEventListener('touchmove', handleTouchMove);
+      screen.removeEventListener('touchend', handleTouchEnd);
+      screen.removeEventListener('touchcancel', handleTouchEnd);
+    });
+
+    logger.info('Preview mode configured with swipe-to-close');
+  }
 
   /**
    * Настроить кнопки экрана результата

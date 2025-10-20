@@ -365,8 +365,54 @@ class TgStyleApp {
        }),
       dataCacheManager.preloadData().catch(err => {
         logger.error('Error during data preload', err);
+      }),
+      // Предзагружаем публичную ленту и изображения капсул
+      this.preloadPublicFeedImages().catch(err => {
+        logger.error('Error preloading public feed images', err);
       })
     ]);
+  }
+
+  /**
+   * Предзагрузка изображений публичной ленты капсул
+   */
+  private async preloadPublicFeedImages(): Promise<void> {
+    try {
+      logger.info('Preloading public feed images');
+
+      // Динамически импортируем PublicFeedService
+      const { publicFeedService } = await import('./modules/publicFeed/PublicFeedService');
+      
+      // Загружаем первую страницу публичной ленты
+      const response = await publicFeedService.loadPublicCapsules(1, 10);
+
+      if (response.success && response.capsules.length > 0) {
+        const baseUrl = 'https://tgstyle.flappy.crazedns.ru';
+        
+        // Создаем массив промисов для предзагрузки изображений
+        const imagePromises = response.capsules
+          .filter(capsule => capsule.thumbnailUrl)
+          .map(capsule => {
+            return new Promise<void>((resolve) => {
+              const img = new Image();
+              img.onload = () => {
+                logger.debug('Preloaded feed image', { capsuleId: capsule.id });
+                resolve();
+              };
+              img.onerror = () => {
+                logger.warn('Failed to preload feed image', { capsuleId: capsule.id });
+                resolve();
+              };
+              img.src = baseUrl + capsule.thumbnailUrl!;
+            });
+          });
+
+        await Promise.allSettled(imagePromises);
+        logger.info('Public feed images preloaded', { count: imagePromises.length });
+      }
+    } catch (error) {
+      logger.error('Error during public feed preload', error);
+    }
   }
 
   /**
