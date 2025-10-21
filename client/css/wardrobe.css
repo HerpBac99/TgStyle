@@ -58,6 +58,20 @@
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none; /* IE and Edge */
     -webkit-overflow-scrolling: touch;
+    
+    /* Анимация появления */
+    animation: slideInFromTop 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes slideInFromTop {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .wardrobe-filters::-webkit-scrollbar {
@@ -101,6 +115,18 @@
     gap: 12px;
     padding: 10px 0;
     width: 100%;
+    
+    /* Анимация появления грида */
+    animation: fadeIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 /* Карточка одежды */
@@ -112,13 +138,49 @@
     border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.3s ease, opacity 0.3s ease;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    
+    /* Stagger animation - карточки появляются по очереди */
+    opacity: 0;
+    animation: cardFadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Задержка для каждой карточки (до 20 карточек) */
+.wardrobe-item-card:nth-child(1) { animation-delay: 0.05s; }
+.wardrobe-item-card:nth-child(2) { animation-delay: 0.08s; }
+.wardrobe-item-card:nth-child(3) { animation-delay: 0.11s; }
+.wardrobe-item-card:nth-child(4) { animation-delay: 0.14s; }
+.wardrobe-item-card:nth-child(5) { animation-delay: 0.17s; }
+.wardrobe-item-card:nth-child(6) { animation-delay: 0.20s; }
+.wardrobe-item-card:nth-child(7) { animation-delay: 0.23s; }
+.wardrobe-item-card:nth-child(8) { animation-delay: 0.26s; }
+.wardrobe-item-card:nth-child(9) { animation-delay: 0.29s; }
+.wardrobe-item-card:nth-child(10) { animation-delay: 0.32s; }
+.wardrobe-item-card:nth-child(11) { animation-delay: 0.35s; }
+.wardrobe-item-card:nth-child(12) { animation-delay: 0.38s; }
+.wardrobe-item-card:nth-child(n+13) { animation-delay: 0.40s; }
+
+@keyframes cardFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
 }
 
 .wardrobe-item-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Эффект нажатия */
+.wardrobe-item-card:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
 }
 
 .wardrobe-item-card-content {

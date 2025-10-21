@@ -93,7 +93,7 @@ export class WardrobeManager implements PhotoUploadHandler {
    */
   private loadWardrobeInBackground(): void {
     const currentCount = this.wardrobeItems.length;
-    
+
     // Загружаем полные данные с сервера в фоне
     wardrobeService.loadWardrobe().then(items => {
       // Проверяем изменились ли данные
@@ -121,9 +121,9 @@ export class WardrobeManager implements PhotoUploadHandler {
     const categories = [
       { key: 'ALL', label: 'Все' },
       { key: 'OUTERWEAR', label: 'Верхняя одежда' },
-      { key: 'INNERWEAR', label: 'Кофты'},
+      { key: 'INNERWEAR', label: 'Кофты' },
       { key: 'BODYWEAR', label: 'Футболки и рубашки' },
-      { key: 'FULLBODY', label: 'Платья и костюмы'},
+      { key: 'FULLBODY', label: 'Платья и костюмы' },
       { key: 'LEGWEAR', label: 'Штаны' },
       { key: 'FOOTWEAR', label: 'Обувь' },
       { key: 'HEADWEAR', label: 'Головные уборы' },
@@ -172,10 +172,10 @@ export class WardrobeManager implements PhotoUploadHandler {
 
     // Сохраняем кнопку "Добавить" если она есть
     const addBtn = document.getElementById('add-item-btn');
-    
+
     // Очищаем грид
     grid.innerHTML = '';
-    
+
     // Возвращаем кнопку "Добавить" обратно
     if (addBtn) {
       grid.appendChild(addBtn);
@@ -208,33 +208,108 @@ export class WardrobeManager implements PhotoUploadHandler {
     card.appendChild(content);
 
     // Обработчик кликов с разной длительностью
-    let pressStartTime: number;
-    let longPressTimer: number;
+    let pressStartTime = 0;
+    let longPressTimer: number | null = null;
+    let longPressTriggered = false;
+    let startPos: { x: number; y: number } | null = null;
+    const SCROLL_THRESHOLD = 10;
 
-    const startPress = () => {
-      pressStartTime = Date.now();
-      // Таймер для долгого нажатия (удаление)
+    const startPress = (e: MouseEvent | TouchEvent) => {
+      // Не сбрасываем longPressTriggered сразу, чтобы избежать ложных срабатываний
+      // после закрытия confirm диалога
+      if (!longPressTriggered) {
+        pressStartTime = Date.now();
+      }
+
+      if (e instanceof TouchEvent && e.touches[0]) {
+        startPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      } else if (e instanceof MouseEvent) {
+        startPos = { x: e.clientX, y: e.clientY };
+      }
+
       longPressTimer = window.setTimeout(() => {
+        longPressTriggered = true;
+        
+        // Тактильная обратная связь
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+        }
+        
         if (confirm('Удалить этот предмет из гардероба?')) {
           this.removeItem(item.id);
         }
       }, 800);
     };
 
-    const endPress = () => {
-      const pressDuration = Date.now() - pressStartTime;
-      clearTimeout(longPressTimer);
+    const endPress = (e: MouseEvent | TouchEvent) => {
+      if (longPressTimer !== null) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
 
-      // Короткий клик (< 500ms) - открываем preview
-      if (pressDuration < 500) {
+      if (!startPos) return;
+
+      const pressDuration = Date.now() - pressStartTime;
+
+      let endPos: { x: number; y: number } | null = null;
+      if (e instanceof TouchEvent && e.changedTouches[0]) {
+        endPos = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+      } else if (e instanceof MouseEvent) {
+        endPos = { x: e.clientX, y: e.clientY };
+      }
+
+      if (!endPos) return;
+
+      const deltaX = Math.abs(endPos.x - startPos.x);
+      const deltaY = Math.abs(endPos.y - startPos.y);
+      const hasMoved = deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD;
+
+      // Открываем превью только если: короткое нажатие, не было долгого нажатия, не было движения
+      if (!longPressTriggered && !hasMoved && pressDuration < 500) {
+        // Легкая вибрация при открытии превью
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+        }
         this.showPreviewModal(item);
       }
-      // Долгое нажатие (> 800ms) обрабатывается в таймере выше
-      // Промежуток 500-800ms - ничего не делаем
+
+      // Сбрасываем флаг долгого нажатия с задержкой, чтобы избежать ложных срабатываний
+      if (longPressTriggered) {
+        setTimeout(() => {
+          longPressTriggered = false;
+        }, 100);
+      }
+    };
+
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      if (!startPos) return;
+
+      let currentPos: { x: number; y: number } | null = null;
+      if (e instanceof TouchEvent && e.touches[0]) {
+        currentPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      } else if (e instanceof MouseEvent) {
+        currentPos = { x: e.clientX, y: e.clientY };
+      }
+
+      if (!currentPos) return;
+
+      const deltaX = Math.abs(currentPos.x - startPos.x);
+      const deltaY = Math.abs(currentPos.y - startPos.y);
+
+      if (deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD) {
+        if (longPressTimer !== null) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
     };
 
     const cancelPress = () => {
-      clearTimeout(longPressTimer);
+      if (longPressTimer !== null) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      longPressTriggered = false;
     };
 
     card.addEventListener('mousedown', startPress);
@@ -242,6 +317,9 @@ export class WardrobeManager implements PhotoUploadHandler {
     card.addEventListener('mouseleave', cancelPress);
     card.addEventListener('touchstart', startPress);
     card.addEventListener('touchend', endPress);
+    card.addEventListener('touchmove', handleMove);
+    card.addEventListener('mousemove', handleMove);
+    card.addEventListener('touchmove', cancelPress);
 
     return card;
   }
@@ -468,7 +546,7 @@ export class WardrobeManager implements PhotoUploadHandler {
             // Показываем loading БЕЗ модального окна
             const loadingModal = document.getElementById('canvas-loading-modal');
             const loadingText = document.querySelector('.canvas-loading-text') as HTMLElement;
-            
+
             if (loadingModal && loadingText) {
               loadingText.textContent = 'Обрабатываем фото...';
               loadingModal.classList.remove('hidden');
@@ -516,7 +594,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       this.currentClassification.category = finalData.category;
       this.currentClassification.color = finalData.color;
       if (finalData.material) this.currentClassification.material = finalData.material;
-      logger.info('Using modal data', { 
+      logger.info('Using modal data', {
         category: finalData.category,
         color: finalData.color,
         material: finalData.material
