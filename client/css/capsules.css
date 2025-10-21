@@ -39,7 +39,7 @@
     font-size: 1.4rem;
     font-weight: 700;
     color: var(--tg-theme-text-color);
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
     margin: 0;
 }
 
@@ -50,43 +50,143 @@
     gap: 12px;
     padding: 20px 0;
     width: 100%;
+
+    /* Анимация появления грида */
+    animation: fadeIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 /* Карточка капсулы */
-.capsules-capsule-card {
+.capsules-item-card {
     position: relative;
     width: 100%;
-    padding-bottom: 100%; /* Квадратная карточка */
+    padding-bottom: 100%;
+    /* Квадратная карточка */
     background: rgba(255, 255, 255, 0.9);
     border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.3s ease, opacity 0.3s ease;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+    /* Stagger animation - карточки появляются по очереди */
+    opacity: 0;
+    animation: cardFadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
-.capsules-capsule-card:hover {
+/* Задержка для каждой карточки */
+.capsules-item-card:nth-child(1) {
+    animation-delay: 0.05s;
+}
+
+.capsules-item-card:nth-child(2) {
+    animation-delay: 0.08s;
+}
+
+.capsules-item-card:nth-child(3) {
+    animation-delay: 0.11s;
+}
+
+.capsules-item-card:nth-child(4) {
+    animation-delay: 0.14s;
+}
+
+.capsules-item-card:nth-child(5) {
+    animation-delay: 0.17s;
+}
+
+.capsules-item-card:nth-child(6) {
+    animation-delay: 0.20s;
+}
+
+.capsules-item-card:nth-child(7) {
+    animation-delay: 0.23s;
+}
+
+.capsules-item-card:nth-child(8) {
+    animation-delay: 0.26s;
+}
+
+.capsules-item-card:nth-child(9) {
+    animation-delay: 0.29s;
+}
+
+.capsules-item-card:nth-child(10) {
+    animation-delay: 0.32s;
+}
+
+.capsules-item-card:nth-child(n+11) {
+    animation-delay: 0.35s;
+}
+
+@keyframes cardFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8) translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.capsules-item-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.capsules-capsule-card-content {
+/* Эффект нажатия */
+.capsules-item-card:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+}
+
+.capsules-item-card-content {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     padding: 8px;
+}
+
+.capsules-item-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.capsules-item-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    margin-top: auto;
 }
 
 /* Кнопка добавить капсулу (аналог add-item-btn) */
 .add-capsule-btn {
     position: relative;
     width: 100%;
-    padding-bottom: 100%; /* Квадратная карточка */
+    padding-bottom: 100%;
+    /* Квадратная карточка */
     border-radius: 12px;
     background: rgba(218, 109, 163, 0.1);
     border: 2px dashed rgba(218, 109, 163, 0.5);
@@ -188,11 +288,13 @@
 .canvas-save-capsule-btn {
     position: absolute;
     bottom: 10vh;
-    right: 20px; /* Слева от кнопки добавления */
+    right: 20px;
+    /* Слева от кнопки добавления */
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background-color: rgba(76, 175, 80, 0.8) !important; /* Зеленый цвет для сохранения */
+    background-color: rgba(76, 175, 80, 0.8) !important;
+    /* Зеленый цвет для сохранения */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -223,18 +325,21 @@
     width: 20px;
     height: 20px;
     stroke: white;
-    stroke-width: 3; /* Толще для галочки */
+    stroke-width: 3;
+    /* Толще для галочки */
 }
 
 /* Кнопка поделиться капсулой */
 .canvas-share-capsule-btn {
     position: absolute;
     bottom: 10vh;
-    right: 80px; /* Слева от кнопки сохранения */
+    right: 80px;
+    /* Слева от кнопки сохранения */
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background-color: rgba(33, 150, 243, 0.8) !important; /* Синий цвет для sharing */
+    background-color: rgba(33, 150, 243, 0.8) !important;
+    /* Синий цвет для sharing */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -281,7 +386,8 @@
     height: 100vh;
     z-index: 1000;
     display: flex;
-    align-items: flex-end; /* Модальное окно внизу */
+    align-items: flex-end;
+    /* Модальное окно внизу */
     justify-content: center;
 }
 
@@ -302,17 +408,23 @@
 .capsules-modal-content {
     position: relative;
     width: 100%;
-    height: calc(100vh - 10vh); /* Высота = полная высота минус отступ сверху */
-    max-height: 90vh; /* Максимум 90% экрана */
+    height: calc(100vh - 10vh);
+    /* Высота = полная высота минус отступ сверху */
+    max-height: 90vh;
+    /* Максимум 90% экрана */
     background: rgba(255, 255, 255, 0.95);
-    border-radius: 20px 20px 0 0; /* отступ сверху 10px */
-    padding: 8px; /* Уменьшен padding */
+    border-radius: 20px 20px 0 0;
+    /* отступ сверху 10px */
+    padding: 8px;
+    /* Уменьшен padding */
     display: flex;
     flex-direction: column;
     /* gap: 8px; - убираю gap снова, он мешает гриду */
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
-    margin-top: 10vh; /* Отступ сверху 10vh */
-    z-index: 1001; /* Выше чем overlay */
+    margin-top: 10vh;
+    /* Отступ сверху 10vh */
+    z-index: 1001;
+    /* Выше чем overlay */
 }
 
 /* Анимация убрана - модальное окно сразу позиционируется правильно */
@@ -322,7 +434,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: 6px; /* Уменьшен отступ снизу */
+    padding-bottom: 6px;
+    /* Уменьшен отступ снизу */
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     background: transparent !important;
 }
@@ -372,15 +485,20 @@
     display: flex;
     flex-wrap: nowrap;
     gap: 5px;
-    margin: 10px 0 16px 0; /* Увеличиваем верхний отступ на 4px для учета подъема активных кнопок */
+    margin: 10px 0 16px 0;
+    /* Увеличиваем верхний отступ на 4px для учета подъема активных кнопок */
     width: 100%;
-    height: 50px; /* ФИКСИРОВАННАЯ минимальная высота */
+    height: 50px;
+    /* ФИКСИРОВАННАЯ минимальная высота */
     padding: 5px;
-    flex-shrink: 0; /* НЕ СЖИМАТЬ контейнер */
+    flex-shrink: 0;
+    /* НЕ СЖИМАТЬ контейнер */
     overflow-x: auto;
     overflow-y: hidden;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
     -webkit-overflow-scrolling: touch;
 }
 
@@ -403,7 +521,8 @@
     backdrop-filter: blur(10px);
     -webkit-tap-highlight-color: transparent;
     white-space: nowrap;
-    flex-shrink: 0; /* НЕ СЖИМАТЬ кнопки */
+    flex-shrink: 0;
+    /* НЕ СЖИМАТЬ кнопки */
 }
 
 .capsules-filter-btn:hover {
@@ -425,18 +544,23 @@
     gap: 12px;
     padding: 10px 0;
     width: 100%;
-    height: calc(100vh - 250px); /* Фиксированная высота */
+    height: calc(100vh - 250px);
+    /* Фиксированная высота */
     overflow-y: auto;
-    margin-top: 8px; /* Отступ от фильтров */
+    margin-top: 8px;
+    /* Отступ от фильтров */
 }
 
 /* Карточка элемента в capsules */
 .capsules-item-card {
     position: relative;
     width: 100%;
-    min-height: 80px; /* Минимальная высота */
-    height: auto; /* Автоматическая высота */
-    aspect-ratio: 1; /* Квадратная форма */
+    min-height: 80px;
+    /* Минимальная высота */
+    height: auto;
+    /* Автоматическая высота */
+    aspect-ratio: 1;
+    /* Квадратная форма */
     background: rgba(255, 255, 255, 0.9);
     border-radius: 12px;
     overflow: hidden;
@@ -494,20 +618,23 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 8px; /* Тот же padding что в wardrobe */
+    padding: 8px;
+    /* Тот же padding что в wardrobe */
 }
 
 .capsules-item-image {
     max-width: 100%;
     max-height: 100%;
-    object-fit: contain; /* Contain как в wardrobe для правильного отображения */
+    object-fit: contain;
+    /* Contain как в wardrobe для правильного отображения */
 }
 
 /* Кнопки действий */
 .capsules-modal-actions {
     display: flex;
     justify-content: center;
-    padding-top: 6px; /* Уменьшен отступ сверху */
+    padding-top: 6px;
+    /* Уменьшен отступ сверху */
     border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
@@ -536,7 +663,8 @@
     cursor: not-allowed;
     transform: none;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    background: rgba(200, 200, 200, 0.8); /* Более заметный disabled стиль */
+    background: rgba(200, 200, 200, 0.8);
+    /* Более заметный disabled стиль */
 }
 
 /* Модальное окно загрузки для canvas операций */
@@ -720,13 +848,13 @@
     flex: 1;
     max-width: 160px;
     -webkit-tap-highlight-color: transparent;
-    
+
     /* НЕОМОРФНЫЙ ГРАДИЕНТ */
     background: linear-gradient(145deg, #e8ecf2, #d4dbe4);
-    
+
     /* НЕОМОРФНЫЕ ТЕНИ - ВЫПУКЛЫЙ ЭФФЕКТ */
     box-shadow: 8px 8px 16px #c7cbd1, -8px -8px 16px #ffffff;
-    
+
     /* СОВРЕМЕННЫЕ АНИМАЦИИ */
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }

@@ -30,6 +30,7 @@ export const STORAGE_KEYS = {
   USER_SETTINGS: 'tgStyleUserSettings',
   LOGS: 'tgStyleLogs',
   WARDROBE_CACHE: 'tgStyleWardrobeCache', // Кэш первых 30 элементов гардероба
+  CAPSULES_CACHE: 'tgStyleCapsulesCache', // Кэш всех капсул
 } as const;
 
 // Ограничения истории

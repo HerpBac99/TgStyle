@@ -74,7 +74,7 @@ export class UICapsulesGrid {
    */
   render(capsules: StyleCapsule[]): void {
     this.capsules = capsules;
-    
+
     const grid = document.getElementById('capsules-clothes-grid');
     if (!grid) {
       logger.error('Capsules grid element not found');
@@ -84,17 +84,21 @@ export class UICapsulesGrid {
     // Очищаем обработчики перед перерисовкой
     this.cleanup();
 
-    // Очищаем грид, сохраняем только кнопку добавления
+    // Сохраняем кнопку "Создать" из HTML
     const addBtn = document.getElementById('add-capsule-btn');
+
+    // Очищаем грид
     grid.innerHTML = '';
+
+    // Возвращаем кнопку "Создать" обратно первой
     if (addBtn) {
       grid.appendChild(addBtn);
     }
 
-    // Добавляем карточки капсул
+    // Добавляем карточки капсул после кнопки
     capsules.forEach(capsule => {
       const card = this.createCapsuleCard(capsule);
-      grid.insertBefore(card, addBtn); // Вставляем перед кнопкой добавления
+      grid.appendChild(card);
     });
 
     // Настраиваем обработчик кнопки добавления
@@ -206,7 +210,7 @@ export class UICapsulesGrid {
    */
   private setupAddButton(): void {
     const addBtn = document.getElementById('add-capsule-btn');
-    
+
     if (!addBtn) {
       logger.warn('Add capsule button not found');
       return;
