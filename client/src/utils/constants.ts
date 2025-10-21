@@ -29,11 +29,23 @@ export const STORAGE_KEYS = {
   HISTORY: 'tgStyleHistory',
   USER_SETTINGS: 'tgStyleUserSettings',
   LOGS: 'tgStyleLogs',
+  WARDROBE_CACHE: 'tgStyleWardrobeCache', // Кэш первых 30 элементов гардероба
 } as const;
 
 // Ограничения истории
 export const HISTORY_CONSTRAINTS = {
   MAX_ITEMS: 50, // Увеличено до 50 для сервера (синхронизировано)
+} as const;
+
+// Ограничения гардероба
+export const WARDROBE_CONSTRAINTS = {
+  CACHE_ITEMS: 30, // Количество элементов для кэширования в localStorage
+} as const;
+
+// Настройки кэширования изображений
+export const IMAGE_CACHE_CONFIG = {
+  BATCH_SIZE: 30, // Размер батча для фоновой загрузки изображений
+  BATCH_DELAY_MS: 50, // Задержка между батчами в миллисекундах
 } as const;
 
 // Настройки логирования

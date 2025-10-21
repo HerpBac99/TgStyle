@@ -35,14 +35,15 @@ export class WardrobeManager implements PhotoUploadHandler {
     // Настраиваем обработчики
     this.setupEventListeners();
 
-    // Загружаем вещи
-    await this.loadWardrobe();
-
     // Создаем фильтры
     this.createFilters();
 
-    // Рендерим грид
+    // МГНОВЕННО отрисовываем из кэша (уже загружен в dataCacheManager при инициализации)
+    await this.loadWardrobeFromCache();
     this.renderGrid();
+
+    // Загружаем полные данные в фоне
+    this.loadWardrobeInBackground();
   }
 
   /**
@@ -73,16 +74,39 @@ export class WardrobeManager implements PhotoUploadHandler {
   }
 
   /**
-   * Загрузить гардероб
+   * Загрузить гардероб из кэша (мгновенно)
    */
-  private async loadWardrobe(): Promise<void> {
+  private async loadWardrobeFromCache(): Promise<void> {
     try {
+      // Загружаем из кэша (уже в памяти dataCacheManager)
       this.wardrobeItems = await wardrobeService.loadWardrobe();
-      logger.info(`Loaded ${this.wardrobeItems.length} items`);
+      logger.info(`Loaded ${this.wardrobeItems.length} items from cache`);
     } catch (error) {
-      logger.error('Error loading wardrobe', error);
+      logger.error('Error loading wardrobe from cache', error);
       this.wardrobeItems = [];
     }
+  }
+
+  /**
+   * Загрузить полный гардероб в фоне
+   * Обновляет данные только если они изменились на сервере
+   */
+  private loadWardrobeInBackground(): void {
+    const currentCount = this.wardrobeItems.length;
+    
+    // Загружаем полные данные с сервера в фоне
+    wardrobeService.loadWardrobe().then(items => {
+      // Проверяем изменились ли данные
+      if (items.length !== currentCount) {
+        this.wardrobeItems = items;
+        logger.info(`Background load: data changed (${currentCount} → ${items.length})`);
+        this.renderGrid();
+      } else {
+        logger.info(`Background load: no changes (${items.length} items)`);
+      }
+    }).catch(error => {
+      logger.error('Error loading wardrobe in background', error);
+    });
   }
 
   /**

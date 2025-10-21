@@ -7,6 +7,8 @@ import { logger } from './logger';
 import { historyManager } from './history';
 import { api } from './api';
 import type { HistoryItem } from '@/types/api';
+import { STORAGE_KEYS, WARDROBE_CONSTRAINTS, IMAGE_CACHE_CONFIG } from '@/utils/constants';
+import { safeJsonParse, safeJsonStringify } from '@/utils/helpers';
 
 /**
  * Интерфейс для элемента гардероба
@@ -51,6 +53,127 @@ class DataCacheManager {
   private isLoaded = false;
 
   constructor() {
+    // Загружаем кэш гардероба из localStorage при инициализации
+    this.loadWardrobeCacheFromStorage();
+    
+    // Предзагружаем изображения из кэша
+    this.preloadCachedImages();
+  }
+
+  /**
+   * Загрузка кэша гардероба из localStorage
+   * Вызывается при инициализации для мгновенного отображения
+   */
+  private loadWardrobeCacheFromStorage(): void {
+    try {
+      const cached = localStorage.getItem(STORAGE_KEYS.WARDROBE_CACHE);
+      if (!cached) {
+        logger.info('No wardrobe cache in localStorage');
+        return;
+      }
+
+      const parsed = safeJsonParse<WardrobeItem[]>(cached, []);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        this.wardrobeItems = parsed;
+        logger.info('Wardrobe cache loaded from localStorage', { 
+          count: this.wardrobeItems.length 
+        });
+      }
+    } catch (error) {
+      logger.error('Error loading wardrobe cache from storage', error);
+      this.wardrobeItems = [];
+    }
+  }
+
+  /**
+   * Предзагрузка изображений из кэша при старте приложения
+   * Кэширует изображения гардероба в браузере для мгновенного отображения
+   */
+  private preloadCachedImages(): void {
+    if (this.wardrobeItems.length === 0) {
+      return;
+    }
+
+    // Собираем URL изображений из кэша
+    const imageUrls = this.wardrobeItems
+      .map(item => item.imageUrl)
+      .filter(url => url);
+
+    if (imageUrls.length === 0) {
+      return;
+    }
+
+    logger.info('Preloading wardrobe images from cache', { count: imageUrls.length });
+
+    // Кэшируем изображения ПРИОРИТЕТНО - все параллельно без задержек
+    this.cachePriorityImages(imageUrls).catch(error => {
+      logger.error('Error preloading cached images', error);
+    });
+  }
+
+  /**
+   * Приоритетное кэширование изображений (все параллельно, без батчей)
+   * Используется для критически важных изображений (гардероб из кэша)
+   */
+  private async cachePriorityImages(imageUrls: string[]): Promise<void> {
+    if (imageUrls.length === 0) {
+      return;
+    }
+
+    try {
+      const startTime = Date.now();
+      
+      // Загружаем ВСЕ изображения параллельно
+      const results = await Promise.allSettled(
+        imageUrls.map(relativeUrl => {
+          return new Promise<void>((resolve, reject) => {
+            try {
+              const absoluteUrl = this.makeAbsoluteUrl(relativeUrl);
+              const img = new Image();
+              
+              img.onload = () => resolve();
+              img.onerror = () => reject(new Error(`Failed to load: ${absoluteUrl}`));
+              
+              img.src = absoluteUrl;
+            } catch (error) {
+              reject(error);
+            }
+          });
+        })
+      );
+
+      const cachedCount = results.filter(r => r.status === 'fulfilled').length;
+      const failedCount = results.filter(r => r.status === 'rejected').length;
+      const loadTime = Date.now() - startTime;
+
+      logger.info('✅ Priority wardrobe images cached', { 
+        cached: cachedCount,
+        failed: failedCount,
+        total: imageUrls.length,
+        loadTime: `${loadTime}ms`
+      });
+    } catch (error) {
+      logger.error('Error caching priority images', error);
+    }
+  }
+
+  /**
+   * Сохранение первых N элементов гардероба в localStorage
+   */
+  private saveWardrobeCacheToStorage(): void {
+    try {
+      // Сохраняем только первые 30 элементов
+      const itemsToCache = this.wardrobeItems.slice(0, WARDROBE_CONSTRAINTS.CACHE_ITEMS);
+      const json = safeJsonStringify(itemsToCache);
+      localStorage.setItem(STORAGE_KEYS.WARDROBE_CACHE, json);
+      
+      logger.info('Wardrobe cache saved to localStorage', { 
+        count: itemsToCache.length,
+        sizeKB: (json.length / 1024).toFixed(2)
+      });
+    } catch (error) {
+      logger.error('Error saving wardrobe cache to storage', error);
+    }
   }
 
   /**
@@ -75,8 +198,16 @@ class DataCacheManager {
 
       // Обрабатываем результаты
       if (wardrobeResponse.status === 'fulfilled') {
-        this.wardrobeItems = wardrobeResponse.value;
+        const newItems = wardrobeResponse.value;
+        const hasChanges = newItems.length !== this.wardrobeItems.length;
+        
+        this.wardrobeItems = newItems;
         logger.info('Wardrobe items loaded', { count: this.wardrobeItems.length });
+        
+        // Сохраняем первые 30 в localStorage только если данные изменились
+        if (hasChanges) {
+          this.saveWardrobeCacheToStorage();
+        }
       } else {
         logger.error('Failed to load wardrobe items', wardrobeResponse.reason);
       }
@@ -88,13 +219,19 @@ class DataCacheManager {
         logger.error('Failed to load capsules', capsulesResponse.reason);
       }
 
-      // Собираем все URL изображений для кэширования
+      // Собираем URL изображений для кэширования (история + капсулы, БЕЗ гардероба)
       const imageUrls = this.collectImageUrls();
+      
+      // Фильтруем изображения гардероба (они уже закэшированы в preloadCachedImages)
+      const wardrobeUrls = new Set(this.wardrobeItems.map(item => item.imageUrl));
+      const remainingUrls = imageUrls.filter(url => !wardrobeUrls.has(url));
 
-      // Кэшируем изображения в фоне (не блокируем)
-      this.cacheImages(imageUrls).catch(error => {
-        logger.error('Error caching images', error);
-      });
+      // Кэшируем только оставшиеся изображения (история + капсулы)
+      if (remainingUrls.length > 0) {
+        this.cacheImages(remainingUrls).catch(error => {
+          logger.error('Error caching images', error);
+        });
+      }
 
       this.isLoaded = true;
       const loadTime = Date.now() - startTime;
@@ -239,8 +376,8 @@ class DataCacheManager {
 
       logger.info('Starting image cache', { totalImages: imageUrls.length });
 
-      // Кэшируем изображения порциями по 10 для более быстрой загрузки
-      const batchSize = 10;
+      // Кэшируем изображения порциями для фоновой загрузки
+      const batchSize = IMAGE_CACHE_CONFIG.BATCH_SIZE;
       for (let i = 0; i < imageUrls.length; i += batchSize) {
         const batch = imageUrls.slice(i, i + batchSize);
         
@@ -284,7 +421,7 @@ class DataCacheManager {
 
         // Минимальная задержка между батчами
         if (i + batchSize < imageUrls.length) {
-          await new Promise(resolve => setTimeout(resolve, 50));
+          await new Promise(resolve => setTimeout(resolve, IMAGE_CACHE_CONFIG.BATCH_DELAY_MS));
         }
       }
 
@@ -319,6 +456,9 @@ class DataCacheManager {
   addWardrobeItem(item: WardrobeItem): void {
     this.wardrobeItems.push(item);
 
+    // Обновляем localStorage кэш
+    this.saveWardrobeCacheToStorage();
+
     // Кэшируем изображение нового элемента
     if (item.imageUrl) {
       this.cacheImages([item.imageUrl]).catch(error => {
@@ -334,6 +474,11 @@ class DataCacheManager {
     const index = this.wardrobeItems.findIndex(item => item.id === itemId);
     if (index !== -1) {
       this.wardrobeItems[index] = updatedItem;
+      
+      // Обновляем localStorage кэш если элемент в первых 30
+      if (index < WARDROBE_CONSTRAINTS.CACHE_ITEMS) {
+        this.saveWardrobeCacheToStorage();
+      }
     }
   }
 
@@ -344,6 +489,9 @@ class DataCacheManager {
     const index = this.wardrobeItems.findIndex(item => item.id === itemId);
     if (index !== -1) {
       this.wardrobeItems.splice(index, 1);
+      
+      // Обновляем localStorage кэш
+      this.saveWardrobeCacheToStorage();
     }
   }
 

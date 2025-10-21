@@ -22,22 +22,33 @@ export class DataLoader {
     maxWaitMs: number = 5000 // Увеличим время ожидания до 5 сек
   ): Promise<T[]> {
     try {
-      // Проверяем готовность кэша
-      if (dataCacheManager.isDataLoaded()) {
-        logger.info('DataLoader: Using cached data');
-        return cacheGetter();
+      // СНАЧАЛА проверяем есть ли данные в памяти (из localStorage)
+      const cachedData = cacheGetter();
+      if (cachedData.length > 0) {
+        logger.info('DataLoader: Using cached data from memory', { count: cachedData.length });
+        return cachedData;
       }
 
-      // Если кэш загружается - ждем дольше для полной загрузки
+      // Если данных нет, но кэш загружается - ждем
       if (dataCacheManager.isDataLoading()) {
         logger.info('DataLoader: Waiting for cache to complete...');
         await this.waitForCache(maxWaitMs);
         
-        if (dataCacheManager.isDataLoaded()) {
-          logger.info('DataLoader: Cache ready, using cached data');
-          return cacheGetter();
+        const loadedData = cacheGetter();
+        if (loadedData.length > 0) {
+          logger.info('DataLoader: Cache ready, using cached data', { count: loadedData.length });
+          return loadedData;
         }
         logger.warn('DataLoader: Cache still loading after timeout, fallback to server');
+      }
+
+      // Если кэш загружен но пустой
+      if (dataCacheManager.isDataLoaded()) {
+        const loadedData = cacheGetter();
+        if (loadedData.length > 0) {
+          logger.info('DataLoader: Using loaded cache', { count: loadedData.length });
+          return loadedData;
+        }
       }
 
       // Fallback на сервер
