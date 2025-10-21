@@ -19,24 +19,29 @@ export class DataLoader {
   async loadWithCacheFallback<T>(
     cacheGetter: () => T[],
     serverLoader: () => Promise<T[]>,
-    maxWaitMs: number = 3000
+    maxWaitMs: number = 5000 // Увеличим время ожидания до 5 сек
   ): Promise<T[]> {
     try {
       // Проверяем готовность кэша
       if (dataCacheManager.isDataLoaded()) {
+        logger.info('DataLoader: Using cached data');
         return cacheGetter();
       }
 
-      // Если кэш загружается - ждем
+      // Если кэш загружается - ждем дольше для полной загрузки
       if (dataCacheManager.isDataLoading()) {
+        logger.info('DataLoader: Waiting for cache to complete...');
         await this.waitForCache(maxWaitMs);
         
         if (dataCacheManager.isDataLoaded()) {
+          logger.info('DataLoader: Cache ready, using cached data');
           return cacheGetter();
         }
+        logger.warn('DataLoader: Cache still loading after timeout, fallback to server');
       }
 
       // Fallback на сервер
+      logger.info('DataLoader: Fallback to server fetch');
       return await serverLoader();
 
     } catch (error) {

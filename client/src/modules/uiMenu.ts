@@ -108,6 +108,17 @@ export class UIMenuManager {
     containerWidth: 0,     // Ширина контейнера
   };
 
+  // Метрики загрузки изображений
+  private imageLoadMetrics = {
+    priorityLoadStartTime: 0,
+    priorityLoadEndTime: 0,
+    backgroundLoadStartTime: 0,
+    backgroundLoadEndTime: 0,
+    priorityImagesLoaded: 0,
+    backgroundImagesLoaded: 0,
+    totalImagesToLoad: 0
+  };
+
   constructor() {
     this.initializeElements();
     this.setupEventListeners();
@@ -351,8 +362,155 @@ export class UIMenuManager {
       // Позиционируем карусель
       this.positionCarousel(preservePosition);
 
+      // OPTIMIZATION: Progressive image loading - грузим только видимые карты
+      this.loadVisibleCardImages();
+
       // Обновляем навигацию
       this.updateCarouselNavigation();
+    }
+
+    /**
+     * Progressive image loading - сначала последние 5 фото, потом остальные в фоне
+     * OPTIMIZATION: Приоритетная загрузка для плавной прокрутки
+     */
+    private loadVisibleCardImages(): void {
+      const totalCards = this.carouselState.totalCards;
+      const priorityCount = 5; // Приоритетно грузим последние 5 фоток
+
+      // Определяем диапазон приоритетных карт (последние 5)
+      const priorityStartIndex = Math.max(0, totalCards - priorityCount - 1);
+      
+      // Сбрасываем счетчики
+      this.imageLoadMetrics.priorityImagesLoaded = 0;
+      this.imageLoadMetrics.backgroundImagesLoaded = 0;
+      this.imageLoadMetrics.totalImagesToLoad = totalCards - 1; // -1 потому что последняя карта пустая
+      
+      // 1. ВЫСОКИЙ ПРИОРИТЕТ: Последние 5 карт (самые новые анализы) - синхронно
+      this.imageLoadMetrics.priorityLoadStartTime = performance.now();
+      
+      logger.info('Loading priority images (last 5)', { 
+        priorityRange: [priorityStartIndex, totalCards - 1] 
+      });
+      
+      const priorityLoadPromises = [];
+      for (let i = priorityStartIndex; i < totalCards; i++) {
+        const promise = this.loadCardImageWithCallback(i, () => {
+          this.imageLoadMetrics.priorityImagesLoaded++;
+          
+          // Когда все приоритетные загружены
+          if (this.imageLoadMetrics.priorityImagesLoaded === priorityCount) {
+            this.imageLoadMetrics.priorityLoadEndTime = performance.now();
+            const priorityLoadTime = Math.round(this.imageLoadMetrics.priorityLoadEndTime - this.imageLoadMetrics.priorityLoadStartTime);
+            logger.info('✅ Priority images loaded (INSTANT UI)', { 
+              count: priorityCount,
+              loadTime: `${priorityLoadTime}ms` 
+            });
+          }
+        });
+        priorityLoadPromises.push(promise);
+      }
+
+      // 2. НИЗКИЙ ПРИОРИТЕТ: Остальные карты (старые анализы) - асинхронно в фоне
+      // Используем setTimeout для отложенной загрузки (не блокирует UI)
+      setTimeout(() => {
+        this.imageLoadMetrics.backgroundLoadStartTime = performance.now();
+        
+        logger.info('Starting background image loading', { 
+          backgroundRange: [0, priorityStartIndex - 1] 
+        });
+        
+        for (let i = 0; i < priorityStartIndex; i++) {
+          // Используем requestIdleCallback если доступен, иначе setTimeout
+          if ('requestIdleCallback' in window) {
+            requestIdleCallback(() => {
+              this.loadCardImageWithCallback(i, () => {
+                this.imageLoadMetrics.backgroundImagesLoaded++;
+                
+                // Когда все фоновые загружены
+                if (this.imageLoadMetrics.backgroundImagesLoaded === priorityStartIndex) {
+                  this.imageLoadMetrics.backgroundLoadEndTime = performance.now();
+                  const backgroundLoadTime = Math.round(this.imageLoadMetrics.backgroundLoadEndTime - this.imageLoadMetrics.backgroundLoadStartTime);
+                  const totalLoadTime = Math.round(this.imageLoadMetrics.backgroundLoadEndTime - this.imageLoadMetrics.priorityLoadStartTime);
+                  logger.info('✅ All 46 images loaded (BACKGROUND)', { 
+                    priorityCount,
+                    backgroundCount: priorityStartIndex,
+                    backgroundLoadTime: `${backgroundLoadTime}ms`,
+                    totalLoadTime: `${totalLoadTime}ms`
+                  });
+                }
+              });
+            });
+          } else {
+            setTimeout(() => {
+              this.loadCardImageWithCallback(i, () => {
+                this.imageLoadMetrics.backgroundImagesLoaded++;
+                
+                // Когда все фоновые загружены
+                if (this.imageLoadMetrics.backgroundImagesLoaded === priorityStartIndex) {
+                  this.imageLoadMetrics.backgroundLoadEndTime = performance.now();
+                  const backgroundLoadTime = Math.round(this.imageLoadMetrics.backgroundLoadEndTime - this.imageLoadMetrics.backgroundLoadStartTime);
+                  const totalLoadTime = Math.round(this.imageLoadMetrics.backgroundLoadEndTime - this.imageLoadMetrics.priorityLoadStartTime);
+                  logger.info('✅ All 46 images loaded (BACKGROUND)', { 
+                    priorityCount,
+                    backgroundCount: priorityStartIndex,
+                    backgroundLoadTime: `${backgroundLoadTime}ms`,
+                    totalLoadTime: `${totalLoadTime}ms`
+                  });
+                }
+              });
+            }, i * 10); // Задержка между картами
+          }
+        }
+      }, 100); // Даем 100ms для отрисовки приоритетных изображений
+    }
+
+    /**
+     * Загрузить изображение для одной карты с callback
+     */
+    private loadCardImageWithCallback(index: number, onLoad: () => void): Promise<void> {
+      return new Promise((resolve) => {
+        if (index < 0 || index >= this.carouselState.totalCards) {
+          resolve();
+          return;
+        }
+
+        const card = document.querySelector(`.history-card[data-index="${index}"]`) as HTMLElement;
+        if (!card) {
+          resolve();
+          return;
+        }
+
+        const photoUrl = card.dataset['photoUrl'];
+        if (!photoUrl) {
+          resolve();
+          return;
+        }
+
+        // Если изображение уже загружено, пропускаем
+        if (card.style.backgroundImage) {
+          onLoad();
+          resolve();
+          return;
+        }
+
+        // Создаем Image объект для отслеживания загрузки
+        const img = new Image();
+        img.onload = () => {
+          card.style.backgroundImage = `url(${photoUrl})`;
+          card.classList.remove('image-loading');
+          card.classList.add('image-loaded');
+          delete card.dataset['photoUrl'];
+          
+          onLoad();
+          resolve();
+        };
+        img.onerror = () => {
+          logger.warn('Failed to load card image', { index, photoUrl });
+          onLoad(); // Все равно считаем загруженным чтобы счетчик не застрял
+          resolve();
+        };
+        img.src = photoUrl;
+      });
     }
 
     /**
@@ -427,10 +585,13 @@ export class UIMenuManager {
     private setupFilledCard(card: HTMLElement, content: HTMLElement, data: HistoryItem): void {
       card.classList.add(CSS_CLASSES.FILLED);
 
-      // Устанавливаем фон - приоритет photoPath (URL), затем base64
+      // OPTIMIZATION: Lazy loading - НЕ загружаем изображения сразу
+      // Сохраняем URL в data-атрибут для отложенной загрузки
       if (data.photoPath) {
         const backgroundUrl = `/uploads/analysis/${data.telegramId}/${data.photoPath}`;
-        card.style.backgroundImage = `url(${backgroundUrl})`;
+        card.dataset['photoUrl'] = backgroundUrl;
+        // Добавляем класс для skeleton UI
+        card.classList.add('image-loading');
       } else {
         logger.warn('DEBUG: photoPath is empty or null!', {
           itemId: data.id,
@@ -804,20 +965,20 @@ export class UIMenuManager {
   }
 
   /**
-   * Переход к предыдущему элементу карусели
-   */
-  private moveToPreviousCarouselItem(): void {
-    const newPosition = Math.max(0, this.carouselState.currentCenterIndex - 1);
-    this.moveCarouselToPosition(newPosition);
-  }
-
-  /**
    * Переход к следующему элементу карусели
    */
   private moveToNextCarouselItem(): void {
     const newPosition = Math.min(this.carouselState.totalCards - 1, this.carouselState.currentCenterIndex + 1);
     this.moveCarouselToPosition(newPosition);
     logger.info('Carousel moved to next item', { position: newPosition });
+  }
+
+  /**
+   * Переход к предыдущему элементу карусели
+   */
+  private moveToPreviousCarouselItem(): void {
+    const newPosition = Math.max(0, this.carouselState.currentCenterIndex - 1);
+    this.moveCarouselToPosition(newPosition);
   }
 
   /**

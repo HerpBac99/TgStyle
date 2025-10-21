@@ -7,15 +7,63 @@ import { logger } from '../logger';
 import { publicFeedService } from './PublicFeedService';
 import { UIPublicFeed } from './UIPublicFeed';
 import type { PublicCapsule } from '@/types/publicFeed';
+import { BASE_URL } from '@/utils/constants';
 
 export class PublicFeedManager {
   private uiFeed: UIPublicFeed | null = null;
   private currentPage: number = 1;
   private hasMore: boolean = true;
   private isLoading: boolean = false;
+  private cacheKey: string = 'publicFeed_cache';
+  private cacheExpiry: number = 5 * 60 * 1000; // 5 минут
 
   constructor() {
     logger.info('PublicFeedManager initialized');
+  }
+
+  /**
+   * Загрузить публичную ленту из кэша
+   */
+  private loadFromCache(): PublicCapsule[] | null {
+    try {
+      const cached = localStorage.getItem(this.cacheKey);
+      if (!cached) return null;
+
+      const data = JSON.parse(cached);
+      const now = Date.now();
+      
+      if (now - data.timestamp > this.cacheExpiry) {
+        // Кэш устарел
+        localStorage.removeItem(this.cacheKey);
+        return null;
+      }
+
+      logger.info('Loaded public feed from cache', { 
+        count: data.capsules.length,
+        age: Math.round((now - data.timestamp) / 1000) + 's'
+      });
+      
+      return data.capsules;
+    } catch (error) {
+      logger.error('Error loading feed from cache', error);
+      return null;
+    }
+  }
+
+  /**
+   * Сохранить публичную ленту в кэш
+   */
+  private saveToCache(capsules: PublicCapsule[]): void {
+    try {
+      const data = {
+        capsules,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(this.cacheKey, JSON.stringify(data));
+      logger.info('Saved public feed to cache', { count: capsules.length });
+    } catch (error) {
+      logger.error('Error saving feed to cache', error);
+    }
   }
 
   /**
@@ -59,28 +107,40 @@ export class PublicFeedManager {
   }
 
   /**
-   * Загрузить первую страницу
+   * Загрузить первую страницу (с кэшированием)
    */
   private async loadInitialPage(): Promise<void> {
     if (this.isLoading) return;
 
     try {
       this.isLoading = true;
-      if (this.uiFeed) {
+
+      // Сначала показываем из кэша (instant UI)
+      const cachedCapsules = this.loadFromCache();
+      if (cachedCapsules && cachedCapsules.length > 0) {
+        if (this.uiFeed) {
+          this.uiFeed.render(cachedCapsules, false);
+          logger.info('Rendered feed from cache instantly');
+        }
+      } else if (this.uiFeed) {
         this.uiFeed.showLoading(true);
       }
 
+      // Затем грузим свежие данные с сервера
       this.currentPage = 1;
       const response = await publicFeedService.loadPublicCapsules(this.currentPage);
 
       this.hasMore = response.pagination.hasMore;
+
+      // Сохраняем в кэш
+      this.saveToCache(response.capsules);
 
       if (this.uiFeed) {
         this.uiFeed.render(response.capsules, false);
         this.uiFeed.showLoading(false);
       }
 
-      logger.info('Initial feed page loaded', {
+      logger.info('Initial feed page loaded from server', {
         capsulesCount: response.capsules.length,
         hasMore: this.hasMore
       });
@@ -90,7 +150,10 @@ export class PublicFeedManager {
       if (this.uiFeed) {
         this.uiFeed.showLoading(false);
       }
-      throw error;
+      // Если есть кэш, не показываем ошибку - пользователь уже видит данные
+      if (!this.loadFromCache()) {
+        throw error;
+      }
     } finally {
       this.isLoading = false;
     }
@@ -156,8 +219,7 @@ export class PublicFeedManager {
     }
 
     // Строим полный URL изображения (thumbnailUrl уже содержит относительный путь от корня сервера)
-    const baseUrl = 'https://tgstyle.flappy.crazedns.ru';
-    const fullImageUrl = baseUrl + capsule.thumbnailUrl;
+    const fullImageUrl = BASE_URL + capsule.thumbnailUrl;
 
     logger.info('Opening capsule preview', { imageUrl: fullImageUrl });
 

@@ -1,4 +1,4 @@
-# Factory CLI Complete Cleanup Script
+ Factory CLI Complete Cleanup Script
 # WARNING: This script will permanently remove all traces of Factory CLI from your system
 # Run as Administrator for full cleanup
 

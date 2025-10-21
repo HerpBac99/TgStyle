@@ -353,66 +353,42 @@ class TgStyleApp {
   }
 
   /**
-   * Предзагрузка данных приложения (гардероб, капсулы, изображения)
+   * Предзагрузка данных приложения - ТОЛЬКО КРИТИЧЕСКИЕ ДАННЫЕ
+   * Остальное грузится по требованию (lazy loading)
    */
   private preloadAppData(): void {
     logger.info('Starting app data preload in background');
 
-    // Батчинг endpoint /api/initial-data доступен, но параллельные запросы быстрее
     Promise.allSettled([
-      historyManager.loadHistoryFromServer().catch(err => {
-         logger.error('Error loading history from server', err);
-       }),
       dataCacheManager.preloadData().catch(err => {
         logger.error('Error during data preload', err);
-      }),
-      // Предзагружаем публичную ленту и изображения капсул
-      this.preloadPublicFeedImages().catch(err => {
-        logger.error('Error preloading public feed images', err);
       })
     ]);
+
+    // Фоновая загрузка остальной истории (низкий приоритет)
+    // Загружаем только после того как приложение готово
+    setTimeout(() => {
+      this.loadRemainingHistoryInBackground();
+    }, 1000);
   }
 
   /**
-   * Предзагрузка изображений публичной ленты капсул
+   * Фоновая загрузка остальной истории (элементы 11-50)
+   * Выполняется с низким приоритетом после инициализации
    */
-  private async preloadPublicFeedImages(): Promise<void> {
-    try {
-      logger.info('Preloading public feed images');
-
-      // Динамически импортируем PublicFeedService
-      const { publicFeedService } = await import('./modules/publicFeed/PublicFeedService');
-      
-      // Загружаем первую страницу публичной ленты
-      const response = await publicFeedService.loadPublicCapsules(1, 10);
-
-      if (response.success && response.capsules.length > 0) {
-        const baseUrl = 'https://tgstyle.flappy.crazedns.ru';
-        
-        // Создаем массив промисов для предзагрузки изображений
-        const imagePromises = response.capsules
-          .filter(capsule => capsule.thumbnailUrl)
-          .map(capsule => {
-            return new Promise<void>((resolve) => {
-              const img = new Image();
-              img.onload = () => {
-                logger.debug('Preloaded feed image', { capsuleId: capsule.id });
-                resolve();
-              };
-              img.onerror = () => {
-                logger.warn('Failed to preload feed image', { capsuleId: capsule.id });
-                resolve();
-              };
-              img.src = baseUrl + capsule.thumbnailUrl!;
-            });
-          });
-
-        await Promise.allSettled(imagePromises);
-        logger.info('Public feed images preloaded', { count: imagePromises.length });
-      }
-    } catch (error) {
-      logger.error('Error during public feed preload', error);
+  private loadRemainingHistoryInBackground(): void {
+    const stats = historyManager.getStats();
+    if (stats.filledSlots < 10) {
+      // Если истории меньше 10 элементов, грузим все
+      historyManager.loadHistoryFromServer().catch(err => {
+        logger.error('Error loading remaining history', err);
+      });
     }
+    // Если история уже большая (>= 10), не грузим дополнительно при старте
+    logger.info('Background history load decision', { 
+      filledSlots: stats.filledSlots,
+      willLoad: stats.filledSlots < 10 
+    });
   }
 
   /**

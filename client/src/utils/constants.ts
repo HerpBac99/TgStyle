@@ -4,8 +4,10 @@
 
 import type { AppConfig } from '@/types/index';
 
+// Базовый URL сервера (без /api)
+export const BASE_URL = 'https://tgstyle.flappy.crazedns.ru';
 // URL API сервера (для Telegram Mini App всегда production)
-export const API_URL = 'https://tgstyle.flappy.crazedns.ru/api';
+export const API_URL = `${BASE_URL}/api`;
 
 // Конфигурация приложения
 export const APP_CONFIG: AppConfig = {

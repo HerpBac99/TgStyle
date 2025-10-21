@@ -118,7 +118,14 @@ class DataCacheManager {
    */
   private async loadWardrobeItems(): Promise<WardrobeItem[]> {
     try {
+      const loadStart = Date.now();
       const result = await api.getWardrobe();
+
+      const loadTime = Date.now() - loadStart;
+      logger.info('Wardrobe items loaded from server', {
+        itemsCount: result.items.length,
+        loadTime: `${loadTime}ms`
+      });
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to load wardrobe items');
@@ -230,9 +237,10 @@ class DataCacheManager {
       let cachedCount = 0;
       let failedCount = 0;
 
+      logger.info('Starting image cache', { totalImages: imageUrls.length });
 
-      // Кэшируем изображения порциями по 5 для контроля нагрузки
-      const batchSize = 5;
+      // Кэшируем изображения порциями по 10 для более быстрой загрузки
+      const batchSize = 10;
       for (let i = 0; i < imageUrls.length; i += batchSize) {
         const batch = imageUrls.slice(i, i + batchSize);
         
@@ -250,8 +258,7 @@ class DataCacheManager {
                   resolve({ url: absoluteUrl, success: true });
                 };
                 
-                img.onerror = (error) => {
-                  logger.error('Failed to preload image', { url: absoluteUrl, error });
+                img.onerror = () => {
                   reject(new Error(`Failed to load: ${absoluteUrl}`));
                 };
                 
@@ -275,12 +282,17 @@ class DataCacheManager {
           }
         });
 
-        // Небольшая задержка между батчами
+        // Минимальная задержка между батчами
         if (i + batchSize < imageUrls.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
       }
 
+      logger.info('Image cache completed', { 
+        cached: cachedCount, 
+        failed: failedCount,
+        total: imageUrls.length 
+      });
 
     } catch (error) {
       logger.error('Error caching images', error);
