@@ -71,20 +71,6 @@
     aspect-ratio: 1 / 2; /* Прямоугольник 1:2 */
 }
 
-/* Паттерн A: Большой элемент слева (позиции 0, 10, 20, ...) */
-.feed-item:nth-child(10n+1) {
-    grid-column: 1;
-    grid-row: span 2;
-    aspect-ratio: 1 / 2;
-}
-
-/* Паттерн B: Большой элемент справа (позиции 6, 16, 26, ...) */
-.feed-item:nth-child(10n+6) {
-    grid-column: 3;
-    grid-row: span 2;
-    aspect-ratio: 1 / 2;
-}
-
 /* Изображение карточки */
 .feed-item-image {
     width: 100%;

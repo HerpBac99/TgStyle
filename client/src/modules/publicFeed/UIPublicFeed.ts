@@ -95,17 +95,49 @@ export class UIPublicFeed {
     card.className = 'feed-item';
     card.dataset['capsuleId'] = String(capsule.id);
 
-    // Определяем большие элементы по паттерну Instagram
+    // Определяем позицию элемента по паттерну Instagram
     // Каждые 10 элементов - 2 паттерна по 5 элементов (2 строки каждый)
-    // Паттерн A (0-4): большой элемент 0 слева
-    // Паттерн B (5-9): большой элемент 5 справа
+    // Паттерн A (0-4): большой элемент 0 слева, маленькие справа
+    // Паттерн B (5-9): маленькие слева, большой элемент 7 справа
     const positionInPattern = index % 10;
+    
+    // Добавляем data-атрибут для отладки
+    card.dataset['position'] = String(positionInPattern);
+    
     if (positionInPattern === 0) {
-      // Большой элемент слева
-      card.classList.add('feed-item-large', 'feed-item-large-left');
+      // Большой элемент слева (2 строки)
+      card.classList.add('feed-item-large');
+      card.style.gridColumn = '1';
+      card.style.gridRow = 'span 2';
+    } else if (positionInPattern === 1) {
+      // Маленький, колонка 2
+      card.style.gridColumn = '2';
+    } else if (positionInPattern === 2) {
+      // Маленький, колонка 3
+      card.style.gridColumn = '3';
+    } else if (positionInPattern === 3) {
+      // Маленький, колонка 2
+      card.style.gridColumn = '2';
+    } else if (positionInPattern === 4) {
+      // Маленький, колонка 3
+      card.style.gridColumn = '3';
     } else if (positionInPattern === 5) {
-      // Большой элемент справа
-      card.classList.add('feed-item-large', 'feed-item-large-right');
+      // Маленький, колонка 1
+      card.style.gridColumn = '1';
+    } else if (positionInPattern === 6) {
+      // Маленький, колонка 2
+      card.style.gridColumn = '2';
+    } else if (positionInPattern === 7) {
+      // Большой элемент справа (2 строки)
+      card.classList.add('feed-item-large');
+      card.style.gridColumn = '3';
+      card.style.gridRow = 'span 2';
+    } else if (positionInPattern === 8) {
+      // Маленький, колонка 1
+      card.style.gridColumn = '1';
+    } else if (positionInPattern === 9) {
+      // Маленький, колонка 2
+      card.style.gridColumn = '2';
     }
 
     // Создаем изображение

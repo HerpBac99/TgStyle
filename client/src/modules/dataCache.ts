@@ -44,21 +44,44 @@ export interface Capsule {
 }
 
 /**
+ * Интерфейс для публичной капсулы в ленте
+ */
+export interface PublicFeedCapsule {
+  id: number;
+  name: string;
+  description?: string;
+  thumbnailUrl: string;
+  likesCount: number;
+  viewsCount: number;
+  isLiked: boolean;
+  author?: {
+    id: number;
+    username: string;
+    photoUrl?: string;
+  };
+  createdAt: string;
+}
+
+/**
  * Класс для управления кэшем данных
  */
 class DataCacheManager {
   private wardrobeItems: WardrobeItem[] = [];
   private capsules: Capsule[] = [];
+  private publicFeed: PublicFeedCapsule[] = [];
   private isLoading = false;
   private isLoaded = false;
 
   constructor() {
     // Загружаем кэш гардероба из localStorage при инициализации
     this.loadWardrobeCacheFromStorage();
-    
+
     // Загружаем кэш капсул из localStorage
     this.loadCapsulesCacheFromStorage();
-    
+
+    // Загружаем кэш публичной ленты из localStorage
+    this.loadPublicFeedCacheFromStorage();
+
     // Предзагружаем изображения из кэша
     this.preloadCachedImages();
   }
@@ -78,8 +101,8 @@ class DataCacheManager {
       const parsed = safeJsonParse<WardrobeItem[]>(cached, []);
       if (Array.isArray(parsed) && parsed.length > 0) {
         this.wardrobeItems = parsed;
-        logger.info('Wardrobe cache loaded from localStorage', { 
-          count: this.wardrobeItems.length 
+        logger.info('Wardrobe cache loaded from localStorage', {
+          count: this.wardrobeItems.length
         });
       }
     } catch (error) {
@@ -103,8 +126,8 @@ class DataCacheManager {
       const parsed = safeJsonParse<Capsule[]>(cached, []);
       if (Array.isArray(parsed) && parsed.length > 0) {
         this.capsules = parsed;
-        logger.info('Capsules cache loaded from localStorage', { 
-          count: this.capsules.length 
+        logger.info('Capsules cache loaded from localStorage', {
+          count: this.capsules.length
         });
       }
     } catch (error) {
@@ -114,8 +137,33 @@ class DataCacheManager {
   }
 
   /**
+   * Загрузка кэша публичной ленты из localStorage
+   * Вызывается при инициализации для мгновенного отображения
+   */
+  private loadPublicFeedCacheFromStorage(): void {
+    try {
+      const cached = localStorage.getItem(STORAGE_KEYS.PUBLIC_FEED_CACHE);
+      if (!cached) {
+        logger.info('No public feed cache in localStorage');
+        return;
+      }
+
+      const parsed = safeJsonParse<PublicFeedCapsule[]>(cached, []);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        this.publicFeed = parsed;
+        logger.info('Public feed cache loaded from localStorage', {
+          count: this.publicFeed.length
+        });
+      }
+    } catch (error) {
+      logger.error('Error loading public feed cache from storage', error);
+      this.publicFeed = [];
+    }
+  }
+
+  /**
    * Предзагрузка изображений из кэша при старте приложения
-   * Кэширует изображения гардероба и капсул в браузере для мгновенного отображения
+   * Кэширует изображения гардероба, капсул и публичной ленты в браузере для мгновенного отображения
    */
   private preloadCachedImages(): void {
     const imageUrls: string[] = [];
@@ -132,7 +180,7 @@ class DataCacheManager {
     // Собираем изображения капсул
     if (this.capsules.length > 0) {
       const capsuleUrls: string[] = [];
-      
+
       // Миниатюры капсул
       this.capsules.forEach(capsule => {
         if (capsule.thumbnailUrl) {
@@ -145,9 +193,18 @@ class DataCacheManager {
           }
         });
       });
-      
+
       imageUrls.push(...capsuleUrls);
       logger.info('Preloading capsules images from cache', { count: capsuleUrls.length });
+    }
+
+    // Собираем изображения публичной ленты
+    if (this.publicFeed.length > 0) {
+      const feedUrls = this.publicFeed
+        .map(capsule => capsule.thumbnailUrl)
+        .filter(url => url);
+      imageUrls.push(...feedUrls);
+      logger.info('Preloading public feed images from cache', { count: feedUrls.length });
     }
 
     if (imageUrls.length === 0) {
@@ -171,7 +228,7 @@ class DataCacheManager {
 
     try {
       const startTime = Date.now();
-      
+
       // Загружаем ВСЕ изображения параллельно
       const results = await Promise.allSettled(
         imageUrls.map(relativeUrl => {
@@ -179,10 +236,10 @@ class DataCacheManager {
             try {
               const absoluteUrl = this.makeAbsoluteUrl(relativeUrl);
               const img = new Image();
-              
+
               img.onload = () => resolve();
               img.onerror = () => reject(new Error(`Failed to load: ${absoluteUrl}`));
-              
+
               img.src = absoluteUrl;
             } catch (error) {
               reject(error);
@@ -195,7 +252,7 @@ class DataCacheManager {
       const failedCount = results.filter(r => r.status === 'rejected').length;
       const loadTime = Date.now() - startTime;
 
-      logger.info('✅ Priority images cached (wardrobe + capsules)', { 
+      logger.info('✅ Priority images cached (wardrobe + capsules)', {
         cached: cachedCount,
         failed: failedCount,
         total: imageUrls.length,
@@ -215,8 +272,8 @@ class DataCacheManager {
       const itemsToCache = this.wardrobeItems.slice(0, WARDROBE_CONSTRAINTS.CACHE_ITEMS);
       const json = safeJsonStringify(itemsToCache);
       localStorage.setItem(STORAGE_KEYS.WARDROBE_CACHE, json);
-      
-      logger.info('Wardrobe cache saved to localStorage', { 
+
+      logger.info('Wardrobe cache saved to localStorage', {
         count: itemsToCache.length,
         sizeKB: (json.length / 1024).toFixed(2)
       });
@@ -232,13 +289,30 @@ class DataCacheManager {
     try {
       const json = safeJsonStringify(this.capsules);
       localStorage.setItem(STORAGE_KEYS.CAPSULES_CACHE, json);
-      
-      logger.info('Capsules cache saved to localStorage', { 
+
+      logger.info('Capsules cache saved to localStorage', {
         count: this.capsules.length,
         sizeKB: (json.length / 1024).toFixed(2)
       });
     } catch (error) {
       logger.error('Error saving capsules cache to storage', error);
+    }
+  }
+
+  /**
+   * Сохранение публичной ленты в localStorage
+   */
+  private savePublicFeedCacheToStorage(): void {
+    try {
+      const json = safeJsonStringify(this.publicFeed);
+      localStorage.setItem(STORAGE_KEYS.PUBLIC_FEED_CACHE, json);
+
+      logger.info('Public feed cache saved to localStorage', {
+        count: this.publicFeed.length,
+        sizeKB: (json.length / 1024).toFixed(2)
+      });
+    } catch (error) {
+      logger.error('Error saving public feed cache to storage', error);
     }
   }
 
@@ -266,7 +340,7 @@ class DataCacheManager {
       if (wardrobeResponse.status === 'fulfilled') {
         this.wardrobeItems = wardrobeResponse.value;
         logger.info('Wardrobe items loaded', { count: this.wardrobeItems.length });
-        
+
         // Всегда сохраняем в localStorage при успешной загрузке
         // (могли измениться данные элементов, не только количество)
         this.saveWardrobeCacheToStorage();
@@ -277,7 +351,7 @@ class DataCacheManager {
       if (capsulesResponse.status === 'fulfilled') {
         this.capsules = capsulesResponse.value;
         logger.info('Capsules loaded', { count: this.capsules.length });
-        
+
         // Всегда сохраняем в localStorage при успешной загрузке
         // (могли измениться данные капсул, не только количество)
         this.saveCapsulesCacheToStorage();
@@ -287,7 +361,7 @@ class DataCacheManager {
 
       // Собираем URL изображений для кэширования (история + капсулы, БЕЗ гардероба)
       const imageUrls = this.collectImageUrls();
-      
+
       // Фильтруем изображения гардероба (они уже закэшированы в preloadCachedImages)
       const wardrobeUrls = new Set(this.wardrobeItems.map(item => item.imageUrl));
       const remainingUrls = imageUrls.filter(url => !wardrobeUrls.has(url));
@@ -446,28 +520,28 @@ class DataCacheManager {
       const batchSize = IMAGE_CACHE_CONFIG.BATCH_SIZE;
       for (let i = 0; i < imageUrls.length; i += batchSize) {
         const batch = imageUrls.slice(i, i + batchSize);
-        
+
         const results = await Promise.allSettled(
           batch.map(async (relativeUrl) => {
             return new Promise<{ url: string; success: boolean }>((resolve, reject) => {
               try {
                 // Конвертируем в абсолютный URL
                 const absoluteUrl = this.makeAbsoluteUrl(relativeUrl);
-                
+
                 // Создаем Image объект для предзагрузки
                 const img = new Image();
-                
+
                 img.onload = () => {
                   resolve({ url: absoluteUrl, success: true });
                 };
-                
+
                 img.onerror = () => {
                   reject(new Error(`Failed to load: ${absoluteUrl}`));
                 };
-                
+
                 // Начинаем загрузку
                 img.src = absoluteUrl;
-                
+
               } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
                 logger.warn('Failed to cache image', { url: relativeUrl, error: errorMessage });
@@ -491,10 +565,10 @@ class DataCacheManager {
         }
       }
 
-      logger.info('Image cache completed', { 
-        cached: cachedCount, 
+      logger.info('Image cache completed', {
+        cached: cachedCount,
         failed: failedCount,
-        total: imageUrls.length 
+        total: imageUrls.length
       });
 
     } catch (error) {
@@ -540,7 +614,7 @@ class DataCacheManager {
     const index = this.wardrobeItems.findIndex(item => item.id === itemId);
     if (index !== -1) {
       this.wardrobeItems[index] = updatedItem;
-      
+
       // Обновляем localStorage кэш если элемент в первых 30
       if (index < WARDROBE_CONSTRAINTS.CACHE_ITEMS) {
         this.saveWardrobeCacheToStorage();
@@ -555,7 +629,7 @@ class DataCacheManager {
     const index = this.wardrobeItems.findIndex(item => item.id === itemId);
     if (index !== -1) {
       this.wardrobeItems.splice(index, 1);
-      
+
       // Обновляем localStorage кэш
       this.saveWardrobeCacheToStorage();
     }
@@ -605,9 +679,48 @@ class DataCacheManager {
     const index = this.capsules.findIndex(c => c.id === capsuleId);
     if (index !== -1) {
       this.capsules.splice(index, 1);
-      
+
       // Обновляем localStorage кэш
       this.saveCapsulesCacheToStorage();
+    }
+  }
+
+  /**
+   * Получить публичную ленту из кэша
+   */
+  getPublicFeed(): PublicFeedCapsule[] {
+    return [...this.publicFeed];
+  }
+
+  /**
+   * Установить публичную ленту в кэш
+   */
+  setPublicFeed(capsules: PublicFeedCapsule[]): void {
+    this.publicFeed = capsules;
+
+    // Сохраняем в localStorage
+    this.savePublicFeedCacheToStorage();
+
+    // Кэшируем изображения
+    const imageUrls = capsules.map(c => c.thumbnailUrl).filter(url => url);
+    if (imageUrls.length > 0) {
+      this.cacheImages(imageUrls).catch(error => {
+        logger.error('Error caching public feed images', error);
+      });
+    }
+  }
+
+  /**
+   * Обновить лайк капсулы в публичной ленте
+   */
+  updatePublicFeedLike(capsuleId: number, isLiked: boolean, likesCount: number): void {
+    const capsule = this.publicFeed.find(c => c.id === capsuleId);
+    if (capsule) {
+      capsule.isLiked = isLiked;
+      capsule.likesCount = likesCount;
+
+      // Обновляем localStorage кэш
+      this.savePublicFeedCacheToStorage();
     }
   }
 
@@ -631,6 +744,7 @@ class DataCacheManager {
   clearAllCache(): void {
     this.wardrobeItems = [];
     this.capsules = [];
+    this.publicFeed = [];
     this.isLoaded = false;
     logger.info('All cache cleared');
   }
@@ -643,7 +757,8 @@ class DataCacheManager {
       isLoaded: this.isLoaded,
       isLoading: this.isLoading,
       wardrobeItemsCount: this.wardrobeItems.length,
-      capsulesCount: this.capsules.length
+      capsulesCount: this.capsules.length,
+      publicFeedCount: this.publicFeed.length
     };
   }
 }
