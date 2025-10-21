@@ -62,8 +62,8 @@ export class UIManager {
     window.addEventListener('analysisStateChange', this.handleAnalysisStateChange.bind(this) as EventListener);
     window.addEventListener('photo:captured', this.handlePhotoCaptured.bind(this) as EventListener);
 
-    // Обработчик видимости страницы (для очистки состояния при сворачивании)
-    document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
+    // ПРИМЕЧАНИЕ: Обработчик visibilitychange находится в uiMenu.ts
+    // для избежания дублирования логики
   }
 
   /**
@@ -106,95 +106,73 @@ export class UIManager {
   }
 
   /**
-   * Обработка переключения закладок
+   * Скрыть все закладки
    */
-  private handleTabSwitch(tabName: string): void {
+  private hideAllTabs(): void {
     const mainContent = document.querySelector('.main-content') as HTMLElement;
     const wardrobeContent = document.querySelector('.wardrobe-content') as HTMLElement;
     const capsulesContent = document.querySelector('.capsules-content') as HTMLElement;
     const feedContent = document.getElementById('feed-content') as HTMLElement;
     const clothesContainerMain = document.getElementById('wardrobe-clothes-container') as HTMLElement;
 
+    if (mainContent) mainContent.classList.add('hidden');
+    if (wardrobeContent) wardrobeContent.classList.add('hidden');
+    if (capsulesContent) capsulesContent.classList.add('hidden');
+    if (feedContent) feedContent.classList.add('hidden');
+    if (clothesContainerMain) clothesContainerMain.classList.add('hidden');
+  }
 
+  /**
+   * Обработка переключения закладок
+   */
+  private handleTabSwitch(tabName: string): void {
+    // Сначала скрываем все закладки
+    this.hideAllTabs();
+
+    // Затем показываем нужную и вызываем соответствующий обработчик
     switch (tabName) {
-      case 'main':
-        // Показываем главный экран с анализом
+      case 'main': {
+        const mainContent = document.querySelector('.main-content') as HTMLElement;
         if (mainContent) mainContent.classList.remove('hidden');
-        //Скрываем экран гардероба
-        if (wardrobeContent) wardrobeContent.classList.add('hidden');
-        if (clothesContainerMain) clothesContainerMain.classList.add('hidden');
-        // Скрываем экран капсул
-        if (capsulesContent) capsulesContent.classList.add('hidden');
-        // Скрываем ленту
-        if (feedContent) feedContent.classList.add('hidden');
-
         uiMenuManager.updateHistoryDisplay();
         break;
+      }
 
-      case 'feed':
-        // Скрываем главный экран с анализом
-        if (mainContent) mainContent.classList.add('hidden');
-        // Скрываем экран гардероба
-        if (wardrobeContent) wardrobeContent.classList.add('hidden');
-        if (clothesContainerMain) clothesContainerMain.classList.add('hidden');
-        // Скрываем экран капсул
-        if (capsulesContent) capsulesContent.classList.add('hidden');
-        // Показываем ленту
+      case 'feed': {
+        const feedContent = document.getElementById('feed-content') as HTMLElement;
         if (feedContent) feedContent.classList.remove('hidden');
-
-        // Обрабатываем открытие ленты через специализированный менеджер
+        
         publicFeedManager.open().catch((error: unknown) => {
           logger.error('Error handling feed open', error);
         });
         break;
+      }
 
-      case 'wardrobe':
-        // Скрываем главный экран с анализом
-        if (mainContent) mainContent.classList.add('hidden');
-        // Показываем экран гардероба
+      case 'wardrobe': {
+        const wardrobeContent = document.querySelector('.wardrobe-content') as HTMLElement;
+        const clothesContainerMain = document.getElementById('wardrobe-clothes-container') as HTMLElement;
         if (wardrobeContent) wardrobeContent.classList.remove('hidden');
         if (clothesContainerMain) clothesContainerMain.classList.remove('hidden');
-        // Скрываем экран капсул
-        if (capsulesContent) capsulesContent.classList.add('hidden');
-        // Скрываем ленту
-        if (feedContent) feedContent.classList.add('hidden');
 
-        // Обрабатываем открытие гардероба через специализированный менеджер
         uiWardrobeManager.handleWardrobeOpen().catch((error: unknown) => {
           logger.error('Error handling wardrobe open', error);
         });
         break;
+      }
 
-      case 'capsules':
-        // Скрываем главный экран с анализом
-        if (mainContent) mainContent.classList.add('hidden');
-        // Скрываем экран гардероба
-        if (wardrobeContent) wardrobeContent.classList.add('hidden');
-        if (clothesContainerMain) clothesContainerMain.classList.add('hidden');
-        // Показываем экран капсул
+      case 'capsules': {
+        const capsulesContent = document.querySelector('.capsules-content') as HTMLElement;
         if (capsulesContent) capsulesContent.classList.remove('hidden');
-        // Скрываем ленту
-        if (feedContent) feedContent.classList.add('hidden');
 
-        // Обрабатываем открытие капсул через специализированный менеджер
         uiCapsulesManager.handleCapsulesOpen().catch((error: unknown) => {
           logger.error('Error handling capsules open', error);
         });
         break;
+      }
 
       default:
         logger.warn('Unknown tab', { tab: tabName });
         break;
-    }
-  }
-
-  /**
-   * Обработчик изменения видимости страницы
-   */
-  private handleVisibilityChange(): void {
-    if (document.hidden && uiMenuManager.getStats().longPressActive) {
-      // Если страница свернута и активен режим удаления, выходим из него
-      uiMenuManager.exitDeleteModePublic();
     }
   }
 
@@ -226,8 +204,8 @@ export class UIManager {
   /**
    * Показать shared анализ
    */
-  async showSharedAnalysis(photoBase64: string, analysisText: string, timestamp: string, historyItemId?: number): Promise<void> {
-    await uiCoreManager.showSharedAnalysis(photoBase64, analysisText, timestamp, historyItemId);
+  async showSharedAnalysis(photoBase64: string, analysisText: string, timestamp: string, historyItemId?: number, likesCount?: number, isLiked?: boolean): Promise<void> {
+    await uiCoreManager.showSharedAnalysis(photoBase64, analysisText, timestamp, historyItemId, likesCount, isLiked);
   }
 
   /**
@@ -305,17 +283,3 @@ export const uiManager = new UIManager();
 
 // Экспортируем отдельные менеджеры для прямого доступа при необходимости
 export { uiMenuManager, uiAnalysisManager, uiCoreManager, uiWardrobeManager, uiCapsulesManager };
-
-// Импортируем типы для обратной совместимости
-
-// Глобальные переменные для обратной совместимости (постепенно уберем)
-declare global {
-  var currentPreview: HTMLElement | null;
-  var currentAnalysisData: any;
-  var currentLamodaUrl: string | null;
-}
-
-// Инициализируем глобальные переменные для обратной совместимости
-globalThis.currentPreview = null;
-globalThis.currentAnalysisData = uiAnalysisManager.getCurrentAnalysisData?.() || {};
-globalThis.currentLamodaUrl = uiAnalysisManager.getCurrentLamodaUrl?.() || null;

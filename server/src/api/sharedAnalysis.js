@@ -153,7 +153,9 @@ router.get('/:analysisId', async (req, res) => {
                 photo: photoBase64,
                 analysis: analysisText,  // Креативный ответ стилиста
                 timestamp: historyItem.createdAt.toISOString(),
-                historyItemId: historyItem.id
+                historyItemId: historyItem.id,
+                likesCount: historyItem.likesCount || 0,
+                isLiked: false // Для shared анализа всегда false, так как это не своя история
             }
         });
 

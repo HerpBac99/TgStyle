@@ -125,7 +125,9 @@ class TgStyleApp {
           data.photo, 
           data.analysis, 
           data.timestamp, 
-          data.historyItemId
+          data.historyItemId,
+          data.likesCount,
+          data.isLiked
         );
       } else {
         logger.warn('Server returned no data for shared analysis', { 

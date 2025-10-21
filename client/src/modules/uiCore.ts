@@ -27,7 +27,7 @@ declare global {
 export class UICoreManager {
   private cleanupFunctions: (() => void)[] = [];
 
-  constructor() {}
+  constructor() { }
 
   /**
    * Показать модальное окно покупки подписки
@@ -222,19 +222,73 @@ export class UICoreManager {
 
   /**
    * Показать shared анализ другого пользователя
+   * @param photoBase64 - Base64 изображения
+   * @param analysisText - Текст анализа
+   * @param timestamp - Временная метка
+   * @param historyItemId - ID элемента истории
+   * @param likesCount - Количество лайков
+   * @param isLiked - Лайкнул ли текущий пользователь
    */
-  async showSharedAnalysis(photoBase64: string, analysisText: string, timestamp: string, historyItemId?: number): Promise<void> {
-    logger.info('Showing shared analysis', { historyItemId });
+  async showSharedAnalysis(photoBase64: string, analysisText: string, timestamp: string, historyItemId?: number, likesCount?: number, isLiked?: boolean): Promise<void> {
+    logger.info('Showing shared analysis', { historyItemId, hasPhoto: !!photoBase64, likesCount, isLiked });
 
     try {
-      // Имитируем загрузку
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // ОПТИМИЗАЦИЯ: Убрана искусственная задержка для ускорения загрузки
+
+      // Показываем экран анализа с фото
+      const analysisScreen = getElement('#analysis-screen');
+      const analysisPhoto = getElement('#analysis-photo') as HTMLImageElement;
+      const loadingIndicator = getElement('#analysis-loading');
+      const resultContainer = getElement('#analysis-result-container');
+
+      if (!analysisScreen || !analysisPhoto || !loadingIndicator || !resultContainer) {
+        logger.error('Analysis screen elements not found');
+        return;
+      }
+
+      // Устанавливаем фото (проверяем есть ли уже data URL префикс)
+      if (photoBase64.startsWith('data:image')) {
+        analysisPhoto.src = photoBase64;
+      } else {
+        analysisPhoto.src = `data:image/jpeg;base64,${photoBase64}`;
+      }
+
+      logger.info('Photo src set for shared analysis', {
+        hasPrefix: photoBase64.startsWith('data:image'),
+        srcLength: analysisPhoto.src.length
+      });
+
+      // Скрываем результат, показываем загрузку
+      resultContainer.classList.add('hidden');
+      loadingIndicator.classList.remove('hidden');
 
       // Показываем экран анализа
-      this.showFullscreenPreview(photoBase64);
+      analysisScreen.classList.remove('hidden');
 
-      // Показываем результат анализа с historyItemId для лайков
-      this.showAnalysisResult(analysisText, historyItemId);
+      // Используем uiAnalysisManager для показа результата анализа
+      uiAnalysisManager.showAnalysisResult(analysisText, historyItemId);
+
+      // Добавляем кнопку лайка для shared анализа (если есть historyItemId)
+      if (historyItemId) {
+        const resultActions = getElement('.result-actions');
+        if (resultActions) {
+          // Импортируем analysisLikesService
+          const { analysisLikesService } = await import('./analysis/AnalysisLikesService');
+          
+          // Создаем компонент лайков с данными с сервера
+          analysisLikesService.createLikeComponent(
+            resultActions,
+            historyItemId,
+            { 
+              isLiked: isLiked || false, 
+              likesCount: likesCount || 0 
+            },
+            'result' // Добавляем класс для экрана результата
+          );
+
+          logger.info('Like button added for shared analysis', { historyItemId, likesCount, isLiked });
+        }
+      }
 
       // Добавляем индикацию что это shared анализ
       const resultHeader = getElement('.result-header h3');
@@ -246,55 +300,6 @@ export class UICoreManager {
     } catch (error) {
       logger.error('Failed to show shared analysis', error);
     }
-  }
-
-  /**
-   * Показать экран анализа для shared анализа
-   */
-  private showFullscreenPreview(imageBase64: string): void {
-    logger.info('Showing shared analysis screen');
-
-    // Получаем элементы экрана анализа
-    const analysisScreen = getElement('#analysis-screen');
-    const analysisPhoto = getElement('#analysis-photo') as HTMLImageElement;
-    const loadingIndicator = getElement('#analysis-loading');
-    const resultContainer = getElement('#analysis-result-container');
-
-    if (!analysisScreen || !analysisPhoto || !loadingIndicator || !resultContainer) {
-      logger.error('Analysis screen elements not found');
-      return;
-    }
-
-    // Устанавливаем фото (проверяем есть ли уже data URL префикс)
-    if (imageBase64.startsWith('data:image')) {
-      analysisPhoto.src = imageBase64;
-    } else {
-      analysisPhoto.src = `data:image/jpeg;base64,${imageBase64}`;
-    }
-
-    logger.info('Photo src set', { 
-      hasPrefix: imageBase64.startsWith('data:image'),
-      srcLength: analysisPhoto.src.length 
-    });
-
-    // Скрываем результат, показываем загрузку
-    resultContainer.classList.add('hidden');
-    loadingIndicator.classList.remove('hidden');
-
-    // Показываем экран анализа
-    analysisScreen.classList.remove('hidden');
-
-    logger.info('Shared analysis screen displayed');
-  }
-
-  /**
-   * Показать результат анализа (для shared анализа)
-   */
-  private showAnalysisResult(result: string, historyItemId?: number): void {
-    logger.info('Showing shared analysis result', { historyItemId });
-
-    // Используем uiAnalysisManager для показа результата (унифицированный подход)
-    uiAnalysisManager.showAnalysisResult(result, historyItemId);
   }
 
   /**
@@ -320,8 +325,11 @@ export class UICoreManager {
 
   /**
    * Инициализация
+   * ПРИМЕЧАНИЕ: Метод оставлен для совместимости с интерфейсом UI менеджеров.
+   * UICoreManager не требует инициализации, так как все компоненты создаются по требованию.
    */
   init(): void {
+    // Инициализация не требуется
   }
 
   /**

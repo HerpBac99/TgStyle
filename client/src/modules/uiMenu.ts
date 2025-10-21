@@ -1427,23 +1427,12 @@ export class UIMenuManager {
   }
 
   /**
-   * Показывает диалог подтверждения через Telegram API (silent fallback)
+   * Показывает диалог подтверждения через uiCoreManager
+   * ПРИМЕЧАНИЕ: Используем централизованный метод из uiCoreManager
+   * для избежания дублирования логики
    */
   private async showConfirmDialog(message: string): Promise<boolean> {
-    try {
-      if (window.Telegram?.WebApp?.showConfirm) {
-        return new Promise((resolve) => {
-          window.Telegram!.WebApp.showConfirm(message, resolve);
-        });
-      } else {
-        // Silent fallback - всегда подтверждаем
-        logger.info('Silent confirm', { message });
-        return true;
-      }
-    } catch (error) {
-      logger.warn('Failed to show Telegram confirm dialog', error);
-      return true; // Silent fallback
-    }
+    return await uiCoreManager.showConfirmDialog(message);
   }
 
   /**

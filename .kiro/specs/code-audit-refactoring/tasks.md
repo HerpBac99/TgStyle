@@ -1,387 +1,405 @@
-# Implementation Plan
+# План реализации
 
-## Phase 1: Analysis and Discovery
+## Фаза 1: Анализ и исследование
 
-- [-] 1. Prepare audit environment
+- [x] 1. Подготовка окружения для аудита
 
 
 
-  - Create git commit with current state
-  - Verify project compiles: `npm run type-check`
-  - Document current metrics (lines of code, bundle size)
-  - _Requirements: 8.1, 8.2_
 
-- [ ] 2. Audit client modules - Core managers
-  - [ ] 2.1 Analyze uiManager.ts for dead code and duplicates
-    - Extract all public methods and check usage
-    - Identify unused private methods
-    - Check for duplicate logic with other UI managers
-    - _Requirements: 1.1, 1.2, 1.4_
-  
-  - [ ] 2.2 Analyze uiCore.ts and uiMenu.ts
-    - Check for overlapping functionality
-    - Identify duplicate UI manipulation code
-    - Verify singleton pattern compliance
-    - _Requirements: 1.1, 1.4_
-  
-  - [ ] 2.3 Analyze uiModalManager.ts and navigationManager.ts
-    - Check for unused modal configurations
-    - Verify navigation stack usage
-    - Identify duplicate event handlers
-    - _Requirements: 1.1, 1.2_
 
-- [ ] 3. Audit client modules - Feature modules
-  - [ ] 3.1 Analyze dataCache.ts and history.ts
-    - Check for duplicate caching logic
-    - Identify unused cache methods
-    - Verify localStorage usage patterns
-    - _Requirements: 1.1, 1.2, 1.3_
-  
-  - [ ] 3.2 Analyze api.ts and auth.ts
-    - Check for duplicate error handling
-    - Identify unused API methods (e.g., checkLikeStatus marked DEPRECATED)
-    - Verify initData handling consistency
-    - _Requirements: 1.1, 1.2_
-  
-  - [ ] 3.3 Analyze logger.ts and photoUploadManager.ts
-    - Check for duplicate logging patterns
-    - Identify unused log levels or methods
-    - Verify photo upload handler usage
-    - _Requirements: 1.1, 1.2_
+  - Создать git commit с текущим состоянием
+  - Проверить компиляцию проекта: `npm run type-check`
+  - Задокументировать текущие метрики (строки кода, размер бандла)
+  - _Требования: 8.1, 8.2_
 
-- [ ] 4. Audit client modules - Domain modules
-  - [ ] 4.1 Analyze wardrobe modules (WardrobeManager.ts, WardrobeService.ts)
-    - Check for duplicate CRUD operations
-    - Identify unused wardrobe methods
-    - Verify separation of concerns between Manager and Service
-    - _Requirements: 1.1, 1.2, 4.1_
-  
-  - [ ] 4.2 Analyze capsules modules (CapsulesManager.ts, CapsulesService.ts, CapsulesSharing.ts)
-    - Check for duplicate CRUD operations
-    - Identify unused capsule methods
-    - Verify sharing logic is not duplicated
-    - _Requirements: 1.1, 1.2, 4.1_
-  
-  - [ ] 4.3 Analyze publicFeed modules
-    - Check for duplicate feed loading logic
-    - Identify unused feed methods
-    - Verify like/unlike logic consistency
-    - _Requirements: 1.1, 1.2_
+- [x] 2. Аудит клиентских модулей - Основные менеджеры
 
-- [ ] 5. Audit client modules - Shared utilities
-  - [ ] 5.1 Analyze DataLoader.ts and ImageRenderService.ts
-    - Check for duplicate data loading patterns
-    - Identify duplicate image caching logic
-    - Verify cache fallback strategies
-    - _Requirements: 1.1, 4.1, 4.2_
-  
-  - [ ] 5.2 Analyze PhotoProcessor.ts and SharingService.ts
-    - Check for duplicate photo processing logic
-    - Identify duplicate sharing logic
-    - Verify Telegram WebApp integration
-    - _Requirements: 1.1, 4.1_
-  
-  - [ ] 5.3 Analyze ItemSelector.ts and utils.ts
-    - Check for duplicate utility functions
-    - Identify unused utility methods
-    - Verify type conversion functions
-    - _Requirements: 1.1, 1.2, 4.1_
 
-- [ ] 6. Audit server API endpoints
-  - [ ] 6.1 Analyze authentication and authorization
-    - Check auth.js for duplicate logic
-    - Verify authHelper.js usage across all endpoints
-    - Identify endpoints missing auth checks
-    - _Requirements: 2.1, 2.3, 2.4_
-  
-  - [ ] 6.2 Analyze file handling endpoints
-    - Check analyze.js, backgroundRemoval.js, clothingClassification.js
-    - Verify fileStorage.js usage consistency
-    - Identify duplicate image processing logic
-    - _Requirements: 2.1, 2.5_
-  
-  - [ ] 6.3 Analyze CRUD endpoints
-    - Check history.js, wardrobe.js, capsules.js
-    - Identify duplicate Prisma query patterns
-    - Verify error handling consistency
-    - _Requirements: 2.1, 2.4, 2.5_
-  
-  - [ ] 6.4 Analyze social features endpoints
-    - Check analysisLikes.js, capsuleLikes.js, sharedAnalysis.js
-    - Identify duplicate like/unlike logic
-    - Verify denormalized counter updates
-    - _Requirements: 2.1, 2.5_
-  
-  - [ ] 6.5 Analyze utility endpoints
-    - Check subscription.js, initialData.js
-    - Identify unused routes
-    - Verify batch loading optimization
-    - _Requirements: 2.1, 2.2_
 
-- [ ] 7. Audit database schema
-  - [ ] 7.1 Analyze User and HistoryItem models
-    - Check for unused fields (e.g., photoData marked deprecated)
-    - Verify field usage in server code
-    - Check index usage for common queries
-    - _Requirements: 3.1, 3.2, 3.3_
-  
-  - [ ] 7.2 Analyze WardrobeItem and Capsule models
-    - Check ClothingCategory enum usage
-    - Verify all fields are used in code
-    - Check index coverage for queries
-    - _Requirements: 3.1, 3.2, 3.3, 3.4_
-  
-  - [ ] 7.3 Analyze social models (Rating, Comment, Notification, CapsuleLike)
-    - Check cascade delete configurations
-    - Verify denormalized counters (likesCount, viewsCount)
-    - Check index coverage for foreign keys
-    - _Requirements: 3.1, 3.3, 3.5_
-  
-  - [ ] 7.4 Check TypeScript types vs Prisma schema
-    - Compare client/src/types/ with schema.prisma
-    - Identify type mismatches
-    - Verify enum consistency (ClothingCategory)
-    - _Requirements: 1.3, 3.4_
 
-- [ ] 8. Generate Phase 1 analysis report
-  - Compile all findings from client, server, and database audits
-  - Categorize issues by severity (high/medium/low)
-  - Create prioritized list of refactoring tasks
-  - Document current metrics (LOC, file count, bundle size)
-  - _Requirements: 8.1, 8.2, 8.3_
 
-## Phase 2: Refactoring and Cleanup
 
-- [ ] 9. Consolidate duplicate functions - Client
-  - [ ] 9.1 Create shared image caching utility
-    - Extract common caching logic from dataCache.ts and ImageRenderService.ts
-    - Create `client/src/modules/shared/ImageCache.ts`
-    - Update all usages to use new utility
-    - _Requirements: 4.1, 4.2, 4.3, 4.4_
-  
-  - [ ] 9.2 Create shared data loading utility
-    - Extract common loading patterns from various Service classes
-    - Enhance DataLoader.ts with additional patterns
-    - Update all Service classes to use DataLoader
-    - _Requirements: 4.1, 4.2, 4.3, 4.4_
-  
-  - [ ] 9.3 Create shared error handling utility
-    - Extract common try-catch patterns
-    - Create `client/src/modules/shared/ErrorHandler.ts`
-    - Update all modules to use shared error handling
-    - _Requirements: 4.1, 4.2, 4.3, 4.4, 6.3_
+  - [x] 2.1 Анализ uiManager.ts на мертвый код и дубликаты
 
-- [ ] 10. Consolidate duplicate functions - Server
-  - [ ] 10.1 Create shared Prisma utilities
-    - Extract common query patterns
-    - Create `server/src/utils/prismaHelpers.js`
-    - Update all API endpoints to use helpers
-    - _Requirements: 4.1, 4.2, 4.3, 4.4_
-  
-  - [ ] 10.2 Create shared validation utilities
-    - Extract common validation logic
-    - Create `server/src/utils/validation.js`
-    - Update all endpoints to use shared validation
-    - _Requirements: 4.1, 4.2, 4.3, 4.4_
-  
-  - [ ] 10.3 Enhance error handling middleware
-    - Consolidate error handling patterns
-    - Update server.js error middleware
-    - Ensure all endpoints use consistent error responses
-    - _Requirements: 4.1, 4.2, 4.3, 4.4, 6.3_
 
-- [ ] 11. Remove dead code - Client
-  - [ ] 11.1 Remove unused methods from large classes
-    - Remove unused methods from UIManager, UIAnalysisManager
-    - Remove deprecated methods (e.g., checkLikeStatus in api.ts)
-    - Update documentation for removed methods
-    - _Requirements: 5.1, 5.2, 5.4_
+    - Извлечь все публичные методы и проверить использование
+    - Определить неиспользуемые приватные методы
+    - Проверить дублирование логики с другими UI менеджерами
+    - _Требования: 1.1, 1.2, 1.4_
   
-  - [ ] 11.2 Remove unused imports
-    - Scan all client modules for unused imports
-    - Remove unused imports systematically
-    - Verify compilation after each batch
-    - _Requirements: 5.1, 5.3, 5.5_
-  
-  - [ ] 11.3 Remove commented code
-    - Identify commented code blocks older than 30 days
-    - Remove obsolete commented code
-    - Keep only relevant TODO comments
-    - _Requirements: 5.1, 5.4_
 
-- [ ] 12. Remove dead code - Server
-  - [ ] 12.1 Remove unused routes and handlers
-    - Identify unused API routes
-    - Remove unused middleware
-    - Update route documentation
-    - _Requirements: 5.1, 5.2, 5.4_
-  
-  - [ ] 12.2 Remove unused utility functions
-    - Check authHelper.js and fileStorage.js for unused exports
-    - Remove unused helper functions
-    - Verify all endpoints still work
-    - _Requirements: 5.1, 5.2, 5.5_
 
-- [ ] 13. Clean up database schema
-  - [ ] 13.1 Remove deprecated fields
-    - Remove photoData field from HistoryItem (marked deprecated)
-    - Create migration for field removal
-    - Update all code references
-    - _Requirements: 5.1, 5.2, 3.2_
-  
-  - [ ] 13.2 Remove unused fields
-    - Identify and remove unused fields from models
-    - Create migrations for schema changes
-    - Update Prisma client
-    - _Requirements: 5.1, 5.2, 3.2_
+  - [x] 2.2 Анализ uiCore.ts и uiMenu.ts
 
-- [ ] 14. Standardize coding patterns - Client
-  - [ ] 14.1 Standardize singleton exports
-    - Verify all modules follow pattern: `export const moduleName = new ModuleClass()`
-    - Fix any violations
-    - Update documentation
-    - _Requirements: 6.1, 6.2_
-  
-  - [ ] 14.2 Standardize error handling
-    - Apply consistent try-catch patterns
-    - Use shared ErrorHandler utility
-    - Ensure all errors are logged
-    - _Requirements: 6.1, 6.3_
-  
-  - [ ] 14.3 Standardize logging
-    - Apply consistent logging patterns
-    - Use logger module everywhere
-    - Remove console.log statements
-    - _Requirements: 6.1, 6.4_
-  
-  - [ ] 14.4 Standardize API calls
-    - Replace direct fetch with api client
-    - Ensure consistent error handling
-    - Verify initData is passed correctly
-    - _Requirements: 6.1, 6.4_
-  
-  - [ ] 14.5 Update JSDoc comments
-    - Add missing JSDoc for public methods
-    - Update outdated comments
-    - Document parameters and return types
-    - _Requirements: 6.1, 6.5_
 
-- [ ] 15. Standardize coding patterns - Server
-  - [ ] 15.1 Standardize error handling
-    - Apply consistent error handling in all endpoints
-    - Use centralized error middleware
-    - Ensure all errors are logged
-    - _Requirements: 6.1, 6.3_
-  
-  - [ ] 15.2 Standardize logging
-    - Apply consistent logging patterns
-    - Use logger from logsController
-    - Add request/response logging where missing
-    - _Requirements: 6.1, 6.4_
-  
-  - [ ] 15.3 Standardize Prisma usage
-    - Use shared Prisma helpers
-    - Apply consistent transaction patterns
-    - Ensure proper error handling for DB operations
-    - _Requirements: 6.1, 6.4_
 
-## Phase 3: Optimization and Reporting
 
-- [ ] 16. Optimize imports - Client
-  - [ ] 16.1 Replace relative imports with path aliases
-    - Convert all relative imports to use @/ aliases
-    - Update tsconfig.json if needed
-    - Verify compilation after changes
-    - _Requirements: 7.1, 7.5_
-  
-  - [ ] 16.2 Create barrel exports
-    - Create index.ts for shared utilities
-    - Create index.ts for domain modules
-    - Update imports to use barrel exports
-    - _Requirements: 7.1, 7.5_
-  
-  - [ ] 16.3 Fix circular dependencies
-    - Identify circular dependencies
-    - Refactor to break circular imports
-    - Verify no circular dependencies remain
-    - _Requirements: 7.2_
-  
-  - [ ] 16.4 Split large modules
-    - Identify modules >500 lines
-    - Split into smaller, focused modules
-    - Update imports and exports
-    - _Requirements: 7.3_
-  
-  - [ ] 16.5 Use named exports
-    - Convert default exports to named exports
-    - Update all import statements
-    - Verify tree-shaking improvements
-    - _Requirements: 7.4_
 
-- [ ] 17. Optimize imports - Server
-  - [ ] 17.1 Organize server utilities
-    - Group related utilities
-    - Create index.js for utils folder
-    - Update imports across endpoints
-    - _Requirements: 7.1, 7.5_
+    - Проверить пересекающуюся функциональность
+    - Определить дублирующийся код манипуляции UI
+    - Проверить соответствие паттерну singleton
+    - _Требования: 1.1, 1.4_
   
-  - [ ] 17.2 Split large API files
-    - Identify API files >300 lines
-    - Split into controller + route files
-    - Update server.js route registration
-    - _Requirements: 7.3_
+  - [x] 2.3 Анализ uiModalManager.ts и navigationManager.ts
 
-- [ ] 18. Final validation and testing
-  - [ ] 18.1 Run TypeScript compilation
-    - Execute `npm run type-check`
-    - Fix any compilation errors
-    - Verify no type errors remain
-    - _Requirements: 5.5_
-  
-  - [ ] 18.2 Test core functionality
-    - Test authentication flow
-    - Test image analysis
-    - Test wardrobe CRUD operations
-    - Test capsules CRUD operations
-    - Test public feed
-    - _Requirements: 5.5_
-  
-  - [ ] 18.3 Measure improvements
-    - Count lines of code (before vs after)
-    - Measure bundle size (before vs after)
-    - Count removed duplicates
-    - Count removed dead code lines
-    - _Requirements: 8.3, 8.4_
+    - Проверить неиспользуемые конфигурации модальных окон
+    - Проверить использование стека навигации
+    - Определить дублирующиеся обработчики событий
+    - _Требования: 1.1, 1.2_
 
-- [ ] 19. Generate final audit report
-  - [ ] 19.1 Create executive summary
-    - Total files scanned
-    - Total issues found and fixed
-    - Metrics improvements (LOC, bundle size)
-    - _Requirements: 8.1, 8.2, 8.4_
+- [ ] 3. Аудит клиентских модулей - Функциональные модули
+  - [ ] 3.1 Анализ dataCache.ts и history.ts
+    - Проверить дублирование логики кеширования
+    - Определить неиспользуемые методы кеша
+    - Проверить паттерны использования localStorage
+    - _Требования: 1.1, 1.2, 1.3_
   
-  - [ ] 19.2 Document detailed findings
-    - List all client module changes
-    - List all server API changes
-    - List all database schema changes
-    - Include code examples where relevant
-    - _Requirements: 8.1, 8.3_
+  - [ ] 3.2 Анализ api.ts и auth.ts
+    - Проверить дублирование обработки ошибок
+    - Определить неиспользуемые API методы (например, checkLikeStatus помечен DEPRECATED)
+    - Проверить консистентность обработки initData
+    - _Требования: 1.1, 1.2_
   
-  - [ ] 19.3 Provide recommendations
-    - Suggest future improvements
-    - Identify remaining technical debt
-    - Propose architectural enhancements
-    - _Requirements: 8.1, 8.5_
-  
-  - [ ] 19.4 Create audit-report.md
-    - Compile all sections into final report
-    - Add metrics and statistics
-    - Include before/after comparisons
-    - Save to `.kiro/specs/code-audit-refactoring/audit-report.md`
-    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
+  - [ ] 3.3 Анализ logger.ts и photoUploadManager.ts
+    - Проверить дублирование паттернов логирования
+    - Определить неиспользуемые уровни логов или методы
+    - Проверить использование обработчиков загрузки фото
+    - _Требования: 1.1, 1.2_
 
-- [ ] 20. Create final git commit
-  - Review all changes
-  - Create comprehensive commit message
-  - Tag commit as `audit-refactoring-complete`
-  - _Requirements: 8.3_
+- [ ] 4. Аудит клиентских модулей - Доменные модули
+  - [ ] 4.1 Анализ модулей гардероба (WardrobeManager.ts, WardrobeService.ts)
+    - Проверить дублирование CRUD операций
+    - Определить неиспользуемые методы гардероба
+    - Проверить разделение ответственности между Manager и Service
+    - _Требования: 1.1, 1.2, 4.1_
+  
+  - [ ] 4.2 Анализ модулей капсул (CapsulesManager.ts, CapsulesService.ts, CapsulesSharing.ts)
+    - Проверить дублирование CRUD операций
+    - Определить неиспользуемые методы капсул
+    - Проверить что логика шеринга не дублируется
+    - _Требования: 1.1, 1.2, 4.1_
+  
+  - [ ] 4.3 Анализ модулей публичной ленты
+    - Проверить дублирование логики загрузки ленты
+    - Определить неиспользуемые методы ленты
+    - Проверить консистентность логики лайков/анлайков
+    - _Требования: 1.1, 1.2_
+
+- [ ] 5. Аудит клиентских модулей - Общие утилиты
+  - [ ] 5.1 Анализ DataLoader.ts и ImageRenderService.ts
+    - Проверить дублирование паттернов загрузки данных
+    - Определить дублирование логики кеширования изображений
+    - Проверить стратегии fallback для кеша
+    - _Требования: 1.1, 4.1, 4.2_
+  
+  - [ ] 5.2 Анализ PhotoProcessor.ts и SharingService.ts
+    - Проверить дублирование логики обработки фото
+    - Определить дублирование логики шеринга
+    - Проверить интеграцию с Telegram WebApp
+    - _Требования: 1.1, 4.1_
+  
+  - [ ] 5.3 Анализ ItemSelector.ts и utils.ts
+    - Проверить дублирование утилитарных функций
+    - Определить неиспользуемые утилитарные методы
+    - Проверить функции конвертации типов
+    - _Требования: 1.1, 1.2, 4.1_
+
+- [ ] 6. Аудит серверных API эндпоинтов
+  - [ ] 6.1 Анализ аутентификации и авторизации
+    - Проверить auth.js на дублирование логики
+    - Проверить использование authHelper.js во всех эндпоинтах
+    - Определить эндпоинты без проверки авторизации
+    - _Требования: 2.1, 2.3, 2.4_
+  
+  - [ ] 6.2 Анализ эндпоинтов обработки файлов
+    - Проверить analyze.js, backgroundRemoval.js, clothingClassification.js
+    - Проверить консистентность использования fileStorage.js
+    - Определить дублирование логики обработки изображений
+    - _Требования: 2.1, 2.5_
+  
+  - [ ] 6.3 Анализ CRUD эндпоинтов
+    - Проверить history.js, wardrobe.js, capsules.js
+    - Определить дублирование паттернов Prisma запросов
+    - Проверить консистентность обработки ошибок
+    - _Требования: 2.1, 2.4, 2.5_
+  
+  - [ ] 6.4 Анализ эндпоинтов социальных функций
+    - Проверить analysisLikes.js, capsuleLikes.js, sharedAnalysis.js
+    - Определить дублирование логики лайков/анлайков
+    - Проверить обновление денормализованных счетчиков
+    - _Требования: 2.1, 2.5_
+  
+  - [ ] 6.5 Анализ утилитарных эндпоинтов
+    - Проверить subscription.js, initialData.js
+    - Определить неиспользуемые роуты
+    - Проверить оптимизацию пакетной загрузки
+    - _Требования: 2.1, 2.2_
+
+- [ ] 7. Аудит схемы базы данных
+  - [ ] 7.1 Анализ моделей User и HistoryItem
+    - Проверить неиспользуемые поля (например, photoData помечен deprecated)
+    - Проверить использование полей в серверном коде
+    - Проверить использование индексов для частых запросов
+    - _Требования: 3.1, 3.2, 3.3_
+  
+  - [ ] 7.2 Анализ моделей WardrobeItem и Capsule
+    - Проверить использование enum ClothingCategory
+    - Проверить что все поля используются в коде
+    - Проверить покрытие индексами для запросов
+    - _Требования: 3.1, 3.2, 3.3, 3.4_
+  
+  - [ ] 7.3 Анализ социальных моделей (Rating, Comment, Notification, CapsuleLike)
+    - Проверить конфигурации каскадного удаления
+    - Проверить денормализованные счетчики (likesCount, viewsCount)
+    - Проверить покрытие индексами для внешних ключей
+    - _Требования: 3.1, 3.3, 3.5_
+  
+  - [ ] 7.4 Проверка TypeScript типов vs Prisma схемы
+    - Сравнить client/src/types/ с schema.prisma
+    - Определить несоответствия типов
+    - Проверить консистентность enum (ClothingCategory)
+    - _Требования: 1.3, 3.4_
+
+- [ ] 8. Генерация отчета анализа Фазы 1
+  - Скомпилировать все находки из аудита клиента, сервера и БД
+  - Категоризировать проблемы по серьезности (высокая/средняя/низкая)
+  - Создать приоритизированный список задач рефакторинга
+  - Задокументировать текущие метрики (LOC, количество файлов, размер бандла)
+  - _Требования: 8.1, 8.2, 8.3_
+
+## Фаза 2: Рефакторинг и очистка
+
+- [ ] 9. Консолидация дублирующихся функций - Клиент
+  - [ ] 9.1 Создать общую утилиту кеширования изображений
+    - Извлечь общую логику кеширования из dataCache.ts и ImageRenderService.ts
+    - Создать `client/src/modules/shared/ImageCache.ts`
+    - Обновить все использования для применения новой утилиты
+    - _Требования: 4.1, 4.2, 4.3, 4.4_
+  
+  - [ ] 9.2 Создать общую утилиту загрузки данных
+    - Извлечь общие паттерны загрузки из различных Service классов
+    - Улучшить DataLoader.ts дополнительными паттернами
+    - Обновить все Service классы для использования DataLoader
+    - _Требования: 4.1, 4.2, 4.3, 4.4_
+  
+  - [ ] 9.3 Создать общую утилиту обработки ошибок
+    - Извлечь общие паттерны try-catch
+    - Создать `client/src/modules/shared/ErrorHandler.ts`
+    - Обновить все модули для использования общей обработки ошибок
+    - _Требования: 4.1, 4.2, 4.3, 4.4, 6.3_
+
+- [ ] 10. Консолидация дублирующихся функций - Сервер
+  - [ ] 10.1 Создать общие Prisma утилиты
+    - Извлечь общие паттерны запросов
+    - Создать `server/src/utils/prismaHelpers.js`
+    - Обновить все API эндпоинты для использования хелперов
+    - _Требования: 4.1, 4.2, 4.3, 4.4_
+  
+  - [ ] 10.2 Создать общие утилиты валидации
+    - Извлечь общую логику валидации
+    - Создать `server/src/utils/validation.js`
+    - Обновить все эндпоинты для использования общей валидации
+    - _Требования: 4.1, 4.2, 4.3, 4.4_
+  
+  - [ ] 10.3 Улучшить middleware обработки ошибок
+    - Консолидировать паттерны обработки ошибок
+    - Обновить error middleware в server.js
+    - Убедиться что все эндпоинты используют консистентные ответы об ошибках
+    - _Требования: 4.1, 4.2, 4.3, 4.4, 6.3_
+
+- [ ] 11. Удаление мертвого кода - Клиент
+  - [ ] 11.1 Удалить неиспользуемые методы из больших классов
+    - Удалить неиспользуемые методы из UIManager, UIAnalysisManager
+    - Удалить устаревшие методы (например, checkLikeStatus в api.ts)
+    - Обновить документацию для удаленных методов
+    - _Требования: 5.1, 5.2, 5.4_
+  
+  - [ ] 11.2 Удалить неиспользуемые импорты
+    - Просканировать все клиентские модули на неиспользуемые импорты
+    - Систематически удалить неиспользуемые импорты
+    - Проверить компиляцию после каждой партии
+    - _Требования: 5.1, 5.3, 5.5_
+  
+  - [ ] 11.3 Удалить закомментированный код
+    - Определить блоки закомментированного кода старше 30 дней
+    - Удалить устаревший закомментированный код
+    - Оставить только релевантные TODO комментарии
+    - _Требования: 5.1, 5.4_
+
+- [ ] 12. Удаление мертвого кода - Сервер
+  - [ ] 12.1 Удалить неиспользуемые роуты и обработчики
+    - Определить неиспользуемые API роуты
+    - Удалить неиспользуемые middleware
+    - Обновить документацию роутов
+    - _Требования: 5.1, 5.2, 5.4_
+  
+  - [ ] 12.2 Удалить неиспользуемые утилитарные функции
+    - Проверить authHelper.js и fileStorage.js на неиспользуемые экспорты
+    - Удалить неиспользуемые хелпер функции
+    - Проверить что все эндпоинты все еще работают
+    - _Требования: 5.1, 5.2, 5.5_
+
+- [ ] 13. Очистка схемы базы данных
+  - [ ] 13.1 Удалить устаревшие поля
+    - Удалить поле photoData из HistoryItem (помечено deprecated)
+    - Создать миграцию для удаления поля
+    - Обновить все ссылки в коде
+    - _Требования: 5.1, 5.2, 3.2_
+  
+  - [ ] 13.2 Удалить неиспользуемые поля
+    - Определить и удалить неиспользуемые поля из моделей
+    - Создать миграции для изменений схемы
+    - Обновить Prisma client
+    - _Требования: 5.1, 5.2, 3.2_
+
+- [ ] 14. Стандартизация паттернов кодирования - Клиент
+  - [ ] 14.1 Стандартизировать singleton экспорты
+    - Проверить что все модули следуют паттерну: `export const moduleName = new ModuleClass()`
+    - Исправить любые нарушения
+    - Обновить документацию
+    - _Требования: 6.1, 6.2_
+  
+  - [ ] 14.2 Стандартизировать обработку ошибок
+    - Применить консистентные паттерны try-catch
+    - Использовать общую утилиту ErrorHandler
+    - Убедиться что все ошибки логируются
+    - _Требования: 6.1, 6.3_
+  
+  - [ ] 14.3 Стандартизировать логирование
+    - Применить консистентные паттерны логирования
+    - Использовать модуль logger везде
+    - Удалить console.log выражения
+    - _Требования: 6.1, 6.4_
+  
+  - [ ] 14.4 Стандартизировать API вызовы
+    - Заменить прямые fetch на api клиент
+    - Обеспечить консистентную обработку ошибок
+    - Проверить что initData передается корректно
+    - _Требования: 6.1, 6.4_
+  
+  - [ ] 14.5 Обновить JSDoc комментарии
+    - Добавить недостающие JSDoc для публичных методов
+    - Обновить устаревшие комментарии
+    - Задокументировать параметры и типы возврата
+    - _Требования: 6.1, 6.5_
+
+- [ ] 15. Стандартизация паттернов кодирования - Сервер
+  - [ ] 15.1 Стандартизировать обработку ошибок
+    - Применить консистентную обработку ошибок во всех эндпоинтах
+    - Использовать централизованный error middleware
+    - Убедиться что все ошибки логируются
+    - _Требования: 6.1, 6.3_
+  
+  - [ ] 15.2 Стандартизировать логирование
+    - Применить консистентные паттерны логирования
+    - Использовать logger из logsController
+    - Добавить логирование запросов/ответов где отсутствует
+    - _Требования: 6.1, 6.4_
+  
+  - [ ] 15.3 Стандартизировать использование Prisma
+    - Использовать общие Prisma хелперы
+    - Применить консистентные паттерны транзакций
+    - Обеспечить правильную обработку ошибок для DB операций
+    - _Требования: 6.1, 6.4_
+
+## Фаза 3: Оптимизация и отчетность
+
+- [ ] 16. Оптимизация импортов - Клиент
+  - [ ] 16.1 Заменить относительные импорты на path aliases
+    - Конвертировать все относительные импорты для использования @/ алиасов
+    - Обновить tsconfig.json если необходимо
+    - Проверить компиляцию после изменений
+    - _Требования: 7.1, 7.5_
+  
+  - [ ] 16.2 Создать barrel экспорты
+    - Создать index.ts для общих утилит
+    - Создать index.ts для доменных модулей
+    - Обновить импорты для использования barrel экспортов
+    - _Требования: 7.1, 7.5_
+  
+  - [ ] 16.3 Исправить циклические зависимости
+    - Определить циклические зависимости
+    - Рефакторить для разрыва циклических импортов
+    - Проверить что циклических зависимостей не осталось
+    - _Требования: 7.2_
+  
+  - [ ] 16.4 Разделить большие модули
+    - Определить модули >500 строк
+    - Разделить на меньшие, сфокусированные модули
+    - Обновить импорты и экспорты
+    - _Требования: 7.3_
+  
+  - [ ] 16.5 Использовать именованные экспорты
+    - Конвертировать default экспорты в именованные экспорты
+    - Обновить все import выражения
+    - Проверить улучшения tree-shaking
+    - _Требования: 7.4_
+
+- [ ] 17. Оптимизация импортов - Сервер
+  - [ ] 17.1 Организовать серверные утилиты
+    - Сгруппировать связанные утилиты
+    - Создать index.js для папки utils
+    - Обновить импорты во всех эндпоинтах
+    - _Требования: 7.1, 7.5_
+  
+  - [ ] 17.2 Разделить большие API файлы
+    - Определить API файлы >300 строк
+    - Разделить на controller + route файлы
+    - Обновить регистрацию роутов в server.js
+    - _Требования: 7.3_
+
+- [ ] 18. Финальная валидация и тестирование
+  - [ ] 18.1 Запустить TypeScript компиляцию
+    - Выполнить `npm run type-check`
+    - Исправить любые ошибки компиляции
+    - Проверить что ошибок типов не осталось
+    - _Требования: 5.5_
+  
+  - [ ] 18.2 Протестировать основную функциональность
+    - Протестировать поток аутентификации
+    - Протестировать анализ изображений
+    - Протестировать CRUD операции гардероба
+    - Протестировать CRUD операции капсул
+    - Протестировать публичную ленту
+    - _Требования: 5.5_
+  
+  - [ ] 18.3 Измерить улучшения
+    - Подсчитать строки кода (до vs после)
+    - Измерить размер бандла (до vs после)
+    - Подсчитать удаленные дубликаты
+    - Подсчитать удаленные строки мертвого кода
+    - _Требования: 8.3, 8.4_
+
+- [ ] 19. Генерация финального отчета аудита
+  - [ ] 19.1 Создать исполнительное резюме
+    - Всего просканировано файлов
+    - Всего найдено и исправлено проблем
+    - Улучшения метрик (LOC, размер бандла)
+    - _Требования: 8.1, 8.2, 8.4_
+  
+  - [ ] 19.2 Задокументировать детальные находки
+    - Перечислить все изменения клиентских модулей
+    - Перечислить все изменения серверных API
+    - Перечислить все изменения схемы базы данных
+    - Включить примеры кода где релевантно
+    - _Требования: 8.1, 8.3_
+  
+  - [ ] 19.3 Предоставить рекомендации
+    - Предложить будущие улучшения
+    - Определить оставшийся технический долг
+    - Предложить архитектурные улучшения
+    - _Требования: 8.1, 8.5_
+  
+  - [ ] 19.4 Создать audit-report.md
+    - Скомпилировать все секции в финальный отчет
+    - Добавить метрики и статистику
+    - Включить сравнения до/после
+    - Сохранить в `.kiro/specs/code-audit-refactoring/audit-report.md`
+    - _Требования: 8.1, 8.2, 8.3, 8.4, 8.5_
+
+- [ ] 20. Создать финальный git commit
+  - Просмотреть все изменения
+  - Создать подробное commit сообщение
+  - Пометить commit тегом `audit-refactoring-complete`
+  - _Требования: 8.3_
