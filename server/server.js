@@ -44,7 +44,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 
 // Middleware для раздачи загруженных файлов (изображения гардероба)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// OPTIMIZATION: Агрессивное кэширование для изображений (1 год)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  maxAge: '365d', // Кэшировать на 1 год
+  immutable: true, // Файлы не изменяются (immutable)
+  etag: true, // Включить ETag для валидации
+  lastModified: true // Включить Last-Modified заголовок
+}));
 
 // API роуты
 logger.info('Loading API routes...');

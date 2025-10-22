@@ -2,10 +2,10 @@
  * Модуль авторизации через Telegram WebApp
  */
 
-import type { 
-  TelegramWebApp, 
+import type {
+  TelegramWebApp,
   TelegramUser,
-  AuthResponse 
+  AuthResponse
 } from '@/types/index';
 import { validateTelegramInitData } from '@/utils/validation';
 import { createError, ERROR_CODES } from '@/utils/helpers';
@@ -29,6 +29,37 @@ class AuthManager {
 
   constructor() {
     this.initializeTelegram();
+    this.loadSubscriptionFromCache();
+  }
+
+  /**
+   * Загрузка подписки из кэша для мгновенного отображения
+   */
+  private loadSubscriptionFromCache(): void {
+    try {
+      const cached = localStorage.getItem('tgStyleSubscription');
+      if (cached) {
+        this.userSubscription = JSON.parse(cached);
+        // НЕ вызываем displaySubscriptionInfo() здесь - DOM еще не готов
+        // Будет вызвано в initializeSubscriptionUI() после загрузки DOM
+        logger.debug('⚡ Subscription loaded from cache (instant)', {
+          analysesLeft: this.userSubscription?.analysesLeft
+        });
+      }
+    } catch (e) {
+      logger.warn('Failed to load subscription from cache', e);
+    }
+  }
+
+  /**
+   * Инициализация UI подписки после загрузки DOM
+   * Вызывается из main.ts после initializeUI()
+   */
+  initializeSubscriptionUI(): void {
+    if (this.userSubscription) {
+      this.displaySubscriptionInfo();
+      logger.debug('⚡ Subscription UI initialized from cache');
+    }
   }
 
   /**
@@ -36,7 +67,7 @@ class AuthManager {
    */
   private initializeTelegram(): void {
     this.tg = window.Telegram?.WebApp || null;
-    
+
     if (!this.tg) {
       logger.warn('Telegram WebApp not available');
       return;
@@ -136,6 +167,8 @@ class AuthManager {
     if (!this.userSubscription) return;
 
     try {
+      const startTime = performance.now();
+
       // Ищем элементы для отображения подписки
       const subscriptionStatus = document.getElementById('subscription-status');
       const analysesLeft = document.getElementById('analyses-left');
@@ -151,7 +184,7 @@ class AuthManager {
       if (analysesLeft) {
         const isUnlimited = this.userSubscription.type === 'premium';
         const leftCount = this.userSubscription.analysesLeft;
-        
+
         if (isUnlimited) {
           analysesLeft.textContent = 'Unlimited';
           analysesLeft.className = 'analyses-left unlimited';
@@ -159,6 +192,18 @@ class AuthManager {
           analysesLeft.textContent = leftCount.toString();
           analysesLeft.className = `analyses-left ${leftCount <= 1 ? 'low' : leftCount <= 3 ? 'medium' : 'high'}`;
         }
+
+        logger.debug('⏱️ Subscription UI updated', {
+          analysesLeft: leftCount,
+          updateTime: `${(performance.now() - startTime).toFixed(2)}ms`
+        });
+      }
+
+      // Сохраняем подписку в localStorage для быстрой загрузки при следующем запуске
+      try {
+        localStorage.setItem('tgStyleSubscription', JSON.stringify(this.userSubscription));
+      } catch (e) {
+        logger.warn('Failed to cache subscription', e);
       }
 
     } catch (error) {
@@ -178,10 +223,10 @@ class AuthManager {
 
       // Получаем initData для валидации на сервере
       const initData = this.tg?.initData;
-      
+
       if (!initData) {
         logger.warn('InitData not available, continuing without server authentication');
-        
+
         // Создаем базовую подписку для локального режима
         this.userSubscription = {
           type: 'free',
@@ -189,7 +234,7 @@ class AuthManager {
           totalAnalyses: 0,
           weeklyResetDate: new Date().toISOString()
         };
-        
+
         // В режиме разработки можем продолжить без авторизации
         const authResponse: AuthResponse = {
           success: true,
@@ -228,7 +273,7 @@ class AuthManager {
 
       if (response.success) {
         this.isAuthenticated = true;
-        
+
         // Сохраняем информацию о подписке если доступна
         if (response.user?.subscription) {
           this.userSubscription = response.user.subscription;
@@ -245,7 +290,7 @@ class AuthManager {
 
         // Обновляем отображение профиля с новой информацией
         this.displayUserProfile();
-        
+
         logger.info('Authentication successful');
       } else {
         logger.error('Server authentication failed', { error: response.error });
@@ -256,11 +301,11 @@ class AuthManager {
 
     } catch (error) {
       logger.error('Authentication failed', error);
-      
+
       if (error instanceof Error && 'code' in error) {
         throw error;
       }
-      
+
       throw createError(ERROR_CODES.AUTH_FAILED, 'Неизвестная ошибка авторизации');
     }
   }

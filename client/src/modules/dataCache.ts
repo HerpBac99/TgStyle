@@ -168,6 +168,9 @@ class DataCacheManager {
   private preloadCachedImages(): void {
     const imageUrls: string[] = [];
 
+    // НЕ кэшируем историю здесь - она загружается через uiMenu
+    // Кэшируем только гардероб и капсулы для быстрого доступа
+
     // Собираем изображения гардероба
     if (this.wardrobeItems.length > 0) {
       const wardrobeUrls = this.wardrobeItems

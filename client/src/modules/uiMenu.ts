@@ -119,6 +119,9 @@ export class UIMenuManager {
     totalImagesToLoad: 0
   };
 
+  // Флаг для предотвращения повторной загрузки изображений
+  private isLoadingImages = false;
+
   constructor() {
     this.initializeElements();
     this.setupEventListeners();
@@ -350,8 +353,14 @@ export class UIMenuManager {
      * #UPDATE-HISTORY-DISPLAY #UI-MENU #UI-UPDATE-HISTORY-DISPLAY
      */
     updateHistoryDisplay(options: { preservePosition?: boolean } = {}): void {
+      const displayStartTime = performance.now();
       const { preservePosition = false } = options;
       const filledItems = historyManager.getAllItems();
+
+      logger.debug('🎨 updateHistoryDisplay() called', {
+        itemsCount: filledItems.length,
+        preservePosition
+      });
 
       // Сервер возвращает в порядке desc (новые первые), а нам нужно asc (старые первые)
       const sortedItems = [...filledItems].reverse();
@@ -361,6 +370,12 @@ export class UIMenuManager {
 
       // Позиционируем карусель
       this.positionCarousel(preservePosition);
+
+      const displayTime = performance.now() - displayStartTime;
+      logger.debug('✅ Carousel rendered (DOM ready)', {
+        renderTime: `${displayTime.toFixed(2)}ms`,
+        itemsCount: filledItems.length
+      });
 
       // OPTIMIZATION: Progressive image loading - грузим только видимые карты
       this.loadVisibleCardImages();
@@ -374,6 +389,14 @@ export class UIMenuManager {
      * OPTIMIZATION: Приоритетная загрузка для плавной прокрутки
      */
     private loadVisibleCardImages(): void {
+      // Предотвращаем повторную загрузку если уже идет процесс
+      if (this.isLoadingImages) {
+        logger.debug('⏭️ Skipping image loading - already in progress');
+        return;
+      }
+
+      this.isLoadingImages = true;
+
       const totalCards = this.carouselState.totalCards;
       const priorityCount = 5; // Приоритетно грузим последние 5 фоток
 
@@ -431,12 +454,14 @@ export class UIMenuManager {
                   this.imageLoadMetrics.backgroundLoadEndTime = performance.now();
                   const backgroundLoadTime = Math.round(this.imageLoadMetrics.backgroundLoadEndTime - this.imageLoadMetrics.backgroundLoadStartTime);
                   const totalLoadTime = Math.round(this.imageLoadMetrics.backgroundLoadEndTime - this.imageLoadMetrics.priorityLoadStartTime);
-                  logger.info('✅ All 46 images loaded (BACKGROUND)', { 
+                  logger.info('✅ All images loaded (BACKGROUND)', { 
                     priorityCount,
                     backgroundCount: priorityStartIndex,
                     backgroundLoadTime: `${backgroundLoadTime}ms`,
                     totalLoadTime: `${totalLoadTime}ms`
                   });
+                  // Сбрасываем флаг загрузки
+                  this.isLoadingImages = false;
                 }
               });
             });
@@ -450,12 +475,14 @@ export class UIMenuManager {
                   this.imageLoadMetrics.backgroundLoadEndTime = performance.now();
                   const backgroundLoadTime = Math.round(this.imageLoadMetrics.backgroundLoadEndTime - this.imageLoadMetrics.backgroundLoadStartTime);
                   const totalLoadTime = Math.round(this.imageLoadMetrics.backgroundLoadEndTime - this.imageLoadMetrics.priorityLoadStartTime);
-                  logger.info('✅ All 46 images loaded (BACKGROUND)', { 
+                  logger.info('✅ All images loaded (BACKGROUND)', { 
                     priorityCount,
                     backgroundCount: priorityStartIndex,
                     backgroundLoadTime: `${backgroundLoadTime}ms`,
                     totalLoadTime: `${totalLoadTime}ms`
                   });
+                  // Сбрасываем флаг загрузки
+                  this.isLoadingImages = false;
                 }
               });
             }, i * 10); // Задержка между картами
@@ -493,22 +520,45 @@ export class UIMenuManager {
           return;
         }
 
+        const loadStartTime = performance.now();
+        
         // Создаем Image объект для отслеживания загрузки
         const img = new Image();
         img.onload = () => {
+          const loadTime = performance.now() - loadStartTime;
+          
           card.style.backgroundImage = `url(${photoUrl})`;
           card.classList.remove('image-loading');
           card.classList.add('image-loaded');
           delete card.dataset['photoUrl'];
           
+          // Логируем загрузку каждой картинки с временем
+          logger.debug(`🖼️ Card ${index} image loaded`, {
+            index,
+            loadTime: `${loadTime.toFixed(2)}ms`,
+            url: photoUrl.substring(0, 50) + '...'
+          });
+          
           onLoad();
           resolve();
         };
         img.onerror = () => {
-          logger.warn('Failed to load card image', { index, photoUrl });
+          const loadTime = performance.now() - loadStartTime;
+          logger.warn('❌ Failed to load card image', { 
+            index, 
+            loadTime: `${loadTime.toFixed(2)}ms`,
+            photoUrl 
+          });
           onLoad(); // Все равно считаем загруженным чтобы счетчик не застрял
           resolve();
         };
+        
+        // Логируем начало загрузки
+        logger.debug(`⏳ Starting to load card ${index} image`, {
+          index,
+          url: photoUrl.substring(0, 50) + '...'
+        });
+        
         img.src = photoUrl;
       });
     }
@@ -996,8 +1046,8 @@ export class UIMenuManager {
     // Настраиваем навигацию карусели
     this.setupCarouselNavigation();
 
-    // Обновляем отображение истории
-    this.updateHistoryDisplay();
+    // НЕ вызываем updateHistoryDisplay() здесь - это делается в optimisticUIRender()
+    // Это предотвращает дублирование отрисовки карусели
 
   }
 

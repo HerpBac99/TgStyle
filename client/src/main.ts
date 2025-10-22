@@ -307,6 +307,10 @@ class TgStyleApp {
   private initializeUI(): void {
     try {
       uiManager.init();
+      
+      // Инициализируем UI подписки из кэша (мгновенно)
+      authManager.initializeSubscriptionUI();
+      
       logger.info('UI initialized successfully');
     } catch (error) {
       logger.error('Error initializing UI', error);
@@ -319,10 +323,17 @@ class TgStyleApp {
    */
   private optimisticUIRender(): void {
     try {
+      const startTime = performance.now();
+      
       // Мгновенно отрисовываем карусель, используя данные из localStorage,
       // которые уже были загружены в конструкторе historyManager.
       uiManager.updateHistoryDisplay();
-      logger.info('Optimistic UI render completed from cache.');
+      
+      const renderTime = performance.now() - startTime;
+      logger.info('⚡ Optimistic UI render completed from cache', {
+        renderTime: `${renderTime.toFixed(2)}ms`,
+        historyItems: historyManager.getFilledCount()
+      });
     } catch (error) {
       logger.warn('Failed to perform optimistic UI render', error);
     }
@@ -332,22 +343,36 @@ class TgStyleApp {
    * Выполнение авторизации
    */
   private async performAuthentication(): Promise<void> {
-    logger.info('Starting authentication');
+    const authStartTime = performance.now();
+    logger.info('⏱️ Starting authentication');
 
     try {
       const authResponse = await authManager.authenticate();
+      const authDuration = performance.now() - authStartTime;
       
       if (authResponse.success) {
+        logger.info('✅ Authentication successful', {
+          duration: `${authDuration.toFixed(2)}ms`,
+          analysesLeft: authResponse.user?.subscription?.analysesLeft
+        });
+        
         // Отправляем событие успешной авторизации
         this.dispatchAppEvent(APP_EVENTS.AUTH_SUCCESS, authResponse.user);
       } else {
-        logger.error('Authentication failed', { error: authResponse.error });
+        logger.error('❌ Authentication failed', { 
+          error: authResponse.error,
+          duration: `${authDuration.toFixed(2)}ms`
+        });
         
         // Отправляем событие неудачной авторизации
         this.dispatchAppEvent(APP_EVENTS.AUTH_FAILURE, { error: authResponse.error });
       }
     } catch (error) {
-      logger.error('Authentication error', error);
+      const authDuration = performance.now() - authStartTime;
+      logger.error('❌ Authentication error', { 
+        error,
+        duration: `${authDuration.toFixed(2)}ms`
+      });
       
       // Отправляем событие ошибки авторизации
       this.dispatchAppEvent(APP_EVENTS.AUTH_FAILURE, { error: error instanceof Error ? error.message : 'Unknown error' });
@@ -399,8 +424,10 @@ class TgStyleApp {
   private completeInitialization(): void {
     this.isInitialized = true;
 
+    // Сообщаем Telegram что приложение готово к показу
     if (this.tg) {
       this.tg.ready();
+      logger.info('⚡ Telegram WebApp ready() called - UI visible to user');
     }
 
     // Отправляем событие готовности приложения
@@ -412,7 +439,9 @@ class TgStyleApp {
     // Логируем статистику всех модулей
     this.logModulesStats();
 
-    logger.info('TgStyle application is ready for use');
+    logger.info('✅ TgStyle application fully initialized', {
+      totalTime: `${Date.now() - this.initStartTime}ms`
+    });
   }
 
   /**
