@@ -197,18 +197,6 @@ class ApiClient {
     return this.request<T>(endpoint, { method: 'DELETE' }, timeout, skipInitData);
   }
 
-  /**
-   * Проверка доступности API
-   */
-  async ping(): Promise<boolean> {
-    try {
-      await this.get('/ping', TIMEOUTS.HEALTH_CHECK);
-      return true;
-    } catch (error) {
-      logger.warn('API ping failed', error);
-      return false;
-    }
-  }
 }
 
 /**
@@ -262,21 +250,6 @@ class TgStyleApi extends ApiClient {
    */
   async sendLogs(request: LogRequest): Promise<LogResponse> {
     return this.post<LogResponse>('/log-client', request, TIMEOUTS.LOG_REQUEST);
-  }
-
-  /**
-   * BATCH: Загрузка всех начальных данных
-   * Оптимизация: вместо 3-5 запросов делаем 1 батч запрос
-   */
-  async getInitialData(): Promise<{
-    history: any[];
-    wardrobe: any[];
-    capsules: any[];
-    user: any;
-    subscription: any;
-  }> {
-    logger.info('Loading initial data batch');
-    return this.get('/initial-data', TIMEOUTS.ANALYSIS_REQUEST);
   }
 
   /**
@@ -399,13 +372,6 @@ class TgStyleApi extends ApiClient {
     return this.delete(`/analysis-likes/${historyItemId}`, TIMEOUTS.ANALYSIS_REQUEST);
   }
 
-  /**
-   * Проверка статуса лайка (DEPRECATED: используй isLiked из истории)
-   */
-  async checkLikeStatus(historyItemId: number): Promise<any> {
-    logger.info('Checking like status', { historyItemId });
-    return this.get(`/analysis-likes/${historyItemId}/status`, TIMEOUTS.ANALYSIS_REQUEST);
-  }
 }
 
 // Создаем глобальный экземпляр API клиента

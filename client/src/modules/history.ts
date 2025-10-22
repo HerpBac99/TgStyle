@@ -399,25 +399,8 @@ class HistoryManager {
   }
 
   /**
-   * Проверка, есть ли место для нового элемента
-   * #HISTORY #HISTORY-HAS-SLOTS
-   */
-  hasEmptySlots(): boolean {
-    return this.history.length < this.maxItems;
-  }
-
-  /**
-   * Получение позиции для нового элемента (= текущая длина)
-   * #HISTORY #HISTORY-FIRST-EMPTY
-   */
-  getFirstEmptySlotIndex(): number {
-    return this.history.length;
-  }
-
-
-
-  /**
    * Экспорт истории в JSON
+   * Future feature
    */
   exportToJson(): string {
     try {
@@ -435,6 +418,7 @@ class HistoryManager {
 
   /**
    * Импорт истории из JSON
+   * Future feature
    */
   importFromJson(jsonString: string): boolean {
     try {

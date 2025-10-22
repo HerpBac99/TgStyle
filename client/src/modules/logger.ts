@@ -870,45 +870,8 @@ export const appLogger = {
   error: (message: string, data?: any) => logger.error(message, data),
 };
 
-// Совместимость с LoggerService API
-export function sendLogsToServer(): Promise<any> {
-  return logger.manualSave();
-}
-
-// Устаревший объект Logger для совместимости
-const LegacyLogger = {
-  init() {
-    return logger;
-  },
-  log(message: string, level: LogLevel = 'info', data?: any) {
-    logger[level](message, data);
-  },
-  saveLogs() {
-    // Логи автоматически сохраняются в новом логгере
-  },
-  clearLogs() {
-    logger.clear();
-  },
-  sendLogsToServer() {
-    return logger.manualSave();
-  },
-  updateLogDisplay() {
-    return logger.updateLogDisplay();
-  },
-  formatLogsForExport() {
-    return logger.formatLogsForExport();
-  },
-  getLogs() {
-    return logger.getLogs();
-  },
-  getStats() {
-    return logger.getStats();
-  }
-};
-
 // Экспортируем в глобальную область
 window.appLogger = appLogger;
 window.clientLogger = logger;
-window.Logger = LegacyLogger;
 
 export default logger;
