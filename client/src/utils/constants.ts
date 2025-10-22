@@ -52,7 +52,7 @@ export const IMAGE_CACHE_CONFIG = {
 
 // Настройки логирования
 export const LOGGING_CONFIG = {
-  MAX_LOGS_IN_MEMORY: 500,
+  MAX_LOGS_IN_MEMORY: 5000,
   LOG_FLUSH_TIMEOUT: 5000, // 5 секунд
   SESSION_ID_LENGTH: 16,
 } as const;

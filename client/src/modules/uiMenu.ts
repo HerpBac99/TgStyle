@@ -303,47 +303,78 @@ export class UIMenuManager {
    * Закрытие экрана сохраненного анализа
    */
   private closeSavedAnalysis(): void {
-    logger.info('[CLOSE-SAVED-ANALYSIS] closeSavedAnalysis() STARTED');
-    
     const savedAnalysisScreen = getElement('#saved-analysis-screen');
     if (!savedAnalysisScreen) {
-      logger.info('[CLOSE-SAVED-ANALYSIS] saved-analysis-screen not found, returning');
       return;
     }
 
-    logger.info('[CLOSE-SAVED-ANALYSIS] Hiding saved analysis screen');
     savedAnalysisScreen.classList.add('hidden');
     this.currentPreview = null;
-    
-    logger.info('[CLOSE-SAVED-ANALYSIS] closeSavedAnalysis() COMPLETED');
+  }
+
+  /**
+   * Синхронизация метаданных истории (лайки, просмотры) без загрузки фото
+   * #OPTIMIZATION #METADATA-SYNC
+   */
+  private async syncHistoryMetadata(): Promise<void> {
+    try {
+      const { api } = await import('./api.js');
+      const initData = window.Telegram?.WebApp?.initData || '';
+      
+      if (!initData) {
+        logger.warn('No initData available for metadata sync');
+        return;
+      }
+      
+      logger.info('Syncing history metadata from server');
+      const response = await api.get(`/history-metadata?initData=${encodeURIComponent(initData)}`) as any;
+      
+      if (response.success && response.metadata) {
+        historyManager.updateMetadata(response.metadata);
+        logger.info('History metadata synced successfully', { 
+          itemsCount: response.metadata.length 
+        });
+      }
+    } catch (err) {
+      logger.error('Error syncing history metadata', err);
+    }
   }
 
   /**
    * Закрытие экрана анализа
    */
-  private closePreview(): void {
-    logger.info('[CLOSE-PREVIEW] closePreview() STARTED');
-    
+  private async closePreview(): Promise<void> {
     // Закрываем экран анализа
     const analysisScreen = getElement('#analysis-screen');
     if (analysisScreen) {
-      logger.info('[CLOSE-PREVIEW] Hiding analysis screen');
       analysisScreen.classList.add('hidden');
     }
 
     // Закрываем экран сохраненного анализа
-    logger.info('[CLOSE-PREVIEW] Calling closeSavedAnalysis()');
     this.closeSavedAnalysis();
 
     // Очищаем текущее изображение в менеджере камеры
-    logger.info('[CLOSE-PREVIEW] Clearing camera image');
     cameraManager.clearCurrentImage();
     
-    // FIXED: Пересчитываем карусель после закрытия экрана (для обновления лайков)
-    logger.info('[CLOSE-PREVIEW] Calling updateHistoryDisplay()');
-    this.updateHistoryDisplay();
+    // OPTIMIZATION: Загружаем только метаданные если история большая
+    const stats = historyManager.getStats();
     
-    logger.info('[CLOSE-PREVIEW] closePreview() COMPLETED');
+    try {
+      if (stats.filledSlots < 10) {
+        // Мало элементов - загружаем полностью
+        await historyManager.loadHistoryFromServer();
+        logger.info('History reloaded from server', { itemsCount: stats.filledSlots });
+      } else {
+        // Много элементов - загружаем только метаданные (оптимизация)
+        await this.syncHistoryMetadata();
+        logger.info('History metadata synced', { itemsCount: stats.filledSlots });
+      }
+    } catch (error) {
+      logger.warn('Failed to update history from server', { error });
+    }
+    
+    // Пересчитываем карусель после закрытия экрана (с сохранением позиции)
+    this.updateHistoryDisplay({ preservePosition: true });
   }
 
     /**
@@ -353,14 +384,10 @@ export class UIMenuManager {
      * #UPDATE-HISTORY-DISPLAY #UI-MENU #UI-UPDATE-HISTORY-DISPLAY
      */
     updateHistoryDisplay(options: { preservePosition?: boolean } = {}): void {
-      const displayStartTime = performance.now();
       const { preservePosition = false } = options;
       const filledItems = historyManager.getAllItems();
 
-      logger.debug('🎨 updateHistoryDisplay() called', {
-        itemsCount: filledItems.length,
-        preservePosition
-      });
+      // Обновление карусели (debug логи отключены)
 
       // Сервер возвращает в порядке desc (новые первые), а нам нужно asc (старые первые)
       const sortedItems = [...filledItems].reverse();
@@ -371,11 +398,7 @@ export class UIMenuManager {
       // Позиционируем карусель
       this.positionCarousel(preservePosition);
 
-      const displayTime = performance.now() - displayStartTime;
-      logger.debug('✅ Carousel rendered (DOM ready)', {
-        renderTime: `${displayTime.toFixed(2)}ms`,
-        itemsCount: filledItems.length
-      });
+      // Карусель отрисована (debug логи отключены)
 
       // OPTIMIZATION: Progressive image loading - грузим только видимые карты
       this.loadVisibleCardImages();
@@ -385,110 +408,58 @@ export class UIMenuManager {
     }
 
     /**
-     * Progressive image loading - сначала последние 5 фото, потом остальные в фоне
-     * OPTIMIZATION: Приоритетная загрузка для плавной прокрутки
+     * Загрузка всех изображений карусели
+     * SIMPLIFIED: Загружаем все изображения последовательно без приоритетов
      */
     private loadVisibleCardImages(): void {
       // Предотвращаем повторную загрузку если уже идет процесс
       if (this.isLoadingImages) {
-        logger.debug('⏭️ Skipping image loading - already in progress');
+        logger.debug('⏭️ Skipping image loading - already in progress', {
+          currentState: {
+            priorityLoaded: this.imageLoadMetrics.priorityImagesLoaded,
+            backgroundLoaded: this.imageLoadMetrics.backgroundImagesLoaded,
+            totalToLoad: this.imageLoadMetrics.totalImagesToLoad
+          }
+        });
         return;
       }
 
       this.isLoadingImages = true;
 
       const totalCards = this.carouselState.totalCards;
-      const priorityCount = 5; // Приоритетно грузим последние 5 фоток
-
-      // Определяем диапазон приоритетных карт (последние 5)
-      const priorityStartIndex = Math.max(0, totalCards - priorityCount - 1);
+      const totalImagesToLoad = totalCards - 1; // -1 потому что последняя карта пустая
       
       // Сбрасываем счетчики
       this.imageLoadMetrics.priorityImagesLoaded = 0;
       this.imageLoadMetrics.backgroundImagesLoaded = 0;
-      this.imageLoadMetrics.totalImagesToLoad = totalCards - 1; // -1 потому что последняя карта пустая
-      
-      // 1. ВЫСОКИЙ ПРИОРИТЕТ: Последние 5 карт (самые новые анализы) - синхронно
+      this.imageLoadMetrics.totalImagesToLoad = totalImagesToLoad;
       this.imageLoadMetrics.priorityLoadStartTime = performance.now();
       
-      logger.info('Loading priority images (last 5)', { 
-        priorityRange: [priorityStartIndex, totalCards - 1] 
+      logger.info('Loading all carousel images', { 
+        totalCards: totalImagesToLoad
       });
       
-      const priorityLoadPromises = [];
-      for (let i = priorityStartIndex; i < totalCards; i++) {
-        const promise = this.loadCardImageWithCallback(i, () => {
-          this.imageLoadMetrics.priorityImagesLoaded++;
+      let loadedCount = 0;
+      
+      // Загружаем все изображения последовательно
+      for (let i = 0; i < totalCards; i++) {
+        this.loadCardImageWithCallback(i, () => {
+          loadedCount++;
           
-          // Когда все приоритетные загружены
-          if (this.imageLoadMetrics.priorityImagesLoaded === priorityCount) {
+          // Когда все изображения загружены
+          if (loadedCount === totalImagesToLoad) {
             this.imageLoadMetrics.priorityLoadEndTime = performance.now();
-            const priorityLoadTime = Math.round(this.imageLoadMetrics.priorityLoadEndTime - this.imageLoadMetrics.priorityLoadStartTime);
-            logger.info('✅ Priority images loaded (INSTANT UI)', { 
-              count: priorityCount,
-              loadTime: `${priorityLoadTime}ms` 
+            const totalLoadTime = Math.round(this.imageLoadMetrics.priorityLoadEndTime - this.imageLoadMetrics.priorityLoadStartTime);
+            logger.info('✅ All carousel images loaded', { 
+              count: totalImagesToLoad,
+              loadTime: `${totalLoadTime}ms` 
             });
+            
+            // Сбрасываем флаг загрузки
+            this.isLoadingImages = false;
           }
         });
-        priorityLoadPromises.push(promise);
       }
-
-      // 2. НИЗКИЙ ПРИОРИТЕТ: Остальные карты (старые анализы) - асинхронно в фоне
-      // Используем setTimeout для отложенной загрузки (не блокирует UI)
-      setTimeout(() => {
-        this.imageLoadMetrics.backgroundLoadStartTime = performance.now();
-        
-        logger.info('Starting background image loading', { 
-          backgroundRange: [0, priorityStartIndex - 1] 
-        });
-        
-        for (let i = 0; i < priorityStartIndex; i++) {
-          // Используем requestIdleCallback если доступен, иначе setTimeout
-          if ('requestIdleCallback' in window) {
-            requestIdleCallback(() => {
-              this.loadCardImageWithCallback(i, () => {
-                this.imageLoadMetrics.backgroundImagesLoaded++;
-                
-                // Когда все фоновые загружены
-                if (this.imageLoadMetrics.backgroundImagesLoaded === priorityStartIndex) {
-                  this.imageLoadMetrics.backgroundLoadEndTime = performance.now();
-                  const backgroundLoadTime = Math.round(this.imageLoadMetrics.backgroundLoadEndTime - this.imageLoadMetrics.backgroundLoadStartTime);
-                  const totalLoadTime = Math.round(this.imageLoadMetrics.backgroundLoadEndTime - this.imageLoadMetrics.priorityLoadStartTime);
-                  logger.info('✅ All images loaded (BACKGROUND)', { 
-                    priorityCount,
-                    backgroundCount: priorityStartIndex,
-                    backgroundLoadTime: `${backgroundLoadTime}ms`,
-                    totalLoadTime: `${totalLoadTime}ms`
-                  });
-                  // Сбрасываем флаг загрузки
-                  this.isLoadingImages = false;
-                }
-              });
-            });
-          } else {
-            setTimeout(() => {
-              this.loadCardImageWithCallback(i, () => {
-                this.imageLoadMetrics.backgroundImagesLoaded++;
-                
-                // Когда все фоновые загружены
-                if (this.imageLoadMetrics.backgroundImagesLoaded === priorityStartIndex) {
-                  this.imageLoadMetrics.backgroundLoadEndTime = performance.now();
-                  const backgroundLoadTime = Math.round(this.imageLoadMetrics.backgroundLoadEndTime - this.imageLoadMetrics.backgroundLoadStartTime);
-                  const totalLoadTime = Math.round(this.imageLoadMetrics.backgroundLoadEndTime - this.imageLoadMetrics.priorityLoadStartTime);
-                  logger.info('✅ All images loaded (BACKGROUND)', { 
-                    priorityCount,
-                    backgroundCount: priorityStartIndex,
-                    backgroundLoadTime: `${backgroundLoadTime}ms`,
-                    totalLoadTime: `${totalLoadTime}ms`
-                  });
-                  // Сбрасываем флаг загрузки
-                  this.isLoadingImages = false;
-                }
-              });
-            }, i * 10); // Задержка между картами
-          }
-        }
-      }, 100); // Даем 100ms для отрисовки приоритетных изображений
     }
 
     /**
@@ -520,45 +491,24 @@ export class UIMenuManager {
           return;
         }
 
-        const loadStartTime = performance.now();
-        
         // Создаем Image объект для отслеживания загрузки
         const img = new Image();
         img.onload = () => {
-          const loadTime = performance.now() - loadStartTime;
-          
           card.style.backgroundImage = `url(${photoUrl})`;
           card.classList.remove('image-loading');
           card.classList.add('image-loaded');
           delete card.dataset['photoUrl'];
           
-          // Логируем загрузку каждой картинки с временем
-          logger.debug(`🖼️ Card ${index} image loaded`, {
-            index,
-            loadTime: `${loadTime.toFixed(2)}ms`,
-            url: photoUrl.substring(0, 50) + '...'
-          });
-          
           onLoad();
           resolve();
         };
         img.onerror = () => {
-          const loadTime = performance.now() - loadStartTime;
-          logger.warn('❌ Failed to load card image', { 
-            index, 
-            loadTime: `${loadTime.toFixed(2)}ms`,
-            photoUrl 
-          });
+          logger.warn('Failed to load card image', { index, photoUrl });
           onLoad(); // Все равно считаем загруженным чтобы счетчик не застрял
           resolve();
         };
         
-        // Логируем начало загрузки
-        logger.debug(`⏳ Starting to load card ${index} image`, {
-          index,
-          url: photoUrl.substring(0, 50) + '...'
-        });
-        
+        // Начинаем загрузку (debug логи отключены для производительности)
         img.src = photoUrl;
       });
     }
@@ -634,6 +584,11 @@ export class UIMenuManager {
      */
     private setupFilledCard(card: HTMLElement, content: HTMLElement, data: HistoryItem): void {
       card.classList.add(CSS_CLASSES.FILLED);
+      
+      // Добавляем data-id для возможности точечного обновления метаданных
+      if (data.id) {
+        card.setAttribute('data-id', data.id.toString());
+      }
 
       // OPTIMIZATION: Lazy loading - НЕ загружаем изображения сразу
       // Сохраняем URL в data-атрибут для отложенной загрузки
@@ -1039,12 +994,59 @@ export class UIMenuManager {
   }
 
   /**
+   * Обновление метаданных карточки (лайки, просмотры) без перерисовки
+   * #OPTIMIZATION #METADATA-UPDATE
+   */
+  private updateCardMetadata(historyItemId: number, likesCount: number, isLiked: boolean): void {
+    try {
+      // Находим карточку по data-id
+      const card = document.querySelector(`.history-card[data-id="${historyItemId}"]`);
+      if (!card) {
+        logger.debug('Card not found for metadata update', { historyItemId });
+        return;
+      }
+
+      // Обновляем счетчик лайков
+      const likeCountEl = card.querySelector('.carousel-like-count');
+      if (likeCountEl) {
+        likeCountEl.textContent = String(likesCount);
+      }
+
+      // Обновляем состояние кнопки лайка
+      const likeBtn = card.querySelector('.carousel-like-btn');
+      if (likeBtn) {
+        if (isLiked) {
+          likeBtn.classList.add('liked');
+        } else {
+          likeBtn.classList.remove('liked');
+        }
+      }
+
+      logger.debug('Card metadata updated', { historyItemId, likesCount, isLiked });
+    } catch (error) {
+      logger.error('Error updating card metadata', { error, historyItemId });
+    }
+  }
+
+  /**
    * Инициализация UI
    */
   init(): void {
 
     // Настраиваем навигацию карусели
     this.setupCarouselNavigation();
+
+    // Подписываемся на обновления метаданных истории
+    const metadataUpdateHandler = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { historyItemId, likesCount, isLiked } = customEvent.detail;
+      this.updateCardMetadata(historyItemId, likesCount, isLiked);
+    };
+    
+    window.addEventListener('history:metadata-updated', metadataUpdateHandler);
+    this.cleanupFunctions.push(() => {
+      window.removeEventListener('history:metadata-updated', metadataUpdateHandler);
+    });
 
     // НЕ вызываем updateHistoryDisplay() здесь - это делается в optimisticUIRender()
     // Это предотвращает дублирование отрисовки карусели

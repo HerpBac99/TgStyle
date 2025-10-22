@@ -21,6 +21,7 @@ const analyzeRoutes = require('./src/api/analyze');
 const backgroundRemovalRoutes = require('./src/api/backgroundRemoval');
 const clothingClassificationRoutes = require('./src/api/clothingClassification');
 const historyRoutes = require('./src/api/history');
+const historyMetadataRoutes = require('./src/api/history-metadata');
 const subscriptionRoutes = require('./src/api/subscription');
 const wardrobeRoutes = require('./src/api/wardrobe');
 const capsulesRoutes = require('./src/api/capsules');
@@ -59,6 +60,7 @@ app.use('/api/analyze', analyzeRoutes);
 app.use('/api/remove-background', backgroundRemovalRoutes);
 app.use('/api/classify-clothing', clothingClassificationRoutes);
 app.use('/api/history', historyRoutes);
+app.use('/api/history-metadata', historyMetadataRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/wardrobe', wardrobeRoutes);
 app.use('/api/capsules', capsulesRoutes);
@@ -90,8 +92,8 @@ app.get('/api/health', (req, res) => {
 app.use((error, req, res, next) => {
   // Игнорируем обычные клиентские ошибки (не логируем)
   if (error.message === 'request aborted' ||
-      error.code === 'ECONNABORTED' ||
-      error.code === 'ECONNRESET') {
+    error.code === 'ECONNABORTED' ||
+    error.code === 'ECONNRESET') {
     return;
   }
 

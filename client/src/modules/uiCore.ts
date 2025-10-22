@@ -272,6 +272,17 @@ export class UICoreManager {
       if (historyItemId) {
         const resultActions = getElement('.result-actions');
         if (resultActions) {
+          // Удаляем старые компоненты, чтобы избежать дублирования при повторном вызове
+          const existingLikeComponent = resultActions.querySelector('.result-like-btn');
+          if (existingLikeComponent) {
+            existingLikeComponent.parentElement?.remove();
+          }
+
+          const existingShareComponent = resultActions.querySelector('.result-share-btn');
+          if (existingShareComponent) {
+            existingShareComponent.parentElement?.remove();
+          }
+
           // Импортируем analysisLikesService
           const { analysisLikesService } = await import('./analysis/AnalysisLikesService');
           

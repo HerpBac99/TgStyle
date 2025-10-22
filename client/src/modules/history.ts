@@ -399,6 +399,51 @@ class HistoryManager {
   }
 
   /**
+   * Обновление метаданных (лайки, просмотры) без перерисовки карусели
+   * OPTIMIZATION: Точечное обновление для избежания мигания
+   * #HISTORY #HISTORY-UPDATE-METADATA
+   */
+  updateMetadata(metadata: Array<{ id: number; likesCount: number; viewsCount: number; isLiked: boolean }>): void {
+    try {
+      let updatedCount = 0;
+      
+      metadata.forEach(meta => {
+        const item = this.getItemById(meta.id);
+        if (item) {
+          // Обновляем только если данные изменились
+          if (item.likesCount !== meta.likesCount || item.isLiked !== meta.isLiked) {
+            item.likesCount = meta.likesCount;
+            item.isLiked = meta.isLiked;
+            item.viewsCount = meta.viewsCount;
+            updatedCount++;
+            
+            // Диспатчим событие для точечного обновления UI
+            window.dispatchEvent(new CustomEvent('history:metadata-updated', {
+              detail: { 
+                historyItemId: meta.id,
+                likesCount: meta.likesCount,
+                isLiked: meta.isLiked
+              }
+            }));
+          }
+        }
+      });
+      
+      if (updatedCount > 0) {
+        // Сохраняем в localStorage
+        this.saveToStorage();
+        
+        logger.info('History metadata updated', {
+          totalItems: metadata.length,
+          updatedItems: updatedCount
+        });
+      }
+    } catch (error) {
+      logger.error('Error updating metadata', { error });
+    }
+  }
+
+  /**
    * Экспорт истории в JSON
    * Future feature
    */

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { logger } = require('../controllers/logsController');
+const { validateTelegramWebAppData } = require('../utils/telegram');
 const prisma = require('../lib/prisma');
 const fs = require('fs').promises;
 const path = require('path');
@@ -147,6 +148,47 @@ router.get('/:analysisId', async (req, res) => {
             usingFallback: !historyItem.analysisText && !!historyItem.technicalAnalysis
         });
 
+        // Проверяем лайкнул ли текущий пользователь этот анализ
+        let isLiked = false;
+        const initData = req.query.initData || req.body.initData;
+        if (initData) {
+            try {
+                const validationResult = validateTelegramWebAppData(initData);
+                
+                if (validationResult.isValid && validationResult.data.user) {
+                    const telegramId = validationResult.data.user.id;
+                    
+                    // Получаем пользователя из БД по telegramId
+                    const user = await prisma.user.findUnique({
+                        where: { telegramId: BigInt(telegramId) }
+                    });
+                    
+                    if (user) {
+                        // Проверяем есть ли лайк от этого пользователя
+                        const existingLike = await prisma.rating.findFirst({
+                            where: {
+                                userId: user.id,
+                                historyItemId: historyItem.id,
+                                ratingType: 'like'
+                            }
+                        });
+                        
+                        isLiked = !!existingLike;
+                        
+                        logger.info('Checked like status for shared analysis', {
+                            historyItemId: historyItem.id,
+                            userId: user.id,
+                            telegramId: telegramId,
+                            isLiked
+                        });
+                    }
+                }
+            } catch (authError) {
+                logger.warn('Could not verify user for like status', { error: authError.message });
+                // Если не удалось проверить пользователя, оставляем isLiked = false
+            }
+        }
+
         res.json({
             success: true,
             data: {
@@ -155,7 +197,7 @@ router.get('/:analysisId', async (req, res) => {
                 timestamp: historyItem.createdAt.toISOString(),
                 historyItemId: historyItem.id,
                 likesCount: historyItem.likesCount || 0,
-                isLiked: false // Для shared анализа всегда false, так как это не своя история
+                isLiked: isLiked
             }
         });
 

@@ -668,7 +668,7 @@ export class UIAnalysisManager {
       const clonedCloseBtn = closeBtn.cloneNode(true) as HTMLElement;
       closeBtn.replaceWith(clonedCloseBtn);
       clonedCloseBtn.addEventListener('click', () => {
-        logger.info('[CLOSE-BTN] Close analysis button clicked');
+        logger.info('Close analysis button clicked');
         this.closePreview();
       });
     }
@@ -687,16 +687,63 @@ export class UIAnalysisManager {
   /**
    * Закрытие экрана анализа
    */
-  private closePreview(): void {
+  private async closePreview(): Promise<void> {
     // Закрываем экран анализа
     const analysisScreen = getElement('#analysis-screen');
     if (analysisScreen) {
       analysisScreen.classList.add('hidden');
     }
 
-    // Обновляем только что проанализированную карточку в карусели
-    if (this.currentAnalysisData.historyItemId) {
-      uiMenuManager.updateCardDisplay(this.currentAnalysisData.historyItemId);
+    // Очищаем текущее изображение в менеджере камеры
+    cameraManager.clearCurrentImage();
+    
+    // OPTIMIZATION: Загружаем только метаданные если история большая
+    const stats = historyManager.getStats();
+    
+    try {
+      if (stats.filledSlots < 10) {
+        // Мало элементов - загружаем полностью
+        await historyManager.loadHistoryFromServer();
+        logger.info('History reloaded from server', { itemsCount: stats.filledSlots });
+      } else {
+        // Много элементов - загружаем только метаданные (оптимизация)
+        await this.syncHistoryMetadata();
+        logger.info('History metadata synced', { itemsCount: stats.filledSlots });
+        // Обновляем UI вручную с сохранением позиции
+        uiMenuManager.updateHistoryDisplay({ preservePosition: true });
+      }
+    } catch (error) {
+      logger.warn('Failed to update history from server', { error });
+      // Если загрузка с сервера не удалась, обновляем UI вручную
+      uiMenuManager.updateHistoryDisplay();
+    }
+  }
+
+  /**
+   * Синхронизация метаданных истории (лайки, просмотры) без загрузки фото
+   * #OPTIMIZATION #METADATA-SYNC
+   */
+  private async syncHistoryMetadata(): Promise<void> {
+    try {
+      const { api } = await import('./api.js');
+      const initData = window.Telegram?.WebApp?.initData || '';
+      
+      if (!initData) {
+        logger.warn('No initData available for metadata sync');
+        return;
+      }
+      
+      logger.info('Syncing history metadata from server');
+      const response = await api.get(`/history-metadata?initData=${encodeURIComponent(initData)}`) as any;
+      
+      if (response.success && response.metadata) {
+        historyManager.updateMetadata(response.metadata);
+        logger.info('History metadata synced successfully', { 
+          itemsCount: response.metadata.length 
+        });
+      }
+    } catch (err) {
+      logger.error('Error syncing history metadata', err);
     }
   }
 

@@ -23,79 +23,65 @@ class TgStyleApp {
   private initStartTime = Date.now();
 
   /**
-   * Обработка URL хэшей для shared анализов
+   * Обработка shared анализов при инициализации
+   * Проверяет все возможные источники параметров один раз
    */
   private handleSharedAnalysis(): void {
-    const hash = window.location.hash;
     const urlParams = new URLSearchParams(window.location.search);
     const tgStartParam = this.tg?.initDataUnsafe?.start_param;
+    let analysisId: string | null = null;
 
-    // Проверяем хэш (для прямых ссылок)
-    if (hash.startsWith('#shared-analysis-')) {
-      const analysisId = hash.replace('#shared-analysis-', '');
-      logger.info('Found shared analysis in hash', { analysisId });
-      this.showSharedAnalysis(analysisId);
-      return;
-    }
-
-    // Проверяем параметры URL (для ссылок из бота через Mini App)
-    const startAppParam = urlParams.get('startapp');
-    if (startAppParam) {
-      // Новый формат: analysis_xxx
-      if (startAppParam.startsWith('analysis_')) {
-        const analysisId = startAppParam.replace('analysis_', '');
-        logger.info('Found shared analysis in startapp param', { analysisId });
-        window.location.hash = `shared-analysis-${analysisId}`;
-        this.showSharedAnalysis(analysisId);
-        return;
-      }
-      // Старый формат: shared_xxx (для обратной совместимости)
-      if (startAppParam.startsWith('shared_')) {
-        const analysisId = startAppParam.replace('shared_', '');
-        logger.info('Found shared analysis in startapp param (old format)', { analysisId });
-        window.location.hash = `shared-analysis-${analysisId}`;
-        this.showSharedAnalysis(analysisId);
-        return;
-      }
-    }
-
-    // Проверяем Telegram WebApp start_param (для Mini App ссылок)
+    // Проверяем Telegram WebApp start_param (приоритет 1)
     if (tgStartParam) {
-      // Новый формат: analysis_xxx
       if (tgStartParam.startsWith('analysis_')) {
-        const analysisId = tgStartParam.replace('analysis_', '');
+        analysisId = tgStartParam.replace('analysis_', '');
         logger.info('Found shared analysis in Telegram start_param', { analysisId });
-        window.location.hash = `shared-analysis-${analysisId}`;
-        this.showSharedAnalysis(analysisId);
-        return;
-      }
-      // Старый формат: shared_xxx (для обратной совместимости)
-      if (tgStartParam.startsWith('shared_')) {
-        const analysisId = tgStartParam.replace('shared_', '');
+      } else if (tgStartParam.startsWith('shared_')) {
+        analysisId = tgStartParam.replace('shared_', '');
         logger.info('Found shared analysis in Telegram start_param (old format)', { analysisId });
-        window.location.hash = `shared-analysis-${analysisId}`;
-        this.showSharedAnalysis(analysisId);
-        return;
       }
     }
 
-    // Для обратной совместимости проверяем start параметр
-    const startParam = urlParams.get('start');
-    if (startParam) {
-      // Новый формат: analysis_xxx
-      if (startParam.startsWith('analysis_')) {
-        const analysisId = startParam.replace('analysis_', '');
-        window.location.hash = `shared-analysis-${analysisId}`;
-        this.showSharedAnalysis(analysisId);
-        return;
+    // Проверяем параметр startapp (приоритет 2)
+    if (!analysisId) {
+      const startAppParam = urlParams.get('startapp');
+      if (startAppParam) {
+        if (startAppParam.startsWith('analysis_')) {
+          analysisId = startAppParam.replace('analysis_', '');
+          logger.info('Found shared analysis in startapp param', { analysisId });
+        } else if (startAppParam.startsWith('shared_')) {
+          analysisId = startAppParam.replace('shared_', '');
+          logger.info('Found shared analysis in startapp param (old format)', { analysisId });
+        }
       }
-      // Старый формат: shared_xxx
-      if (startParam.startsWith('shared_')) {
-        const analysisId = startParam.replace('shared_', '');
-        window.location.hash = `shared-analysis-${analysisId}`;
-        this.showSharedAnalysis(analysisId);
-        return;
+    }
+
+    // Проверяем параметр start (приоритет 3, для обратной совместимости)
+    if (!analysisId) {
+      const startParam = urlParams.get('start');
+      if (startParam) {
+        if (startParam.startsWith('analysis_')) {
+          analysisId = startParam.replace('analysis_', '');
+          logger.info('Found shared analysis in start param', { analysisId });
+        } else if (startParam.startsWith('shared_')) {
+          analysisId = startParam.replace('shared_', '');
+          logger.info('Found shared analysis in start param (old format)', { analysisId });
+        }
       }
+    }
+
+    // Проверяем hash (приоритет 4, для прямых ссылок)
+    if (!analysisId) {
+      const hash = window.location.hash;
+      if (hash.startsWith('#shared-analysis-')) {
+        analysisId = hash.replace('#shared-analysis-', '');
+        logger.info('Found shared analysis in hash', { analysisId });
+      }
+    }
+
+    // Если нашли analysisId, загружаем анализ
+    if (analysisId) {
+      this.showSharedAnalysis(analysisId);
     }
   }
 
@@ -107,7 +93,10 @@ class TgStyleApp {
       logger.info('Loading shared analysis from server', { analysisId });
 
       const { api } = await import('./modules/api.js');
-      const apiUrl = `/shared-analysis/${analysisId}`;
+      
+      // Добавляем initData для проверки статуса лайка
+      const initData = this.tg?.initData || '';
+      const apiUrl = `/shared-analysis/${analysisId}?initData=${encodeURIComponent(initData)}`;
       
       const response = await api.get(apiUrl);
 
@@ -165,13 +154,8 @@ class TgStyleApp {
       // Предзагружаем данные в фоне
       this.preloadAppData();
 
-      // Обрабатываем shared анализы
+      // Обрабатываем shared анализы (один раз при инициализации)
       this.handleSharedAnalysis();
-
-      // Добавляем слушатель изменений хэша
-      window.addEventListener('hashchange', () => {
-        this.handleSharedAnalysis();
-      });
 
       // Завершаем инициализацию
       this.completeInitialization();
@@ -400,22 +384,55 @@ class TgStyleApp {
   }
 
   /**
-   * Фоновая загрузка остальной истории (элементы 11-50)
-   * Выполняется с низким приоритетом после инициализации
+   * Фоновая загрузка метаданных истории с сервера
+   * Выполняется с низким приоритетом после инициализации для синхронизации лайков
+   * OPTIMIZATION: Загружаем только метаданные (лайки, просмотры) без тяжелых данных
    */
-  private loadRemainingHistoryInBackground(): void {
+  private async loadRemainingHistoryInBackground(): Promise<void> {
     const stats = historyManager.getStats();
+    
+    // Если истории мало, загружаем полностью
     if (stats.filledSlots < 10) {
-      // Если истории меньше 10 элементов, грузим все
-      historyManager.loadHistoryFromServer().catch(err => {
-        logger.error('Error loading remaining history', err);
+      logger.info('Background history load decision', { 
+        filledSlots: stats.filledSlots,
+        willLoad: true,
+        reason: 'Loading full history (< 10 items)'
       });
+      
+      historyManager.loadHistoryFromServer().catch(err => {
+        logger.error('Error loading history from server', err);
+      });
+      return;
     }
-    // Если история уже большая (>= 10), не грузим дополнительно при старте
-    logger.info('Background history load decision', { 
+    
+    // Если истории много, загружаем только метаданные для синхронизации лайков
+    logger.info('Background metadata sync decision', { 
       filledSlots: stats.filledSlots,
-      willLoad: stats.filledSlots < 10 
+      willSync: true,
+      reason: 'Syncing likes without reloading images'
     });
+    
+    try {
+      const { api } = await import('./modules/api.js');
+      const initData = window.Telegram?.WebApp?.initData || '';
+      
+      if (!initData) {
+        logger.warn('No initData available for metadata sync');
+        return;
+      }
+      
+      const response = await api.get(`/history-metadata?initData=${encodeURIComponent(initData)}`) as any;
+      
+      if (response.success && response.metadata) {
+        // Обновляем только метаданные в кэше без перерисовки
+        historyManager.updateMetadata(response.metadata);
+        logger.info('History metadata synced', { 
+          itemsCount: response.metadata.length 
+        });
+      }
+    } catch (err) {
+      logger.error('Error syncing history metadata', err);
+    }
   }
 
   /**

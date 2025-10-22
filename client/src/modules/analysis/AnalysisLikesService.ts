@@ -69,12 +69,12 @@ export class AnalysisLikesService {
       try {
         // Асинхронный запрос к API
         const updatedStatus = await this.toggleLike(entityId, !isLiking);
-        
+
         // Корректировка UI, если ответ сервера отличается
         currentState = updatedStatus;
         likesCountEl.textContent = String(currentState.likesCount);
         if (currentState.isLiked !== isLiking) {
-           likeBtn.classList.toggle('liked', currentState.isLiked);
+          likeBtn.classList.toggle('liked', currentState.isLiked);
         }
 
       } catch (error) {
@@ -104,16 +104,26 @@ export class AnalysisLikesService {
         throw new Error(response.error || 'Failed to like analysis');
       }
 
+      // Проверяем, есть ли этот анализ в локальной истории пользователя
+      const isInLocalHistory = historyManager.getItemById(historyItemId) !== undefined;
+
       logger.info('Analysis liked successfully', {
         historyItemId,
-        likesCount: response.likesCount
+        likesCount: response.likesCount,
+        isInLocalHistory
       });
 
-      // Обновляем состояние в historyManager, который сохранит его в localStorage
-      historyManager.updateItemLikeStatus(historyItemId, {
-        isLiked: true,
-        likesCount: response.likesCount || 0
-      });
+      // Обновляем состояние в historyManager ТОЛЬКО если анализ есть в локальной истории
+      if (isInLocalHistory) {
+        historyManager.updateItemLikeStatus(historyItemId, {
+          isLiked: true,
+          likesCount: response.likesCount || 0
+        });
+      } else {
+        logger.info('Skipping local history update - shared analysis not in user history', {
+          historyItemId
+        });
+      }
 
       return {
         isLiked: true,
@@ -143,16 +153,26 @@ export class AnalysisLikesService {
         throw new Error(response.error || 'Failed to unlike analysis');
       }
 
+      // Проверяем, есть ли этот анализ в локальной истории пользователя
+      const isInLocalHistory = historyManager.getItemById(historyItemId) !== undefined;
+
       logger.info('Analysis unliked successfully', {
         historyItemId,
-        likesCount: response.likesCount
+        likesCount: response.likesCount,
+        isInLocalHistory
       });
 
-      // Обновляем состояние в historyManager, который сохранит его в localStorage
-      historyManager.updateItemLikeStatus(historyItemId, {
-        isLiked: false,
-        likesCount: response.likesCount || 0
-      });
+      // Обновляем состояние в historyManager ТОЛЬКО если анализ есть в локальной истории
+      if (isInLocalHistory) {
+        historyManager.updateItemLikeStatus(historyItemId, {
+          isLiked: false,
+          likesCount: response.likesCount || 0
+        });
+      } else {
+        logger.info('Skipping local history update - shared analysis not in user history', {
+          historyItemId
+        });
+      }
 
       return {
         isLiked: false,

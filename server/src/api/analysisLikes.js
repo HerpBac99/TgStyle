@@ -270,13 +270,12 @@ router.get('/:historyItemId/status', async (req, res) => {
       });
     }
 
-    // Проверяем наличие лайка
-    const like = await prisma.rating.findUnique({
+    // Проверяем наличие лайка (с учетом ratingType)
+    const like = await prisma.rating.findFirst({
       where: {
-        userId_historyItemId: {
-          userId: user.id,
-          historyItemId: parseInt(historyItemId)
-        }
+        userId: user.id,
+        historyItemId: parseInt(historyItemId),
+        ratingType: 'like'
       }
     });
 
