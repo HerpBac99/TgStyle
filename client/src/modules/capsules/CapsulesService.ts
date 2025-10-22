@@ -9,6 +9,7 @@ import { Capsule, StyleCapsule, CreateCapsuleDto, UpdateCapsuleDto } from '@/typ
 import { WardrobeItem } from '@/types/wardrobe';
 import { dataLoader } from '../shared/DataLoader';
 import { dataCacheManager } from '../dataCache';
+import { handleServiceError, handleServiceErrorAndThrow } from '../shared/ErrorHandler';
 
 /**
  * Класс-сервис для работы с капсулами
@@ -40,8 +41,7 @@ export class CapsulesService {
       return result.capsules;
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Error loading capsules from server', { error: errorMessage });
+      handleServiceError(error, 'Error loading capsules from server');
       return [];
     }
   }
@@ -63,9 +63,7 @@ export class CapsulesService {
       return response.capsule;
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Error loading capsule data', { error: errorMessage, capsuleId });
-      throw error;
+      handleServiceErrorAndThrow(error, 'Error loading capsule data', { capsuleId });
     }
   }
 
@@ -89,9 +87,7 @@ export class CapsulesService {
 
       return result.capsule;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Error saving capsule to server', { error: errorMessage });
-      throw error;
+      handleServiceErrorAndThrow(error, 'Error saving capsule to server');
     }
   }
 
@@ -115,9 +111,7 @@ export class CapsulesService {
 
       return result.capsule;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Error updating capsule on server', { error: errorMessage, capsuleId });
-      throw error;
+      handleServiceErrorAndThrow(error, 'Error updating capsule on server', { capsuleId });
     }
   }
 
@@ -140,9 +134,7 @@ export class CapsulesService {
       dataCacheManager.removeCapsule(capsuleId);
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Error removing capsule', { error: errorMessage, capsuleId });
-      throw error;
+      handleServiceErrorAndThrow(error, 'Error removing capsule', { capsuleId });
     }
   }
 

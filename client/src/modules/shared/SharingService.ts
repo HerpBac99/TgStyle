@@ -4,6 +4,7 @@
  */
 
 import { logger } from '../logger';
+import { api } from '../api';
 import { ShareConfig, ShareOptions, ShareResult } from '@/types/sharing';
 import { APP_CONFIG } from '@/utils/constants';
 import { createElement } from '@/utils/helpers';
@@ -297,9 +298,6 @@ export class SharingService {
       const cleanShareId = shareId.startsWith('analysis_') 
         ? shareId.replace('analysis_', '') 
         : shareId;
-
-      // Импортируем api динамически
-      const { api } = await import('../api.js');
 
       const requestBody = {
         analysisId: cleanShareId,  // Отправляем БЕЗ префикса

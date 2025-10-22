@@ -610,8 +610,8 @@ export class WardrobeManager implements PhotoUploadHandler {
     this.currentClassification = null;
 
     try {
-      // Сохраняем через сервис
-      const item = await photoProcessor.saveToWardrobe(imageToSave, classification);
+      // Сохраняем через wardrobeService
+      const item = await wardrobeService.addItem(imageToSave, classification);
 
       // Добавляем в локальный массив
       this.wardrobeItems.push(item);

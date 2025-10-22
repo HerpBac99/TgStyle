@@ -91,8 +91,6 @@ class TgStyleApp {
   private async showSharedAnalysis(analysisId: string): Promise<void> {
     try {
       logger.info('Loading shared analysis from server', { analysisId });
-
-      const { api } = await import('./modules/api.js');
       
       // Добавляем initData для проверки статуса лайка
       const initData = this.tg?.initData || '';
@@ -413,7 +411,6 @@ class TgStyleApp {
     });
     
     try {
-      const { api } = await import('./modules/api.js');
       const initData = window.Telegram?.WebApp?.initData || '';
       
       if (!initData) {

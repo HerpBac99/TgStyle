@@ -11,6 +11,7 @@ import {
 import { logger } from './logger';
 import { authManager } from './auth';
 import { uiAnalysisManager } from './uiAnalysis';
+import { analysisLikesService } from './analysis/AnalysisLikesService';
 
 // Объявляем глобальную переменную Telegram
 declare global {
@@ -283,9 +284,6 @@ export class UICoreManager {
             existingShareComponent.parentElement?.remove();
           }
 
-          // Импортируем analysisLikesService
-          const { analysisLikesService } = await import('./analysis/AnalysisLikesService');
-          
           // Создаем компонент лайков с данными с сервера
           analysisLikesService.createLikeComponent(
             resultActions,

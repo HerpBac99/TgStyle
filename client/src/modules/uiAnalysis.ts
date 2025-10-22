@@ -23,6 +23,7 @@ import { sharingService } from './shared/SharingService';
 import { analysisLikesService } from './analysis/AnalysisLikesService';
 import { historyManager } from './history';
 import { uiMenuManager } from './uiMenu';
+import { api } from './api';
 
 // Объявляем глобальную переменную Telegram
 declare global {
@@ -725,7 +726,6 @@ export class UIAnalysisManager {
    */
   private async syncHistoryMetadata(): Promise<void> {
     try {
-      const { api } = await import('./api.js');
       const initData = window.Telegram?.WebApp?.initData || '';
       
       if (!initData) {

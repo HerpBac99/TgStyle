@@ -5,6 +5,7 @@
 
 import { logger } from './logger';
 import { WardrobeItem, ClothingCategory } from './photoUploadManager';
+import { UICanvasResultScreen } from './uiCanvasResultScreen';
 
 /**
  * Базовый конфиг для любой модалки
@@ -618,30 +619,23 @@ export class UIModalManager {
   showCapsulePreview(imageUrl: string, onClose?: () => void): void {
     logger.info('Showing capsule preview from feed', { imageUrl });
 
-    // Импортируем UICanvasResultScreen динамически
-    import('./uiCanvasResultScreen').then(({ UICanvasResultScreen }) => {
-      // Создаем экземпляр UICanvasResultScreen
-      const previewScreen = new UICanvasResultScreen({
-        screenId: 'capsule-result-screen',
-        onDone: () => {
-          // Скрываем экран и вызываем callback
-          previewScreen.hide();
-          if (onClose) {
-            onClose();
-          }
-          logger.info('Capsule preview closed');
+    // Создаем экземпляр UICanvasResultScreen
+    const previewScreen = new UICanvasResultScreen({
+      screenId: 'capsule-result-screen',
+      onDone: () => {
+        // Скрываем экран и вызываем callback
+        previewScreen.hide();
+        if (onClose) {
+          onClose();
         }
-      });
-
-      // Показываем экран БЕЗ кнопок (showButtons = false)
-      previewScreen.show(imageUrl, false);
-
-      logger.info('Capsule preview shown successfully');
-    }).catch(error => {
-      logger.error('Failed to load UICanvasResultScreen', {
-        error: error instanceof Error ? error.message : String(error)
-      });
+        logger.info('Capsule preview closed');
+      }
     });
+
+    // Показываем экран БЕЗ кнопок (showButtons = false)
+    previewScreen.show(imageUrl, false);
+
+    logger.info('Capsule preview shown successfully');
   }
 
   // ============================================

@@ -198,44 +198,6 @@ export class UIPublicFeed {
   }
 
   /**
-   * Обновить UI лайка (если нужно синхронизировать извне)
-   * Метод оставлен для обратной совместимости, но компонент лайков сам управляет своим UI
-   */
-  updateLikeUI(capsuleId: number, isLiked: boolean, likesCount?: number): void {
-    if (!this.gridContainer) return;
-    
-    const card = this.gridContainer.querySelector(`[data-capsule-id="${capsuleId}"]`);
-    if (!card) return;
-
-    // Ищем кнопку лайка (универсальный компонент)
-    const likeBtn = card.querySelector('.like-btn') as HTMLElement;
-    if (!likeBtn) return;
-
-    const likeCountEl = card.querySelector('.like-count') as HTMLElement;
-    if (!likeCountEl) return;
-
-    // Обновляем состояние
-    if (isLiked) {
-      likeBtn.classList.add('liked');
-    } else {
-      likeBtn.classList.remove('liked');
-    }
-
-    if (likesCount !== undefined) {
-      likeCountEl.textContent = String(likesCount);
-    }
-
-    // Обновляем в массиве
-    const capsule = this.capsules.find(c => c.id === capsuleId);
-    if (capsule) {
-      capsule.isLiked = isLiked;
-      if (likesCount !== undefined) {
-        capsule.likesCount = likesCount;
-      }
-    }
-  }
-
-  /**
    * Настройка infinite scroll через Intersection Observer
    */
   private setupInfiniteScroll(): void {

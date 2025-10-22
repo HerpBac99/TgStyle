@@ -6,8 +6,10 @@
 import { logger } from '../logger';
 import { api } from '../api';
 import { WardrobeItem } from '@/types/wardrobe';
+import { ClassificationResult } from '@/types/wardrobe';
 import { dataLoader } from '../shared/DataLoader';
 import { dataCacheManager } from '../dataCache';
+import { handleServiceError, handleServiceErrorAndThrow } from '../shared/ErrorHandler';
 
 /**
  * Класс-сервис для работы с гардеробом
@@ -39,8 +41,7 @@ export class WardrobeService {
       return result.items;
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Error loading wardrobe from server', { error: errorMessage });
+      handleServiceError(error, 'Error loading wardrobe from server');
       return [];
     }
   }
@@ -64,9 +65,7 @@ export class WardrobeService {
       dataCacheManager.removeWardrobeItem(itemId);
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Error deleting wardrobe item', { error: errorMessage, itemId });
-      throw error;
+      handleServiceErrorAndThrow(error, 'Error deleting wardrobe item', { itemId });
     }
   }
 
@@ -91,9 +90,38 @@ export class WardrobeService {
       }
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Error updating wardrobe item', { error: errorMessage, itemId });
-      throw error;
+      handleServiceErrorAndThrow(error, 'Error updating wardrobe item', { itemId });
+    }
+  }
+
+  /**
+   * Добавить новый элемент в гардероб
+   */
+  async addItem(imageData: string, classification: ClassificationResult): Promise<WardrobeItem> {
+    try {
+      logger.info('Adding new wardrobe item', {
+        category: classification.category,
+        color: classification.color
+      });
+
+      const result = await api.post('/wardrobe', {
+        imageData,
+        classification
+      }) as any;
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to add item');
+      }
+
+      logger.info('Item added successfully', { id: result.item.id });
+
+      // Добавляем в кэш
+      dataCacheManager.addWardrobeItem(result.item);
+
+      return result.item;
+
+    } catch (error) {
+      handleServiceErrorAndThrow(error, 'Error adding wardrobe item');
     }
   }
 
@@ -108,25 +136,6 @@ export class WardrobeService {
     return items.filter(item => item.category?.toUpperCase() === category);
   }
 
-  /**
-   * Получить статистику гардероба
-   */
-  getStats(items: WardrobeItem[]): {
-    totalItems: number;
-    byCategory: Record<string, number>;
-  } {
-    const stats = {
-      totalItems: items.length,
-      byCategory: {} as Record<string, number>
-    };
-
-    items.forEach(item => {
-      const category = item.category?.toUpperCase() || 'UNKNOWN';
-      stats.byCategory[category] = (stats.byCategory[category] || 0) + 1;
-    });
-
-    return stats;
-  }
 }
 
 // Экспортируем синглтон

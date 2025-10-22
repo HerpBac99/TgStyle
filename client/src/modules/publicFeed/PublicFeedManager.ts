@@ -6,6 +6,7 @@
 import { logger } from '../logger';
 import { publicFeedService } from './PublicFeedService';
 import { UIPublicFeed } from './UIPublicFeed';
+import { uiModalManager } from '../uiModalManager';
 import type { PublicCapsule } from '@/types/publicFeed';
 import { BASE_URL } from '@/utils/constants';
 
@@ -223,16 +224,9 @@ export class PublicFeedManager {
 
     logger.info('Opening capsule preview', { imageUrl: fullImageUrl });
 
-    // Импортируем и используем uiModalManager для показа превью
-    import('../uiModalManager').then(({ uiModalManager }) => {
-      uiModalManager.showCapsulePreview(fullImageUrl, () => {
-        logger.info('Capsule preview closed from feed');
-      });
-    }).catch(error => {
-      logger.error('Failed to load uiModalManager', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-      alert('Не удалось открыть предпросмотр');
+    // Используем uiModalManager для показа превью
+    uiModalManager.showCapsulePreview(fullImageUrl, () => {
+      logger.info('Capsule preview closed from feed');
     });
   }
 

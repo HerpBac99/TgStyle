@@ -9,6 +9,7 @@ import { CanvasItem } from '@/types/capsules';
 import { StyleCapsule } from '../uiCapsulesGrid';
 import { PhotoUploadHandler, ClothingCategory } from '../photoUploadManager';
 import { capsulesService } from './CapsulesService';
+import { wardrobeService } from '../wardrobe/WardrobeService';
 import { photoProcessor } from '../shared/PhotoProcessor';
 import { itemSelector } from '../shared/ItemSelector';
 import { dataLoader } from '../shared/DataLoader';
@@ -45,6 +46,9 @@ export class CapsulesManager implements PhotoUploadHandler {
   private currentPreviewImage: string | null = null;
   private currentClassification: any = null;
 
+  // Event listener для очистки
+  private wardrobeItemSavedHandler: EventListener;
+
   constructor() {
     // CapsulesManager initialized
 
@@ -56,10 +60,12 @@ export class CapsulesManager implements PhotoUploadHandler {
     });
 
     // Подписываемся на событие сохранения нового элемента гардероба
-    window.addEventListener('wardrobe:item-saved', ((event: CustomEvent) => {
+    this.wardrobeItemSavedHandler = ((event: CustomEvent) => {
       const { item } = event.detail;
       this.handleNewItemSaved(item);
-    }) as EventListener);
+    }) as EventListener;
+    
+    window.addEventListener('wardrobe:item-saved', this.wardrobeItemSavedHandler);
   }
 
   // ============================================
@@ -632,25 +638,8 @@ export class CapsulesManager implements PhotoUploadHandler {
    */
   private async loadWardrobeItems(): Promise<void> {
     try {
-      this.wardrobeItems = await dataLoader.loadWithCacheFallback<WardrobeItem>(
-        () => dataCacheManager.getWardrobeItems(),
-        async () => {
-          const initData = (window as any).Telegram?.WebApp?.initData || '';
-          const response = await fetch(`/api/wardrobe?initData=${encodeURIComponent(initData)}`);
-          
-          if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
-          }
-          
-          const result = await response.json();
-          
-          if (!result.success) {
-            throw new Error(result.error || 'Failed to load items');
-          }
-          
-          return result.items;
-        }
-      );
+      // Используем wardrobeService вместо прямого fetch
+      this.wardrobeItems = await wardrobeService.loadWardrobe();
       logger.info(`Loaded ${this.wardrobeItems.length} wardrobe items`);
     } catch (error) {
       logger.error('Error loading wardrobe items', error);
@@ -801,8 +790,8 @@ export class CapsulesManager implements PhotoUploadHandler {
     this.currentClassification = null;
 
     try {
-      // Сохраняем через сервис
-      const item = await photoProcessor.saveToWardrobe(imageToSave, classification);
+      // Сохраняем через wardrobeService
+      const item = await wardrobeService.addItem(imageToSave, classification);
 
       logger.info('Item saved successfully', { id: item.id });
 
@@ -868,6 +857,9 @@ export class CapsulesManager implements PhotoUploadHandler {
     logger.info('Destroying CapsulesManager');
 
     this.closeCapsules();
+
+    // Удаляем event listener для предотвращения утечки памяти
+    window.removeEventListener('wardrobe:item-saved', this.wardrobeItemSavedHandler);
 
     this.wardrobeItems = [];
     this.capsules = [];

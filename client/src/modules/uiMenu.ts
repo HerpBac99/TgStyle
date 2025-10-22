@@ -27,6 +27,7 @@ import { uiCoreManager } from './uiCore';
 import { analysisLikesService } from './analysis/AnalysisLikesService';
 import { sharingService } from './shared/SharingService';
 import { uiAnalysisManager } from './uiAnalysis';
+import { api } from './api';
 
 // Объявляем глобальную переменную Telegram
 declare global {
@@ -318,7 +319,6 @@ export class UIMenuManager {
    */
   private async syncHistoryMetadata(): Promise<void> {
     try {
-      const { api } = await import('./api.js');
       const initData = window.Telegram?.WebApp?.initData || '';
       
       if (!initData) {

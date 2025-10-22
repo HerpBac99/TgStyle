@@ -158,48 +158,134 @@ export class UICapsulesGrid {
     content.appendChild(footer);
     card.appendChild(content);
 
-    // Обработчик клика для просмотра капсулы (исключаем лайки и sharing)
-    const handleClick = (e: Event) => {
-      const target = e.target as HTMLElement;
-      // Проверяем что клик НЕ на кнопку лайка, share или их содержимое
-      if (!target.closest('.like-container') && !target.closest('.share-container')) {
-        logger.info('Capsule card clicked', { capsuleId: capsule.id });
-        this.config.onView(capsule.id);
+    // Обработчики кликов с разной длительностью
+    let pressStartTime = 0;
+    let longPressTimer: number | null = null;
+    let longPressTriggered = false;
+    let startPos: { x: number; y: number } | null = null;
+    const SCROLL_THRESHOLD = 10;
+
+    const startPress = (e: MouseEvent | TouchEvent) => {
+      // Не сбрасываем longPressTriggered сразу, чтобы избежать ложных срабатываний
+      // после закрытия confirm диалога
+      if (!longPressTriggered) {
+        pressStartTime = Date.now();
       }
-    };
 
-    card.addEventListener('click', handleClick);
+      if (e instanceof TouchEvent && e.touches[0]) {
+        startPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      } else if (e instanceof MouseEvent) {
+        startPos = { x: e.clientX, y: e.clientY };
+      }
 
-    // Обработчик удаления капсулы (долгое нажатие)
-    let longPressTimer: number;
-
-    const startLongPress = () => {
       longPressTimer = window.setTimeout(() => {
+        longPressTriggered = true;
+
+        // Тактильная обратная связь
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+        }
+
         if (confirm('Удалить эту капсулу?')) {
           logger.info('Capsule delete confirmed', { capsuleId: capsule.id });
           this.config.onDelete(capsule.id);
         }
-      }, 800); // 800ms для долгого нажатия
+      }, 800);
     };
 
-    const cancelLongPress = () => {
-      clearTimeout(longPressTimer);
+    const endPress = (e: MouseEvent | TouchEvent) => {
+      if (longPressTimer !== null) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+
+      if (!startPos) return;
+
+      const pressDuration = Date.now() - pressStartTime;
+
+      let endPos: { x: number; y: number } | null = null;
+      if (e instanceof TouchEvent && e.changedTouches[0]) {
+        endPos = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+      } else if (e instanceof MouseEvent) {
+        endPos = { x: e.clientX, y: e.clientY };
+      }
+
+      if (!endPos) return;
+
+      const deltaX = Math.abs(endPos.x - startPos.x);
+      const deltaY = Math.abs(endPos.y - startPos.y);
+      const hasMoved = deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD;
+
+      const target = e.target as HTMLElement;
+      // Проверяем что клик НЕ на кнопку лайка, share или их содержимое
+      const isInteractiveElement = target.closest('.like-container') || target.closest('.share-container');
+
+      // Открываем превью только если: короткое нажатие, не было долгого нажатия, не было движения, не интерактивный элемент
+      if (!longPressTriggered && !hasMoved && pressDuration < 500 && !isInteractiveElement) {
+        // Легкая вибрация при открытии превью
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+        }
+        logger.info('Capsule card clicked', { capsuleId: capsule.id });
+        this.config.onView(capsule.id);
+      }
+
+      // Сбрасываем флаг долгого нажатия с задержкой, чтобы избежать ложных срабатываний
+      if (longPressTriggered) {
+        setTimeout(() => {
+          longPressTriggered = false;
+        }, 100);
+      }
     };
 
-    card.addEventListener('mousedown', startLongPress);
-    card.addEventListener('mouseup', cancelLongPress);
-    card.addEventListener('mouseleave', cancelLongPress);
-    card.addEventListener('touchstart', startLongPress);
-    card.addEventListener('touchend', cancelLongPress);
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      if (!startPos) return;
+
+      let currentPos: { x: number; y: number } | null = null;
+      if (e instanceof TouchEvent && e.touches[0]) {
+        currentPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      } else if (e instanceof MouseEvent) {
+        currentPos = { x: e.clientX, y: e.clientY };
+      }
+
+      if (!currentPos) return;
+
+      const deltaX = Math.abs(currentPos.x - startPos.x);
+      const deltaY = Math.abs(currentPos.y - startPos.y);
+
+      if (deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD) {
+        if (longPressTimer !== null) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
+    };
+
+    const cancelPress = () => {
+      if (longPressTimer !== null) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      longPressTriggered = false;
+    };
+
+    card.addEventListener('mousedown', startPress);
+    card.addEventListener('mouseup', endPress);
+    card.addEventListener('mouseleave', cancelPress);
+    card.addEventListener('touchstart', startPress);
+    card.addEventListener('touchend', endPress);
+    card.addEventListener('touchmove', handleMove);
+    card.addEventListener('mousemove', handleMove);
 
     // Добавляем в cleanup функции
     this.cleanupFunctions.push(() => {
-      card.removeEventListener('click', handleClick);
-      card.removeEventListener('mousedown', startLongPress);
-      card.removeEventListener('mouseup', cancelLongPress);
-      card.removeEventListener('mouseleave', cancelLongPress);
-      card.removeEventListener('touchstart', startLongPress);
-      card.removeEventListener('touchend', cancelLongPress);
+      card.removeEventListener('mousedown', startPress);
+      card.removeEventListener('mouseup', endPress);
+      card.removeEventListener('mouseleave', cancelPress);
+      card.removeEventListener('touchstart', startPress);
+      card.removeEventListener('touchend', endPress);
+      card.removeEventListener('touchmove', handleMove);
+      card.removeEventListener('mousemove', handleMove);
     });
 
     return card;
