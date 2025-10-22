@@ -65,7 +65,7 @@ export class UICanvasEditor {
       container.classList.remove('hidden');
       this.isVisible = true;
       logger.info('Canvas container shown');
-      
+
       // ВАЖНО: Настраиваем кнопки при каждом показе canvas
       // Это исправляет баг когда кнопки исчезают после первого использования
       this.setupCanvasButtons();
@@ -138,6 +138,8 @@ export class UICanvasEditor {
         enableRetinaScaling: true
       });
 
+      // Настраиваем обработчик выделения объектов
+      this.setupSelectionHandlers();
 
       // Настраиваем кнопки
       this.setupCanvasButtons();
@@ -217,7 +219,7 @@ export class UICanvasEditor {
       finalY = position.y;
       finalScale = scale;
       finalAngle = angle || 0;
-      
+
       logger.debug('Using saved parameters', {
         itemId: item.id,
         position,
@@ -231,7 +233,7 @@ export class UICanvasEditor {
       finalY = calculated.y;
       finalScale = calculated.scale;
       finalAngle = 0;
-      
+
       logger.debug('Calculated parameters automatically', {
         itemId: item.id,
         calculated
@@ -351,7 +353,7 @@ export class UICanvasEditor {
     // Восстанавливаем каждый объект
     for (let i = 0; i < savedData.canvas.objects.length; i++) {
       const objData = savedData.canvas.objects[i];
-      
+
       // Находим элемент гардероба
       let wardrobeItem: WardrobeItem | null = null;
 
@@ -434,7 +436,7 @@ export class UICanvasEditor {
     for (const obj of objects) {
       const fabricObj = obj as any;
       const itemData = fabricObj.itemData || fabricObj._element?.itemData;
-      
+
       if (itemData && itemData.id === itemId) {
         this.fabricCanvas.remove(obj);
         removed = true;
@@ -484,13 +486,48 @@ export class UICanvasEditor {
   // ============================================
 
   /**
+   * Настроить обработчики выделения объектов
+   * При выделении объект автоматически поднимается на самый верх
+   */
+  private setupSelectionHandlers(): void {
+    if (!this.fabricCanvas) {
+      return;
+    }
+
+    const handleSelection = (e: any) => {
+      const selectedObject = e.selected?.[0];
+      if (selectedObject && this.fabricCanvas) {
+        // Поднимаем выделенный объект на самый верх
+        // В Fabric.js используется метод canvas.bringObjectToFront()
+        const canvas = this.fabricCanvas as any;
+        if (canvas.bringObjectToFront) {
+          canvas.bringObjectToFront(selectedObject);
+          this.fabricCanvas.renderAll();
+
+          logger.debug('Object brought to front on selection', {
+            itemId: (selectedObject as any).id
+          });
+        }
+      }
+    };
+
+    // Обработчик для первого выделения объекта
+    this.fabricCanvas.on('selection:created', handleSelection);
+
+    // Обработчик для смены выделения (когда выбираем другой объект)
+    this.fabricCanvas.on('selection:updated', handleSelection);
+
+    logger.info('Selection handlers configured');
+  }
+
+  /**
    * Настроить кнопки canvas (Добавить, Далее)
    */
   private setupCanvasButtons(): void {
     // Очищаем старые обработчики перед добавлением новых
     // Это предотвращает накопление обработчиков при повторных вызовах
     this.cleanup();
-    
+
     // Кнопка "Добавить одежду"
     const addBtn = document.getElementById('canvas-add-item-btn') as HTMLElement;
     if (addBtn && this.config.onAddItem) {
@@ -510,6 +547,15 @@ export class UICanvasEditor {
     if (nextBtn && this.config.onNext) {
       const handleNext = () => {
         logger.info('Canvas next button clicked');
+
+        // Снимаем выделение со всех объектов перед сохранением
+        // Это предотвращает попадание рамки на превью
+        if (this.fabricCanvas) {
+          this.fabricCanvas.discardActiveObject();
+          this.fabricCanvas.renderAll();
+          logger.debug('Active object discarded before saving');
+        }
+
         this.config.onNext!();
       };
 
@@ -593,9 +639,10 @@ export class UICanvasEditor {
       transparentCorners: false,
       cornerColor: '#ffffff',
       cornerStrokeColor: '#333333',
+      cornerStyle: 'circle',
       borderColor: '#333333',
       borderOpacityWhenMoving: 0.8,
-      cornerSize: 12,
+      cornerSize: 8,
       touchCornerSize: 24,
     });
 
@@ -732,11 +779,11 @@ export class UICanvasEditor {
 
       this.fabricCanvas.remove(target);
       this.fabricCanvas.renderAll();
-      
-      logger.info('Object deleted from canvas', { 
-        itemId: (target as any).id 
+
+      logger.info('Object deleted from canvas', {
+        itemId: (target as any).id
       });
-      
+
       return true;
 
     } catch (error) {

@@ -921,3 +921,28 @@
     width: 16px;
     height: 16px;
 }
+
+/* Градиентный индикатор выбранного объекта на canvas */
+.selection-indicator-gradient {
+    position: fixed;
+    pointer-events: none;
+    border-radius: 8px;
+    will-change: transform, opacity;
+    transform: translateZ(0);
+    background-size: 200% 200%;
+    transition: opacity 0.3s ease-in-out;
+    z-index: 1000;
+}
+
+/* Анимация градиента */
+@keyframes gradientMove {
+    0% {
+        background-position: 0% 0%;
+    }
+    50% {
+        background-position: 100% 100%;
+    }
+    100% {
+        background-position: 0% 0%;
+    }
+}
