@@ -6,6 +6,7 @@
 import { logger } from './logger';
 import { api } from './api';
 import { WardrobeItem } from './photoUploadManager';
+import type { GeneratedCapsule } from '@/types/capsules';
 import * as fabric from 'fabric';
 
 // Делаем fabric доступным глобально для совместимости
@@ -184,6 +185,170 @@ export class UICanvasEditor {
 
     this.fabricCanvas.renderAll();
     logger.info('Items loaded to canvas successfully');
+  }
+
+  /**
+   * Загрузить сгенерированную капсулу на canvas
+   * Автоматически позиционирует вещи по категориям
+   * 
+   * @param capsule - Сгенерированная капсула с вещами
+   */
+  async loadGeneratedCapsule(capsule: GeneratedCapsule): Promise<void> {
+    if (!this.fabricCanvas) {
+      logger.error('Canvas not initialized, cannot load generated capsule');
+      throw new Error('Canvas not initialized');
+    }
+
+    logger.info('Loading generated capsule to canvas', {
+      capsuleId: capsule.id,
+      itemsCount: capsule.items.length
+    });
+
+    // Очищаем canvas
+    this.fabricCanvas.clear();
+    (this.fabricCanvas as any).backgroundColor = '#f5f5f5';
+    this.fabricCanvas.renderAll();
+
+    // Автоматически позиционируем вещи
+    const positionedItems = this.autoPositionItems(capsule.items);
+
+    // Загружаем элементы последовательно для сохранения порядка слоев
+    for (const canvasItem of positionedItems) {
+      await this.addItem(canvasItem);
+    }
+
+    this.fabricCanvas.renderAll();
+    logger.info('Generated capsule loaded to canvas successfully');
+  }
+
+  /**
+   * Автоматически позиционировать вещи на canvas по категориям
+   * Порядок сверху вниз: outerwear → innerwear → bodywear → legwear → footwear
+   * 
+   * @param items - Массив вещей для позиционирования
+   * @returns Массив элементов с рассчитанными позициями
+   */
+  private autoPositionItems(items: WardrobeItem[]): CanvasItem[] {
+    if (!this.fabricCanvas) {
+      throw new Error('Canvas not initialized');
+    }
+
+    const canvasWidth = this.fabricCanvas.width!;
+    const canvasHeight = this.fabricCanvas.height!;
+    const canvasCenterX = canvasWidth / 2;
+
+    // Определяем вертикальные позиции для каждой категории
+    const categoryPositions: Record<string, number> = {
+      'HEADWEAR': canvasHeight * 0.15,      // Верх (15%)
+      'OUTERWEAR': canvasHeight * 0.35,     // Верхняя одежда (35%)
+      'INNERWEAR': canvasHeight * 0.40,     // Внутренняя одежда (40%)
+      'BODYWEAR': canvasHeight * 0.45,      // Основная одежда (45%)
+      'LEGWEAR': canvasHeight * 0.65,       // Низ (65%)
+      'FOOTWEAR': canvasHeight * 0.85,      // Обувь (85%)
+      'FULLBODY': canvasHeight * 0.50,      // Полный образ (50%)
+      'ACCESSORIES': canvasHeight * 0.40    // Аксессуары (40%)
+    };
+
+    // Группируем вещи по категориям
+    const itemsByCategory: Record<string, WardrobeItem[]> = {};
+    items.forEach(item => {
+      const category = item.category?.toUpperCase() || 'BODYWEAR';
+      if (!itemsByCategory[category]) {
+        itemsByCategory[category] = [];
+      }
+      itemsByCategory[category]!.push(item);
+    });
+
+    const positionedItems: CanvasItem[] = [];
+
+    // Позиционируем каждую категорию
+    Object.entries(itemsByCategory).forEach(([category, categoryItems]) => {
+      const baseY = categoryPositions[category] || canvasHeight * 0.5;
+      
+      // Если несколько вещей в категории, располагаем их горизонтально
+      const itemCount = categoryItems.length;
+      const horizontalSpacing = Math.min(150, canvasWidth / (itemCount + 1));
+
+      categoryItems.forEach((item, index) => {
+        let x: number;
+        
+        if (itemCount === 1) {
+          // Одна вещь - по центру
+          x = canvasCenterX;
+        } else if (itemCount === 2) {
+          // Две вещи - слева и справа от центра
+          x = canvasCenterX + (index === 0 ? -horizontalSpacing / 2 : horizontalSpacing / 2);
+        } else {
+          // Три и более - равномерно распределяем
+          const startX = canvasCenterX - (horizontalSpacing * (itemCount - 1)) / 2;
+          x = startX + (index * horizontalSpacing);
+        }
+
+        // Добавляем небольшое смещение для аксессуаров
+        let y = baseY;
+        if (category === 'ACCESSORIES') {
+          // Аксессуары располагаем чуть в стороне
+          x += (index % 2 === 0 ? -100 : 100);
+          y += (index % 2 === 0 ? -50 : 50);
+        }
+
+        positionedItems.push({
+          item,
+          position: { x, y },
+          scale: this.calculateAutoScale(item),
+          angle: 0
+        });
+      });
+    });
+
+    logger.debug('Items auto-positioned', {
+      totalItems: items.length,
+      categoriesCount: Object.keys(itemsByCategory).length
+    });
+
+    return positionedItems;
+  }
+
+  /**
+   * Вычислить автоматический масштаб для вещи
+   */
+  private calculateAutoScale(item: WardrobeItem): number {
+    if (!this.fabricCanvas) {
+      return 0.3;
+    }
+
+    const category = item.category?.toUpperCase() || '';
+
+    // Базовый масштаб - 25% от размера canvas
+    let baseScale = 0.25;
+
+    // Корректируем масштаб по категориям
+    switch (category) {
+      case 'OUTERWEAR':
+        baseScale = 0.35; // Верхняя одежда крупнее
+        break;
+      case 'INNERWEAR':
+      case 'BODYWEAR':
+        baseScale = 0.30;
+        break;
+      case 'LEGWEAR':
+        baseScale = 0.28;
+        break;
+      case 'FOOTWEAR':
+        baseScale = 0.22;
+        break;
+      case 'HEADWEAR':
+        baseScale = 0.18;
+        break;
+      case 'ACCESSORIES':
+        baseScale = 0.15; // Аксессуары мельче
+        break;
+      case 'FULLBODY':
+        baseScale = 0.40; // Полный образ крупнее
+        break;
+    }
+
+    return baseScale;
   }
 
   /**

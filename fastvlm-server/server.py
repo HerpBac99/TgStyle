@@ -2182,6 +2182,653 @@ def simple_analyze():
         }), 500
 
 
+def build_capsule_generation_prompt(wardrobe_items, current_season, current_month, existing_capsules):
+    """
+    Строит промпт для Gemini с полными данными вещей (9 полей) и учетом сезона
+    
+    Args:
+        wardrobe_items: Список вещей с полной классификацией (9 полей + usageCount)
+        current_season: Текущий сезон (winter, spring, summer, autumn)
+        current_month: Текущий месяц на русском
+        existing_capsules: Существующие капсулы для избежания дубликатов
+    
+    Returns:
+        Промпт для Gemini API
+    """
+    # Формируем JSON с полной классификацией каждой вещи
+    items_data = []
+    for item in wardrobe_items:
+        items_data.append({
+            'id': item['id'],
+            'category': item['category'],
+            'subtype': item['subtype'],
+            'color': item['color'],
+            'material': item['material'],
+            'fit': item['fit'],
+            'style': item['style'],
+            'season': item['season'],
+            'pattern': item['pattern'],
+            'description': item['description'],
+            'usageCount': item.get('usageCount', 0)
+        })
+    
+    # Инструкции по многослойности в зависимости от сезона
+    layering_instructions = {
+        'winter': 'Зима: используй многослойность - футболки/рубашки как базовый слой, свитера/кофты как средний слой, куртки/пальто как верхний слой.',
+        'spring': 'Весна: переходный сезон - футболки/рубашки как базовый слой, свитера/кофты как средний слой или верхний в прохладную погоду, легкие куртки.',
+        'summer': 'Лето: футболки/рубашки как основная одежда или базовый слой, свитера/кофты для прохладных вечеров как верхний слой, куртки/пальто не используй.',
+        'autumn': 'Осень: переходный сезон - футболки/рубашки как базовый слой, свитера/кофты как средний слой, куртки как верхний слой.'
+    }
+    
+    prompt = f"""Ты профессиональный AI-стилист. Создай 3 стильных образа из вещей гардероба.
+
+ТЕКУЩИЙ СЕЗОН: {current_season} ({current_month})
+{layering_instructions.get(current_season, '')}
+
+СТРАТЕГИЯ ПРИОРИТИЗАЦИИ:
+- Приоритизируй вещи с usageCount 1-3 (одобрены пользователем, но используются редко)
+- Создай 3 РАЗНЫХ подхода:
+  * Капсула 1: Микс редко используемых (usageCount 1-2) + популярных (usageCount 3+)
+  * Капсула 2: Больше популярных вещей (проверенные комбинации)
+  * Капсула 3: Экспериментальная (можно включить 1-2 новые вещи с usageCount = 0)
+
+Вещи гардероба (с полной классификацией):
+{json.dumps(items_data, ensure_ascii=False, indent=2)}
+
+Существующие капсулы (избегать похожих >80%):
+{json.dumps(existing_capsules, ensure_ascii=False)}
+
+Требования:
+1. Создай ровно 3 разных комбинации согласно стратегии выше
+2. Каждая комбинация должна отличаться минимум на 30%
+3. Учитывай МНОГОСЛОЙНОСТЬ и текущий сезон (НЕ фильтруй жестко по полю season)
+4. Учитывай ВСЕ 9 полей: цвет, стиль, материал, сезон, паттерн, fit, category, subtype, description
+5. Для каждого образа дай:
+   - Название (максимум 3 слова на русском)
+   - Описание образа (1-2 предложения)
+   - Обоснование выбора комбинации (почему эти вещи сочетаются с учетом сезона и многослойности)
+   - Рекомендации по улучшению
+
+Формат ответа: JSON
+{{
+  "capsules": [
+    {{
+      "name": "Casual Denim",
+      "description": "Повседневный образ для {current_season}",
+      "reasoning": "Синяя джинсовая куртка (верхний слой) хорошо сочетается с белой футболкой (базовый слой)",
+      "recommendations": "Добавьте аксессуары для завершения образа",
+      "itemIds": [1, 5, 12, 20]
+    }}
+  ]
+}}
+"""
+    return prompt
+
+
+def parse_gemini_capsule_response(response_text):
+    """
+    Парсит JSON ответ от Gemini
+    
+    Args:
+        response_text: Текстовый ответ от Gemini (должен быть JSON)
+    
+    Returns:
+        Список капсул или None при ошибке
+    """
+    try:
+        # Парсим JSON
+        data = json.loads(response_text)
+        
+        # Проверяем структуру
+        if 'capsules' not in data:
+            app.logger.error("Ответ Gemini не содержит поле 'capsules'")
+            return None
+        
+        capsules = data['capsules']
+        
+        # Валидируем каждую капсулу
+        for capsule in capsules:
+            required_fields = ['name', 'description', 'reasoning', 'recommendations', 'itemIds']
+            for field in required_fields:
+                if field not in capsule:
+                    app.logger.error(f"Капсула не содержит обязательное поле '{field}'")
+                    return None
+            
+            # Проверяем что itemIds - это список
+            if not isinstance(capsule['itemIds'], list):
+                app.logger.error("itemIds должен быть списком")
+                return None
+        
+        return capsules
+    
+    except json.JSONDecodeError as e:
+        app.logger.error(f"Ошибка парсинга JSON от Gemini: {e}")
+        app.logger.error(f"Ответ: {response_text}")
+        return None
+    except Exception as e:
+        app.logger.error(f"Ошибка обработки ответа Gemini: {e}")
+        return None
+
+
+def create_capsules_with_gemini(prompt):
+    """
+    Вызывает Gemini API для создания 3 капсул
+    
+    Args:
+        prompt: Промпт для генерации капсул
+    
+    Returns:
+        Список капсул или None при ошибке
+    """
+    global gemini_client
+    
+    if not gemini_client:
+        raise Exception("Gemini клиент не инициализирован")
+    
+    try:
+        app.logger.info("Отправка запроса в Gemini для генерации капсул")
+        
+        response = gemini_client.models.generate_content(
+            model=Config.STYLIST_GEMINI_MODEL,
+            contents=[{"parts": [{"text": prompt}]}],
+            config=types.GenerateContentConfig(
+                temperature=Config.STYLIST_GEMINI_TEMPERATURE,
+                max_output_tokens=Config.STYLIST_GEMINI_MAX_TOKENS,
+                response_mime_type="application/json"
+            )
+        )
+        
+        if not response or not hasattr(response, 'text') or not response.text:
+            raise Exception("Gemini API вернул пустой ответ")
+        
+        app.logger.info(f"Получен ответ от Gemini: {len(response.text)} символов")
+        
+        # Парсим ответ
+        capsules = parse_gemini_capsule_response(response.text)
+        
+        if capsules is None:
+            raise Exception("Не удалось распарсить ответ Gemini")
+        
+        app.logger.info(f"Успешно сгенерировано {len(capsules)} капсул")
+        return capsules
+    
+    except Exception as e:
+        app.logger.error(f"Ошибка вызова Gemini API: {e}")
+        raise
+
+
+@app.route('/generate-capsules', methods=['POST'])
+def generate_capsules():
+    """Генерация капсул через Gemini API"""
+    start_time = time.time()
+    
+    try:
+        if not gemini_client:
+            return jsonify({
+                'success': False,
+                'error': 'Gemini клиент не инициализирован'
+            }), 500
+        
+        # Получаем данные
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No data provided'
+            }), 400
+        
+        wardrobe_items = data.get('wardrobeItems', [])
+        current_season = data.get('currentSeason', 'summer')
+        current_month = data.get('currentMonth', 'июнь')
+        existing_capsules = data.get('existingCapsules', [])
+        exclude_combinations = data.get('excludeCombinations', [])
+        
+        # Валидация
+        if not wardrobe_items:
+            return jsonify({
+                'success': False,
+                'error': 'Нет вещей в гардеробе'
+            }), 400
+        
+        if len(wardrobe_items) < 3:
+            return jsonify({
+                'success': False,
+                'error': 'Недостаточно вещей в гардеробе (минимум 3)'
+            }), 400
+        
+        app.logger.info(f"Генерация капсул: {len(wardrobe_items)} вещей, сезон: {current_season} ({current_month})")
+        
+        # Строим промпт
+        prompt = build_capsule_generation_prompt(
+            wardrobe_items,
+            current_season,
+            current_month,
+            existing_capsules
+        )
+        
+        # Вызываем Gemini
+        capsules = create_capsules_with_gemini(prompt)
+        
+        total_time = time.time() - start_time
+        
+        app.logger.info(f"Генерация капсул завершена за {total_time:.2f}с")
+        
+        return jsonify({
+            'success': True,
+            'capsules': capsules,
+            'timing': {
+                'total_time': round(total_time, 2)
+            }
+        })
+    
+    except Exception as e:
+        total_time = time.time() - start_time
+        error_msg = f"Ошибка генерации капсул: {e}"
+        app.logger.error(error_msg)
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timing': {
+                'total_time': round(total_time, 2)
+            }
+        }), 500
+
+
+@app.route('/generate-capsules-mock', methods=['POST'])
+def generate_capsules_mock():
+    """Mock генерация капсул по алгоритму (без Gemini)"""
+    start_time = time.time()
+    
+    try:
+        # Получаем данные
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No data provided'
+            }), 400
+        
+        wardrobe_items = data.get('wardrobeItems', [])
+        current_season = data.get('currentSeason', 'summer')
+        current_month = data.get('currentMonth', 'июнь')
+        existing_capsules = data.get('existingCapsules', [])
+        exclude_combinations = data.get('excludeCombinations', [])
+        
+        # Валидация
+        if not wardrobe_items:
+            return jsonify({
+                'success': False,
+                'error': 'Нет вещей в гардеробе'
+            }), 400
+        
+        if len(wardrobe_items) < 3:
+            return jsonify({
+                'success': False,
+                'error': 'Недостаточно вещей в гардеробе (минимум 3)'
+            }), 400
+        
+        app.logger.info(f"Mock генерация капсул: {len(wardrobe_items)} вещей, сезон: {current_season} ({current_month})")
+        
+        # Генерируем капсулы алгоритмически
+        capsules = generate_capsules_algorithmically(
+            wardrobe_items,
+            current_season,
+            current_month,
+            existing_capsules,
+            exclude_combinations
+        )
+        
+        total_time = time.time() - start_time
+        
+        app.logger.info(f"Mock генерация капсул завершена за {total_time:.2f}с, создано {len(capsules)} капсул")
+        
+        return jsonify({
+            'success': True,
+            'capsules': capsules,
+            'timing': {
+                'total_time': round(total_time, 2)
+            }
+        })
+    
+    except Exception as e:
+        total_time = time.time() - start_time
+        error_msg = f"Ошибка mock генерации капсул: {e}"
+        app.logger.error(error_msg)
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timing': {
+                'total_time': round(total_time, 2)
+            }
+        }), 500
+
+
+def generate_capsules_algorithmically(wardrobe_items, current_season, current_month, existing_capsules, exclude_combinations):
+    """
+    Алгоритмическая генерация 3 капсул на основе правил стиля
+    """
+    import random
+    from collections import defaultdict
+    
+    # Группируем вещи по категориям
+    items_by_category = defaultdict(list)
+    for item in wardrobe_items:
+        category = item.get('category', 'UNKNOWN')
+        items_by_category[category].append(item)
+    
+    # Определяем базовые правила сочетаемости цветов
+    color_compatibility = {
+        'black': ['white', 'gray', 'red', 'blue', 'green', 'yellow', 'pink', 'purple', 'brown', 'beige'],
+        'white': ['black', 'gray', 'red', 'blue', 'green', 'yellow', 'pink', 'purple', 'brown', 'beige'],
+        'gray': ['black', 'white', 'red', 'blue', 'green', 'yellow', 'pink', 'purple'],
+        'blue': ['white', 'black', 'gray', 'beige', 'brown', 'yellow'],
+        'red': ['black', 'white', 'gray', 'beige'],
+        'green': ['black', 'white', 'gray', 'beige', 'brown'],
+        'brown': ['white', 'beige', 'green', 'black'],
+        'beige': ['black', 'white', 'brown', 'blue', 'green'],
+        'yellow': ['black', 'white', 'gray', 'blue'],
+        'pink': ['black', 'white', 'gray'],
+        'purple': ['black', 'white', 'gray']
+    }
+    
+    # Определяем стилевую совместимость
+    style_compatibility = {
+        'casual': ['casual', 'streetwear', 'sporty'],
+        'formal': ['formal', 'business', 'elegant'],
+        'streetwear': ['streetwear', 'casual', 'sporty'],
+        'sporty': ['sporty', 'casual', 'streetwear'],
+        'elegant': ['elegant', 'formal', 'business'],
+        'business': ['business', 'formal', 'elegant']
+    }
+    
+    # Сезонные приоритеты
+    season_priorities = {
+        'winter': ['OUTERWEAR', 'INNERWEAR', 'BODYWEAR', 'LEGWEAR', 'FOOTWEAR'],
+        'spring': ['BODYWEAR', 'INNERWEAR', 'LEGWEAR', 'OUTERWEAR', 'FOOTWEAR'],
+        'summer': ['BODYWEAR', 'LEGWEAR', 'FOOTWEAR', 'INNERWEAR'],
+        'autumn': ['INNERWEAR', 'BODYWEAR', 'OUTERWEAR', 'LEGWEAR', 'FOOTWEAR']
+    }
+    
+    def get_color_score(color1, color2):
+        """Оценка совместимости цветов (0-1)"""
+        if not color1 or not color2:
+            return 0.5
+        
+        color1_clean = color1.lower().strip()
+        color2_clean = color2.lower().strip()
+        
+        if color1_clean == color2_clean:
+            return 0.3  # Одинаковые цвета - низкий приоритет
+        
+        if color2_clean in color_compatibility.get(color1_clean, []):
+            return 1.0
+        
+        return 0.2
+    
+    def get_style_score(style1, style2):
+        """Оценка совместимости стилей (0-1)"""
+        if not style1 or not style2:
+            return 0.5
+        
+        style1_clean = style1.lower().strip()
+        style2_clean = style2.lower().strip()
+        
+        if style1_clean == style2_clean:
+            return 1.0
+        
+        if style2_clean in style_compatibility.get(style1_clean, []):
+            return 0.8
+        
+        return 0.3
+    
+    def get_season_score(item_season, current_season):
+        """Оценка сезонной уместности (0-1)"""
+        if not item_season:
+            return 0.7
+        
+        item_season_clean = item_season.lower().strip()
+        
+        if item_season_clean == 'all-season' or item_season_clean == current_season:
+            return 1.0
+        
+        # Переходные сезоны
+        transitions = {
+            'spring': ['summer', 'winter'],
+            'autumn': ['winter', 'summer'],
+            'summer': ['spring', 'autumn'],
+            'winter': ['autumn', 'spring']
+        }
+        
+        if item_season_clean in transitions.get(current_season, []):
+            return 0.6
+        
+        return 0.3
+    
+    def calculate_item_priority(item, current_season):
+        """Вычисляет приоритет вещи для текущего сезона"""
+        usage_count = item.get('usageCount', 0)
+        
+        # Приоритет по использованию (как в спецификации)
+        if 1 <= usage_count <= 3:
+            usage_score = 3  # Высокий приоритет
+        elif usage_count > 3:
+            usage_score = 2  # Средний приоритет
+        else:
+            usage_score = 1  # Низкий приоритет
+        
+        # Сезонная уместность
+        season_score = get_season_score(item.get('season'), current_season)
+        
+        # Итоговый приоритет
+        return usage_score * 0.6 + season_score * 0.4
+    
+    def create_capsule_combination(base_items, strategy='balanced', used_combinations=None):
+        """Создает комбинацию вещей для капсулы"""
+        if used_combinations is None:
+            used_combinations = []
+        
+        combination = []
+        used_categories = set()
+        
+        # Сортируем по приоритету категорий для сезона
+        category_priority = season_priorities.get(current_season, ['BODYWEAR', 'LEGWEAR', 'FOOTWEAR'])
+        
+        # Добавляем случайность в порядок категорий для разнообразия
+        if strategy == 'experimental':
+            category_priority = category_priority.copy()
+            random.shuffle(category_priority)
+        
+        max_items = 4 if strategy == 'experimental' else 5  # Экспериментальные капсулы короче
+        
+        for category in category_priority:
+            if category in items_by_category and len(items_by_category[category]) > 0:
+                available_items = [
+                    item for item in items_by_category[category] 
+                    if item['id'] not in [c['id'] for c in combination]
+                ]
+                
+                if not available_items:
+                    continue
+                
+                # Выбираем вещь в зависимости от стратегии
+                if strategy == 'popular':
+                    # Приоритет популярным вещам (usageCount > 3)
+                    popular_items = [item for item in available_items if item.get('usageCount', 0) > 3]
+                    if popular_items:
+                        selected = random.choice(popular_items)
+                    else:
+                        selected = max(available_items, key=lambda x: x.get('usageCount', 0))
+                        
+                elif strategy == 'experimental':
+                    # Приоритет новым вещам (usageCount = 0)
+                    new_items = [item for item in available_items if item.get('usageCount', 0) == 0]
+                    rarely_used = [item for item in available_items if 1 <= item.get('usageCount', 0) <= 2]
+                    
+                    if new_items and len([c for c in combination if c.get('usageCount', 0) == 0]) < 2:
+                        selected = random.choice(new_items)
+                    elif rarely_used:
+                        selected = random.choice(rarely_used)
+                    else:
+                        selected = random.choice(available_items)
+                        
+                else:  # balanced
+                    # Сбалансированный выбор (приоритет usageCount 1-3)
+                    balanced_items = [item for item in available_items if 1 <= item.get('usageCount', 0) <= 3]
+                    if balanced_items:
+                        selected = random.choice(balanced_items)
+                    else:
+                        priorities = [calculate_item_priority(item, current_season) for item in available_items]
+                        max_priority = max(priorities)
+                        best_items = [
+                            item for item, priority in zip(available_items, priorities) 
+                            if priority >= max_priority * 0.8
+                        ]
+                        selected = random.choice(best_items)
+                
+                combination.append(selected)
+                used_categories.add(category)
+                
+                # Ограничиваем количество вещей в капсуле
+                if len(combination) >= max_items:
+                    break
+        
+        # Если мало вещей, добавляем из других категорий
+        if len(combination) < 3:
+            for category, items in items_by_category.items():
+                if category not in used_categories:
+                    available = [
+                        item for item in items 
+                        if item['id'] not in [c['id'] for c in combination]
+                    ]
+                    if available:
+                        combination.append(random.choice(available))
+                        if len(combination) >= 3:
+                            break
+        
+        # Проверяем уникальность комбинации
+        combination_ids = set(item['id'] for item in combination)
+        for used_combo in used_combinations:
+            used_ids = set(used_combo)
+            # Если совпадает больше 70% вещей, пытаемся изменить
+            if len(combination_ids & used_ids) / len(combination_ids | used_ids) > 0.7:
+                # Заменяем одну вещь на случайную из той же категории
+                if len(combination) > 3:
+                    item_to_replace = random.choice(combination)
+                    category = item_to_replace.get('category')
+                    if category in items_by_category:
+                        alternatives = [
+                            item for item in items_by_category[category]
+                            if item['id'] not in combination_ids
+                        ]
+                        if alternatives:
+                            combination.remove(item_to_replace)
+                            combination.append(random.choice(alternatives))
+                break
+        
+        return combination
+    
+    def generate_capsule_name(items, strategy):
+        """Генерирует название капсулы"""
+        names_by_strategy = {
+            'balanced': ['Casual Mix', 'Daily Look', 'Комфорт Стиль'],
+            'popular': ['Проверенный', 'Любимый Лук', 'Классика'],
+            'experimental': ['Новый Образ', 'Эксперимент', 'Свежий Взгляд']
+        }
+        
+        return random.choice(names_by_strategy.get(strategy, ['Стильный Образ']))
+    
+    def generate_capsule_description(items, strategy, season):
+        """Генерирует описание капсулы"""
+        season_names = {
+            'winter': 'зимний',
+            'spring': 'весенний', 
+            'summer': 'летний',
+            'autumn': 'осенний'
+        }
+        
+        strategy_descriptions = {
+            'balanced': f'Сбалансированный {season_names.get(season, "")} образ',
+            'popular': f'Проверенная комбинация для {season_names.get(season, "любого")} сезона',
+            'experimental': f'Экспериментальный {season_names.get(season, "")} лук'
+        }
+        
+        return strategy_descriptions.get(strategy, f'Стильный образ для {season_names.get(season, "любого сезона")}')
+    
+    def generate_recommendations(items, season):
+        """Генерирует рекомендации для капсулы"""
+        recommendations = []
+        
+        # Проверяем наличие аксессуаров
+        has_accessories = any(item.get('category') == 'ACCESSORIES' for item in items)
+        if not has_accessories:
+            recommendations.append("Добавьте аксессуары для завершения образа")
+        
+        # Сезонные рекомендации
+        if season == 'winter':
+            has_outerwear = any(item.get('category') == 'OUTERWEAR' for item in items)
+            if not has_outerwear:
+                recommendations.append("Рекомендуем добавить верхнюю одежду")
+        
+        if not recommendations:
+            recommendations.append("Отличная комбинация! Образ готов")
+        
+        return "; ".join(recommendations)
+    
+    # Генерируем 3 капсулы с разными стратегиями
+    strategies = ['balanced', 'popular', 'experimental']
+    capsules = []
+    used_combinations = []  # Отслеживаем уже созданные комбинации
+    
+    for i, strategy in enumerate(strategies):
+        # Создаем комбинацию с учетом уже использованных
+        items = create_capsule_combination(wardrobe_items, strategy, used_combinations)
+        
+        if len(items) < 3:
+            continue  # Пропускаем если недостаточно вещей
+        
+        # Добавляем комбинацию в список использованных
+        used_combinations.append([item['id'] for item in items])
+        
+        # Создаем капсулу
+        capsule = {
+            'id': f'mock_{i+1}',
+            'name': generate_capsule_name(items, strategy),
+            'description': generate_capsule_description(items, strategy, current_season),
+            'reasoning': f'Стратегия "{strategy}": комбинация из {len(items)} вещей с учетом сезона {current_season}',
+            'recommendations': generate_recommendations(items, current_season),
+            'itemIds': [item['id'] for item in items],
+            'items': items,
+            'strategy': strategy
+        }
+        
+        capsules.append(capsule)
+    
+    # Если получилось меньше 3 капсул, дополняем случайными
+    attempts = 0
+    while len(capsules) < 3 and attempts < 5:
+        items = create_capsule_combination(wardrobe_items, 'balanced', used_combinations)
+        if len(items) >= 3:
+            used_combinations.append([item['id'] for item in items])
+            capsule = {
+                'id': f'mock_{len(capsules)+1}',
+                'name': f'Образ {len(capsules)+1}',
+                'description': f'Дополнительный образ для {current_season}',
+                'reasoning': 'Автоматически сгенерированная комбинация',
+                'recommendations': generate_recommendations(items, current_season),
+                'itemIds': [item['id'] for item in items],
+                'items': items,
+                'strategy': 'auto'
+            }
+            capsules.append(capsule)
+        attempts += 1
+    
+    return capsules[:3]  # Возвращаем максимум 3 капсулы
+
+
 def cleanup_resources():
     """Очистка ресурсов при завершении"""
     global model, tokenizer, image_processor

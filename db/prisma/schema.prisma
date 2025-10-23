@@ -162,6 +162,7 @@ model Capsule {
 
   canvasData  Json     // Данные canvas: wardrobe_items[], items[], canvas{}
   thumbnailPath String? @map("thumbnail_path") // Путь к thumbnail изображению
+  metadata    Json?    // Метаданные: source, recommendations, season, reasoning
 
   analysis    String?  @db.Text         // Анализ от LLM стилиста
   analysisDate DateTime? @map("analysis_date")

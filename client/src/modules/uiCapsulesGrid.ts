@@ -4,8 +4,12 @@
  */
 
 import { logger } from './logger';
+import { api } from './api';
 import { capsuleLikesService } from './capsules/CapsuleLikesService';
 import { sharingService } from './shared/SharingService';
+import { GenerationModal } from './capsules/GenerationModal';
+import { CapsuleGenerationService } from './capsules/CapsuleGenerationService';
+import type { GeneratedCapsule } from '@/types/capsules';
 
 /**
  * Интерфейс для капсулы стиля
@@ -29,6 +33,7 @@ export interface CapsulesGridConfig {
   onAdd: () => void;           // Callback при клике на "Добавить капсулу"
   onView: (capsuleId: number) => void;  // Callback при клике на капсулу
   onDelete: (capsuleId: number) => void; // Callback при удалении капсулы
+  onGenerate?: (capsule: GeneratedCapsule) => void; // Callback при выборе сгенерированной капсулы
 }
 
 /**
@@ -38,9 +43,15 @@ export class UICapsulesGrid {
   private config: CapsulesGridConfig;
   private cleanupFunctions: (() => void)[] = [];
   private capsules: StyleCapsule[] = [];
+  private generationModal: GenerationModal;
+  private generationService: CapsuleGenerationService;
+  private generateButtonInitialized = false;
 
   constructor(config: CapsulesGridConfig) {
     this.config = config;
+    this.generationModal = new GenerationModal();
+    this.generationService = new CapsuleGenerationService();
+    // setupGenerateButton будет вызван в show() когда DOM точно готов
   }
 
   /**
@@ -54,6 +65,46 @@ export class UICapsulesGrid {
     } else {
       logger.error('Capsules grid container not found');
     }
+
+    // Показываем кнопку генерации
+    const generateBtn = document.getElementById('capsule-generate-btn');
+    if (generateBtn) {
+      generateBtn.classList.remove('hidden');
+      logger.info('Generate button shown');
+    }
+
+    // Настраиваем кнопку генерации при каждом показе (на случай если DOM не был готов в конструкторе)
+    this.setupGenerateButton();
+
+    // Добавляем глобальный обработчик для отладки
+    this.setupDebugClickHandler();
+  }
+
+  /**
+   * Настроить отладочный обработчик кликов (временно для диагностики)
+   */
+  private setupDebugClickHandler(): void {
+    const debugHandler = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const generateBtn = document.getElementById('capsule-generate-btn');
+
+      // Проверяем клик по кнопке или её дочерним элементам
+      if (target === generateBtn || generateBtn?.contains(target)) {
+        logger.info('DEBUG: Click detected on generate button or its child', {
+          targetTag: target.tagName,
+          targetId: target.id,
+          targetClass: target.className,
+          buttonFound: !!generateBtn,
+          isDirectClick: target === generateBtn
+        });
+      }
+    };
+
+    document.addEventListener('click', debugHandler, { capture: true });
+
+    this.cleanupFunctions.push(() => {
+      document.removeEventListener('click', debugHandler, { capture: true });
+    });
   }
 
   /**
@@ -64,6 +115,13 @@ export class UICapsulesGrid {
     if (container) {
       container.classList.add('hidden');
       logger.info('Capsules grid container hidden');
+    }
+
+    // Скрываем кнопку генерации
+    const generateBtn = document.getElementById('capsule-generate-btn');
+    if (generateBtn) {
+      generateBtn.classList.add('hidden');
+      logger.info('Generate button hidden');
     }
   }
 
@@ -328,6 +386,186 @@ export class UICapsulesGrid {
       }
     });
     this.cleanupFunctions = [];
+  }
+
+  /**
+   * Настроить обработчик кнопки генерации
+   */
+  private setupGenerateButton(): void {
+    // Если уже инициализирована, не делаем повторно
+    if (this.generateButtonInitialized) {
+      logger.info('Generate button already initialized, skipping');
+      return;
+    }
+
+    const generateBtn = document.getElementById('capsule-generate-btn');
+
+    if (!generateBtn) {
+      logger.warn('Generate capsule button not found');
+      return;
+    }
+
+    logger.info('Setting up generate button', {
+      buttonId: generateBtn.id,
+      buttonClass: generateBtn.className,
+      buttonVisible: !generateBtn.classList.contains('hidden'),
+      buttonDisabled: generateBtn.hasAttribute('disabled')
+    });
+
+    // Создаем глобальную функцию для onclick (работает надежнее чем addEventListener)
+    (window as any).handleGenerateClick = () => {
+      logger.info('🎉 Generate button clicked!');
+      this.handleGenerate();
+    };
+
+    this.generateButtonInitialized = true;
+  }
+
+  /**
+   * Обработать генерацию капсул
+   */
+  private async handleGenerate(): Promise<void> {
+    try {
+      // Показываем индикатор загрузки
+      this.showLoadingIndicator('Создаем образы для вас...');
+
+      // Загружаем данные для генерации
+      const { wardrobeItems, existingCapsules } = await this.loadGenerationData();
+
+      // Генерируем капсулы
+      const result = await this.generationService.generateCapsules(
+        wardrobeItems,
+        existingCapsules
+      );
+
+      // Скрываем индикатор загрузки
+      this.hideLoadingIndicator();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Не удалось сгенерировать капсулы');
+      }
+
+      if (!result.capsules || result.capsules.length === 0) {
+        throw new Error('Не удалось сгенерировать капсулы');
+      }
+
+      // Показываем модальное окно с результатами
+      this.generationModal.show(result.capsules);
+
+      // Обрабатываем выбор капсулы
+      this.generationModal.onSelect((capsule: GeneratedCapsule) => {
+        logger.info('Capsule selected from generation modal', { capsuleId: capsule.id });
+
+        // Закрываем модальное окно
+        this.generationModal.hide();
+
+        // Вызываем callback для перехода к canvas editor
+        if (this.config.onGenerate) {
+          this.config.onGenerate(capsule);
+        }
+      });
+
+      // Обрабатываем регенерацию
+      this.generationModal.onRegenerate(() => {
+        logger.info('Regenerate button clicked');
+        this.generationModal.hide();
+        // Запускаем генерацию заново
+        this.handleGenerate();
+      });
+
+    } catch (error) {
+      this.hideLoadingIndicator();
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Failed to generate capsules', { error: errorMessage });
+
+      // Показываем уведомление об ошибке
+      this.showErrorNotification(errorMessage);
+    }
+  }
+
+  /**
+   * Загрузить данные для генерации (вещи гардероба и существующие капсулы)
+   */
+  private async loadGenerationData(): Promise<{
+    wardrobeItems: any[];
+    existingCapsules: any[];
+  }> {
+    try {
+      logger.info('Starting to load generation data');
+
+      // Загружаем вещи гардероба
+      logger.info('Loading wardrobe items from /wardrobe');
+      const wardrobeResponse = await api.get<{ items: any[] }>('/wardrobe');
+      const wardrobeItems = wardrobeResponse.items || [];
+      logger.info('Wardrobe items loaded successfully', { count: wardrobeItems.length });
+
+      // Загружаем существующие капсулы
+      logger.info('Loading existing capsules from /capsules');
+      const capsulesResponse = await api.get<{ capsules: any[] }>('/capsules');
+      const existingCapsules = capsulesResponse.capsules || [];
+      logger.info('Existing capsules loaded successfully', { count: existingCapsules.length });
+
+      logger.info('Generation data loaded', {
+        wardrobeItemsCount: wardrobeItems.length,
+        existingCapsulesCount: existingCapsules.length
+      });
+
+      return { wardrobeItems, existingCapsules };
+
+    } catch (error) {
+      logger.error('Failed to load generation data', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw new Error('Не удалось загрузить данные для генерации');
+    }
+  }
+
+  /**
+   * Показать индикатор загрузки
+   */
+  private showLoadingIndicator(message: string): void {
+    // Проверяем существует ли уже индикатор
+    let indicator = document.getElementById('capsule-generation-loading');
+
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.id = 'capsule-generation-loading';
+      indicator.className = 'capsule-generation-loading';
+      document.body.appendChild(indicator);
+    }
+
+    indicator.innerHTML = `
+      <div class="loading-overlay"></div>
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">${message}</p>
+      </div>
+    `;
+    indicator.classList.remove('hidden');
+  }
+
+  /**
+   * Скрыть индикатор загрузки
+   */
+  private hideLoadingIndicator(): void {
+    const indicator = document.getElementById('capsule-generation-loading');
+    if (indicator) {
+      indicator.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Показать уведомление об ошибке
+   */
+  private showErrorNotification(message: string): void {
+    // Используем Telegram WebApp для показа уведомления
+    if (window.Telegram?.WebApp?.showAlert) {
+      window.Telegram.WebApp.showAlert(message);
+    } else {
+      alert(message);
+    }
   }
 
   /**

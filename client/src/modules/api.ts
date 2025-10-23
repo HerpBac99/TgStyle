@@ -105,13 +105,13 @@ class ApiClient {
       return data;
     } catch (error) {
       const duration = Date.now() - startTime;
-      
+
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
           logger.error(`API Timeout: ${url} (${duration}ms)`);
           throw createError(ERROR_CODES.NETWORK_ERROR, 'Превышено время ожидания ответа');
         }
-        
+
         if (error.name === 'TypeError' && error.message.includes('fetch')) {
           logger.error(`Network Error: ${url}`, error);
           throw createError(ERROR_CODES.NETWORK_ERROR, 'Ошибка сети');
@@ -126,18 +126,26 @@ class ApiClient {
    */
   private async handleHttpError(response: Response): Promise<never> {
     const status = response.status as HttpStatusCode;
-    
+    const url = response.url;
+
     try {
       const errorData = await response.json();
       const message = errorData.error || errorData.message || response.statusText;
-      
+
+      logger.error('HTTP Error Response', {
+        status,
+        url,
+        message,
+        errorData
+      });
+
       switch (status) {
         case 400:
           throw createError(ERROR_CODES.NETWORK_ERROR, `Неверный запрос: ${message}`);
         case 401:
           throw createError(ERROR_CODES.AUTH_FAILED, `Ошибка авторизации: ${message}`);
         case 404:
-          throw createError(ERROR_CODES.SERVER_ERROR, 'Запрашиваемый ресурс не найден');
+          throw createError(ERROR_CODES.SERVER_ERROR, `Ресурс не найден: ${url}`);
         case 500:
           throw createError(ERROR_CODES.SERVER_ERROR, 'Внутренняя ошибка сервера');
         case 502:
@@ -149,7 +157,12 @@ class ApiClient {
       }
     } catch (parseError) {
       // Если не удалось спарсить JSON ошибки
-      throw createError(ERROR_CODES.SERVER_ERROR, `HTTP ${status}: ${response.statusText}`);
+      logger.error('Failed to parse error response', {
+        status,
+        url,
+        parseError: parseError instanceof Error ? parseError.message : String(parseError)
+      });
+      throw createError(ERROR_CODES.SERVER_ERROR, `HTTP ${status}: ${response.statusText || 'Unknown error'} (${url})`);
     }
   }
 
@@ -209,11 +222,11 @@ class TgStyleApi extends ApiClient {
   async authenticate(initData: string): Promise<AuthResponse> {
     const request: AuthRequest = { initData };
     const response = await this.post<AuthResponse>('/auth', request, TIMEOUTS.AUTH_REQUEST);
-    
+
     if (!response.success) {
       logger.error('Authentication failed', { error: response.error });
     }
-    
+
     return response;
   }
 
@@ -228,8 +241,8 @@ class TgStyleApi extends ApiClient {
     });
 
     const response = await this.post<AnalysisResponse>(
-      '/analyze', 
-      request, 
+      '/analyze',
+      request,
       TIMEOUTS.ANALYSIS_REQUEST
     );
 

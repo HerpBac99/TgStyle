@@ -5,7 +5,7 @@
 
 import { logger } from '../logger';
 import { WardrobeItem } from '@/types/wardrobe';
-import { CanvasItem } from '@/types/capsules';
+import { CanvasItem, GeneratedCapsule } from '@/types/capsules';
 import { StyleCapsule } from '../uiCapsulesGrid';
 import { PhotoUploadHandler, ClothingCategory } from '../photoUploadManager';
 import { capsulesService } from './CapsulesService';
@@ -22,6 +22,7 @@ import { uiModalManager } from '../uiModalManager';
 import { navigationManager } from '../navigationManager';
 import { capsulesSharing } from './CapsulesSharing';
 import { addWatermark } from '@/utils/watermarkUtils';
+import { capsuleGenerationService } from './CapsuleGenerationService';
 
 /**
  * Менеджер капсул
@@ -56,7 +57,8 @@ export class CapsulesManager implements PhotoUploadHandler {
     this.capsulesGrid = new UICapsulesGrid({
       onAdd: () => this.handleAddCapsuleClick(),
       onView: (id) => this.handleViewCapsule(id),
-      onDelete: (id) => this.handleDeleteCapsule(id)
+      onDelete: (id) => this.handleDeleteCapsule(id),
+      onGenerate: (capsule) => this.handleGeneratedCapsule(capsule)
     });
 
     // Подписываемся на событие сохранения нового элемента гардероба
@@ -252,6 +254,62 @@ export class CapsulesManager implements PhotoUploadHandler {
     } catch (error) {
       logger.error('Error removing capsule', error);
       alert('Ошибка при удалении капсулы. Попробуйте еще раз.');
+    }
+  }
+
+  /**
+   * Обработчик выбора сгенерированной капсулы
+   * Создает капсулу с metadata и открывает canvas editor
+   */
+  private async handleGeneratedCapsule(capsule: GeneratedCapsule): Promise<void> {
+    try {
+      logger.info('Handling generated capsule', { name: capsule.name });
+
+      // Инициализируем canvas editor если еще не инициализирован
+      if (!this.canvasEditor) {
+        this.initializeCanvasEditor();
+      }
+
+      if (!this.canvasEditor) {
+        throw new Error('Canvas editor not initialized');
+      }
+
+      // Скрываем грид капсул
+      this.capsulesGrid.hide();
+
+      // Показываем canvas editor
+      this.canvasEditor.show();
+
+      // Загружаем сгенерированную капсулу на canvas
+      await this.canvasEditor.loadGeneratedCapsule(capsule);
+
+      // Сохраняем metadata для последующего сохранения
+      (this.canvasEditor as any).generatedCapsuleMetadata = {
+        source: 'ai_generated',
+        recommendations: capsule.recommendations,
+        reasoning: capsule.reasoning,
+        description: capsule.description,
+        season: capsuleGenerationService.getCurrentSeason()
+      };
+
+      // Сохраняем название капсулы
+      (this.canvasEditor as any).generatedCapsuleName = capsule.name;
+
+      // Настраиваем навигацию
+      navigationManager.push(() => {
+        this.returnToCapsulesGrid();
+      }, 'Return to capsules grid from generated capsule');
+
+      this.mode = 'canvas';
+
+      logger.info('Generated capsule loaded to canvas', { name: capsule.name });
+
+    } catch (error) {
+      logger.error('Error handling generated capsule', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      alert('Ошибка при загрузке капсулы. Попробуйте еще раз.');
+      this.returnToCapsulesGrid();
     }
   }
 
@@ -570,16 +628,27 @@ export class CapsulesManager implements PhotoUploadHandler {
 
       } else {
         // Создание новой капсулы
+        // Проверяем есть ли metadata от сгенерированной капсулы
+        const metadata = (this.canvasEditor as any)?.generatedCapsuleMetadata;
+        const generatedName = (this.canvasEditor as any)?.generatedCapsuleName;
+
         const created = await capsulesService.createCapsule({
-          name: `Капсула ${new Date().toLocaleDateString()}`,
+          name: generatedName || `Капсула ${new Date().toLocaleDateString()}`,
           canvasData: state.canvasData,
           thumbnailImage: state.thumbnailImage,
-          itemIds: state.canvasData.selected_items?.map((item: WardrobeItem) => item.id) || []
+          itemIds: state.canvasData.selected_items?.map((item: WardrobeItem) => item.id) || [],
+          metadata: metadata || undefined
         });
+
+        // Очищаем временные данные
+        if (this.canvasEditor) {
+          delete (this.canvasEditor as any).generatedCapsuleMetadata;
+          delete (this.canvasEditor as any).generatedCapsuleName;
+        }
 
         // Добавляем в массив
         this.capsules.unshift(created as StyleCapsule);
-        logger.info('Capsule created', { id: created.id });
+        logger.info('Capsule created', { id: created.id, source: metadata?.source || 'manual' });
       }
 
       // Скрываем экран результата

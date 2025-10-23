@@ -11,11 +11,23 @@ const { logger } = require('../controllers/logsController');
 const prisma = require('../lib/prisma');
 const { validateTelegramWebAppData } = require('../utils/telegram');
 const { getInitData } = require('../utils/authHelper');
+const wardrobeUsageService = require('../services/wardrobeUsageService');
+const capsuleSimilarityService = require('../services/capsuleSimilarityService');
 
 /**
  * Папка для хранения изображений капсул
  */
 const CAPSULES_UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'capsules');
+
+/**
+ * Константы для FastVLM интеграции
+ */
+const FASTVLM_CONFIG = {
+  HOST: 'http://127.0.0.1',
+  PORT: 3001,
+  TIMEOUT: 60000, // 60 секунд для генерации капсул
+  ENDPOINT: '/generate-capsules'
+};
 
 /**
  * Конвертировать base64 в Buffer и определить расширение
@@ -107,7 +119,7 @@ async function saveCapsuleThumbnail(telegramId, thumbnailImage) {
  */
 async function createCapsule(req, res) {
   try {
-    const { name, canvasData, thumbnailImage, itemIds } = req.body;
+    const { name, canvasData, thumbnailImage, itemIds, metadata } = req.body;
 
     // Валидация Telegram данных из headers (как в других эндпоинтах)
     const initData = getInitData(req);
@@ -164,6 +176,18 @@ async function createCapsule(req, res) {
       }
     }
 
+    // Подготовка metadata для автогенерированных капсул
+    let capsuleMetadata = null;
+    if (metadata) {
+      capsuleMetadata = {
+        source: metadata.source || 'manual', // 'ai_generated' или 'manual'
+        recommendations: metadata.recommendations || null,
+        reasoning: metadata.reasoning || null,
+        season: metadata.season || null,
+        description: metadata.description || null
+      };
+    }
+
     // Создаем капсулу
     const capsule = await prisma.capsule.create({
       data: {
@@ -171,6 +195,7 @@ async function createCapsule(req, res) {
         name: name || null,
         canvasData: canvasData,
         thumbnailPath: thumbnailPath,
+        metadata: capsuleMetadata,
         items: wardrobeItemIds.length > 0 ? {
           connect: wardrobeItemIds.map(id => ({ id }))
         } : undefined
@@ -193,7 +218,8 @@ async function createCapsule(req, res) {
     logger.info(`Capsule created: ${capsule.id} for user ${telegramId}`, {
       name: name,
       thumbnailPath: thumbnailPath,
-      itemCount: capsule.items.length
+      itemCount: capsule.items.length,
+      source: capsuleMetadata?.source || 'manual'
     });
 
     res.json({
@@ -203,6 +229,7 @@ async function createCapsule(req, res) {
         name: capsule.name,
         thumbnailUrl: capsule.thumbnailPath ? `/uploads/capsules/${telegramId}/${capsule.thumbnailPath}` : null,
         canvasData: capsule.canvasData,
+        metadata: capsule.metadata,
         createdAt: capsule.createdAt,
         itemCount: capsule.items.length,
         items: capsule.items
@@ -310,6 +337,7 @@ async function getUserCapsules(req, res) {
         thumbnailUrl: capsule.thumbnailPath ?
           `/uploads/capsules/${telegramId}/${capsule.thumbnailPath}` : null,
         canvasData: capsule.canvasData,
+        metadata: capsule.metadata,
         analysis: capsule.analysis,
         createdAt: capsule.createdAt,
         likesCount: capsule.likesCount || 0,
@@ -396,6 +424,7 @@ async function getCapsule(req, res) {
         name: capsule.name,
         description: capsule.description,
         canvasData: capsule.canvasData,
+        metadata: capsule.metadata,
         analysis: capsule.analysis,
         analysisDate: capsule.analysisDate,
         createdAt: capsule.createdAt,
@@ -546,6 +575,7 @@ async function updateCapsule(req, res) {
         name: updatedCapsule.name,
         thumbnailUrl: updatedCapsule.thumbnailPath ? `/uploads/capsules/${telegramId}/${updatedCapsule.thumbnailPath}` : null,
         canvasData: updatedCapsule.canvasData,
+        metadata: updatedCapsule.metadata,
         createdAt: updatedCapsule.createdAt,
         likesCount: updatedCapsule.likesCount || 0,
         isLiked: isLiked,
@@ -619,6 +649,275 @@ async function deleteCapsule(req, res) {
 
   } catch (error) {
     console.error('Error deleting capsule:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+}
+
+/**
+ * Генерация 3 вариантов капсул через Gemini AI
+ * POST /api/capsules/generate
+ */
+async function generateCapsules(req, res) {
+  try {
+    const { excludeCombinations } = req.body;
+
+    // Валидация Telegram данных из headers
+    const initData = getInitData(req);
+    if (!initData) {
+      return res.status(401).json({
+        success: false,
+        error: 'Missing Telegram authentication data'
+      });
+    }
+
+    const validationResult = validateTelegramWebAppData(initData);
+    if (!validationResult.isValid) {
+      return res.status(401).json({
+        success: false,
+        error: validationResult.error || 'Invalid Telegram authentication'
+      });
+    }
+
+    const telegramId = BigInt(validationResult.data.user.id);
+
+    logger.info('Capsule generation requested', {
+      telegramId: telegramId.toString(),
+      excludeCombinations: excludeCombinations?.length || 0
+    });
+
+    // Получаем все вещи гардероба с полными данными (9 полей)
+    const wardrobeItems = await prisma.wardrobeItem.findMany({
+      where: { telegramId },
+      select: {
+        id: true,
+        category: true,
+        subtype: true,
+        color: true,
+        material: true,
+        fit: true,
+        style: true,
+        season: true,
+        pattern: true,
+        description: true,
+        imagePath: true
+      }
+    });
+
+    // Проверка минимального количества вещей
+    if (wardrobeItems.length < 3) {
+      logger.warn('Insufficient wardrobe items for generation', {
+        telegramId: telegramId.toString(),
+        itemCount: wardrobeItems.length
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'Недостаточно вещей в гардеробе (минимум 3)'
+      });
+    }
+
+    // Получаем существующие капсулы для вычисления usageCount
+    const existingCapsules = await prisma.capsule.findMany({
+      where: { telegramId },
+      select: { id: true, canvasData: true }
+    });
+
+    logger.info('Loaded wardrobe and capsules', {
+      telegramId: telegramId.toString(),
+      wardrobeItemsCount: wardrobeItems.length,
+      existingCapsulesCount: existingCapsules.length
+    });
+
+    // Вычисляем usageCount для каждой вещи
+    const itemsWithUsage = wardrobeUsageService.calculateUsageStats(
+      wardrobeItems,
+      existingCapsules
+    );
+
+    // Приоритизируем редко используемые вещи (1-3)
+    const prioritizedItems = wardrobeUsageService.prioritizeRarelyUsedItems(itemsWithUsage);
+
+    // Определяем текущий сезон и месяц
+    const currentSeason = wardrobeUsageService.getCurrentSeason();
+    const currentMonth = wardrobeUsageService.getCurrentMonth();
+
+    logger.info('Usage stats calculated', {
+      telegramId: telegramId.toString(),
+      currentSeason,
+      currentMonth,
+      unusedItems: itemsWithUsage.filter(i => i.usageCount === 0).length,
+      rarelyUsedItems: itemsWithUsage.filter(i => i.usageCount >= 1 && i.usageCount <= 3).length,
+      popularItems: itemsWithUsage.filter(i => i.usageCount > 3).length
+    });
+
+    // Подготавливаем данные для FastVLM
+    const existingCapsulesData = existingCapsules.map(c => ({
+      itemIds: wardrobeUsageService.extractItemIdsFromCanvas(c.canvasData)
+    }));
+
+    const requestPayload = {
+      wardrobeItems: prioritizedItems,
+      currentSeason,
+      currentMonth,
+      existingCapsules: existingCapsulesData,
+      excludeCombinations: excludeCombinations || []
+    };
+
+    // Отправляем запрос в FastVLM для mock генерации (временно вместо Gemini)
+    const url = `${FASTVLM_CONFIG.HOST}:${FASTVLM_CONFIG.PORT}/generate-capsules-mock`;
+
+    logger.info('Sending request to FastVLM Mock', {
+      telegramId: telegramId.toString(),
+      url,
+      itemsCount: prioritizedItems.length,
+      wardrobeItems: prioritizedItems.map(item => ({
+        id: item.id,
+        category: item.category,
+        color: item.color,
+        usageCount: item.usageCount,
+        imagePath: item.imagePath
+      }))
+    });
+
+    // Создаем AbortController для таймаута
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      logger.warn('Capsule generation request timeout', {
+        telegramId: telegramId.toString()
+      });
+    }, FASTVLM_CONFIG.TIMEOUT);
+
+    let fastvlmResponse;
+    try {
+      fastvlmResponse = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestPayload),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError.name === 'AbortError') {
+        logger.error('FastVLM request timeout', {
+          telegramId: telegramId.toString()
+        });
+        return res.status(504).json({
+          success: false,
+          error: 'Генерация заняла слишком много времени. Попробуйте снова'
+        });
+      }
+
+      logger.error('FastVLM request failed', {
+        telegramId: telegramId.toString(),
+        error: fetchError.message
+      });
+      return res.status(502).json({
+        success: false,
+        error: 'Не удалось подключиться к сервису генерации'
+      });
+    }
+
+    // Проверяем ответ от FastVLM
+    if (!fastvlmResponse.ok) {
+      const errorText = await fastvlmResponse.text();
+      logger.error('FastVLM server error', {
+        telegramId: telegramId.toString(),
+        status: fastvlmResponse.status,
+        statusText: fastvlmResponse.statusText,
+        error: errorText
+      });
+
+      // Проверяем на rate limit (429)
+      if (fastvlmResponse.status === 429) {
+        return res.status(429).json({
+          success: false,
+          error: 'Превышен дневной лимит генераций. Попробуйте завтра'
+        });
+      }
+
+      return res.status(502).json({
+        success: false,
+        error: 'Не удалось сгенерировать капсулы. Попробуйте позже'
+      });
+    }
+
+    const generated = await fastvlmResponse.json();
+
+    if (!generated.success) {
+      logger.error('FastVLM generation failed', {
+        telegramId: telegramId.toString(),
+        error: generated.error
+      });
+      return res.status(500).json({
+        success: false,
+        error: generated.error || 'Не удалось сгенерировать капсулы'
+      });
+    }
+
+    logger.info('Capsules generated by FastVLM', {
+      telegramId: telegramId.toString(),
+      capsulesCount: generated.capsules?.length || 0
+    });
+
+    // Проверяем уникальность сгенерированных капсул
+    const enrichedCapsules = generated.capsules.map(capsule => {
+      const isUnique = capsuleSimilarityService.isUnique(
+        capsule.itemIds,
+        existingCapsulesData,
+        80 // порог 80%
+      );
+
+      // Получаем полные данные вещей для каждой капсулы с правильными imageUrl
+      const capsuleItems = wardrobeItems.filter(item => 
+        capsule.itemIds.includes(item.id)
+      ).map(item => ({
+        ...item,
+        imageUrl: item.imagePath ? `/uploads/${item.imagePath.replace(/\\/g, '/')}` : null
+      }));
+
+      return {
+        ...capsule,
+        isUnique,
+        items: capsuleItems
+      };
+    });
+
+    logger.info('Capsule generation completed', {
+      telegramId: telegramId.toString(),
+      totalGenerated: enrichedCapsules.length,
+      uniqueCapsules: enrichedCapsules.filter(c => c.isUnique).length,
+      generatedCapsules: enrichedCapsules.map(capsule => ({
+        id: capsule.id,
+        name: capsule.name,
+        itemIds: capsule.itemIds,
+        itemsWithImages: capsule.items.map(item => ({
+          id: item.id,
+          category: item.category,
+          imagePath: item.imagePath,
+          imageUrl: item.imagePath ? `/uploads/wardrobe/${telegramId}/${item.imagePath}` : null
+        }))
+      }))
+    });
+
+    res.json({
+      success: true,
+      capsules: enrichedCapsules
+    });
+
+  } catch (error) {
+    logger.error('Error in capsule generation', {
+      error: error.message,
+      stack: error.stack
+    });
+
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -720,6 +1019,7 @@ async function getPublicCapsules(req, res) {
         thumbnailUrl: capsule.thumbnailPath ?
           `/uploads/capsules/${capsule.user.telegramId}/${capsule.thumbnailPath}` : null,
         canvasData: capsule.canvasData,
+        metadata: capsule.metadata,
         analysis: capsule.analysis,
         createdAt: capsule.createdAt,
         likesCount: capsule.likesCount || 0,
@@ -751,6 +1051,13 @@ async function getPublicCapsules(req, res) {
 }
 
 // Маршруты для капсул
+
+/**
+ * POST /api/capsules/generate
+ * Генерация 3 вариантов капсул через Gemini AI
+ * ВАЖНО: Должен быть ПЕРЕД POST /api/capsules
+ */
+router.post('/generate', generateCapsules);
 
 /**
  * POST /api/capsules

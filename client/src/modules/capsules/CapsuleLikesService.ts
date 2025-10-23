@@ -44,7 +44,6 @@ export class CapsuleLikesService {
     `;
     const likesCountClass = componentClass ? `like-count ${componentClass}-like-count` : 'like-count';
     const likesCountEl = createElement('span', { class: likesCountClass }, String(initialData.likesCount || 0));
-    logger.info(`Capsule like count element created. Element classes: "${likesCountEl.className}"`);
     container.appendChild(likeBtn);
     container.appendChild(likesCountEl);
 

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,6 +20,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script type="module" src="src/main.ts"></script>
 </head>
+
 <body>
     <div class="app-container">
         <!-- Основной контент анализа -->
@@ -39,17 +41,17 @@
                 <!-- <span id="user-name"></span> -->
             </div>
 
-             <!-- Контейнер с каруселью истории анализов -->
-             <div class="history-carousel-container">
-                 <div class="history-carousel">
-                     <!-- Карты будут создаваться динамически -->
-                 </div>
+            <!-- Контейнер с каруселью истории анализов -->
+            <div class="history-carousel-container">
+                <div class="history-carousel">
+                    <!-- Карты будут создаваться динамически -->
+                </div>
 
-                 <!-- Точки навигации -->
-                 <div class="carousel-dots">
-                     <!-- Точки будут создаваться динамически -->
-                 </div>
-             </div>
+                <!-- Точки навигации -->
+                <div class="carousel-dots">
+                    <!-- Точки будут создаваться динамически -->
+                </div>
+            </div>
         </div>
 
         <!-- Контент гардероба -->
@@ -68,7 +70,8 @@
                     <!-- Кнопка добавить предмет -->
                     <div class="add-item-btn" id="add-item-btn" aria-label="Добавить предмет">
                         <div class="add-item-btn-content">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor">
                                 <path d="M12 5v14M5 12h14"></path>
                             </svg>
                         </div>
@@ -90,7 +93,8 @@
                     <!-- Кнопка создать капсулу -->
                     <div class="add-capsule-btn" id="add-capsule-btn" aria-label="Создать капсулу">
                         <div class="add-capsule-btn-content">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor">
                                 <path d="M12 5v14M5 12h14"></path>
                             </svg>
                         </div>
@@ -98,13 +102,33 @@
                     <!-- Карточки капсул будут добавляться динамически -->
                 </div>
             </div>
+
+            <!-- Кнопка генерации капсул -->
+            <button 
+                id="capsule-generate-btn" 
+                class="capsule-generate-btn hidden" 
+                aria-label="Сгенерировать капсулы"
+                onclick="window.handleGenerateClick && window.handleGenerateClick();">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path
+                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                    </path>
+                    <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+                    <polyline points="7.5 19.79 7.5 14.6 3 12"></polyline>
+                    <polyline points="21 12 16.5 14.6 16.5 19.79"></polyline>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                <span>Сгенерировать</span>
+            </button>
         </div>
 
         <!-- Контент публичной ленты -->
         <div id="feed-content" class="feed-content hidden" style="display: none;">
             <!-- Лента будет заполняться через UIPublicFeed.ts -->
         </div>
-        
+
         <!-- Camera button at the bottom -->
         <!-- Индикатор загрузки карусели 
         <div class="camera-button-container">
@@ -143,7 +167,9 @@
                 </button>
                 <button class="tab-button" data-tab="wardrobe">
                     <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V9.06h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
+                        <path
+                            d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V9.06h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z">
+                        </path>
                     </svg>
                     <span class="tab-label">Гардероб</span>
                 </button>
@@ -197,7 +223,8 @@
                 <!-- Кнопки действий -->
                 <div class="result-actions">
                     <button id="close-analysis-btn" class="action-btn close-btn">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
                             <line x1="21" y1="3" x2="3" y2="21"></line>
                             <line x1="3" y1="3" x2="21" y2="21"></line>
                         </svg>
@@ -244,13 +271,15 @@
             </div>
             <div class="wardrobe-preview-actions" id="wardrobe-preview-actions">
                 <button id="wardrobe-preview-cancel" class="wardrobe-preview-btn cancel-btn" aria-label="Отменить">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="3">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
                 </button>
                 <button id="wardrobe-preview-confirm" class="wardrobe-preview-btn confirm-btn" aria-label="Подтвердить">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="3">
                         <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
                 </button>
@@ -264,6 +293,40 @@
         <div class="canvas-loading-content">
             <div class="canvas-loading-spinner"></div>
             <p class="canvas-loading-text">Обрабатываем образ...</p>
+        </div>
+    </div>
+
+    <!-- Модальное окно генерации капсул -->
+    <div id="generation-modal" class="generation-modal hidden">
+        <div class="generation-modal-overlay"></div>
+        <div class="generation-modal-content">
+            <div class="generation-modal-header">
+                <h2>Выберите капсулу</h2>
+                <button id="generation-modal-close" class="generation-modal-close-btn" aria-label="Закрыть">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="generation-variants" id="generation-variants">
+                <!-- 3 карточки превью будут вставлены сюда динамически -->
+            </div>
+
+            <div class="generation-actions">
+                <button id="regenerate-btn" class="generation-action-btn regenerate-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                    <span>Сгенерировать заново</span>
+                </button>
+                <button id="cancel-generation-btn" class="generation-action-btn cancel-btn">
+                    <span>Отмена</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -284,13 +347,16 @@
             <div class="subscription-modal-body">
                 <div class="subscription-limit-info">
                     <div class="limit-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle>
                             <path d="M12 6v6l4 2"></path>
                         </svg>
                     </div>
                     <p class="limit-message">Вы использовали все бесплатные анализы одежды на этой неделе</p>
-                    <p class="limit-description">Новые анализы станут доступны через 7 дней или оформите подписку Premium для безлимитного доступа</p>
+                    <p class="limit-description">Новые анализы станут доступны через 7 дней или оформите подписку
+                        Premium
+                        для безлимитного доступа</p>
                 </div>
 
                 <div class="subscription-plans">
@@ -317,7 +383,8 @@
 
                 <div class="subscription-footer">
                     <p class="wait-message">
-                        Или подождите до <span id="weekly-reset-date" class="reset-date">следующей недели</span> для бесплатных анализов
+                        Или подождите до <span id="weekly-reset-date" class="reset-date">следующей недели</span> для
+                        бесплатных анализов
                     </p>
                 </div>
             </div>
@@ -374,16 +441,19 @@
             <!-- Кнопки действий (внизу) -->
             <div class="capsule-result-actions">
                 <button id="capsule-result-share-btn" class="capsule-result-btn" aria-label="Поделиться в Telegram">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2">
                         <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
                         <polyline points="16 6 12 2 8 6"></polyline>
                         <line x1="12" y1="2" x2="12" y2="15"></line>
                     </svg>
                     <span>Поделиться</span>
-                </button >
+                </button>
                 <!-- Кнопка "Готово" -->
-                <button id="capsule-result-done-btn" class="capsule-result-btn capsule-result-done-btn" aria-label="Готово">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <button id="capsule-result-done-btn" class="capsule-result-btn capsule-result-done-btn"
+                    aria-label="Готово">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
                     <span>Готово</span>
@@ -427,4 +497,5 @@
     </div>
 
 </body>
-</html> 
+
+</html>

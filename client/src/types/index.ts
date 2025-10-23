@@ -48,6 +48,20 @@ export type {
   FastVLMHealthCheck,
 } from './analysis';
 
+// Экспорт типов капсул
+export type {
+  Capsule,
+  StyleCapsule,
+  CreateCapsuleDto,
+  UpdateCapsuleDto,
+  CanvasItem,
+  GeneratedCapsule,
+  WardrobeItemWithUsage,
+  GenerationRequest,
+  GenerationResponse,
+  GenerationModalCallbacks,
+} from './capsules';
+
 
 // Общие типы приложения
 export interface AppConfig {

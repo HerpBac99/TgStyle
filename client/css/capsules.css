@@ -946,3 +946,493 @@
         background-position: 0% 0%;
     }
 }
+
+/* =======================================
+   КНОПКА ГЕНЕРАЦИИ КАПСУЛ (LIQUID GLASS)
+   ======================================= */
+
+.capsule-generate-btn {
+    position: fixed;
+    bottom: 100px;
+    right: 20px;
+    z-index: 2000;
+    
+    /* Эффект liquid glass */
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50px;
+    
+    /* Размеры и отступы */
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    /* Типографика */
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--tg-theme-text-color);
+    
+    /* Тени и эффекты */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    
+    /* Убираем стандартные стили кнопки */
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.capsule-generate-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: var(--tg-theme-text-color);
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+.capsule-generate-btn span {
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* Hover эффект для десктопа */
+.capsule-generate-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Active state для мобильного */
+.capsule-generate-btn:active {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(0.98) translateY(0);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Состояние загрузки */
+.capsule-generate-btn.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.capsule-generate-btn.loading svg {
+    animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* =======================================
+   МОДАЛЬНОЕ ОКНО ГЕНЕРАЦИИ КАПСУЛ
+   ======================================= */
+
+.generation-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.generation-modal:not(.hidden) {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.generation-modal.hidden {
+    display: none;
+}
+
+.generation-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.generation-modal-content {
+    position: relative;
+    width: 90%;
+    max-width: 500px;
+    max-height: 85vh;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 24px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    z-index: 1101;
+    transform: scale(0.9) translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.generation-modal:not(.hidden) .generation-modal-content {
+    transform: scale(1) translateY(0);
+}
+
+/* Заголовок модального окна */
+.generation-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.generation-modal-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--tg-theme-text-color);
+    margin: 0;
+}
+
+.generation-modal-close-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: background-color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.generation-modal-close-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.generation-modal-close-btn svg {
+    width: 24px;
+    height: 24px;
+    stroke: var(--tg-theme-text-color);
+}
+
+/* Контейнер вариантов */
+.generation-variants {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    max-height: 60vh;
+    padding: 4px;
+}
+
+/* Карточка варианта капсулы */
+.generation-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 16px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 2px solid transparent;
+}
+
+.generation-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    border-color: rgba(218, 109, 163, 0.3);
+}
+
+.generation-card:active {
+    transform: translateY(-2px);
+}
+
+.generation-preview {
+    width: 100%;
+    height: 200px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    background: rgba(0, 0, 0, 0.02);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.generation-preview-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Плейсхолдер с миниатюрами вещей */
+.generation-items-placeholder {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    width: 100%;
+    height: 100%;
+    padding: 8px;
+}
+
+.generation-item-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.generation-items-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(218, 109, 163, 0.1);
+    border-radius: 8px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: rgba(218, 109, 163, 1);
+}
+
+.generation-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.generation-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--tg-theme-text-color);
+    margin: 0;
+}
+
+.generation-description {
+    font-size: 0.9rem;
+    color: rgba(0, 0, 0, 0.7);
+    line-height: 1.4;
+    margin: 0;
+}
+
+.generation-reasoning {
+    font-size: 0.85rem;
+    color: rgba(0, 0, 0, 0.6);
+    line-height: 1.3;
+    margin: 0;
+    padding: 8px 12px;
+    background: rgba(218, 109, 163, 0.05);
+    border-radius: 8px;
+    border-left: 3px solid rgba(218, 109, 163, 0.3);
+}
+
+.generation-recommendations {
+    font-size: 0.85rem;
+    color: rgba(0, 0, 0, 0.6);
+    line-height: 1.3;
+    margin: 0;
+    padding: 8px 12px;
+    background: rgba(76, 175, 80, 0.05);
+    border-radius: 8px;
+    border-left: 3px solid rgba(76, 175, 80, 0.3);
+}
+
+.generation-warning {
+    font-size: 0.85rem;
+    color: rgba(255, 152, 0, 1);
+    line-height: 1.3;
+    margin: 0;
+    padding: 8px 12px;
+    background: rgba(255, 152, 0, 0.05);
+    border-radius: 8px;
+    border-left: 3px solid rgba(255, 152, 0, 0.3);
+}
+
+/* Кнопки действий */
+.generation-actions {
+    display: flex;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.generation-action-btn {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.regenerate-btn {
+    background: rgba(218, 109, 163, 0.1);
+    color: rgba(218, 109, 163, 1);
+    border: 1px solid rgba(218, 109, 163, 0.3);
+}
+
+.regenerate-btn:hover {
+    background: rgba(218, 109, 163, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(218, 109, 163, 0.2);
+}
+
+.regenerate-btn:active {
+    transform: translateY(0);
+}
+
+.regenerate-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: rgba(218, 109, 163, 1);
+}
+
+.cancel-btn {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--tg-theme-text-color);
+}
+
+.cancel-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.cancel-btn:active {
+    transform: translateY(0);
+}
+
+/* Индикатор загрузки в модальном окне */
+.generation-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    gap: 16px;
+}
+
+.generation-loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(218, 109, 163, 0.2);
+    border-top-color: rgba(218, 109, 163, 0.8);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.generation-loading-text {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--tg-theme-text-color);
+    text-align: center;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Адаптивность для маленьких экранов */
+@media (max-width: 480px) {
+    .generation-modal-content {
+        width: 95%;
+        padding: 20px;
+        max-height: 90vh;
+    }
+    
+    .generation-variant-preview {
+        height: 150px;
+    }
+    
+    .generation-actions {
+        flex-direction: column;
+    }
+    
+    .generation-action-btn {
+        width: 100%;
+    }
+}
+
+/* Индикатор загрузки генерации */
+.capsule-generation-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.capsule-generation-loading.hidden {
+  display: none;
+}
+
+.capsule-generation-loading .loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+}
+
+.capsule-generation-loading .loading-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.capsule-generation-loading .loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top-color: var(--tg-theme-button-color, #3390ec);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.capsule-generation-loading .loading-text {
+  color: var(--tg-theme-text-color, #ffffff);
+  font-size: 16px;
+  font-weight: 500;
+  text-align: center;
+  margin: 0;
+}
