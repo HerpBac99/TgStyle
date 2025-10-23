@@ -130,7 +130,8 @@ model WardrobeItem {
   style      String?           @db.VarChar(100)  // Стиль: casual, formal, sport
   material   String?           @db.VarChar(100)  // Материал: cotton, denim, leather
   pattern    String?           @db.VarChar(100)  // Узор: plain, striped, checked
-  fit       String?           @db.VarChar(100)  // Посадка/фит: slim, regular, loose
+  fit        String?           @db.VarChar(100)  // Посадка/фит: slim, regular, loose
+  season     String?           @db.VarChar(50)   // Сезон: spring, summer, autumn, winter, all-season
   description String?          @db.VarChar(500)  // Описание предмета одежды
 
   // Пользовательские данные

@@ -17,15 +17,15 @@ const WARDROBE_UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'wardro
  */
 function parseBase64Image(dataString) {
     const matches = dataString.match(/^data:image\/([a-z]+);base64,(.+)$/);
-    
+
     if (!matches || matches.length !== 3) {
         throw new Error('Invalid base64 image format');
     }
-    
+
     const extension = matches[1] === 'jpeg' ? 'jpg' : matches[1];
     const data = matches[2];
     const buffer = Buffer.from(data, 'base64');
-    
+
     return { buffer, extension };
 }
 
@@ -37,33 +37,33 @@ async function saveImageToDisk(telegramId, imageBase64) {
         // Создаем папку для пользователя если её нет
         const userDir = path.join(WARDROBE_UPLOADS_DIR, telegramId.toString());
         await fs.mkdir(userDir, { recursive: true });
-        
+
         // Парсим base64
         const { buffer, extension } = parseBase64Image(imageBase64);
-        
+
         // Генерируем уникальное имя файла: item_{telegramId}_{уникальныйКлюч}.png
         const randomString = Math.random().toString(36).substring(2, 10);
         const filename = `item_${telegramId}_${randomString}.${extension}`;
         const filePath = path.join(userDir, filename);
-        
+
         // Сохраняем файл
         await fs.writeFile(filePath, buffer);
-        
+
         // Возвращаем относительный путь для БД
         const relativePath = path.join('wardrobe', telegramId.toString(), filename);
-        
-        logger.info('Image saved to disk', { 
-            telegramId, 
+
+        logger.info('Image saved to disk', {
+            telegramId,
             filename,
-            size: buffer.length 
+            size: buffer.length
         });
-        
+
         return relativePath;
-        
+
     } catch (error) {
-        logger.error('Error saving image to disk', { 
-            telegramId, 
-            error: error.message 
+        logger.error('Error saving image to disk', {
+            telegramId,
+            error: error.message
         });
         throw error;
     }
@@ -79,9 +79,9 @@ async function deleteImageFromDisk(imagePath) {
         logger.info('Image deleted from disk', { imagePath });
     } catch (error) {
         // Не бросаем ошибку если файл уже удален
-        logger.warn('Failed to delete image from disk', { 
-            imagePath, 
-            error: error.message 
+        logger.warn('Failed to delete image from disk', {
+            imagePath,
+            error: error.message
         });
     }
 }
@@ -95,11 +95,11 @@ async function deleteImageFromDisk(imagePath) {
  */
 router.post('/', async (req, res) => {
     try {
-        const { imageBase64, name, category, color, material, style, fit, description, tags } = req.body;
-        
+        const { imageBase64, name, category, subtype, color, material, style, fit, season, pattern, description, tags } = req.body;
+
         // FIXED: получаем initData из header или body
         const initData = getInitData(req);
-        
+
         // Валидация Telegram данных
         if (!initData) {
             return res.status(401).json({
@@ -107,7 +107,7 @@ router.post('/', async (req, res) => {
                 error: 'Missing Telegram authentication data'
             });
         }
-        
+
         const validationResult = validateTelegramWebAppData(initData);
         if (!validationResult.isValid) {
             return res.status(401).json({
@@ -115,9 +115,9 @@ router.post('/', async (req, res) => {
                 error: validationResult.error || 'Invalid Telegram authentication'
             });
         }
-        
+
         const telegramId = BigInt(validationResult.data.user.id);
-        
+
         // Валидация
         if (!imageBase64) {
             return res.status(400).json({
@@ -125,16 +125,16 @@ router.post('/', async (req, res) => {
                 error: 'Missing required parameter: imageBase64'
             });
         }
-        
-        logger.info('Creating wardrobe item', { 
-            telegramId: telegramId.toString(), 
+
+        logger.info('Creating wardrobe item', {
+            telegramId: telegramId.toString(),
             name: name || 'unnamed',
             category: category || 'uncategorized'
         });
-        
+
         // Сохраняем изображение на диск
         const imagePath = await saveImageToDisk(telegramId, imageBase64);
-        
+
         // Создаем запись в БД
         const wardrobeItem = await prisma.wardrobeItem.create({
             data: {
@@ -142,23 +142,26 @@ router.post('/', async (req, res) => {
                 imagePath,
                 name: name || null,
                 category: category || null,
+                subtype: subtype || null,
                 color: color || null,
                 material: material || null,
                 style: style || null,
                 fit: fit || null,
+                season: season || null,
+                pattern: pattern || null,
                 description: description || null,
                 tags: tags || []
             }
         });
-        
-        logger.info('Wardrobe item created', { 
-            id: wardrobeItem.id, 
-            telegramId: telegramId.toString() 
+
+        logger.info('Wardrobe item created', {
+            id: wardrobeItem.id,
+            telegramId: telegramId.toString()
         });
-        
+
         // Формируем URL для доступа к изображению
         const imageUrl = `/uploads/${imagePath}`;
-        
+
         return res.json({
             success: true,
             item: {
@@ -166,22 +169,25 @@ router.post('/', async (req, res) => {
                 imageUrl,
                 name: wardrobeItem.name,
                 category: wardrobeItem.category,
+                subtype: wardrobeItem.subtype,
                 color: wardrobeItem.color,
                 material: wardrobeItem.material,
                 style: wardrobeItem.style,
                 fit: wardrobeItem.fit,
+                season: wardrobeItem.season,
+                pattern: wardrobeItem.pattern,
                 description: wardrobeItem.description,
                 tags: wardrobeItem.tags,
                 createdAt: wardrobeItem.createdAt
             }
         });
-        
+
     } catch (error) {
         logger.error('Error creating wardrobe item', {
             error: error.message,
             stack: error.stack
         });
-        
+
         return res.status(500).json({
             success: false,
             error: error.message || 'Internal server error'
@@ -198,7 +204,7 @@ router.get('/', async (req, res) => {
     try {
         // FIXED: получаем initData из header или query параметра
         const initData = getInitData(req);
-        
+
         // Валидация Telegram данных
         if (!initData) {
             return res.status(401).json({
@@ -206,7 +212,7 @@ router.get('/', async (req, res) => {
                 error: 'Missing Telegram authentication data'
             });
         }
-        
+
         const validationResult = validateTelegramWebAppData(initData);
         if (!validationResult.isValid) {
             return res.status(401).json({
@@ -214,11 +220,11 @@ router.get('/', async (req, res) => {
                 error: validationResult.error || 'Invalid Telegram authentication'
             });
         }
-        
+
         const telegramId = BigInt(validationResult.data.user.id);
-        
+
         logger.info('Fetching wardrobe items', { telegramId: telegramId.toString() });
-        
+
         // Получаем все предметы пользователя
         const items = await prisma.wardrobeItem.findMany({
             where: {
@@ -228,38 +234,41 @@ router.get('/', async (req, res) => {
                 createdAt: 'desc'
             }
         });
-        
+
         // Формируем ответ с URL для изображений
         const itemsWithUrls = items.map(item => ({
             id: item.id,
             imageUrl: `/uploads/${item.imagePath}`,
             name: item.name,
             category: item.category,
+            subtype: item.subtype,
             color: item.color,
             material: item.material,
             style: item.style,
             fit: item.fit,
+            season: item.season,
+            pattern: item.pattern,
             description: item.description,
             tags: item.tags,
             createdAt: item.createdAt
         }));
-        
-        logger.info('Wardrobe items fetched', { 
-            telegramId: telegramId.toString(), 
-            count: items.length 
+
+        logger.info('Wardrobe items fetched', {
+            telegramId: telegramId.toString(),
+            count: items.length
         });
-        
+
         return res.json({
             success: true,
             items: itemsWithUrls
         });
-        
+
     } catch (error) {
         logger.error('Error fetching wardrobe items', {
             error: error.message,
             stack: error.stack
         });
-        
+
         return res.status(500).json({
             success: false,
             error: error.message || 'Internal server error'
@@ -324,15 +333,54 @@ router.put('/:id', async (req, res) => {
             updatedAt: new Date()
         };
 
-        // Проверяем реальные изменения (пока только категория)
+        // Проверяем категорию
         if (updates.category !== undefined && updates.category !== existingItem.category) {
-            // Конвертируем строку категории в enum значение
             const validCategories = ['OUTERWEAR', 'INNERWEAR', 'BODYWEAR', 'FULLBODY', 'LEGWEAR', 'FOOTWEAR', 'HEADWEAR', 'ACCESSORIES'];
             if (validCategories.includes(updates.category)) {
                 updateData.category = updates.category;
             } else {
                 logger.warn('Invalid category value', { category: updates.category });
             }
+        }
+
+        // Проверяем subtype
+        if (updates.subtype !== undefined && updates.subtype !== existingItem.subtype) {
+            updateData.subtype = updates.subtype;
+        }
+
+        // Проверяем color
+        if (updates.color !== undefined && updates.color !== existingItem.color) {
+            updateData.color = updates.color;
+        }
+
+        // Проверяем material
+        if (updates.material !== undefined && updates.material !== existingItem.material) {
+            updateData.material = updates.material;
+        }
+
+        // Проверяем style
+        if (updates.style !== undefined && updates.style !== existingItem.style) {
+            updateData.style = updates.style;
+        }
+
+        // Проверяем fit
+        if (updates.fit !== undefined && updates.fit !== existingItem.fit) {
+            updateData.fit = updates.fit;
+        }
+
+        // Проверяем season
+        if (updates.season !== undefined && updates.season !== existingItem.season) {
+            updateData.season = updates.season;
+        }
+
+        // Проверяем pattern
+        if (updates.pattern !== undefined && updates.pattern !== existingItem.pattern) {
+            updateData.pattern = updates.pattern;
+        }
+
+        // Проверяем description
+        if (updates.description !== undefined && updates.description !== existingItem.description) {
+            updateData.description = updates.description;
         }
 
         // Проверяем, есть ли реальные изменения
@@ -392,10 +440,10 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const itemId = parseInt(req.params.id);
-        
+
         // FIXED: получаем initData из header или query
         const initData = getInitData(req);
-        
+
         // Валидация Telegram данных
         if (!initData) {
             return res.status(401).json({
@@ -403,7 +451,7 @@ router.delete('/:id', async (req, res) => {
                 error: 'Missing Telegram authentication data'
             });
         }
-        
+
         const validationResult = validateTelegramWebAppData(initData);
         if (!validationResult.isValid) {
             return res.status(401).json({
@@ -411,59 +459,59 @@ router.delete('/:id', async (req, res) => {
                 error: validationResult.error || 'Invalid Telegram authentication'
             });
         }
-        
+
         const telegramId = BigInt(validationResult.data.user.id);
-        
+
         if (isNaN(itemId)) {
             return res.status(400).json({
                 success: false,
                 error: 'Invalid item ID'
             });
         }
-        
+
         logger.info('Deleting wardrobe item', { telegramId: telegramId.toString(), itemId });
-        
+
         // Проверяем что предмет принадлежит пользователю
         const item = await prisma.wardrobeItem.findUnique({
             where: { id: itemId }
         });
-        
+
         if (!item) {
             return res.status(404).json({
                 success: false,
                 error: 'Item not found'
             });
         }
-        
+
         if (item.telegramId !== telegramId) {
             return res.status(403).json({
                 success: false,
                 error: 'Access denied'
             });
         }
-        
+
         // Удаляем изображение с диска
         await deleteImageFromDisk(item.imagePath);
-        
+
         // Удаляем запись из БД
         await prisma.wardrobeItem.delete({
             where: { id: itemId }
         });
-        
+
         logger.info('Wardrobe item deleted', { telegramId: telegramId.toString(), itemId });
-        
+
         return res.json({
             success: true,
             message: 'Item deleted successfully'
         });
-        
+
     } catch (error) {
         logger.error('Error deleting wardrobe item', {
             error: error.message,
             stack: error.stack,
             itemId: req.params.id
         });
-        
+
         return res.status(500).json({
             success: false,
             error: error.message || 'Internal server error'

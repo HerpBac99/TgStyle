@@ -101,12 +101,21 @@ export class WardrobeService {
     try {
       logger.info('Adding new wardrobe item', {
         category: classification.category,
+        subtype: classification.subtype,
         color: classification.color
       });
 
       const result = await api.post('/wardrobe', {
-        imageData,
-        classification
+        imageBase64: imageData,
+        category: classification.category,
+        subtype: classification.subtype,
+        color: classification.color,
+        material: classification.material,
+        style: classification.style,
+        fit: classification.fit,
+        season: classification.season,
+        pattern: classification.pattern,
+        description: classification.description
       }) as any;
 
       if (!result.success) {

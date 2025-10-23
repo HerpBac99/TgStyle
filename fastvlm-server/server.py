@@ -1322,6 +1322,115 @@ def map_color_to_russian(color_input: str) -> str:
     return color_map.get(normalized, color_input)
 
 
+def map_subtype_to_russian(subtype_input: str) -> str:
+    """
+    Маппинг английского подтипа одежды на русский язык
+
+    Args:
+        subtype_input: Подтип одежды на английском
+
+    Returns:
+        Подтип на русском языке
+    """
+    normalized = subtype_input.lower().strip()
+
+    # Subtype mapping dictionary
+    subtype_map = {
+        # Верхняя одежда
+        'coat': 'Пальто',
+        'jacket': 'Куртка',
+        'blazer': 'Блейзер',
+        'bomber': 'Бомбер',
+        'parka': 'Парка',
+        'trench coat': 'Тренч',
+        'windbreaker': 'Ветровка',
+        'raincoat': 'Дождевик',
+        'vest': 'Жилет',
+        'cardigan': 'Кардиган',
+        'denim jacket': 'Джинсовая куртка',
+        'leather jacket': 'Кожаная куртка',
+
+        # Свитеры и кофты
+        'sweater': 'Свитер',
+        'pullover': 'Пуловер',
+        'hoodie': 'Худи',
+        'sweatshirt': 'Свитшот',
+        'turtleneck': 'Водолазка',
+        'crewneck': 'Свитер с круглым вырезом',
+        'v-neck': 'Свитер с V-образным вырезом',
+
+        # Рубашки и топы
+        't-shirt': 'Футболка',
+        'shirt': 'Рубашка',
+        'blouse': 'Блузка',
+        'top': 'Топ',
+        'tank top': 'Майка',
+        'polo': 'Поло',
+        'crop top': 'Укороченный топ',
+        'dress shirt': 'Классическая рубашка',
+
+        # Платья и комбинезоны
+        'dress': 'Платье',
+        'maxi dress': 'Макси платье',
+        'midi dress': 'Миди платье',
+        'mini dress': 'Мини платье',
+        'jumpsuit': 'Комбинезон',
+        'romper': 'Ромпер',
+
+        # Штаны
+        'jeans': 'Джинсы',
+        'pants': 'Брюки',
+        'trousers': 'Брюки',
+        'shorts': 'Шорты',
+        'leggings': 'Леггинсы',
+        'joggers': 'Джоггеры',
+        'chinos': 'Чиносы',
+        'cargo pants': 'Карго',
+        'skinny jeans': 'Узкие джинсы',
+        'wide-leg pants': 'Широкие брюки',
+
+        # Обувь
+        'sneakers': 'Кроссовки',
+        'boots': 'Ботинки',
+        'ankle boots': 'Ботильоны',
+        'knee-high boots': 'Сапоги',
+        'sandals': 'Сандалии',
+        'heels': 'Туфли на каблуке',
+        'flats': 'Балетки',
+        'loafers': 'Лоферы',
+        'oxfords': 'Оксфорды',
+        'running shoes': 'Беговые кроссовки',
+
+        # Головные уборы
+        'hat': 'Шляпа',
+        'cap': 'Кепка',
+        'beanie': 'Шапка',
+        'baseball cap': 'Бейсболка',
+        'bucket hat': 'Панама',
+
+        # Аксессуары
+        'bag': 'Сумка',
+        'backpack': 'Рюкзак',
+        'belt': 'Ремень',
+        'scarf': 'Шарф',
+        'sunglasses': 'Солнцезащитные очки',
+        'watch': 'Часы',
+        'gloves': 'Перчатки'
+    }
+
+    # Проверяем точное совпадение
+    if normalized in subtype_map:
+        return subtype_map[normalized]
+
+    # Проверяем частичное совпадение (если в описании есть ключевое слово)
+    for eng, rus in subtype_map.items():
+        if eng in normalized:
+            return rus
+
+    # Если не нашли перевод, возвращаем оригинал
+    return subtype_input
+
+
 def map_material_to_russian(material_input: str) -> str:
     """
     Маппинг английского материала на русский язык
@@ -1490,6 +1599,217 @@ def map_to_clothing_category(type_description: str) -> str:
     return 'ACCESSORIES'
 
 
+def map_style_to_enum(style_input: str) -> str:
+    """
+    Маппинг стиля одежды на нормализованный enum (на русском)
+
+    Args:
+        style_input: Стиль от FastVLM (может быть на английском)
+
+    Returns:
+        Нормализованный стиль на русском языке
+    """
+    normalized = style_input.lower().strip()
+
+    # Style mapping dictionary (FastVLM → Русский enum)
+    style_map = {
+        # Casual
+        'casual': 'Повседневный',
+        'everyday': 'Повседневный',
+        'relaxed': 'Повседневный',
+        'comfortable': 'Повседневный',
+
+        # Business
+        'business': 'Деловой',
+        'office': 'Деловой',
+        'professional': 'Деловой',
+        'corporate': 'Деловой',
+        'work': 'Деловой',
+
+        # Sport
+        'sport': 'Спортивный',
+        'athletic': 'Спортивный',
+        'sportswear': 'Спортивный',
+        'activewear': 'Спортивный',
+        'gym': 'Спортивный',
+
+        # Streetwear
+        'streetwear': 'Уличный',
+        'street': 'Уличный',
+        'urban': 'Уличный',
+        'hip-hop': 'Уличный',
+
+        # Formal
+        'formal': 'Официальный',
+        'evening': 'Официальный',
+        'elegant': 'Официальный',
+        'dressy': 'Официальный',
+        'cocktail': 'Официальный',
+
+        # Smart Casual
+        'smart casual': 'Деловой повседневный',
+        'smart-casual': 'Деловой повседневный',
+        'business casual': 'Деловой повседневный',
+        'business-casual': 'Деловой повседневный',
+        'semi-formal': 'Деловой повседневный',
+
+        # Bohemian
+        'bohemian': 'Бохо',
+        'boho': 'Бохо',
+        'hippie': 'Бохо',
+        'ethnic': 'Бохо',
+
+        # Vintage
+        'vintage': 'Винтаж',
+        'retro': 'Винтаж',
+        'classic': 'Винтаж',
+
+        # Minimalist
+        'minimalist': 'Минимализм',
+        'minimal': 'Минимализм',
+        'simple': 'Минимализм',
+        'clean': 'Минимализм',
+
+        # Romantic
+        'romantic': 'Романтический',
+        'feminine': 'Романтический',
+        'delicate': 'Романтический'
+    }
+
+    # Проверяем точное совпадение
+    if normalized in style_map:
+        return style_map[normalized]
+
+    # Проверяем частичное совпадение
+    for eng, rus in style_map.items():
+        if eng in normalized:
+            return rus
+
+    # Если не нашли, возвращаем оригинал с заглавной буквы
+    return style_input.capitalize()
+
+
+def detect_category_from_subtype(subtype: str) -> str:
+    """
+    Определяет категорию одежды на основе подтипа (более точный метод)
+    
+    Args:
+        subtype: Детальное описание одежды (пункт 2 от FastVLM)
+    
+    Returns:
+        Нормализованная категория
+    """
+    text = subtype.lower().strip()
+    
+    # INNERWEAR - свитеры, кофты, водолазки (приоритет!)
+    if any(keyword in text for keyword in [
+        'sweater', 'sweatshirt', 'pullover', 'hoodie', 'cardigan',
+        'turtleneck', 'crewneck', 'v-neck', 'mock neck',
+        'knit', 'кофта', 'свитер', 'водолазка', 'худи'
+    ]):
+        return 'INNERWEAR'
+    
+    # OUTERWEAR - куртки, пальто, жакеты
+    if any(keyword in text for keyword in [
+        'jacket', 'coat', 'blazer', 'vest', 'bomber', 'parka',
+        'trench', 'windbreaker', 'raincoat', 'peacoat', 'overcoat',
+        'куртка', 'пальто', 'жакет', 'плащ'
+    ]):
+        return 'OUTERWEAR'
+    
+    # BODYWEAR - футболки, рубашки, блузки, топы
+    if any(keyword in text for keyword in [
+        't-shirt', 'shirt', 'blouse', 'top', 'tank', 'polo',
+        'tee', 'henley', 'crop', 'camisole',
+        'футболка', 'рубашка', 'блузка', 'топ', 'майка'
+    ]):
+        return 'BODYWEAR'
+    
+    # FULLBODY - платья, комбинезоны, костюмы
+    if any(keyword in text for keyword in [
+        'dress', 'jumpsuit', 'romper', 'suit', 'tracksuit',
+        'overall', 'coverall', 'bodysuit', 'unitard',
+        'платье', 'комбинезон', 'костюм'
+    ]):
+        return 'FULLBODY'
+    
+    # LEGWEAR - штаны, джинсы, шорты
+    if any(keyword in text for keyword in [
+        'pant', 'trouser', 'jean', 'short', 'legging',
+        'chino', 'khaki', 'jogger', 'capri',
+        'штаны', 'брюки', 'джинсы', 'шорты'
+    ]):
+        return 'LEGWEAR'
+    
+    # FOOTWEAR - обувь
+    if any(keyword in text for keyword in [
+        'shoe', 'boot', 'sneaker', 'sandal', 'heel',
+        'loafer', 'oxford', 'slipper', 'moccasin',
+        'обувь', 'ботинки', 'кроссовки', 'туфли'
+    ]):
+        return 'FOOTWEAR'
+    
+    # HEADWEAR - головные уборы
+    if any(keyword in text for keyword in [
+        'hat', 'cap', 'beanie', 'beret', 'fedora',
+        'headband', 'turban', 'шапка', 'кепка', 'шляпа'
+    ]):
+        return 'HEADWEAR'
+    
+    # ACCESSORIES - аксессуары
+    if any(keyword in text for keyword in [
+        'bag', 'belt', 'watch', 'jewelry', 'glove',
+        'scarf', 'tie', 'sunglass', 'wallet',
+        'сумка', 'ремень', 'часы', 'очки', 'перчатки'
+    ]):
+        return 'ACCESSORIES'
+    
+    return None  # Не удалось определить
+
+
+def validate_and_correct_category(raw_type: str, subtype: str) -> str:
+    """
+    Валидирует и корректирует категорию на основе подтипа
+    
+    Логика:
+    1. Пытаемся определить категорию из subtype (более точно)
+    2. Если не получилось, используем raw_type
+    3. Если raw_type противоречит subtype, приоритет у subtype
+    
+    Args:
+        raw_type: Категория из пункта 1 (может быть неточной)
+        subtype: Детальное описание из пункта 2 (обычно точнее)
+    
+    Returns:
+        Корректная категория
+    """
+    # Сначала пытаемся определить по subtype (приоритет)
+    category_from_subtype = detect_category_from_subtype(subtype)
+    
+    if category_from_subtype:
+        # Проверяем конфликт
+        raw_type_normalized = raw_type.upper().strip()
+        if raw_type_normalized in ['OUTERWEAR', 'INNERWEAR', 'BODYWEAR', 'FULLBODY', 'LEGWEAR', 'FOOTWEAR', 'HEADWEAR', 'ACCESSORIES']:
+            if raw_type_normalized != category_from_subtype:
+                app.logger.warning(f"Категория скорректирована: {raw_type_normalized} → {category_from_subtype} (на основе subtype: {subtype})")
+        
+        return category_from_subtype
+    
+    # Если не удалось определить по subtype, используем raw_type
+    raw_type_normalized = raw_type.upper().strip()
+    if raw_type_normalized in ['OUTERWEAR', 'INNERWEAR', 'BODYWEAR', 'FULLBODY', 'LEGWEAR', 'FOOTWEAR', 'HEADWEAR', 'ACCESSORIES']:
+        return raw_type_normalized
+    
+    # Fallback: пытаемся определить по raw_type как по subtype
+    category_from_raw = detect_category_from_subtype(raw_type)
+    if category_from_raw:
+        return category_from_raw
+    
+    # По умолчанию ACCESSORIES
+    app.logger.warning(f"Не удалось определить категорию для: type={raw_type}, subtype={subtype}")
+    return 'ACCESSORIES'
+
+
 @app.route('/classify_clothing', methods=['POST'])
 def classify_clothing():
     """Классификация одежды: удаление фона + анализ через FastVLM"""
@@ -1588,25 +1908,36 @@ def classify_clothing():
 
             parsing_time = time.time() - parsing_start
 
-            # Новый формат ответа:
+            # Новый формат ответа (9 пунктов):
             # 1. Тип одежды (для определения категории)
-            # 2. Цвет
-            # 3. Материал
-            # 4. Посадка (fit)
-            # 5. Стиль
-            # 6. Описание
+            # 2. Подтип одежды (ключевое слово)
+            # 3. Цвет
+            # 4. Материал
+            # 5. Посадка (fit)
+            # 6. Стиль
+            # 7. Сезон
+            # 8. Паттерн/узор
+            # 9. Описание (полное предложение)
 
             raw_type = parsed_data.get('1', 'Unknown')  # Тип одежды для определения категории
-            raw_color = parsed_data.get('2', 'Unknown')  # Цвет (уже на русском от LLM)
-            raw_material = parsed_data.get('3', 'Unknown')  # Материал
-            raw_fit = parsed_data.get('4', 'Unknown')  # Посадка
-            raw_style = parsed_data.get('5', 'Unknown')  # Стиль
-            raw_description = parsed_data.get('6', 'Unknown')  # Описание
+            raw_subtype = parsed_data.get('2', 'Unknown')  # Подтип одежды (ключевое слово)
+            raw_color = parsed_data.get('3', 'Unknown')  # Цвет
+            raw_material = parsed_data.get('4', 'Unknown')  # Материал
+            raw_fit = parsed_data.get('5', 'Unknown')  # Посадка
+            raw_style = parsed_data.get('6', 'Unknown')  # Стиль
+            raw_season = parsed_data.get('7', 'Unknown')  # Сезон
+            raw_pattern = parsed_data.get('8', 'Unknown')  # Паттерн
+            raw_description = parsed_data.get('9', 'Unknown')  # Описание
 
-            # Нормализуем категорию через маппинг
+            # Валидируем и корректируем категорию на основе subtype
             mapping_start = time.time()
-            normalized_category = map_to_clothing_category(raw_type)
+            normalized_category = validate_and_correct_category(raw_type, raw_subtype)
             mapping_time = time.time() - mapping_start
+
+            # Переводим subtype на русский
+            subtype_start = time.time()
+            subtype_russian = map_subtype_to_russian(raw_subtype) if raw_subtype != 'Unknown' else 'Неизвестно'
+            subtype_time = time.time() - subtype_start
 
             # Цвет на английском от LLM - переводим на русский
             color_start = time.time()
@@ -1618,14 +1949,25 @@ def classify_clothing():
             material_russian = map_material_to_russian(raw_material) if raw_material != 'Unknown' else 'Неизвестно'
             material_time = time.time() - material_start
 
+            # Нормализуем стиль на русский enum
+            style_start = time.time()
+            style_russian = map_style_to_enum(raw_style) if raw_style != 'Unknown' else 'Неизвестно'
+            style_time = time.time() - style_start
+
+            # Логируем переводы для отладки
+            app.logger.debug(f"Переводы: subtype '{raw_subtype}' → '{subtype_russian}', style '{raw_style}' → '{style_russian}'")
+
             classification = {
                 'category': normalized_category,  # Нормализованная категория (OUTERWEAR, INNERWEAR, etc.)
-                'type': raw_type,  # Оригинальный тип от LLM
+                'type': raw_type,  # Оригинальный тип от LLM (для отладки)
+                'subtype': subtype_russian,  # Подтип одежды на русском
                 'color': color_russian,  # Цвет на русском языке
                 'material': material_russian,  # Материал на русском языке
-                'fit': raw_fit,  # Посадка
-                'style': raw_style,  # Стиль
-                'description': raw_description  # Самое главное - описание
+                'fit': raw_fit,  # Посадка (оставляем как есть)
+                'style': style_russian,  # Стиль на русском (нормализованный)
+                'season': raw_season,  # Сезон (оставляем как есть)
+                'pattern': raw_pattern,  # Паттерн/узор (оставляем как есть)
+                'description': raw_description  # Полное описание от LLM (пункт 9)
             }
 
             app.logger.info(f"Классификация распарсена: {classification}")
@@ -1635,11 +1977,13 @@ def classify_clothing():
             classification = {
                 'category': 'ACCESSORIES',
                 'type': 'Unknown',
+                'subtype': 'Неизвестно',
                 'color': 'Неизвестно',
                 'material': 'Неизвестно',
                 'fit': 'Unknown',
-                'style': 'Unknown',
-                'description': 'Unknown',
+                'style': 'Неизвестно',
+                'season': 'Unknown',
+                'pattern': 'Unknown',
                 'raw_text': classification_text
             }
 
@@ -1769,6 +2113,74 @@ def remove_background():
                 'total_time': round(total_time, 2)
             }
         }), 500
+
+
+@app.route('/simple_analyze', methods=['POST'])
+def simple_analyze():
+    """Простой эндпоинт: фото + промпт = ответ LLM"""
+    start_time = time.time()
+    
+    try:
+        if model is None:
+            return jsonify({
+                'success': False,
+                'error': 'Model not loaded'
+            }), 500
+
+        # Получаем данные
+        data = request.get_json()
+        if not data or 'image_base64' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'No image provided'
+            }), 400
+
+        image_base64 = data['image_base64']
+        prompt = data.get('prompt')
+        
+        if not prompt:
+            return jsonify({
+                'success': False,
+                'error': 'No prompt provided'
+            }), 400
+
+        # Удаляем префикс data:image если есть
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+
+        app.logger.info("Простой анализ: отправляем фото и промпт в LLM")
+
+        # Анализируем через FastVLM
+        answer, error = analyze_image_fastvlm(image_base64, prompt)
+        
+        if error:
+            app.logger.error(f"Ошибка анализа: {error}")
+            return jsonify({
+                'success': False,
+                'error': error
+            }), 500
+
+        total_time = time.time() - start_time
+        app.logger.info(f"Анализ завершен за {total_time:.2f}с")
+
+        return jsonify({
+            'success': True,
+            'answer': answer,
+            'time': round(total_time, 2)
+        })
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        error_msg = f"Ошибка простого анализа: {e}"
+        app.logger.error(error_msg)
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'time': round(total_time, 2)
+        }), 500
+
 
 def cleanup_resources():
     """Очистка ресурсов при завершении"""

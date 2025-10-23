@@ -229,12 +229,12 @@ export class WardrobeManager implements PhotoUploadHandler {
 
       longPressTimer = window.setTimeout(() => {
         longPressTriggered = true;
-        
+
         // Тактильная обратная связь
         if (window.Telegram?.WebApp?.HapticFeedback) {
           window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
         }
-        
+
         if (confirm('Удалить этот предмет из гардероба?')) {
           this.removeItem(item.id);
         }
@@ -357,10 +357,13 @@ export class WardrobeManager implements PhotoUploadHandler {
   showPreviewModal(existingItem?: WardrobeItem): void {
     // Сохраняем оригинальные данные для сравнения изменений
     if (existingItem) {
-      this.originalItemData = {};
-      if (existingItem.category !== undefined) this.originalItemData.category = existingItem.category;
-      if (existingItem.color !== undefined) this.originalItemData.color = existingItem.color;
-      if (existingItem.material !== undefined) this.originalItemData.material = existingItem.material;
+      this.originalItemData = {
+        category: existingItem.category,
+        subtype: existingItem.subtype,
+        color: existingItem.color,
+        material: existingItem.material,
+        style: existingItem.style
+      } as any;
     } else {
       this.originalItemData = null;
     }
@@ -369,6 +372,7 @@ export class WardrobeManager implements PhotoUploadHandler {
     const modalData: ItemModalData = existingItem ? {
       imageUrl: existingItem.imageUrl,
       category: existingItem.category ? stringToClothingCategory(existingItem.category) : stringToClothingCategory('BODYWEAR'),
+      ...(existingItem.subtype && { subtype: existingItem.subtype }),
       color: existingItem.color || 'Не указано',
       ...(existingItem.material && { material: existingItem.material }),
       ...(existingItem.style && { style: existingItem.style }),
@@ -378,6 +382,7 @@ export class WardrobeManager implements PhotoUploadHandler {
     } : {
       imageUrl: this.currentPreviewImage || '',
       category: this.currentClassification?.category || stringToClothingCategory('BODYWEAR'),
+      ...(this.currentClassification?.subtype && { subtype: this.currentClassification.subtype }),
       color: this.currentClassification?.color || '',
       ...(this.currentClassification?.material && { material: this.currentClassification.material }),
       ...(this.currentClassification?.style && { style: this.currentClassification.style }),
@@ -397,13 +402,17 @@ export class WardrobeManager implements PhotoUploadHandler {
         if (existingItem) {
           // Для существующей вещи
           if (field === 'category') existingItem.category = value;
+          else if (field === 'subtype') existingItem.subtype = value;
           else if (field === 'color') existingItem.color = value;
           else if (field === 'material') existingItem.material = value;
+          else if (field === 'style') existingItem.style = value;
         } else if (this.currentClassification) {
           // Для новой вещи
           if (field === 'category') this.currentClassification.category = value as any;
+          else if (field === 'subtype') this.currentClassification.subtype = value;
           else if (field === 'color') this.currentClassification.color = value;
           else if (field === 'material') this.currentClassification.material = value;
+          else if (field === 'style') this.currentClassification.style = value;
         }
       },
       onConfirm: () => {
@@ -436,6 +445,13 @@ export class WardrobeManager implements PhotoUploadHandler {
         hasChanges = true;
       }
 
+      // Проверяем subtype
+      if (item.subtype !== (this.originalItemData as any).subtype && item.subtype !== undefined) {
+        logger.info(`Subtype changed: ${(this.originalItemData as any).subtype} -> ${item.subtype}`);
+        updates.subtype = item.subtype;
+        hasChanges = true;
+      }
+
       // Проверяем цвет
       if (item.color !== this.originalItemData.color && item.color !== undefined) {
         logger.info(`Color changed: ${this.originalItemData.color} -> ${item.color}`);
@@ -447,6 +463,13 @@ export class WardrobeManager implements PhotoUploadHandler {
       if (item.material !== this.originalItemData.material && item.material !== undefined) {
         logger.info(`Material changed: ${this.originalItemData.material} -> ${item.material}`);
         updates.material = item.material;
+        hasChanges = true;
+      }
+
+      // Проверяем style
+      if (item.style !== (this.originalItemData as any).style && item.style !== undefined) {
+        logger.info(`Style changed: ${(this.originalItemData as any).style} -> ${item.style}`);
+        updates.style = item.style;
         hasChanges = true;
       }
 
@@ -592,12 +615,16 @@ export class WardrobeManager implements PhotoUploadHandler {
     const finalData = uiModalManager.getCurrentModalData();
     if (finalData) {
       this.currentClassification.category = finalData.category;
+      if (finalData.subtype) this.currentClassification.subtype = finalData.subtype;
       this.currentClassification.color = finalData.color;
       if (finalData.material) this.currentClassification.material = finalData.material;
+      if (finalData.style) this.currentClassification.style = finalData.style;
       logger.info('Using modal data', {
         category: finalData.category,
+        subtype: finalData.subtype,
         color: finalData.color,
-        material: finalData.material
+        material: finalData.material,
+        style: finalData.style
       });
     }
 

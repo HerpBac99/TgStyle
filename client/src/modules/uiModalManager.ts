@@ -50,9 +50,10 @@ export interface ClothingSelectionModalConfig extends BaseModalConfig {
 export interface ItemModalData {
   imageUrl: string;
   category: ClothingCategory;
+  subtype?: string;  // Подтип одежды (свитер, джинсы, кроссовки)
   color: string;
   material?: string;
-  style?: string;
+  style?: string;  // Стиль (Повседневный, Деловой, Спортивный)
   fit?: string;
   description?: string;
   // Для существующей вещи
@@ -69,7 +70,7 @@ export interface ItemModalConfig extends BaseModalConfig {
   allowEditColorMaterial?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
-  onDataChange?: (field: 'category' | 'color' | 'material', value: string) => void;
+  onDataChange?: (field: 'category' | 'subtype' | 'color' | 'material' | 'style', value: string) => void;
 }
 
 /**
@@ -173,12 +174,13 @@ export class UIModalManager {
     // Показываем изображение
     this.showImageInModal(config.data.imageUrl);
 
-    // Показываем информацию о классификации (БЕЗ style, fit, description)
+    // Показываем информацию о классификации
     this.showClassificationInfo(
       config.data.category,
+      config.data.subtype,
       config.data.color,
       config.data.material,
-      undefined, // style - НЕ показываем
+      config.data.style,
       undefined, // fit - НЕ показываем
       undefined, // description - НЕ показываем
       config.allowEditColorMaterial,
@@ -325,8 +327,9 @@ export class UIModalManager {
    * Показать информацию о классификации в модальном окне
    */
   showClassificationInfo(
-    category: ClothingCategory, 
-    color: string, 
+    category: ClothingCategory,
+    subtype?: string,
+    color?: string,
     material?: string, 
     style?: string, 
     fit?: string, 
@@ -337,7 +340,8 @@ export class UIModalManager {
     // Обновляем данные в currentModalData если они есть
     if (this.currentModalData) {
       this.currentModalData.category = category;
-      this.currentModalData.color = color;
+      if (subtype !== undefined) this.currentModalData.subtype = subtype;
+      if (color !== undefined) this.currentModalData.color = color;
       if (material !== undefined) this.currentModalData.material = material;
       if (style !== undefined) this.currentModalData.style = style;
       if (fit !== undefined) this.currentModalData.fit = fit;
@@ -366,6 +370,7 @@ export class UIModalManager {
     // Формируем HTML с информацией
     let infoHtml = '';
 
+    // 1. КАТЕГОРИЯ
     if (allowManualSelection) {
       // Создаем селектор категорий
       infoHtml += `
@@ -387,7 +392,24 @@ export class UIModalManager {
       `;
     }
 
-    // Цвет - редактируемое поле если разрешено
+    // 2. ТИП (SUBTYPE) - текстовое поле
+    if (allowEditColorMaterial && subtype !== undefined) {
+      infoHtml += `
+      <div class="classification-item">
+        <span class="classification-label">Тип:</span>
+        <input type="text" id="subtype-input" class="classification-input" value="${subtype || ''}" placeholder="Введите тип" enterkeyhint="done" />
+      </div>
+      `;
+    } else if (subtype) {
+      infoHtml += `
+      <div class="classification-item">
+        <span class="classification-label">Тип:</span>
+        <span class="classification-value">${subtype}</span>
+      </div>
+      `;
+    }
+
+    // 3. ЦВЕТ - редактируемое поле если разрешено
     if (allowEditColorMaterial) {
       infoHtml += `
       <div class="classification-item">
@@ -395,16 +417,16 @@ export class UIModalManager {
         <input type="text" id="color-input" class="classification-input" value="${color || ''}" placeholder="Введите цвет" enterkeyhint="done" />
       </div>
       `;
-    } else {
+    } else if (color) {
       infoHtml += `
       <div class="classification-item">
         <span class="classification-label">Цвет:</span>
-        <span class="classification-value">${color || 'Не определен'}</span>
+        <span class="classification-value">${color}</span>
       </div>
       `;
     }
 
-    // Материал - редактируемое поле если разрешено
+    // 4. МАТЕРИАЛ - редактируемое поле если разрешено
     if (allowEditColorMaterial) {
       infoHtml += `
       <div class="classification-item">
@@ -421,7 +443,26 @@ export class UIModalManager {
       `;
     }
 
-    // Стиль, Посадка, Описание - НЕ показываем (системные поля)
+    // 5. СТИЛЬ - селектор (как категория)
+    if (allowEditColorMaterial && style !== undefined) {
+      infoHtml += `
+      <div class="classification-item">
+        <span class="classification-label">Стиль:</span>
+        <select id="style-selector" class="category-selector" data-current="${style}">
+          ${this.getStyleOptions(style)}
+        </select>
+      </div>
+      `;
+    } else if (style) {
+      infoHtml += `
+      <div class="classification-item">
+        <span class="classification-label">Стиль:</span>
+        <span class="classification-value">${style}</span>
+      </div>
+      `;
+    }
+
+    // Посадка, Описание - НЕ показываем (системные поля)
 
     infoElement.innerHTML = infoHtml;
 
@@ -435,7 +476,7 @@ export class UIModalManager {
 
     // Настраиваем обработчики для редактируемых полей (если они есть)
     if (allowEditColorMaterial) {
-      this.setupColorMaterialInputs();
+      this.setupEditableFields();
     }
 
     logger.info('Classification info shown', { 
@@ -444,6 +485,28 @@ export class UIModalManager {
       manualSelectionAllowed: allowManualSelection,
       editableColorMaterial: allowEditColorMaterial 
     });
+  }
+
+  /**
+   * Получить HTML опции для селектора стилей
+   */
+  getStyleOptions(currentStyle: string): string {
+    const styles = [
+      { key: 'Повседневный', label: 'Повседневный' },
+      { key: 'Деловой', label: 'Деловой' },
+      { key: 'Спортивный', label: 'Спортивный' },
+      { key: 'Уличный', label: 'Уличный' },
+      { key: 'Официальный', label: 'Официальный' },
+      { key: 'Деловой повседневный', label: 'Деловой повседневный' },
+      { key: 'Бохо', label: 'Бохо' },
+      { key: 'Винтаж', label: 'Винтаж' },
+      { key: 'Минимализм', label: 'Минимализм' },
+      { key: 'Романтический', label: 'Романтический' }
+    ];
+
+    return styles
+      .map(style => `<option value="${style.key}" ${style.key === currentStyle ? 'selected' : ''}>${style.label}</option>`)
+      .join('');
   }
 
   /**
@@ -504,12 +567,43 @@ export class UIModalManager {
   }
 
   /**
-   * Настроить обработчики для редактируемых полей цвета и материала
+   * Настроить обработчики для всех редактируемых полей
    */
-  private setupColorMaterialInputs(): void {
-    const colorInput = document.getElementById('color-input') as HTMLInputElement;
-    const materialInput = document.getElementById('material-input') as HTMLInputElement;
+  private setupEditableFields(): void {
+    // Subtype input
+    const subtypeInput = document.getElementById('subtype-input') as HTMLInputElement;
+    if (subtypeInput) {
+      const handleSubtypeChange = (event: Event) => {
+        const target = event.target as HTMLInputElement;
+        const newSubtype = target.value;
 
+        logger.debug('Subtype manually changed', { newSubtype });
+
+        if (this.currentModalData) {
+          this.currentModalData.subtype = newSubtype;
+        }
+
+        if (this.currentModal?.type === 'item-modal' && this.currentModal.onDataChange) {
+          this.currentModal.onDataChange('subtype', newSubtype);
+        }
+      };
+
+      const handleEnter = (event: KeyboardEvent) => {
+        if (event.key === 'Enter') {
+          subtypeInput.blur();
+        }
+      };
+
+      subtypeInput.addEventListener('input', handleSubtypeChange);
+      subtypeInput.addEventListener('keydown', handleEnter);
+      this.cleanupFunctions.push(() => {
+        subtypeInput.removeEventListener('input', handleSubtypeChange);
+        subtypeInput.removeEventListener('keydown', handleEnter);
+      });
+    }
+
+    // Color input
+    const colorInput = document.getElementById('color-input') as HTMLInputElement;
     if (colorInput) {
       const handleColorChange = (event: Event) => {
         const target = event.target as HTMLInputElement;
@@ -517,21 +611,18 @@ export class UIModalManager {
 
         logger.debug('Color manually changed', { newColor });
 
-        // Обновляем текущие данные
         if (this.currentModalData) {
           this.currentModalData.color = newColor;
         }
 
-        // Вызываем callback
         if (this.currentModal?.type === 'item-modal' && this.currentModal.onDataChange) {
           this.currentModal.onDataChange('color', newColor);
         }
       };
 
-      // Обработчик для закрытия клавиатуры по Enter
       const handleEnter = (event: KeyboardEvent) => {
         if (event.key === 'Enter') {
-          colorInput.blur(); // Закрываем клавиатуру
+          colorInput.blur();
         }
       };
 
@@ -543,6 +634,8 @@ export class UIModalManager {
       });
     }
 
+    // Material input
+    const materialInput = document.getElementById('material-input') as HTMLInputElement;
     if (materialInput) {
       const handleMaterialChange = (event: Event) => {
         const target = event.target as HTMLInputElement;
@@ -550,21 +643,18 @@ export class UIModalManager {
 
         logger.debug('Material manually changed', { newMaterial });
 
-        // Обновляем текущие данные
         if (this.currentModalData) {
           this.currentModalData.material = newMaterial;
         }
 
-        // Вызываем callback
         if (this.currentModal?.type === 'item-modal' && this.currentModal.onDataChange) {
           this.currentModal.onDataChange('material', newMaterial);
         }
       };
 
-      // Обработчик для закрытия клавиатуры по Enter
       const handleEnter = (event: KeyboardEvent) => {
         if (event.key === 'Enter') {
-          materialInput.blur(); // Закрываем клавиатуру
+          materialInput.blur();
         }
       };
 
@@ -573,6 +663,30 @@ export class UIModalManager {
       this.cleanupFunctions.push(() => {
         materialInput.removeEventListener('input', handleMaterialChange);
         materialInput.removeEventListener('keydown', handleEnter);
+      });
+    }
+
+    // Style selector
+    const styleSelector = document.getElementById('style-selector') as HTMLSelectElement;
+    if (styleSelector) {
+      const handleStyleChange = (event: Event) => {
+        const target = event.target as HTMLSelectElement;
+        const newStyle = target.value;
+
+        logger.info('Style manually changed', { newStyle });
+
+        if (this.currentModalData) {
+          this.currentModalData.style = newStyle;
+        }
+
+        if (this.currentModal?.type === 'item-modal' && this.currentModal.onDataChange) {
+          this.currentModal.onDataChange('style', newStyle);
+        }
+      };
+
+      styleSelector.addEventListener('change', handleStyleChange);
+      this.cleanupFunctions.push(() => {
+        styleSelector.removeEventListener('change', handleStyleChange);
       });
     }
   }
@@ -586,18 +700,26 @@ export class UIModalManager {
     }
 
     // Обновляем данные из inputs если они есть
+    const categorySelector = document.getElementById('category-selector') as HTMLSelectElement;
+    const subtypeInput = document.getElementById('subtype-input') as HTMLInputElement;
     const colorInput = document.getElementById('color-input') as HTMLInputElement;
     const materialInput = document.getElementById('material-input') as HTMLInputElement;
-    const categorySelector = document.getElementById('category-selector') as HTMLSelectElement;
+    const styleSelector = document.getElementById('style-selector') as HTMLSelectElement;
 
+    if (categorySelector) {
+      this.currentModalData.category = categorySelector.value as ClothingCategory;
+    }
+    if (subtypeInput) {
+      this.currentModalData.subtype = subtypeInput.value;
+    }
     if (colorInput) {
       this.currentModalData.color = colorInput.value;
     }
     if (materialInput) {
       this.currentModalData.material = materialInput.value;
     }
-    if (categorySelector) {
-      this.currentModalData.category = categorySelector.value as ClothingCategory;
+    if (styleSelector) {
+      this.currentModalData.style = styleSelector.value;
     }
 
     return this.currentModalData;

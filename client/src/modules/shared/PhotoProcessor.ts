@@ -38,10 +38,13 @@ export class PhotoProcessor {
         processedImage: result.processed_image_base64,
         classification: {
           category: stringToClothingCategory(result.classification.category),
+          subtype: result.classification.subtype,
           color: result.classification.color,
           material: result.classification.material,
           style: result.classification.style,
           fit: result.classification.fit,
+          season: result.classification.season,
+          pattern: result.classification.pattern,
           description: result.classification.description
         }
       };
@@ -68,10 +71,13 @@ export class PhotoProcessor {
       const requestData: CreateWardrobeItemDto = {
         imageBase64,
         category: classification.category,
+        ...(classification.subtype && { subtype: classification.subtype }),
         color: classification.color,
         material: classification.material,
         style: classification.style,
         fit: classification.fit,
+        ...(classification.season && { season: classification.season }),
+        ...(classification.pattern && { pattern: classification.pattern }),
         description: classification.description
       };
 
