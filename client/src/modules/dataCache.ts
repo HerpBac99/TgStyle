@@ -7,25 +7,11 @@ import { logger } from './logger';
 import { historyManager } from './history';
 import { api } from './api';
 import type { HistoryItem } from '@/types/api';
+import type { WardrobeItem } from '@/types/wardrobe';
 import { STORAGE_KEYS, WARDROBE_CONSTRAINTS, IMAGE_CACHE_CONFIG } from '@/utils/constants';
 import { safeJsonParse, safeJsonStringify } from '@/utils/helpers';
 
-/**
- * Интерфейс для элемента гардероба
- */
-export interface WardrobeItem {
-  id: number;
-  imageUrl: string;
-  name?: string;
-  category?: string;
-  color?: string;
-  material?: string;
-  style?: string;
-  fit?: string;
-  description?: string;
-  tags?: string[];
-  createdAt: string;
-}
+
 
 /**
  * Интерфейс для капсулы
@@ -611,7 +597,7 @@ class DataCacheManager {
   }
 
   /**
-   * Обновить элемент в кэше гардероба
+   * Обновить элемент в кэше гардероба (полная замена)
    */
   updateWardrobeItem(itemId: number, updatedItem: WardrobeItem): void {
     const index = this.wardrobeItems.findIndex(item => item.id === itemId);
@@ -622,6 +608,29 @@ class DataCacheManager {
       if (index < WARDROBE_CONSTRAINTS.CACHE_ITEMS) {
         this.saveWardrobeCacheToStorage();
       }
+    } else {
+      logger.warn('Item not found in cache for update', { itemId });
+    }
+  }
+
+  /**
+   * Обновить только определенные поля элемента в кэше гардероба (оптимистичное обновление)
+   */
+  updateWardrobeItemFields(itemId: number, updates: Partial<WardrobeItem>): void {
+    const index = this.wardrobeItems.findIndex(item => item.id === itemId);
+    if (index !== -1) {
+      // Обновляем только переданные поля
+      this.wardrobeItems[index] = {
+        ...this.wardrobeItems[index],
+        ...updates
+      } as WardrobeItem;
+
+      // Обновляем localStorage кэш если элемент в первых 30
+      if (index < WARDROBE_CONSTRAINTS.CACHE_ITEMS) {
+        this.saveWardrobeCacheToStorage();
+      }
+    } else {
+      logger.warn('Item not found in cache for update', { itemId });
     }
   }
 

@@ -57,16 +57,17 @@ def main():
         image_path = sys.argv[1]
     else:
         # Свитер по умолчанию
-        image_path = str(Path(__file__).parent.parent / "server" / "uploads" / "wardrobe" / "251053908" / "item_251053908_0fubt8zr.png")
+        image_path = str(Path(__file__).parent.parent / "server" / "uploads" / "wardrobe" / "251053908" / "item_251053908_lkq2vjy5.png")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")
         sys.exit(1)
 
     # Промпт для классификации (9 пунктов)
-    prompt = """Analyze the clothing item in the photograph and provide a strict answer in this format:
+    prompt = """Analyze the clothing item in the photograph and provide your answer EXACTLY in this numbered format. You are a professional at identifying clothing elements.
+Do not deviate from this structure:
 1. [Type of clothing (Outerwear, Innerwear, Bodywear, Fullbody, Legwear, Footwear, Headwear, Accessories)]
-2. [Subtype]
+2. [Describe type of clothing]
 3. [Color]
 4. [Material]
 5. [Fit (fitted, loose, oversized, etc.)]
@@ -74,7 +75,8 @@ def main():
 7. [Season (spring, summer, autumn, winter, all-season)]
 8. [Pattern (solid, striped, checkered, floral, graphic, printed, etc.)]
 9. [Describe clothing in one sentence]
-9. [Describe clothing]
+
+IMPORTANT: You must respond with exactly 9 numbered lines. Each line must start with the number and a period (1., 2., etc.).
 """
 
     img = Image.open(image_path).convert('RGB')

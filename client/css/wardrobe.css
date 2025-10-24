@@ -39,7 +39,7 @@
     font-size: 1.4rem;
     font-weight: 700;
     color: var(--tg-theme-text-color);
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
     margin: 0;
 }
 
@@ -48,17 +48,22 @@
     display: flex;
     flex-wrap: nowrap;
     gap: 5px;
-    margin: 10px 0 16px 0; /* Увеличиваем верхний отступ на 4px для учета подъема активных кнопок */
+    margin: 10px 0 16px 0;
+    /* Увеличиваем верхний отступ на 4px для учета подъема активных кнопок */
     width: 100%;
-    height: 50px; /* ФИКСИРОВАННАЯ минимальная высота */
+    height: 50px;
+    /* ФИКСИРОВАННАЯ минимальная высота */
     padding: 5px;
-    flex-shrink: 0; /* НЕ СЖИМАТЬ контейнер */
+    flex-shrink: 0;
+    /* НЕ СЖИМАТЬ контейнер */
     overflow-x: auto;
     overflow-y: hidden;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
     -webkit-overflow-scrolling: touch;
-    
+
     /* Анимация появления */
     animation: slideInFromTop 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
@@ -68,6 +73,7 @@
         opacity: 0;
         transform: translateY(-20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -75,7 +81,8 @@
 }
 
 .wardrobe-filters::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+    display: none;
+    /* Chrome, Safari, Opera */
 }
 
 .wardrobe-filter-btn {
@@ -93,7 +100,8 @@
     backdrop-filter: blur(10px);
     -webkit-tap-highlight-color: transparent;
     white-space: nowrap;
-    flex-shrink: 0; /* НЕ СЖИМАТЬ кнопки */
+    flex-shrink: 0;
+    /* НЕ СЖИМАТЬ кнопки */
 }
 
 .wardrobe-filter-btn:hover {
@@ -115,8 +123,10 @@
     gap: 12px;
     padding: 10px 0;
     width: 100%;
-    
-    /* Анимация появления грида */
+}
+
+/* Анимация появления грида только при первом открытии */
+.wardrobe-clothes-grid.initial-load {
     animation: fadeIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
@@ -124,6 +134,7 @@
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -133,39 +144,47 @@
 .wardrobe-item-card {
     position: relative;
     width: 100%;
-    padding-bottom: 100%; /* Квадратная карточка */
+    padding-bottom: 100%;
+    /* Квадратная карточка */
     background: rgba(255, 255, 255, 0.9);
     border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
     transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.3s ease, opacity 0.3s ease;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    
+
+    /* По умолчанию карточки видимы без анимации */
+    opacity: 1;
+}
+
+/* Анимация карточек только при первом открытии грида */
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card {
     /* Stagger animation - карточки появляются по очереди */
     opacity: 0;
     animation: cardFadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
-/* Задержка для каждой карточки (до 20 карточек) */
-.wardrobe-item-card:nth-child(1) { animation-delay: 0.05s; }
-.wardrobe-item-card:nth-child(2) { animation-delay: 0.08s; }
-.wardrobe-item-card:nth-child(3) { animation-delay: 0.11s; }
-.wardrobe-item-card:nth-child(4) { animation-delay: 0.14s; }
-.wardrobe-item-card:nth-child(5) { animation-delay: 0.17s; }
-.wardrobe-item-card:nth-child(6) { animation-delay: 0.20s; }
-.wardrobe-item-card:nth-child(7) { animation-delay: 0.23s; }
-.wardrobe-item-card:nth-child(8) { animation-delay: 0.26s; }
-.wardrobe-item-card:nth-child(9) { animation-delay: 0.29s; }
-.wardrobe-item-card:nth-child(10) { animation-delay: 0.32s; }
-.wardrobe-item-card:nth-child(11) { animation-delay: 0.35s; }
-.wardrobe-item-card:nth-child(12) { animation-delay: 0.38s; }
-.wardrobe-item-card:nth-child(n+13) { animation-delay: 0.40s; }
+/* Задержка для каждой карточки (до 20 карточек) - только при initial-load */
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(1) { animation-delay: 0.05s; }
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(2) { animation-delay: 0.08s; }
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(3) { animation-delay: 0.11s; }
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(4) { animation-delay: 0.14s; }
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(5) { animation-delay: 0.17s; }
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(6) { animation-delay: 0.20s; }
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(7) { animation-delay: 0.23s; }
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(8) { animation-delay: 0.26s; }
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(9) { animation-delay: 0.29s; }
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(10) { animation-delay: 0.32s; }
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(11) { animation-delay: 0.35s; }
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(12) { animation-delay: 0.38s; }
+.wardrobe-clothes-grid.initial-load .wardrobe-item-card:nth-child(n+13) { animation-delay: 0.40s; }
 
 @keyframes cardFadeIn {
     from {
         opacity: 0;
         transform: scale(0.8) translateY(20px);
     }
+
     to {
         opacity: 1;
         transform: scale(1) translateY(0);
@@ -205,7 +224,8 @@
 .add-item-btn {
     position: relative;
     width: 100%;
-    padding-bottom: 100%; /* Квадратная карточка */
+    padding-bottom: 100%;
+    /* Квадратная карточка */
     border-radius: 12px;
     background: rgba(218, 109, 163, 0.1);
     border: 2px dashed rgba(218, 109, 163, 0.5);
@@ -280,7 +300,8 @@
 .wardrobe-preview-image-container {
     position: relative;
     width: 100%;
-    padding-bottom: 100%; /* Квадратный контейнер */
+    padding-bottom: 100%;
+    /* Квадратный контейнер */
     background: rgba(240, 240, 240, 0.5);
     border-radius: 12px;
     overflow: hidden;
@@ -355,7 +376,7 @@
     justify-content: center;
     transition: all 0.2s ease;
     padding: 10px;
-    -webkit-tap-highlight-color: transparent !important; 
+    -webkit-tap-highlight-color: transparent !important;
 }
 
 .wardrobe-preview-btn:hover {
@@ -447,6 +468,3 @@
     padding: 8px;
     background-color: white;
 }
-
-
-

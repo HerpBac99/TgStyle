@@ -40,7 +40,7 @@ export class WardrobeManager implements PhotoUploadHandler {
 
     // МГНОВЕННО отрисовываем из кэша (уже загружен в dataCacheManager при инициализации)
     await this.loadWardrobeFromCache();
-    this.renderGrid();
+    this.renderGrid(true); // С анимацией при первом открытии
 
     // Загружаем полные данные в фоне
     this.loadWardrobeInBackground();
@@ -139,7 +139,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       btn.addEventListener('click', () => {
         this.currentFilter = cat.key;
         this.updateFilterButtons();
-        this.renderGrid();
+        this.renderGrid(false); // Без анимации при фильтрации
       });
 
       filterContainer.appendChild(btn);
@@ -159,8 +159,9 @@ export class WardrobeManager implements PhotoUploadHandler {
 
   /**
    * Отрендерить грид
+   * @param withAnimation - показывать ли анимацию появления (только при первом открытии)
    */
-  private renderGrid(): void {
+  private renderGrid(withAnimation: boolean = false): void {
     const grid = document.getElementById('wardrobe-clothes-grid');
     if (!grid) {
       logger.error('Wardrobe grid element not found!');
@@ -175,6 +176,20 @@ export class WardrobeManager implements PhotoUploadHandler {
 
     // Очищаем грид
     grid.innerHTML = '';
+
+    // Управляем анимацией грида
+    if (withAnimation) {
+      grid.classList.add('initial-load');
+      logger.info('Rendering grid with initial animation');
+
+      // Удаляем класс после завершения анимации (0.4s + максимальная задержка 0.4s = 0.8s)
+      setTimeout(() => {
+        grid.classList.remove('initial-load');
+      }, 1000);
+    } else {
+      grid.classList.remove('initial-load');
+      logger.info('Rendering grid without animation');
+    }
 
     // Возвращаем кнопку "Добавить" обратно
     if (addBtn) {
@@ -207,50 +222,81 @@ export class WardrobeManager implements PhotoUploadHandler {
     content.appendChild(image);
     card.appendChild(content);
 
-    // Обработчик кликов с разной длительностью
+    // Обработчик нажатий с улучшенной логикой
     let pressStartTime = 0;
     let longPressTimer: number | null = null;
     let longPressTriggered = false;
     let startPos: { x: number; y: number } | null = null;
-    const SCROLL_THRESHOLD = 10;
+    let cardRect: DOMRect | null = null;
+    let isProcessing = false; // Флаг для предотвращения двойных вызовов
 
     const startPress = (e: MouseEvent | TouchEvent) => {
-      // Не сбрасываем longPressTriggered сразу, чтобы избежать ложных срабатываний
-      // после закрытия confirm диалога
-      if (!longPressTriggered) {
-        pressStartTime = Date.now();
+      // Предотвращаем обработку если уже обрабатываем
+      if (isProcessing) {
+        e.preventDefault();
+        return;
       }
 
+      // Сбрасываем состояние
+      longPressTriggered = false;
+      pressStartTime = Date.now();
+      cardRect = card.getBoundingClientRect();
+
+      // Получаем позицию нажатия
       if (e instanceof TouchEvent && e.touches[0]) {
         startPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       } else if (e instanceof MouseEvent) {
         startPos = { x: e.clientX, y: e.clientY };
       }
 
-      longPressTimer = window.setTimeout(() => {
+      // Запускаем таймер долгого нажатия
+      longPressTimer = window.setTimeout(async () => {
+        if (isProcessing) return; // Дополнительная защита
+
         longPressTriggered = true;
+        isProcessing = true;
 
         // Тактильная обратная связь
         if (window.Telegram?.WebApp?.HapticFeedback) {
           window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
         }
 
+        logger.info('Long press detected, showing delete confirmation', { itemId: item.id });
+
         if (confirm('Удалить этот предмет из гардероба?')) {
-          this.removeItem(item.id);
+          try {
+            await this.removeItem(item.id);
+            logger.info('Item deleted via long press', { itemId: item.id });
+          } catch (error) {
+            logger.error('Error deleting item via long press', { itemId: item.id, error });
+          }
+        } else {
+          logger.info('Delete cancelled by user', { itemId: item.id });
         }
-      }, 800);
+
+        // Сбрасываем флаги после завершения операции
+        setTimeout(() => {
+          isProcessing = false;
+          longPressTriggered = false;
+        }, 200);
+      }, 600); // Уменьшили время до 600ms для лучшего UX
     };
 
     const endPress = (e: MouseEvent | TouchEvent) => {
+      // Очищаем таймер
       if (longPressTimer !== null) {
         clearTimeout(longPressTimer);
         longPressTimer = null;
       }
 
-      if (!startPos) return;
+      // Если уже обрабатываем или было долгое нажатие - не показываем превью
+      if (isProcessing || longPressTriggered || !startPos) {
+        return;
+      }
 
       const pressDuration = Date.now() - pressStartTime;
 
+      // Получаем позицию отпускания
       let endPos: { x: number; y: number } | null = null;
       if (e instanceof TouchEvent && e.changedTouches[0]) {
         endPos = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
@@ -260,30 +306,22 @@ export class WardrobeManager implements PhotoUploadHandler {
 
       if (!endPos) return;
 
-      const deltaX = Math.abs(endPos.x - startPos.x);
-      const deltaY = Math.abs(endPos.y - startPos.y);
-      const hasMoved = deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD;
-
-      // Открываем превью только если: короткое нажатие, не было долгого нажатия, не было движения
-      if (!longPressTriggered && !hasMoved && pressDuration < 500) {
+      // Проверяем, что нажатие было коротким (менее 500ms)
+      if (pressDuration < 500) {
         // Легкая вибрация при открытии превью
         if (window.Telegram?.WebApp?.HapticFeedback) {
           window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
         }
-        this.showPreviewModal(item);
-      }
 
-      // Сбрасываем флаг долгого нажатия с задержкой, чтобы избежать ложных срабатываний
-      if (longPressTriggered) {
-        setTimeout(() => {
-          longPressTriggered = false;
-        }, 100);
+        logger.info('Short press detected, showing preview', { itemId: item.id, duration: pressDuration });
+        this.showPreviewModal(item);
       }
     };
 
     const handleMove = (e: MouseEvent | TouchEvent) => {
-      if (!startPos) return;
+      if (!startPos || !cardRect || longPressTriggered) return;
 
+      // Получаем текущую позицию
       let currentPos: { x: number; y: number } | null = null;
       if (e instanceof TouchEvent && e.touches[0]) {
         currentPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -293,14 +331,19 @@ export class WardrobeManager implements PhotoUploadHandler {
 
       if (!currentPos) return;
 
-      const deltaX = Math.abs(currentPos.x - startPos.x);
-      const deltaY = Math.abs(currentPos.y - startPos.y);
+      // Проверяем, вышел ли палец за границы карточки
+      const isOutsideCard = (
+        currentPos.x < cardRect.left ||
+        currentPos.x > cardRect.right ||
+        currentPos.y < cardRect.top ||
+        currentPos.y > cardRect.bottom
+      );
 
-      if (deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD) {
-        if (longPressTimer !== null) {
-          clearTimeout(longPressTimer);
-          longPressTimer = null;
-        }
+      // Отменяем долгое нажатие только если палец вышел за границы карточки
+      if (isOutsideCard && longPressTimer !== null) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+        logger.info('Long press cancelled - finger moved outside card', { itemId: item.id });
       }
     };
 
@@ -309,17 +352,19 @@ export class WardrobeManager implements PhotoUploadHandler {
         clearTimeout(longPressTimer);
         longPressTimer = null;
       }
-      longPressTriggered = false;
+      // Не сбрасываем isProcessing здесь, чтобы избежать конфликтов
     };
 
-    card.addEventListener('mousedown', startPress);
-    card.addEventListener('mouseup', endPress);
+    // Добавляем обработчики событий
+    card.addEventListener('mousedown', startPress, { passive: false });
+    card.addEventListener('mouseup', endPress, { passive: false });
     card.addEventListener('mouseleave', cancelPress);
-    card.addEventListener('touchstart', startPress);
-    card.addEventListener('touchend', endPress);
-    card.addEventListener('touchmove', handleMove);
     card.addEventListener('mousemove', handleMove);
-    card.addEventListener('touchmove', cancelPress);
+
+    card.addEventListener('touchstart', startPress, { passive: false });
+    card.addEventListener('touchend', endPress, { passive: false });
+    card.addEventListener('touchmove', handleMove, { passive: false });
+    card.addEventListener('touchcancel', cancelPress);
 
     return card;
   }
@@ -328,7 +373,15 @@ export class WardrobeManager implements PhotoUploadHandler {
    * Удалить вещь
    */
   private async removeItem(itemId: number): Promise<void> {
+    // Проверяем, что элемент еще существует в массиве
+    const existingIndex = this.wardrobeItems.findIndex(item => item.id === itemId);
+    if (existingIndex === -1) {
+      logger.warn('Attempted to remove item that no longer exists', { itemId });
+      return;
+    }
+
     try {
+      logger.info('Removing wardrobe item', { itemId });
       await wardrobeService.deleteItem(itemId);
 
       // Удаляем из локального массива
@@ -337,11 +390,12 @@ export class WardrobeManager implements PhotoUploadHandler {
         this.wardrobeItems.splice(index, 1);
       }
 
-      // Перерисовываем
-      this.renderGrid();
+      // Перерисовываем без анимации
+      this.renderGrid(false);
 
-      logger.info(`Item removed. Remaining: ${this.wardrobeItems.length}`);
+      logger.info(`Item removed successfully. Remaining: ${this.wardrobeItems.length}`, { itemId });
     } catch (error) {
+      logger.error('Error removing wardrobe item', { itemId, error });
       alert('Ошибка при удалении предмета. Попробуйте еще раз.');
     }
   }
@@ -479,19 +533,28 @@ export class WardrobeManager implements PhotoUploadHandler {
         return;
       }
 
-      await wardrobeService.updateItem(item.id, updates);
-
-      // Обновляем локальный массив
+      // Сначала обновляем локальный кеш оптимистично
       const index = this.wardrobeItems.findIndex(i => i.id === item.id);
       if (index !== -1) {
-        this.wardrobeItems[index] = { ...item };
+        // Обновляем только измененные поля в локальном массиве
+        this.wardrobeItems[index] = {
+          ...this.wardrobeItems[index],
+          ...updates
+        } as WardrobeItem;
+        
+        logger.info('Item updated locally', { itemId: item.id, changes: Object.keys(updates) });
       }
 
       // Очищаем оригинальные данные
       this.originalItemData = null;
 
-      // Перерисовываем
-      this.renderGrid();
+      // Перерисовываем без анимации СРАЗУ с обновленными данными
+      this.renderGrid(false);
+
+      // Отправляем изменения на сервер в фоне (без ожидания)
+      wardrobeService.updateItem(item.id, updates).catch(error => {
+        logger.error('Failed to sync changes to server', { itemId: item.id, error: error.message });
+      });
 
       logger.info(`Item updated: ${item.id}`, { changes: updates });
     } catch (error) {
@@ -644,7 +707,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       this.wardrobeItems.push(item);
 
       // Перерисовываем
-      this.renderGrid();
+      this.renderGrid(false);
 
       // Отправляем событие
       window.dispatchEvent(new CustomEvent('wardrobe:item-saved', {

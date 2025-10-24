@@ -70,26 +70,25 @@ export class WardrobeService {
   }
 
   /**
-   * Обновить элемент гардероба
+   * Обновить элемент гардероба (оптимистичное обновление)
    */
   async updateItem(itemId: number, updates: Partial<WardrobeItem>): Promise<void> {
     try {
-      logger.info('Updating wardrobe item', { itemId, updates });
+      // Сначала обновляем кеш оптимистично
+      dataCacheManager.updateWardrobeItemFields(itemId, updates);
 
+      // Затем отправляем на сервер
       const result = await api.updateWardrobeItem(itemId, updates);
 
       if (!result.success) {
+        logger.error('Server update failed', { itemId, error: result.error });
         throw new Error(result.error || 'Failed to update item');
       }
 
-      logger.info('Item updated successfully', { itemId });
-
-      // Обновляем кэш если сервер вернул обновленный элемент
-      if (result.item) {
-        dataCacheManager.updateWardrobeItem(itemId, result.item);
-      }
+      logger.info('Item synced to server', { itemId });
 
     } catch (error) {
+      logger.error('Failed to sync item to server', { itemId, error: error.message });
       handleServiceErrorAndThrow(error, 'Error updating wardrobe item', { itemId });
     }
   }
