@@ -88,7 +88,6 @@ export class WardrobeService {
       logger.info('Item synced to server', { itemId });
 
     } catch (error) {
-      logger.error('Failed to sync item to server', { itemId, error: error.message });
       handleServiceErrorAndThrow(error, 'Error updating wardrobe item', { itemId });
     }
   }
@@ -123,8 +122,8 @@ export class WardrobeService {
 
       logger.info('Item added successfully', { id: result.item.id });
 
-      // Добавляем в кэш
-      dataCacheManager.addWardrobeItem(result.item);
+      // НЕ добавляем в кэш здесь - это делается оптимистично в WardrobeManager
+      // Кэш будет обновлен при замене временной вещи на реальную
 
       return result.item;
 

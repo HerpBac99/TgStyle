@@ -583,7 +583,8 @@ class DataCacheManager {
    * Добавить новый элемент в кэш гардероба
    */
   addWardrobeItem(item: WardrobeItem): void {
-    this.wardrobeItems.push(item);
+    // Добавляем в НАЧАЛО массива (новые вещи первыми)
+    this.wardrobeItems.unshift(item);
 
     // Обновляем localStorage кэш
     this.saveWardrobeCacheToStorage();
@@ -631,6 +632,29 @@ class DataCacheManager {
       }
     } else {
       logger.warn('Item not found in cache for update', { itemId });
+    }
+  }
+
+  /**
+   * Заменить оптимистичную вещь на реальную (по старому ID)
+   */
+  replaceOptimisticItem(oldId: number, newItem: WardrobeItem): void {
+    const index = this.wardrobeItems.findIndex(item => item.id === oldId);
+    if (index !== -1) {
+      this.wardrobeItems[index] = newItem;
+
+      // Обновляем localStorage кэш если элемент в первых 30
+      if (index < WARDROBE_CONSTRAINTS.CACHE_ITEMS) {
+        this.saveWardrobeCacheToStorage();
+      }
+
+      logger.info('Optimistic item replaced in cache', { 
+        oldId, 
+        newId: newItem.id,
+        index 
+      });
+    } else {
+      logger.warn('Optimistic item not found in cache for replacement', { oldId });
     }
   }
 

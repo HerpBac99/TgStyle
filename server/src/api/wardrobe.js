@@ -231,7 +231,7 @@ router.get('/', async (req, res) => {
                 telegramId
             },
             orderBy: {
-                createdAt: 'desc'
+                createdAt: 'desc'  // Новые вещи первыми
             }
         });
 

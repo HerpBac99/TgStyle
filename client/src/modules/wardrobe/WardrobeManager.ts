@@ -10,6 +10,7 @@ import { wardrobeService } from './WardrobeService';
 import { photoProcessor } from '../shared/PhotoProcessor';
 import { fileToBase64, stringToClothingCategory } from '../shared/utils';
 import { uiModalManager, ItemModalData } from '../uiModalManager';
+import { dataCacheManager } from '../dataCache';
 
 /**
  * Менеджер гардероба
@@ -196,7 +197,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       grid.appendChild(addBtn);
     }
 
-    // Добавляем карточки
+    // Добавляем карточки (новые вещи уже в начале массива)
     filteredItems.forEach(item => {
       const card = this.createItemCard(item);
       grid.appendChild(card);
@@ -261,17 +262,20 @@ export class WardrobeManager implements PhotoUploadHandler {
           window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
         }
 
-        logger.info('Long press detected, showing delete confirmation', { itemId: item.id });
+        // Получаем актуальный ID из DOM элемента (может быть обновлен после оптимистичного создания)
+        const currentId = parseInt(card.dataset['itemId'] || '0');
+        
+        logger.info('Long press detected, showing delete confirmation', { itemId: currentId });
 
         if (confirm('Удалить этот предмет из гардероба?')) {
           try {
-            await this.removeItem(item.id);
-            logger.info('Item deleted via long press', { itemId: item.id });
+            await this.removeItem(currentId);
+            logger.info('Item deleted via long press', { itemId: currentId });
           } catch (error) {
-            logger.error('Error deleting item via long press', { itemId: item.id, error });
+            logger.error('Error deleting item via long press', { itemId: currentId, error });
           }
         } else {
-          logger.info('Delete cancelled by user', { itemId: item.id });
+          logger.info('Delete cancelled by user', { itemId: currentId });
         }
 
         // Сбрасываем флаги после завершения операции
@@ -313,8 +317,18 @@ export class WardrobeManager implements PhotoUploadHandler {
           window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
         }
 
-        logger.info('Short press detected, showing preview', { itemId: item.id, duration: pressDuration });
-        this.showPreviewModal(item);
+        // Получаем актуальный ID из DOM элемента
+        const currentId = parseInt(card.dataset['itemId'] || '0');
+        
+        logger.info('Short press detected, showing preview', { itemId: currentId, duration: pressDuration });
+        
+        // Находим актуальную вещь по ID из DOM
+        const currentItem = this.wardrobeItems.find(wardrobeItem => wardrobeItem.id === currentId);
+        if (currentItem) {
+          this.showPreviewModal(currentItem);
+        } else {
+          logger.warn('Item not found for preview', { itemId: currentId });
+        }
       }
     };
 
@@ -699,24 +713,78 @@ export class WardrobeManager implements PhotoUploadHandler {
     this.currentPreviewImage = null;
     this.currentClassification = null;
 
+    // ОПТИМИСТИЧНОЕ СОЗДАНИЕ: создаем временную вещь с известными данными
+    const optimisticItem: WardrobeItem = {
+      id: Date.now(), // Временный ID (будет заменен на реальный)
+      imageUrl: imageToSave, // У нас уже есть base64 изображение
+      category: classification.category,
+      color: classification.color,
+      material: classification.material,
+      style: classification.style,
+      fit: classification.fit,
+      description: classification.description,
+      tags: [],
+      createdAt: new Date().toISOString()
+    };
+
+    // Добавляем опциональные поля только если они есть
+    if (classification.subtype) optimisticItem.subtype = classification.subtype;
+    if (classification.season) optimisticItem.season = classification.season;
+    if (classification.pattern) optimisticItem.pattern = classification.pattern;
+
+    // СРАЗУ добавляем в начало локального массива (оптимистично)
+    this.wardrobeItems.unshift(optimisticItem);
+
+    // СРАЗУ добавляем в кэш (оптимистично)
+    dataCacheManager.addWardrobeItem(optimisticItem);
+
+    // СРАЗУ перерисовываем грид с новой вещью
+    this.renderGrid(false);
+
+    logger.info('Optimistic item created and rendered', { 
+      tempId: optimisticItem.id,
+      category: classification.category 
+    });
+
     try {
-      // Сохраняем через wardrobeService
-      const item = await wardrobeService.addItem(imageToSave, classification);
+      // Сохраняем на сервер в фоне
+      const serverItem = await wardrobeService.addItem(imageToSave, classification);
 
-      // Добавляем в локальный массив
-      this.wardrobeItems.push(item);
-
-      // Перерисовываем
-      this.renderGrid(false);
+      // Заменяем временную вещь на реальную с сервера
+      const tempIndex = this.wardrobeItems.findIndex(item => item.id === optimisticItem.id);
+      if (tempIndex !== -1) {
+        // Обновляем локальный массив
+        this.wardrobeItems[tempIndex] = serverItem;
+        
+        // Обновляем кэш (заменяем временную вещь на реальную)
+        dataCacheManager.replaceOptimisticItem(optimisticItem.id, serverItem);
+        
+        // Обновляем ID в DOM элементе без перерисовки
+        this.updateItemIdInDOM(optimisticItem.id, serverItem.id, serverItem.imageUrl);
+        
+        logger.info('Optimistic item replaced with server item', { 
+          tempId: optimisticItem.id,
+          realId: serverItem.id,
+          imageUrl: serverItem.imageUrl
+        });
+      }
 
       // Отправляем событие
       window.dispatchEvent(new CustomEvent('wardrobe:item-saved', {
-        detail: { item }
+        detail: { item: serverItem }
       }));
 
-      logger.info('Wardrobe item added', { id: item.id });
+      logger.info('Wardrobe item added successfully', { id: serverItem.id });
 
     } catch (error) {
+      // При ошибке удаляем оптимистичную вещь
+      const tempIndex = this.wardrobeItems.findIndex(item => item.id === optimisticItem.id);
+      if (tempIndex !== -1) {
+        this.wardrobeItems.splice(tempIndex, 1);
+        this.renderGrid(false);
+        logger.error('Optimistic item removed due to error', { tempId: optimisticItem.id });
+      }
+
       alert('Ошибка при сохранении предмета. Попробуйте еще раз.');
     }
   }
@@ -727,6 +795,31 @@ export class WardrobeManager implements PhotoUploadHandler {
   private cancelPreview(): void {
     this.currentPreviewImage = null;
     this.currentClassification = null;
+  }
+
+  /**
+   * Обновить ID в DOM элементе без перерисовки грида
+   */
+  private updateItemIdInDOM(oldId: number, newId: number, newImageUrl: string): void {
+    const cardElement = document.querySelector(`[data-item-id="${oldId}"]`) as HTMLElement;
+    if (cardElement) {
+      // Обновляем ID в dataset
+      cardElement.dataset['itemId'] = newId.toString();
+      
+      // Обновляем изображение с base64 на реальный URL
+      const imageElement = cardElement.querySelector('.wardrobe-item-image') as HTMLImageElement;
+      if (imageElement && newImageUrl !== imageElement.src) {
+        imageElement.src = newImageUrl;
+      }
+      
+      logger.info('DOM element updated', { 
+        oldId, 
+        newId, 
+        imageUpdated: newImageUrl !== imageElement?.src 
+      });
+    } else {
+      logger.warn('DOM element not found for ID update', { oldId, newId });
+    }
   }
 
   /**
