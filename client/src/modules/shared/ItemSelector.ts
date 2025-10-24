@@ -3,9 +3,8 @@
  * Управляет модальным окном выбора и взаимодействием с пользователем
  */
 
-import { logger } from '../logger';
 import { WardrobeItem } from '@/types/wardrobe';
-import { uiModalManager } from '../uiModalManager';
+import { wardrobeManager } from '../wardrobe/WardrobeManager';
 
 /**
  * Callback при подтверждении выбора
@@ -38,143 +37,206 @@ export interface ItemSelectorConfig {
  */
 export class ItemSelector {
   private currentConfig: ItemSelectorConfig | null = null;
+  private selectedItems: Set<number> = new Set();
+  private cleanupFunctions: (() => void)[] = [];
 
   /**
    * Показать модальное окно выбора вещей
+   * Теперь использует WardrobeManager для единой логики отрисовки
    */
   show(config: ItemSelectorConfig): void {
-
     this.currentConfig = config;
 
-    const modalConfig: any = {
-      type: 'clothing-selection',
-      modalId: 'capsules-modal',
-      wardrobeItems: config.wardrobeItems,
-      onConfirm: (selectedItems: WardrobeItem[]) => this.handleConfirm(selectedItems),
-      onCancel: () => this.handleCancel()
+    // Показываем модальное окно
+    const modal = document.getElementById('capsules-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+    }
+
+    // Используем WardrobeManager для отрисовки грида
+
+    // Инициализируем выбранные элементы
+    if (config.preselectedIds) {
+      this.selectedItems = new Set(config.preselectedIds);
+    } else {
+      this.selectedItems.clear();
+    }
+
+    const renderConfig: any = {
+      containerId: 'capsules-grid',
+      filtersContainerId: 'capsules-filters',
+      items: config.wardrobeItems,
+      onItemClick: (item: WardrobeItem) => this.toggleItemSelection(item.id),
+      showAddButton: !!config.onAdd
     };
 
     if (config.preselectedIds) {
-      modalConfig.selectedItemIds = config.preselectedIds;
+      renderConfig.selectedIds = config.preselectedIds;
     }
 
     if (config.onAdd) {
-      modalConfig.handleAdd = () => this.handleAdd();
+      renderConfig.onAddClick = () => this.handleAdd();
     }
 
-    uiModalManager.showClothingSelectionModal(modalConfig);
+    (wardrobeManager as any).renderGridInContainer(renderConfig);
+
+    // Настраиваем обработчики модального окна
+    this.setupModalHandlers();
+  }
+
+  /**
+   * Переключить выбор элемента
+   */
+  private toggleItemSelection(itemId: number): void {
+    if (this.selectedItems.has(itemId)) {
+      this.selectedItems.delete(itemId);
+    } else {
+      this.selectedItems.add(itemId);
+    }
+
+    // Обновляем визуальное состояние карточки
+    const card = document.querySelector(`.wardrobe-item-card[data-item-id="${itemId}"]`) as HTMLElement;
+    if (card) {
+      card.classList.toggle('selected');
+    }
+
+    // Обновляем состояние кнопки "Далее"
+    this.updateNextButtonState();
+  }
+
+  /**
+   * Обновить состояние кнопки "Далее"
+   */
+  private updateNextButtonState(): void {
+    const nextBtn = document.getElementById('capsules-next-btn') as HTMLButtonElement;
+    if (nextBtn) {
+      const hasSelection = this.selectedItems.size > 0;
+      nextBtn.disabled = !hasSelection;
+
+      if (hasSelection) {
+        nextBtn.textContent = `Далее (${this.selectedItems.size})`;
+      } else {
+        nextBtn.textContent = 'Далее';
+      }
+    }
+  }
+
+  /**
+   * Настроить обработчики модального окна
+   */
+  private setupModalHandlers(): void {
+    // Кнопка закрытия
+    const closeBtn = document.getElementById('capsules-modal-close');
+    if (closeBtn) {
+      const handleClose = () => this.handleCancel();
+      closeBtn.addEventListener('click', handleClose);
+      this.cleanupFunctions.push(() => closeBtn.removeEventListener('click', handleClose));
+    }
+
+    // Кнопка "Далее"
+    const nextBtn = document.getElementById('capsules-next-btn');
+    if (nextBtn) {
+      const handleNext = () => this.handleConfirm();
+      nextBtn.addEventListener('click', handleNext);
+      this.cleanupFunctions.push(() => nextBtn.removeEventListener('click', handleNext));
+    }
+
+    // Overlay клик
+    const overlay = document.querySelector('.capsules-modal-overlay');
+    if (overlay) {
+      const handleOverlay = () => this.handleCancel();
+      overlay.addEventListener('click', handleOverlay);
+      this.cleanupFunctions.push(() => overlay.removeEventListener('click', handleOverlay));
+    }
+  }
+
+  /**
+   * Обработать подтверждение выбора
+   */
+  private handleConfirm(): void {
+    if (!this.currentConfig) return;
+
+    const selectedItemsData = this.currentConfig.wardrobeItems.filter(
+      item => this.selectedItems.has(item.id)
+    );
+
+    this.hide();
+    this.currentConfig.onConfirm(selectedItemsData);
+  }
+
+  /**
+   * Обработать отмену выбора
+   */
+  private handleCancel(): void {
+    if (!this.currentConfig) return;
+
+    this.hide();
+    this.currentConfig.onCancel();
+  }
+
+  /**
+   * Обработать добавление новой вещи
+   */
+  private handleAdd(): void {
+    if (!this.currentConfig?.onAdd) return;
+
+    this.currentConfig.onAdd();
+  }
+
+  /**
+   * Обновить список вещей в модальном окне
+   */
+  update(config: { wardrobeItems: WardrobeItem[] }): void {
+    if (!this.currentConfig) {
+      return;
+    }
+
+    // Обновляем конфигурацию
+    this.currentConfig.wardrobeItems = config.wardrobeItems;
+
+    // Перерендериваем грид с новыми данными
+    const renderConfig: any = {
+      containerId: 'capsules-grid',
+      filtersContainerId: 'capsules-filters', 
+      items: config.wardrobeItems,
+      onItemClick: (item: WardrobeItem) => this.toggleItemSelection(item.id),
+      showAddButton: !!this.currentConfig.onAdd
+    };
+
+    if (this.selectedItems.size > 0) {
+      renderConfig.selectedIds = this.selectedItems;
+    }
+
+    if (this.currentConfig.onAdd) {
+      renderConfig.onAddClick = () => this.handleAdd();
+    }
+
+    (wardrobeManager as any).renderGridInContainer(renderConfig);
   }
 
   /**
    * Скрыть модальное окно
    */
   hide(): void {
-    uiModalManager.hide();
-    this.currentConfig = null;
-  }
-
-  /**
-   * Обновить список вещей в модальном окне
-   * Полезно когда добавляется новая вещь
-   */
-  update(
-    newWardrobeItems: WardrobeItem[],
-    preserveSelection: boolean = true
-  ): void {
-    if (!this.currentConfig) {
-      return;
-    }
-
-    // Сохраняем текущий выбор если нужно
-    let currentSelection = this.currentConfig.preselectedIds;
-    if (preserveSelection) {
-      currentSelection = this.getCurrentSelection();
-    }
-
-    // Обновляем конфиг
-    this.currentConfig.wardrobeItems = newWardrobeItems;
-    if (currentSelection) {
-      this.currentConfig.preselectedIds = currentSelection;
-    }
-
-    // Перерисовываем модальное окно
-    this.show(this.currentConfig);
-  }
-
-  /**
-   * Получить текущий выбор из DOM
-   */
-  getCurrentSelection(): Set<number> {
-    const selectedIds = new Set<number>();
     const modal = document.getElementById('capsules-modal');
-
-    if (!modal) {
-      return selectedIds;
+    if (modal) {
+      modal.classList.add('hidden');
     }
 
-    const selectedCards = modal.querySelectorAll('.capsules-item-card.selected');
-    selectedCards.forEach(card => {
-      const itemId = parseInt((card as HTMLElement).dataset['itemId'] || '0', 10);
-      if (itemId > 0) {
-        selectedIds.add(itemId);
-      }
-    });
+    // Очищаем обработчики
+    this.cleanupFunctions.forEach(cleanup => cleanup());
+    this.cleanupFunctions = [];
 
-    return selectedIds;
-  }
-
-  /**
-   * Обработчик подтверждения выбора
-   */
-  private handleConfirm(selectedItems: WardrobeItem[]): void {
-    if (!this.currentConfig) {
-      logger.warn('ItemSelector: confirm called without active config');
-      return;
-    }
-
-    logger.info('ItemSelector: selection confirmed', {
-      selectedCount: selectedItems.length
-    });
-
-    const callback = this.currentConfig.onConfirm;
+    // Сбрасываем состояние
+    this.selectedItems.clear();
     this.currentConfig = null;
-
-    // Вызываем callback
-    callback(selectedItems);
   }
 
-  /**
-   * Обработчик отмены выбора
-   */
-  private handleCancel(): void {
-    if (!this.currentConfig) {
-      logger.warn('ItemSelector: cancel called without active config');
-      return;
-    }
 
-    logger.info('ItemSelector: selection cancelled');
 
-    const callback = this.currentConfig.onCancel;
-    this.currentConfig = null;
 
-    // Вызываем callback
-    callback();
-  }
 
-  /**
-   * Обработчик клика на добавление новой вещи
-   */
-  private handleAdd(): void {
-    if (!this.currentConfig?.onAdd) {
-      logger.warn('ItemSelector: add called without callback');
-      return;
-    }
 
-    logger.info('ItemSelector: add new item clicked');
-
-    // Вызываем callback
-    this.currentConfig.onAdd();
-  }
 
   /**
    * Проверить активно ли модальное окно

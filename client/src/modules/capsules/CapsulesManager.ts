@@ -140,7 +140,7 @@ export class CapsulesManager implements PhotoUploadHandler {
         wardrobeItems: this.wardrobeItems,
         onConfirm: (items) => this.handleClothingConfirmed(items),
         onCancel: () => this.handleClothingCancelled(),
-        onAdd: () => this.handlePhotoUpload()
+        onAdd: () => this.handleWardrobePhotoUpload()
       });
     } catch (error) {
       logger.error('Error opening add capsule modal', error);
@@ -376,7 +376,7 @@ export class CapsulesManager implements PhotoUploadHandler {
         preselectedIds: new Set(currentItemIds),
         onConfirm: (items) => this.handleAddToCanvasConfirmed(items, currentItemIds),
         onCancel: () => this.handleAddToCanvasCancelled(),
-        onAdd: () => this.handlePhotoUpload()
+        onAdd: () => this.handleWardrobePhotoUpload()
       });
 
     } catch (error) {
@@ -803,7 +803,46 @@ export class CapsulesManager implements PhotoUploadHandler {
   }
 
   /**
-   * Обработать загрузку фото
+   * Обработать загрузку фото через WardrobeManager (новый метод)
+   * Использует тот же процесс что и основной гардероб
+   */
+  async handleWardrobePhotoUpload(): Promise<void> {
+    try {
+      logger.info('Starting wardrobe photo upload process');
+
+      // Импортируем wardrobeManager
+      const { wardrobeManager } = await import('../wardrobe/WardrobeManager');
+      
+      // Используем метод из WardrobeManager
+      await wardrobeManager.handlePhotoUpload();
+
+      // После добавления вещи обновляем список в модальном окне
+      await this.loadWardrobeItems();
+      
+      // Обновляем отображение в модальном окне если оно открыто
+      this.refreshModalIfOpen();
+
+    } catch (error) {
+      logger.error('Error in handleWardrobePhotoUpload', error);
+    }
+  }
+
+  /**
+   * Обновить модальное окно если оно открыто
+   */
+  private refreshModalIfOpen(): void {
+    const modal = document.getElementById('capsules-modal');
+    if (modal && !modal.classList.contains('hidden')) {
+      // Модальное окно открыто, обновляем его содержимое
+      itemSelector.update({
+        wardrobeItems: this.wardrobeItems
+      });
+    }
+  }
+
+  /**
+   * Обработать загрузку фото (старый метод - оставлен для совместимости)
+   * @deprecated Используйте handleWardrobePhotoUpload()
    */
   async handlePhotoUpload(): Promise<void> {
     try {
@@ -892,7 +931,7 @@ export class CapsulesManager implements PhotoUploadHandler {
 
     // Если модальное окно выбора открыто - обновляем
     if (this.mode === 'selection') {
-      itemSelector.update(this.wardrobeItems, true);
+      itemSelector.update({ wardrobeItems: this.wardrobeItems });
     }
 
     // Если canvas активен - добавляем на него

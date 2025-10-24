@@ -32,17 +32,7 @@ export interface LoadingOperationConfig {
   asyncOperation: () => Promise<any>;
 }
 
-/**
- * Конфиг для модалки выбора одежды (для капсул)
- */
-export interface ClothingSelectionModalConfig extends BaseModalConfig {
-  type: 'clothing-selection';
-  wardrobeItems: WardrobeItem[];
-  selectedItemIds?: Set<number>;
-  onConfirm: (selectedItems: WardrobeItem[]) => void;
-  onCancel: () => void;
-  handleAdd?: () => void;
-}
+
 
 /**
  * Данные для модального окна вещи
@@ -76,7 +66,7 @@ export interface ItemModalConfig extends BaseModalConfig {
 /**
  * Объединенный тип конфигурации
  */
-export type ModalConfig = ClothingSelectionModalConfig | ItemModalConfig;
+export type ModalConfig = ItemModalConfig;
 
 /**
  * Универсальный менеджер модальных окон
@@ -84,60 +74,15 @@ export type ModalConfig = ClothingSelectionModalConfig | ItemModalConfig;
 export class UIModalManager {
   private currentModal: ModalConfig | null = null;
   private cleanupFunctions: (() => void)[] = [];
-  
-  // Для clothing-selection модалки
-  private selectedItems: Set<number> = new Set();
-  private currentFilter: string = 'ALL';
-  
+
+
+
   // Для item-modal/wardrobe-preview модалки
   private currentModalData: ItemModalData | null = null;
-  
-  // ============================================
-  // ПУБЛИЧНЫЕ МЕТОДЫ - CLOTHING SELECTION MODAL
-  // ============================================
 
-  /**
-   * Показать модалку выбора одежды для капсул
-   */
-  showClothingSelectionModal(config: ClothingSelectionModalConfig): void {
-    logger.info('Showing clothing selection modal', {
-      itemsCount: config.wardrobeItems.length,
-      preSelectedCount: config.selectedItemIds?.size || 0
-    });
 
-    // Сохраняем конфиг
-    this.currentModal = config;
 
-    // Инициализируем выбранные элементы
-    if (config.selectedItemIds) {
-      this.selectedItems = new Set(config.selectedItemIds);
-    } else {
-      this.selectedItems.clear();
-    }
 
-    // Сбрасываем фильтр
-    this.currentFilter = 'ALL';
-
-    // Показываем модалку
-    const modal = document.getElementById(config.modalId);
-    if (modal) {
-      modal.classList.remove('hidden');
-    } else {
-      logger.error('Clothing selection modal not found', { modalId: config.modalId });
-      return;
-    }
-
-    // Создаем фильтры
-    this.createFilters();
-
-    // Рендерим грид с элементами
-    this.renderClothingGrid(config.wardrobeItems);
-
-    // Настраиваем обработчики
-    this.setupClothingSelectionListeners(config);
-
-    logger.info('Clothing selection modal shown');
-  }
 
   // ============================================
   // ПУБЛИЧНЫЕ МЕТОДЫ - ITEM MODAL (УНИВЕРСАЛЬНОЕ МОДАЛЬНОЕ ОКНО)
@@ -330,9 +275,9 @@ export class UIModalManager {
     category: ClothingCategory,
     subtype?: string,
     color?: string,
-    material?: string, 
-    style?: string, 
-    fit?: string, 
+    material?: string,
+    style?: string,
+    fit?: string,
     description?: string,
     allowEditColorMaterial?: boolean,
     allowEditCategory?: boolean
@@ -364,7 +309,7 @@ export class UIModalManager {
     }
 
     // Проверяем, разрешен ли ручной выбор категории
-    const allowManualSelection = allowEditCategory || 
+    const allowManualSelection = allowEditCategory ||
       (this.currentModal?.type === 'item-modal' && this.currentModal.allowEditCategory);
 
     // Формируем HTML с информацией
@@ -479,11 +424,11 @@ export class UIModalManager {
       this.setupEditableFields();
     }
 
-    logger.info('Classification info shown', { 
-      category: this.getCategoryNameRu(category), 
+    logger.info('Classification info shown', {
+      category: this.getCategoryNameRu(category),
       color,
       manualSelectionAllowed: allowManualSelection,
-      editableColorMaterial: allowEditColorMaterial 
+      editableColorMaterial: allowEditColorMaterial
     });
   }
 
@@ -784,8 +729,6 @@ export class UIModalManager {
 
     // Очищаем состояние
     this.currentModal = null;
-    this.selectedItems.clear();
-    this.currentFilter = 'ALL';
   }
 
   /**
@@ -793,332 +736,14 @@ export class UIModalManager {
    */
   destroy(): void {
     logger.info('Destroying UIModalManager');
-    
+
     this.hide();
     this.cleanup();
-    
+
     this.currentModal = null;
-    this.selectedItems.clear();
-    this.currentFilter = 'ALL';
   }
 
-  // ============================================
-  // ПРИВАТНЫЕ МЕТОДЫ - CLOTHING SELECTION
-  // ============================================
 
-  /**
-   * Настроить обработчики для модалки выбора одежды
-   */
-  private setupClothingSelectionListeners(config: ClothingSelectionModalConfig): void {
-    // Кнопка закрытия модального окна
-    const closeBtn = document.getElementById('capsules-modal-close') as HTMLElement;
-    if (closeBtn) {
-      const handleClose = () => {
-        logger.info('Clothing selection modal close button clicked');
-        this.hide();
-        config.onCancel();
-      };
-
-      closeBtn.addEventListener('click', handleClose);
-      this.cleanupFunctions.push(() => {
-        closeBtn.removeEventListener('click', handleClose);
-      });
-    }
-
-    // Overlay клик для закрытия
-    const overlay = document.querySelector('.capsules-modal-overlay') as HTMLElement;
-    if (overlay) {
-      const handleOverlayClick = () => {
-        logger.info('Clothing selection modal overlay clicked');
-        this.hide();
-        config.onCancel();
-      };
-
-      overlay.addEventListener('click', handleOverlayClick);
-      this.cleanupFunctions.push(() => {
-        overlay.removeEventListener('click', handleOverlayClick);
-      });
-    }
-
-    // Кнопка "Далее"
-    const nextBtn = document.getElementById('capsules-next-btn') as HTMLElement;
-    if (nextBtn) {
-      const handleNext = () => {
-        logger.info('Clothing selection next button clicked', {
-          selectedCount: this.selectedItems.size
-        });
-
-        // Получаем выбранные элементы
-        const selectedItemsData = config.wardrobeItems.filter(
-          item => this.selectedItems.has(item.id)
-        );
-
-        // Скрываем модалку
-        this.hide();
-
-        // Вызываем callback
-        config.onConfirm(selectedItemsData);
-      };
-
-      nextBtn.addEventListener('click', handleNext);
-      this.cleanupFunctions.push(() => {
-        nextBtn.removeEventListener('click', handleNext);
-      });
-    }
-  }
-
-  /**
-   * Создать фильтры категорий
-   */
-  private createFilters(): void {
-    const filtersContainer = document.getElementById('capsules-filters');
-    if (!filtersContainer) {
-      logger.error('Capsules filters container not found');
-      return;
-    }
-
-    // Очищаем контейнер
-    filtersContainer.innerHTML = '';
-
-    // Создаем фильтр "Все"
-    const allFilterBtn = this.createFilterButton('ALL', 'Все');
-    allFilterBtn.classList.add('active');
-    filtersContainer.appendChild(allFilterBtn);
-
-    // Создаем фильтры для каждой категории
-    Object.values(ClothingCategory).forEach(category => {
-      const filterBtn = this.createFilterButton(
-        category, 
-        this.getCategoryNameRu(ClothingCategory[category as keyof typeof ClothingCategory])
-      );
-      filtersContainer.appendChild(filterBtn);
-    });
-
-    logger.info('Filters created');
-  }
-
-  /**
-   * Создать кнопку фильтра
-   */
-  private createFilterButton(filterValue: string, filterText: string): HTMLElement {
-    const button = document.createElement('button');
-    button.className = 'capsules-filter-btn';
-    button.textContent = filterText;
-    button.dataset['filter'] = filterValue;
-
-    // Обработчик клика
-    const handleClick = () => {
-      this.setActiveFilter(filterValue);
-    };
-
-    button.addEventListener('click', handleClick);
-
-    // Добавляем в cleanup функции
-    this.cleanupFunctions.push(() => {
-      button.removeEventListener('click', handleClick);
-    });
-
-    return button;
-  }
-
-  /**
-   * Установить активный фильтр
-   */
-  private setActiveFilter(filterValue: string): void {
-    logger.info('Setting active filter', { filter: filterValue });
-
-    // Снимаем активный класс со всех кнопок
-    const allButtons = document.querySelectorAll('.capsules-filter-btn');
-    allButtons.forEach(btn => btn.classList.remove('active'));
-
-    // Устанавливаем активный класс на выбранную кнопку
-    const activeButton = document.querySelector(
-      `.capsules-filter-btn[data-filter="${filterValue}"]`
-    ) as HTMLElement;
-    if (activeButton) {
-      activeButton.classList.add('active');
-    }
-
-    // Обновляем текущий фильтр
-    this.currentFilter = filterValue;
-
-    // Перерисовываем грид с учетом фильтра
-    if (this.currentModal && this.currentModal.type === 'clothing-selection') {
-      this.renderClothingGrid(this.currentModal.wardrobeItems);
-    }
-  }
-
-  /**
-   * Рендерить грид с элементами одежды
-   */
-  private renderClothingGrid(items: WardrobeItem[]): void {
-    const grid = document.getElementById('capsules-grid');
-    if (!grid) {
-      logger.error('Capsules grid element not found');
-      return;
-    }
-
-    // Очищаем грид
-    grid.innerHTML = '';
-
-    // Фильтруем элементы по текущему фильтру
-    const filteredItems = this.getFilteredItems(items);
-
-    // Добавляем кнопку "Добавить элемент" если передан handleAdd
-    if (this.currentModal && this.currentModal.type === 'clothing-selection' && this.currentModal.handleAdd) {
-      const addButton = this.createAddItemButton();
-      grid.appendChild(addButton);
-    }
-
-    // Добавляем карточки одежды
-    filteredItems.forEach(item => {
-      const card = this.createClothingItemCard(item);
-      grid.appendChild(card);
-    });
-
-    // Обновляем состояние кнопки "Далее"
-    this.updateNextButtonState();
-
-    logger.info(`Clothing grid rendered with ${filteredItems.length} filtered items`);
-  }
-
-  /**
-   * Получить отфильтрованные элементы
-   */
-  private getFilteredItems(items: WardrobeItem[]): WardrobeItem[] {
-    if (this.currentFilter === 'ALL') {
-      return items;
-    }
-
-    // Фильтруем по категории
-    return items.filter(item => item.category === this.currentFilter);
-  }
-
-  /**
-   * Создать карточку элемента одежды
-   */
-  private createClothingItemCard(item: WardrobeItem): HTMLElement {
-    const card = document.createElement('div');
-    card.className = 'capsules-item-card';
-    card.dataset['itemId'] = item.id.toString();
-
-    // Добавляем класс selected если элемент выбран
-    if (this.selectedItems.has(item.id)) {
-      card.classList.add('selected');
-    }
-
-    const content = document.createElement('div');
-    content.className = 'capsules-item-card-content';
-
-    const image = document.createElement('img');
-    image.className = 'capsules-item-image';
-    image.src = item.imageUrl;
-    image.alt = item.name || 'Одежда';
-
-    content.appendChild(image);
-    card.appendChild(content);
-
-    // Обработчик клика для выбора/снятия выбора
-    const handleClick = () => {
-      this.toggleItemSelection(item.id);
-    };
-
-    card.addEventListener('click', handleClick);
-
-    // Добавляем в cleanup функции
-    this.cleanupFunctions.push(() => {
-      card.removeEventListener('click', handleClick);
-    });
-
-    return card;
-  }
-
-  /**
-   * Создать кнопку "Добавить элемент"
-   */
-  private createAddItemButton(): HTMLElement {
-    const button = document.createElement('div');
-    button.className = 'add-item-btn';
-    button.setAttribute('aria-label', 'Добавить предмет');
-
-    const content = document.createElement('div');
-    content.className = 'add-item-btn-content';
-
-    // Создаем SVG иконку
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('fill', 'none');
-    svg.setAttribute('stroke', 'currentColor');
-
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', 'M12 5v14M5 12h14');
-
-    svg.appendChild(path);
-    content.appendChild(svg);
-    button.appendChild(content);
-
-    // Обработчик клика
-    const handleClick = () => {
-      logger.info('Add item button clicked in modal');
-      if (this.currentModal && this.currentModal.type === 'clothing-selection' && this.currentModal.handleAdd) {
-        this.currentModal.handleAdd();
-      }
-    };
-
-    button.addEventListener('click', handleClick);
-
-    // Добавляем в cleanup функции
-    this.cleanupFunctions.push(() => {
-      button.removeEventListener('click', handleClick);
-    });
-
-    return button;
-  }
-
-  /**
-   * Переключить выбор элемента
-   */
-  private toggleItemSelection(itemId: number): void {
-    if (this.selectedItems.has(itemId)) {
-      this.selectedItems.delete(itemId);
-    } else {
-      this.selectedItems.add(itemId);
-    }
-
-    // Обновляем визуальное состояние карточки
-    const card = document.querySelector(
-      `.capsules-item-card[data-item-id="${itemId}"]`
-    ) as HTMLElement;
-    if (card) {
-      card.classList.toggle('selected');
-    }
-
-    // Обновляем состояние кнопки "Далее"
-    this.updateNextButtonState();
-
-    logger.info('Item selection toggled', {
-      itemId,
-      isSelected: this.selectedItems.has(itemId),
-      totalSelected: this.selectedItems.size
-    });
-  }
-
-  /**
-   * Обновить состояние кнопки "Далее"
-   */
-  private updateNextButtonState(): void {
-    const nextBtn = document.getElementById('capsules-next-btn') as HTMLButtonElement;
-    if (nextBtn) {
-      const hasSelection = this.selectedItems.size > 0;
-      nextBtn.disabled = !hasSelection;
-
-      if (hasSelection) {
-        nextBtn.textContent = `Далее (${this.selectedItems.size})`;
-      } else {
-        nextBtn.textContent = 'Далее';
-      }
-    }
-  }
 
   // ============================================
   // ПРИВАТНЫЕ МЕТОДЫ - ITEM MODAL
@@ -1220,8 +845,6 @@ export class UIModalManager {
     return {
       hasCurrentModal: !!this.currentModal,
       currentModalType: this.currentModal?.type || null,
-      selectedItemsCount: this.selectedItems.size,
-      currentFilter: this.currentFilter,
       cleanupFunctionsCount: this.cleanupFunctions.length
     };
   }

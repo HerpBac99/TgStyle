@@ -629,18 +629,21 @@
     /* Contain как в wardrobe для правильного отображения */
 }
 
-/* Кнопки действий */
+/* Кнопки действий - фиксированная позиция внизу поверх грида */
 .capsules-modal-actions {
+    position: fixed;
+    bottom: 10vh; /* 10% от низа экрана */
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     justify-content: center;
-    padding-top: 6px;
-    /* Уменьшен отступ сверху */
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    z-index: 1001; /* Поверх грида */
+    pointer-events: none; /* Не блокируем клики по гриду */
 }
 
 .capsules-next-btn {
     padding: 12px 32px;
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.95);
     color: var(--tg-theme-text-color);
     border: none;
     border-radius: 12px;
@@ -648,9 +651,10 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(20px);
     -webkit-tap-highlight-color: transparent;
+    pointer-events: auto; /* Кнопка кликабельна */
 }
 
 .capsules-next-btn:hover:not(:disabled) {
@@ -674,7 +678,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 1000;
+    z-index: 1002; /* Поверх модального окна капсул */
     display: flex;
     align-items: center;
     justify-content: center;

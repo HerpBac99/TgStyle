@@ -264,7 +264,7 @@ export class WardrobeManager implements PhotoUploadHandler {
 
         // Получаем актуальный ID из DOM элемента (может быть обновлен после оптимистичного создания)
         const currentId = parseInt(card.dataset['itemId'] || '0');
-        
+
         logger.info('Long press detected, showing delete confirmation', { itemId: currentId });
 
         if (confirm('Удалить этот предмет из гардероба?')) {
@@ -319,9 +319,9 @@ export class WardrobeManager implements PhotoUploadHandler {
 
         // Получаем актуальный ID из DOM элемента
         const currentId = parseInt(card.dataset['itemId'] || '0');
-        
+
         logger.info('Short press detected, showing preview', { itemId: currentId, duration: pressDuration });
-        
+
         // Находим актуальную вещь по ID из DOM
         const currentItem = this.wardrobeItems.find(wardrobeItem => wardrobeItem.id === currentId);
         if (currentItem) {
@@ -555,7 +555,7 @@ export class WardrobeManager implements PhotoUploadHandler {
           ...this.wardrobeItems[index],
           ...updates
         } as WardrobeItem;
-        
+
         logger.info('Item updated locally', { itemId: item.id, changes: Object.keys(updates) });
       }
 
@@ -741,9 +741,9 @@ export class WardrobeManager implements PhotoUploadHandler {
     // СРАЗУ перерисовываем грид с новой вещью
     this.renderGrid(false);
 
-    logger.info('Optimistic item created and rendered', { 
+    logger.info('Optimistic item created and rendered', {
       tempId: optimisticItem.id,
-      category: classification.category 
+      category: classification.category
     });
 
     try {
@@ -755,14 +755,14 @@ export class WardrobeManager implements PhotoUploadHandler {
       if (tempIndex !== -1) {
         // Обновляем локальный массив
         this.wardrobeItems[tempIndex] = serverItem;
-        
+
         // Обновляем кэш (заменяем временную вещь на реальную)
         dataCacheManager.replaceOptimisticItem(optimisticItem.id, serverItem);
-        
+
         // Обновляем ID в DOM элементе без перерисовки
         this.updateItemIdInDOM(optimisticItem.id, serverItem.id, serverItem.imageUrl);
-        
-        logger.info('Optimistic item replaced with server item', { 
+
+        logger.info('Optimistic item replaced with server item', {
           tempId: optimisticItem.id,
           realId: serverItem.id,
           imageUrl: serverItem.imageUrl
@@ -805,21 +805,205 @@ export class WardrobeManager implements PhotoUploadHandler {
     if (cardElement) {
       // Обновляем ID в dataset
       cardElement.dataset['itemId'] = newId.toString();
-      
+
       // Обновляем изображение с base64 на реальный URL
       const imageElement = cardElement.querySelector('.wardrobe-item-image') as HTMLImageElement;
       if (imageElement && newImageUrl !== imageElement.src) {
         imageElement.src = newImageUrl;
       }
-      
-      logger.info('DOM element updated', { 
-        oldId, 
-        newId, 
-        imageUpdated: newImageUrl !== imageElement?.src 
+
+      logger.info('DOM element updated', {
+        oldId,
+        newId,
+        imageUpdated: newImageUrl !== imageElement?.src
       });
     } else {
       logger.warn('DOM element not found for ID update', { oldId, newId });
     }
+  }
+
+  // ============================================
+  // ПУБЛИЧНЫЕ МЕТОДЫ ДЛЯ МОДАЛЬНЫХ ОКОН
+  // ============================================
+
+  /**
+   * Отрендерить грид в указанном контейнере (для модальных окон)
+   * Использует ту же логику что и основной гардероб
+   */
+  renderGridInContainer(config: {
+    containerId: string;
+    filtersContainerId: string;
+    items: WardrobeItem[];
+    selectedIds?: Set<number>;
+    onItemClick?: (item: WardrobeItem) => void;
+    showAddButton?: boolean;
+    onAddClick?: () => void;
+  }): void {
+    logger.info('Rendering grid in external container', { 
+      containerId: config.containerId,
+      itemsCount: config.items.length 
+    });
+
+    // Создаем фильтры в указанном контейнере
+    this.createFiltersInContainer(config.filtersContainerId);
+    
+    // Рендерим грид в указанном контейнере
+    this.renderGridInSpecificContainer(config);
+  }
+
+  /**
+   * Создать фильтры в указанном контейнере
+   */
+  private createFiltersInContainer(containerId: string): void {
+    const filterContainer = document.getElementById(containerId);
+    if (!filterContainer) {
+      logger.error('Filter container not found', { containerId });
+      return;
+    }
+
+    filterContainer.innerHTML = '';
+
+    const categories = [
+      { key: 'ALL', label: 'Все' },
+      { key: 'OUTERWEAR', label: 'Верхняя одежда' },
+      { key: 'INNERWEAR', label: 'Кофты' },
+      { key: 'BODYWEAR', label: 'Футболки и рубашки' },
+      { key: 'FULLBODY', label: 'Платья и костюмы' },
+      { key: 'LEGWEAR', label: 'Штаны' },
+      { key: 'FOOTWEAR', label: 'Обувь' },
+      { key: 'HEADWEAR', label: 'Головные уборы' },
+      { key: 'ACCESSORIES', label: 'Аксессуары' }
+    ];
+
+    categories.forEach(cat => {
+      const btn = document.createElement('button');
+      btn.className = `wardrobe-filter-btn${cat.key === this.currentFilter ? ' active' : ''}`;
+      btn.textContent = cat.label;
+      btn.dataset['category'] = cat.key;
+
+      btn.addEventListener('click', () => {
+        this.currentFilter = cat.key;
+        this.updateFilterButtonsInContainer(containerId);
+        // TODO: Перерендерить грид с новым фильтром
+      });
+
+      filterContainer.appendChild(btn);
+    });
+  }
+
+  /**
+   * Обновить состояние кнопок фильтров в контейнере
+   */
+  private updateFilterButtonsInContainer(containerId: string): void {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    const buttons = container.querySelectorAll('.wardrobe-filter-btn');
+    buttons.forEach(btn => {
+      const category = (btn as HTMLElement).dataset['category'];
+      btn.classList.toggle('active', category === this.currentFilter);
+    });
+  }
+
+  /**
+   * Отрендерить грид в указанном контейнере
+   */
+  private renderGridInSpecificContainer(config: {
+    containerId: string;
+    items: WardrobeItem[];
+    selectedIds?: Set<number>;
+    onItemClick?: (item: WardrobeItem) => void;
+    showAddButton?: boolean;
+    onAddClick?: () => void;
+  }): void {
+    const grid = document.getElementById(config.containerId);
+    if (!grid) {
+      logger.error('Grid container not found', { containerId: config.containerId });
+      return;
+    }
+
+    // Фильтруем вещи
+    const filteredItems = wardrobeService.filterByCategory(config.items, this.currentFilter);
+
+    // Очищаем грид
+    grid.innerHTML = '';
+
+    // Добавляем кнопку "Добавить" если нужно
+    if (config.showAddButton && config.onAddClick) {
+      const addBtn = this.createAddButton(config.onAddClick);
+      grid.appendChild(addBtn);
+    }
+
+    // Добавляем карточки
+    filteredItems.forEach(item => {
+      const card = this.createSelectableItemCard(item, config.selectedIds, config.onItemClick);
+      grid.appendChild(card);
+    });
+  }
+
+  /**
+   * Создать карточку с возможностью выбора (для модального окна)
+   */
+  private createSelectableItemCard(
+    item: WardrobeItem, 
+    selectedIds?: Set<number>,
+    onItemClick?: (item: WardrobeItem) => void
+  ): HTMLElement {
+    const card = document.createElement('div');
+    card.className = 'wardrobe-item-card';
+    card.dataset['itemId'] = item.id.toString();
+
+    // Добавляем класс selected если элемент выбран
+    if (selectedIds?.has(item.id)) {
+      card.classList.add('selected');
+    }
+
+    const content = document.createElement('div');
+    content.className = 'wardrobe-item-card-content';
+
+    const image = document.createElement('img');
+    image.className = 'wardrobe-item-image';
+    image.src = item.imageUrl;
+    image.alt = item.name || 'Одежда';
+
+    content.appendChild(image);
+    card.appendChild(content);
+
+    // Обработчик клика
+    if (onItemClick) {
+      card.addEventListener('click', () => onItemClick(item));
+    }
+
+    return card;
+  }
+
+  /**
+   * Создать кнопку добавления
+   */
+  private createAddButton(onAddClick: () => void): HTMLElement {
+    const button = document.createElement('div');
+    button.className = 'add-item-btn';
+    button.setAttribute('aria-label', 'Добавить предмет');
+
+    const content = document.createElement('div');
+    content.className = 'add-item-btn-content';
+
+    // Создаем SVG иконку
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M12 5v14M5 12h14');
+
+    svg.appendChild(path);
+    content.appendChild(svg);
+    button.appendChild(content);
+
+    button.addEventListener('click', onAddClick);
+
+    return button;
   }
 
   /**

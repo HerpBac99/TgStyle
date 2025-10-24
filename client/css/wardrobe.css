@@ -157,6 +157,13 @@
     opacity: 1;
 }
 
+/* Выбранная карточка (для модального окна выбора) */
+.wardrobe-item-card.selected {
+    border: 3px solid #da69a3;
+    box-shadow: 0 4px 12px rgba(218, 105, 163, 0.3);
+    transform: translateY(-2px);
+}
+
 /* Анимация карточек только при первом открытии грида */
 .wardrobe-clothes-grid.initial-load .wardrobe-item-card {
     /* Stagger animation - карточки появляются по очереди */
