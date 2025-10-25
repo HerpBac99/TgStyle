@@ -489,12 +489,19 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Инициализировать canvas editor
    */
   private initializeCanvasEditor(): void {
+    logger.debug('initializeCanvasEditor called', {
+      canvasEditorExists: !!this.canvasEditor,
+      stackTrace: new Error().stack?.split('\n').slice(1, 4).join('\n')
+    });
+
     if (this.canvasEditor) {
+      logger.debug('Canvas editor already exists, showing it');
       this.canvasEditor.show();
       this.canvasEditor.initializeCanvas();
       return;
     }
 
+    logger.debug('Creating new canvas editor');
     this.canvasEditor = new UICanvasEditor({
       containerId: 'capsules-canvas-container',
       canvasId: 'capsules-canvas',
@@ -526,11 +533,36 @@ export class CapsulesManager implements PhotoUploadHandler {
       const previousMode = this.mode;
       this.mode = 'selection';
 
-      // Устанавливаем предварительно выбранные вещи
+      // Показываем модальное окно БЕЗ setupCapsuleModalHandlers
+      const modal = document.getElementById('capsules-modal');
+      if (!modal) {
+        logger.error('Capsules modal not found');
+        return;
+      }
+      modal.classList.remove('hidden');
+
+      // Загружаем гардероб через WardrobeManager с префиксом 'capsules-modal'
+      await wardrobeManager.handleWardrobeOpen('capsules-modal');
+      this.wardrobeItems = dataCacheManager.getWardrobeItems();
+
+      logger.info('Capsule creation modal shown', {
+        itemsCount: this.wardrobeItems.length,
+        selectedCount: 0
+      });
+
+      // Устанавливаем предварительно выбранные вещи (после загрузки грида)
       this.selectedItems = this.wardrobeItems.filter(item => currentItemIds.includes(item.id));
 
-      // Показываем модальное окно выбора вещей
-      this.showCapsuleCreationModal();
+      // Отмечаем выбранные карточки визуально
+      this.selectedItems.forEach(item => {
+        const cardElement = document.querySelector(`#capsules-modal-clothes-grid [data-item-id="${item.id}"]`);
+        if (cardElement) {
+          cardElement.classList.add('selected');
+        }
+      });
+
+      // Обновляем состояние кнопки "Далее"
+      this.updateNextButtonState();
 
       // Изменяем заголовок модального окна
       const modalHeader = document.querySelector('#capsules-modal .capsules-modal-header h2');
@@ -538,20 +570,51 @@ export class CapsulesManager implements PhotoUploadHandler {
         modalHeader.textContent = 'Добавить вещи в капсулу';
       }
 
-      // Изменяем обработчик подтверждения для добавления на canvas
+      // Настраиваем обработчики модального окна для добавления на canvas
+      const closeBtn = document.getElementById('capsules-modal-close');
       const nextBtn = document.getElementById('capsules-next-btn');
-      if (nextBtn) {
-        // Удаляем старый обработчик
-        const newNextBtn = nextBtn.cloneNode(true) as HTMLElement;
-        nextBtn.parentNode?.replaceChild(newNextBtn, nextBtn);
 
-        // Добавляем новый обработчик
+      // Обработчик закрытия по клику на overlay
+      const overlay = modal.querySelector('.capsules-modal-overlay') as HTMLElement;
+      if (overlay) {
+        const handleOverlayClick = () => {
+          this.handleClothingCancelled();
+          this.mode = previousMode;
+        };
+        overlay.addEventListener('click', handleOverlayClick);
+        this.cleanupFunctions.push(() => overlay.removeEventListener('click', handleOverlayClick));
+      }
+
+      // Обработчик кнопки закрытия
+      if (closeBtn) {
+        const handleClose = () => {
+          this.handleClothingCancelled();
+          this.mode = previousMode;
+        };
+        closeBtn.addEventListener('click', handleClose);
+        this.cleanupFunctions.push(() => closeBtn.removeEventListener('click', handleClose));
+      }
+
+      // Обработчик кнопки "Далее" для добавления на canvas
+      if (nextBtn) {
         const handleConfirm = () => {
           this.handleAddToCanvasConfirmed(this.selectedItems, currentItemIds);
-          this.mode = previousMode; // Восстанавливаем режим
+          this.mode = previousMode;
         };
-        newNextBtn.addEventListener('click', handleConfirm);
+        nextBtn.addEventListener('click', handleConfirm);
+        this.cleanupFunctions.push(() => nextBtn.removeEventListener('click', handleConfirm));
       }
+
+      // Подписываемся на событие выделения вещи (ПОСЛЕ навешивания обработчиков)
+      const handleSelectionToggle = (event: CustomEvent) => {
+        this.handleItemSelectionToggle(event.detail.item);
+      };
+      window.addEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
+
+      // Сохраняем для очистки
+      this.cleanupFunctions.push(() => {
+        window.removeEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
+      });
 
     } catch (error) {
       logger.error('Error opening add to canvas modal', error);
@@ -562,6 +625,15 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Обработчик подтверждения добавления вещей на canvas
    */
   private async handleAddToCanvasConfirmed(selectedItems: WardrobeItem[], previousItemIds: number[]): Promise<void> {
+    // Скрываем модальное окно
+    const modal = document.getElementById('capsules-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+
+    // Очищаем обработчики
+    this.cleanupFunctions.forEach(cleanup => cleanup());
+    this.cleanupFunctions = [];
 
     if (this.canvasEditor) {
       this.canvasEditor.show();

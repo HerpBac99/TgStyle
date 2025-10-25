@@ -66,10 +66,6 @@ export class UICanvasEditor {
       container.classList.remove('hidden');
       this.isVisible = true;
       logger.info('Canvas container shown');
-
-      // ВАЖНО: Настраиваем кнопки при каждом показе canvas
-      // Это исправляет баг когда кнопки исчезают после первого использования
-      this.setupCanvasButtons();
     } else {
       logger.error('Canvas container not found', { containerId: this.config.containerId });
       throw new Error(`Canvas container not found: ${this.config.containerId}`);
