@@ -44,15 +44,15 @@ export class CapsulesManager implements PhotoUploadHandler {
   private currentResultImage: string | null = null;
 
   // Предпросмотр фото
-    private currentPreviewImage: string | null = null;
-    private currentClassification: any = null;
+  private currentPreviewImage: string | null = null;
+  private currentClassification: any = null;
 
   // Оптимистичное добавление вещей
   private lastOptimisticItemId: number | null = null;
 
   // Event listener для очистки
-    private wardrobeItemSavedHandler: EventListener;
-    private cleanupFunctions: (() => void)[] = [];
+  private wardrobeItemSavedHandler: EventListener;
+  private cleanupFunctions: (() => void)[] = [];
 
   constructor() {
     // CapsulesManager initialized
@@ -70,7 +70,7 @@ export class CapsulesManager implements PhotoUploadHandler {
       const { item } = event.detail;
       this.handleNewItemSaved(item);
     }) as EventListener;
-    
+
     window.addEventListener('wardrobe:item-saved', this.wardrobeItemSavedHandler);
   }
 
@@ -147,7 +147,7 @@ export class CapsulesManager implements PhotoUploadHandler {
         this.handleItemSelectionToggle(event.detail.item);
       };
       window.addEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
-      
+
       // Сохраняем для очистки
       this.cleanupFunctions.push(() => {
         window.removeEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
@@ -322,8 +322,25 @@ export class CapsulesManager implements PhotoUploadHandler {
     }
 
     navigationManager.pop();
+    
     // Возвращаемся к модальному окну выбора вещей
     this.showCapsuleCreationModal();
+    
+    // ВАЖНО: Восстанавливаем обработчик события выбора вещей
+    // Он был удален при переходе на canvas
+    const handleSelectionToggle = (event: CustomEvent) => {
+      this.handleItemSelectionToggle(event.detail.item);
+    };
+    window.addEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
+    
+    // Сохраняем для очистки
+    this.cleanupFunctions.push(() => {
+      window.removeEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
+    });
+    
+    logger.info('Returned to clothing selection, event handler restored', {
+      selectedCount: this.selectedItems.length
+    });
   }
 
   // ============================================
@@ -590,10 +607,10 @@ export class CapsulesManager implements PhotoUploadHandler {
         asyncOperation: async () => {
           // Получаем состояние (включая thumbnailImage с удаленным фоном)
           const canvasState = await this.canvasEditor!.getState();
-          
+
           // Добавляем watermark
           const imageWithWatermark = await addWatermark(canvasState.thumbnailImage);
-          
+
           return {
             ...canvasState,
             finalImage: imageWithWatermark
@@ -683,7 +700,7 @@ export class CapsulesManager implements PhotoUploadHandler {
     try {
       // Открываем изображение через Telegram WebApp
       const tg = (window as any).Telegram?.WebApp;
-      
+
       if (tg && tg.openLink) {
         // Telegram может открыть data URL, пользователь сможет скачать
         tg.openLink(this.currentResultImage);
@@ -716,9 +733,9 @@ export class CapsulesManager implements PhotoUploadHandler {
       // Получаем данные капсулы (если сохранена)
       const capsule = this.capsules.find(c => c.id === this.currentCapsuleId);
       const capsuleName = capsule?.name || `Капсула ${new Date().toLocaleDateString()}`;
-      
-      logger.info('Sharing capsule from result screen', { 
-        id: this.currentCapsuleId, 
+
+      logger.info('Sharing capsule from result screen', {
+        id: this.currentCapsuleId,
         name: capsuleName
       });
 
@@ -922,7 +939,7 @@ export class CapsulesManager implements PhotoUploadHandler {
       try {
         const base64 = await fileToBase64(file);
         this.currentPreviewImage = base64;
-        
+
         uiModalManager.showItemModal({
           type: 'item-modal',
           modalId: 'wardrobe-preview-modal',
@@ -962,10 +979,10 @@ export class CapsulesManager implements PhotoUploadHandler {
       // currentGridId уже установлен в wardrobeManager.handleWardrobeOpen('capsules-modal')
       await wardrobeManager.handlePhotoUpload((newItem) => {
         logger.info('🟢 Item added callback received in capsules', { itemId: newItem.id });
-        
+
         // Синхронизируем наш локальный массив с новой вещью
         this.loadWardrobeItems();
-        
+
         // Оптимистичное добавление уже произошло в правильный грид (capsules-modal-clothes-grid)
         // через WardrobeManager.confirmPreview() → renderGrid(false, currentGridId)
       });
