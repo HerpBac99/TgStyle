@@ -10,8 +10,8 @@ import { StyleCapsule } from '../uiCapsulesGrid';
 import { PhotoUploadHandler, ClothingCategory } from '../photoUploadManager';
 import { capsulesService } from './CapsulesService';
 import { wardrobeService } from '../wardrobe/WardrobeService';
+import { wardrobeManager } from '../wardrobe/WardrobeManager';
 import { photoProcessor } from '../shared/PhotoProcessor';
-import { itemSelector } from '../shared/ItemSelector';
 import { dataLoader } from '../shared/DataLoader';
 import { fileToBase64 } from '../shared/utils';
 import { dataCacheManager } from '../dataCache';
@@ -44,11 +44,15 @@ export class CapsulesManager implements PhotoUploadHandler {
   private currentResultImage: string | null = null;
 
   // Предпросмотр фото
-  private currentPreviewImage: string | null = null;
-  private currentClassification: any = null;
+    private currentPreviewImage: string | null = null;
+    private currentClassification: any = null;
+
+  // Оптимистичное добавление вещей
+  private lastOptimisticItemId: number | null = null;
 
   // Event listener для очистки
-  private wardrobeItemSavedHandler: EventListener;
+    private wardrobeItemSavedHandler: EventListener;
+    private cleanupFunctions: (() => void)[] = [];
 
   constructor() {
     // CapsulesManager initialized
@@ -125,22 +129,28 @@ export class CapsulesManager implements PhotoUploadHandler {
    */
   private async handleAddCapsuleClick(): Promise<void> {
     try {
-
       this.mode = 'selection';
       this.currentCapsuleId = null;
       this.selectedItems = [];
 
       this.capsulesGrid.hide();
 
-      // Загружаем гардероб
-      await this.loadWardrobeItems();
+      // Показываем модальное окно выбора вещей
+      this.showCapsuleCreationModal();
 
-      // Показываем селектор вещей
-      itemSelector.show({
-        wardrobeItems: this.wardrobeItems,
-        onConfirm: (items) => this.handleClothingConfirmed(items),
-        onCancel: () => this.handleClothingCancelled(),
-        onAdd: () => this.handleWardrobePhotoUpload()
+      // Загружаем гардероб через WardrobeManager с префиксом 'capsules-modal'
+      await wardrobeManager.handleWardrobeOpen('capsules-modal');
+      this.wardrobeItems = dataCacheManager.getWardrobeItems();
+
+      // Подписываемся на событие выделения вещи
+      const handleSelectionToggle = (event: CustomEvent) => {
+        this.handleItemSelectionToggle(event.detail.item);
+      };
+      window.addEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
+      
+      // Сохраняем для очистки
+      this.cleanupFunctions.push(() => {
+        window.removeEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
       });
     } catch (error) {
       logger.error('Error opening add capsule modal', error);
@@ -148,47 +158,172 @@ export class CapsulesManager implements PhotoUploadHandler {
   }
 
   /**
+   * Показать модальное окно создания капсулы с гридом гардероба
+   * 
+   * Примечание: Грид рендерится через wardrobeManager.handleWardrobeOpen('capsules-modal')
+   * который вызывается в handleAddCapsule() перед этим методом.
+   */
+  private showCapsuleCreationModal(): void {
+    const modal = document.getElementById('capsules-modal');
+    if (!modal) {
+      logger.error('Capsules modal not found');
+      return;
+    }
+
+    // Показываем модальное окно
+    modal.classList.remove('hidden');
+
+    // Настраиваем обработчики модального окна
+    this.setupCapsuleModalHandlers();
+
+    logger.info('Capsule creation modal shown', {
+      itemsCount: this.wardrobeItems.length,
+      selectedCount: this.selectedItems.length
+    });
+  }
+
+  /**
+   * Обработчик переключения выбора вещи
+   * Вызывается через событие 'wardrobe:item-selection-toggle' из WardrobeManager
+   */
+  private handleItemSelectionToggle(item: WardrobeItem): void {
+    const index = this.selectedItems.findIndex(selected => selected.id === item.id);
+    const cardElement = document.querySelector(`#capsules-modal-clothes-grid [data-item-id="${item.id}"]`);
+
+    if (index === -1) {
+      // Добавляем в выбранные
+      this.selectedItems.push(item);
+      if (cardElement) {
+        cardElement.classList.add('selected');
+      }
+    } else {
+      // Убираем из выбранных
+      this.selectedItems.splice(index, 1);
+      if (cardElement) {
+        cardElement.classList.remove('selected');
+      }
+    }
+
+    // Обновляем состояние кнопки "Далее"
+    this.updateNextButtonState();
+  }
+
+  /**
+   * Обновить состояние кнопки "Далее"
+   */
+  private updateNextButtonState(): void {
+    const nextBtn = document.getElementById('capsules-next-btn') as HTMLButtonElement;
+    if (nextBtn) {
+      const hasSelection = this.selectedItems.length > 0;
+      nextBtn.disabled = !hasSelection;
+    }
+  }
+
+  /**
+   * Настроить обработчики модального окна
+   */
+  private setupCapsuleModalHandlers(): void {
+    const modal = document.getElementById('capsules-modal');
+    const closeBtn = document.getElementById('capsules-modal-close');
+    const nextBtn = document.getElementById('capsules-next-btn');
+
+    if (!modal) return;
+
+    // Обработчик закрытия по клику на overlay
+    const overlay = modal.querySelector('.capsules-modal-overlay') as HTMLElement;
+    if (overlay) {
+      const handleOverlayClick = () => this.handleClothingCancelled();
+      overlay.addEventListener('click', handleOverlayClick);
+
+      // Сохраняем для cleanup
+      this.cleanupFunctions.push(() => overlay.removeEventListener('click', handleOverlayClick));
+    }
+
+    // Обработчик кнопки закрытия
+    if (closeBtn) {
+      const handleClose = () => this.handleClothingCancelled();
+      closeBtn.addEventListener('click', handleClose);
+
+      // Сохраняем для cleanup
+      this.cleanupFunctions.push(() => closeBtn.removeEventListener('click', handleClose));
+    }
+
+    // Обработчик кнопки "Далее"
+    if (nextBtn) {
+      const handleNext = () => this.handleClothingConfirmed();
+      nextBtn.addEventListener('click', handleNext);
+
+      // Сохраняем для cleanup
+      this.cleanupFunctions.push(() => nextBtn.removeEventListener('click', handleNext));
+    }
+  }
+
+  /**
    * Обработчик подтверждения выбора одежды
    */
-  private handleClothingConfirmed(selectedItems: WardrobeItem[]): void {
-
+  private handleClothingConfirmed(): void {
     this.mode = 'canvas';
-    this.selectedItems = selectedItems;
+
+    // Скрываем модальное окно
+    const modal = document.getElementById('capsules-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+
+    // Очищаем обработчики
+    this.cleanupFunctions.forEach(cleanup => cleanup());
+    this.cleanupFunctions = [];
 
     // Инициализируем canvas
     this.initializeCanvasEditor();
 
     // Загружаем выбранные элементы БЕЗ сохраненных позиций
-    const items: CanvasItem[] = capsulesService.sortItemsByLayer(selectedItems).map(item => ({ item }));
+    const items: CanvasItem[] = capsulesService.sortItemsByLayer(this.selectedItems).map(item => ({ item }));
     this.canvasEditor!.loadItems(items);
 
     // Настраиваем навигацию
     navigationManager.push(() => {
       this.returnToClothingSelection();
     }, 'Return to clothing selection from new capsule');
+
+    logger.info('Clothing selection confirmed', {
+      selectedCount: this.selectedItems.length,
+      items: this.selectedItems.map(item => ({ id: item.id, category: item.category }))
+    });
   }
 
   /**
    * Обработчик отмены выбора одежды
    */
   private handleClothingCancelled(): void {
+    // Скрываем модальное окно
+    const modal = document.getElementById('capsules-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+
+    // Очищаем обработчики
+    this.cleanupFunctions.forEach(cleanup => cleanup());
+    this.cleanupFunctions = [];
 
     this.mode = 'grid';
     this.selectedItems = [];
     this.capsulesGrid.show();
+
+    logger.info('Clothing selection cancelled');
   }
 
   /**
    * Вернуться к выбору одежды
    */
   private returnToClothingSelection(): void {
-
     if (this.canvasEditor) {
       this.canvasEditor.hide();
     }
 
     navigationManager.pop();
-    this.handleAddCapsuleClick();
+    // Возвращаемся к модальному окну выбора вещей
+    this.showCapsuleCreationModal();
   }
 
   // ============================================
@@ -370,14 +505,36 @@ export class CapsulesManager implements PhotoUploadHandler {
       // Скрываем canvas
       this.canvasEditor.hide();
 
-      // Показываем селектор с предвыбранными вещами
-      itemSelector.show({
-        wardrobeItems: this.wardrobeItems,
-        preselectedIds: new Set(currentItemIds),
-        onConfirm: (items) => this.handleAddToCanvasConfirmed(items, currentItemIds),
-        onCancel: () => this.handleAddToCanvasCancelled(),
-        onAdd: () => this.handleWardrobePhotoUpload()
-      });
+      // Сохраняем текущий режим
+      const previousMode = this.mode;
+      this.mode = 'selection';
+
+      // Устанавливаем предварительно выбранные вещи
+      this.selectedItems = this.wardrobeItems.filter(item => currentItemIds.includes(item.id));
+
+      // Показываем модальное окно выбора вещей
+      this.showCapsuleCreationModal();
+
+      // Изменяем заголовок модального окна
+      const modalHeader = document.querySelector('#capsules-modal .capsules-modal-header h2');
+      if (modalHeader) {
+        modalHeader.textContent = 'Добавить вещи в капсулу';
+      }
+
+      // Изменяем обработчик подтверждения для добавления на canvas
+      const nextBtn = document.getElementById('capsules-next-btn');
+      if (nextBtn) {
+        // Удаляем старый обработчик
+        const newNextBtn = nextBtn.cloneNode(true) as HTMLElement;
+        nextBtn.parentNode?.replaceChild(newNextBtn, nextBtn);
+
+        // Добавляем новый обработчик
+        const handleConfirm = () => {
+          this.handleAddToCanvasConfirmed(this.selectedItems, currentItemIds);
+          this.mode = previousMode; // Восстанавливаем режим
+        };
+        newNextBtn.addEventListener('click', handleConfirm);
+      }
 
     } catch (error) {
       logger.error('Error opening add to canvas modal', error);
@@ -412,15 +569,6 @@ export class CapsulesManager implements PhotoUploadHandler {
     }
   }
 
-  /**
-   * Обработчик отмены добавления вещей на canvas
-   */
-  private handleAddToCanvasCancelled(): void {
-
-    if (this.canvasEditor) {
-      this.canvasEditor.show();
-    }
-  }
 
   /**
    * Обработчик кнопки "Далее" на canvas
@@ -810,33 +958,20 @@ export class CapsulesManager implements PhotoUploadHandler {
     try {
       logger.info('Starting wardrobe photo upload process');
 
-      // Импортируем wardrobeManager
-      const { wardrobeManager } = await import('../wardrobe/WardrobeManager');
-      
-      // Используем метод из WardrobeManager
-      await wardrobeManager.handlePhotoUpload();
-
-      // После добавления вещи обновляем список в модальном окне
-      await this.loadWardrobeItems();
-      
-      // Обновляем отображение в модальном окне если оно открыто
-      this.refreshModalIfOpen();
+      // Используем статически импортированный wardrobeManager с callback
+      // currentGridId уже установлен в wardrobeManager.handleWardrobeOpen('capsules-modal')
+      await wardrobeManager.handlePhotoUpload((newItem) => {
+        logger.info('🟢 Item added callback received in capsules', { itemId: newItem.id });
+        
+        // Синхронизируем наш локальный массив с новой вещью
+        this.loadWardrobeItems();
+        
+        // Оптимистичное добавление уже произошло в правильный грид (capsules-modal-clothes-grid)
+        // через WardrobeManager.confirmPreview() → renderGrid(false, currentGridId)
+      });
 
     } catch (error) {
       logger.error('Error in handleWardrobePhotoUpload', error);
-    }
-  }
-
-  /**
-   * Обновить модальное окно если оно открыто
-   */
-  private refreshModalIfOpen(): void {
-    const modal = document.getElementById('capsules-modal');
-    if (modal && !modal.classList.contains('hidden')) {
-      // Модальное окно открыто, обновляем его содержимое
-      itemSelector.update({
-        wardrobeItems: this.wardrobeItems
-      });
     }
   }
 
@@ -925,18 +1060,50 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Обработчик сохранения нового элемента гардероба
    */
   private async handleNewItemSaved(item: WardrobeItem): Promise<void> {
+    // Обновляем наш локальный массив (синхронизируем с гардеробом)
+    await this.loadWardrobeItems();
 
-    // Добавляем в массив
-    this.wardrobeItems.push(item);
-
-    // Если модальное окно выбора открыто - обновляем
-    if (this.mode === 'selection') {
-      itemSelector.update({ wardrobeItems: this.wardrobeItems });
+    // Если есть temp ID для обновления - обновляем карточку в модальном окне
+    if (this.lastOptimisticItemId !== null) {
+      // Используем imageUrl из item (уже сформирован правильно в гардеробе)
+      this.updateItemCardInModal(this.lastOptimisticItemId, item.id, item.imageUrl);
+      this.lastOptimisticItemId = null;
     }
 
     // Если canvas активен - добавляем на него
     if (this.canvasEditor && this.mode === 'canvas') {
       await this.canvasEditor.addItem({ item });
+    }
+
+    logger.info('New wardrobe item synced to capsules', {
+      itemId: item.id,
+      totalItems: this.wardrobeItems.length,
+      updatedOptimisticCard: this.lastOptimisticItemId !== null
+    });
+  }
+
+  /**
+   * Обновить ID и URL карточки после ответа сервера
+   */
+  private updateItemCardInModal(oldId: number, newId: number, newImageUrl: string): void {
+    const cardElement = document.querySelector(`#capsules-modal-clothes-grid [data-item-id="${oldId}"]`) as HTMLElement;
+    if (cardElement) {
+      // Обновляем ID в dataset
+      cardElement.dataset['itemId'] = newId.toString();
+
+      // Обновляем изображение если URL изменился
+      const imageElement = cardElement.querySelector('.wardrobe-item-image') as HTMLImageElement;
+      if (imageElement && newImageUrl !== imageElement.src) {
+        imageElement.src = newImageUrl;
+      }
+
+      logger.info('Modal card updated with server data', {
+        oldId,
+        newId,
+        imageUpdated: newImageUrl !== imageElement?.src
+      });
+    } else {
+      logger.warn('Modal card not found for update', { oldId, newId });
     }
   }
 

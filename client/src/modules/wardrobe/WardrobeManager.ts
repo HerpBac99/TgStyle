@@ -22,36 +22,61 @@ export class WardrobeManager implements PhotoUploadHandler {
   private currentClassification: ClassificationResult | null = null;
   private originalItemData: { category?: string; color?: string; material?: string } | null = null; // Оригинальные данные для сравнения изменений
   private currentFilter: string = 'ALL';
+  private onItemAddedCallback: ((item: WardrobeItem) => void) | null = null;
+  private currentGridId: string = 'wardrobe-clothes-grid'; // Текущий активный грид (устанавливается в handleWardrobeOpen)
 
   constructor() {
     // WardrobeManager initialized
   }
 
   /**
-   * Открыть гардероб
+   * Открыть гардероб (универсальный метод для основного гардероба и модальных окон)
+   * 
+   * @param prefix - префикс для ID элементов:
+   *   - 'wardrobe' - основной гардероб (клик = превью, долгое нажатие = удаление)
+   *   - 'capsules-modal' - модальное окно капсулы (клик = выделение, долгое нажатие = удаление)
+   * 
+   * Метод автоматически определяет режим работы по префиксу:
+   * - Если prefix содержит 'modal' → режим выделения вещей
+   * - Иначе → режим просмотра с превью
    */
-  async handleWardrobeOpen(): Promise<void> {
-    logger.info('Wardrobe opened');
+  async handleWardrobeOpen(prefix: string = 'wardrobe'): Promise<void> {
+    const gridId = `${prefix}-clothes-grid`;
+    const filtersId = `${prefix}-filters`;
+    const addBtnId = `${prefix}-add-item-btn`;
 
-    // Настраиваем обработчики
-    this.setupEventListeners();
+    // Сохраняем текущий активный грид для всех последующих операций
+    this.currentGridId = gridId;
 
-    // Создаем фильтры
-    this.createFilters();
+    logger.info('Wardrobe opened', {
+      prefix,
+      gridId,
+      filtersId,
+      addBtnId,
+      currentGridId: this.currentGridId,
+      isModalGrid: this.currentGridId.includes('modal')
+    });
+
+    // Создаем фильтры (с учетом префикса)
+    this.createFilters(filtersId);
 
     // МГНОВЕННО отрисовываем из кэша (уже загружен в dataCacheManager при инициализации)
     await this.loadWardrobeFromCache();
-    this.renderGrid(true); // С анимацией при первом открытии
+    this.renderGrid(true, gridId); // С анимацией при первом открытии
+
+    // Настраиваем обработчики ПОСЛЕ рендера (когда кнопка уже создана)
+    this.setupEventListeners(addBtnId);
 
     // Загружаем полные данные в фоне
-    this.loadWardrobeInBackground();
+    this.loadWardrobeInBackground(gridId);
   }
 
   /**
    * Настройка обработчиков событий
+   * @param addBtnId - ID кнопки добавления (с префиксом)
    */
-  private setupEventListeners(): void {
-    const addBtn = document.getElementById('add-item-btn');
+  private setupEventListeners(addBtnId: string = 'add-item-btn'): void {
+    const addBtn = document.getElementById(addBtnId);
     const confirmBtn = document.getElementById('wardrobe-preview-confirm');
     const cancelBtn = document.getElementById('wardrobe-preview-cancel');
 
@@ -59,6 +84,9 @@ export class WardrobeManager implements PhotoUploadHandler {
       const handleAdd = () => this.handlePhotoUpload();
       addBtn.addEventListener('click', handleAdd);
       this.cleanupFunctions.push(() => addBtn.removeEventListener('click', handleAdd));
+      logger.info('Add button listener attached', { addBtnId });
+    } else {
+      logger.warn('Add button not found', { addBtnId });
     }
 
     if (confirmBtn) {
@@ -91,8 +119,9 @@ export class WardrobeManager implements PhotoUploadHandler {
   /**
    * Загрузить полный гардероб в фоне
    * Обновляет данные только если они изменились на сервере
+   * @param gridId - ID контейнера грида для перерисовки
    */
-  private loadWardrobeInBackground(): void {
+  private loadWardrobeInBackground(gridId: string = 'wardrobe-clothes-grid'): void {
     const currentCount = this.wardrobeItems.length;
 
     // Загружаем полные данные с сервера в фоне
@@ -101,7 +130,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       if (items.length !== currentCount) {
         this.wardrobeItems = items;
         logger.info(`Background load: data changed (${currentCount} → ${items.length})`);
-        this.renderGrid();
+        this.renderGrid(false, gridId);
       } else {
         logger.info(`Background load: no changes (${items.length} items)`);
       }
@@ -112,10 +141,14 @@ export class WardrobeManager implements PhotoUploadHandler {
 
   /**
    * Создать фильтры
+   * @param filtersId - ID контейнера фильтров (с префиксом)
    */
-  private createFilters(): void {
-    const filterContainer = document.getElementById('wardrobe-filters');
-    if (!filterContainer) return;
+  private createFilters(filtersId: string = 'wardrobe-filters'): void {
+    const filterContainer = document.getElementById(filtersId);
+    if (!filterContainer) {
+      logger.warn('Filter container not found', { filtersId });
+      return;
+    }
 
     filterContainer.innerHTML = '';
 
@@ -140,7 +173,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       btn.addEventListener('click', () => {
         this.currentFilter = cat.key;
         this.updateFilterButtons();
-        this.renderGrid(false); // Без анимации при фильтрации
+        this.renderGrid(false, this.currentGridId); // Без анимации при фильтрации в текущем гриде
       });
 
       filterContainer.appendChild(btn);
@@ -161,19 +194,59 @@ export class WardrobeManager implements PhotoUploadHandler {
   /**
    * Отрендерить грид
    * @param withAnimation - показывать ли анимацию появления (только при первом открытии)
+   * @param gridId - ID контейнера грида (с префиксом)
    */
-  private renderGrid(withAnimation: boolean = false): void {
-    const grid = document.getElementById('wardrobe-clothes-grid');
+  private renderGrid(withAnimation: boolean = false, gridId: string = 'wardrobe-clothes-grid'): void {
+    logger.info('🎨 renderGrid called', {
+      gridId,
+      withAnimation,
+      wardrobeItemsCount: this.wardrobeItems.length,
+      currentFilter: this.currentFilter
+    });
+
+    const grid = document.getElementById(gridId);
     if (!grid) {
-      logger.error('Wardrobe grid element not found!');
+      logger.error('❌ Wardrobe grid element not found!', { gridId });
       return;
     }
+
+    logger.info('✅ Grid element found', {
+      gridId,
+      gridClassName: grid.className,
+      gridChildrenCount: grid.children.length
+    });
 
     // Фильтруем вещи
     const filteredItems = wardrobeService.filterByCategory(this.wardrobeItems, this.currentFilter);
 
-    // Сохраняем кнопку "Добавить" если она есть
-    const addBtn = document.getElementById('add-item-btn');
+    logger.info('🔍 Items filtered', {
+      totalItems: this.wardrobeItems.length,
+      filteredItems: filteredItems.length,
+      currentFilter: this.currentFilter
+    });
+
+    // Определяем ID кнопки добавления по ID грида
+    const prefix = gridId.replace('-clothes-grid', '');
+    const addBtnId = `${prefix}-add-item-btn`;
+
+    // Сохраняем кнопку "Добавить" ПЕРЕД очисткой грида
+    let addBtn = grid.querySelector(`#${addBtnId}`) as HTMLElement | null;
+
+    // Если не нашли по ID, ищем по классу и добавляем ID
+    if (!addBtn) {
+      const btnByClass = grid.querySelector('.add-item-btn') as HTMLElement | null;
+      if (btnByClass && !btnByClass.id) {
+        btnByClass.id = addBtnId;
+        addBtn = btnByClass;
+        logger.info('✅ Added missing ID to button', { addBtnId });
+      }
+    }
+
+    logger.info('🔍 Looking for add button', {
+      addBtnId,
+      found: !!addBtn,
+      gridChildrenBefore: grid.children.length
+    });
 
     // Очищаем грид
     grid.innerHTML = '';
@@ -181,7 +254,7 @@ export class WardrobeManager implements PhotoUploadHandler {
     // Управляем анимацией грида
     if (withAnimation) {
       grid.classList.add('initial-load');
-      logger.info('Rendering grid with initial animation');
+      logger.info('Rendering grid with initial animation', { gridId });
 
       // Удаляем класс после завершения анимации (0.4s + максимальная задержка 0.4s = 0.8s)
       setTimeout(() => {
@@ -189,18 +262,42 @@ export class WardrobeManager implements PhotoUploadHandler {
       }, 1000);
     } else {
       grid.classList.remove('initial-load');
-      logger.info('Rendering grid without animation');
+      logger.info('Rendering grid without animation', { gridId });
     }
 
     // Возвращаем кнопку "Добавить" обратно
     if (addBtn) {
       grid.appendChild(addBtn);
+      logger.info('Add button restored to grid', { addBtnId });
+    } else {
+      logger.warn('Add button not found for grid', { addBtnId, gridId });
     }
 
     // Добавляем карточки (новые вещи уже в начале массива)
-    filteredItems.forEach(item => {
+    logger.info('📦 Adding cards to grid', {
+      gridId,
+      filteredItemsCount: filteredItems.length,
+      totalItemsCount: this.wardrobeItems.length,
+      currentFilter: this.currentFilter
+    });
+
+    filteredItems.forEach((item, index) => {
       const card = this.createItemCard(item);
       grid.appendChild(card);
+
+      if (index === 0) {
+        logger.info('✅ First card added to grid', {
+          itemId: item.id,
+          category: item.category,
+          cardHTML: card.outerHTML.substring(0, 100)
+        });
+      }
+    });
+
+    logger.info('✅ Grid rendering completed', {
+      gridId,
+      cardsAdded: filteredItems.length,
+      gridChildrenCount: grid.children.length
     });
   }
 
@@ -223,7 +320,7 @@ export class WardrobeManager implements PhotoUploadHandler {
     content.appendChild(image);
     card.appendChild(content);
 
-    // Обработчик нажатий с улучшенной логикой
+    // Обработчик нажатий (только touch для мобильных)
     let pressStartTime = 0;
     let longPressTimer: number | null = null;
     let longPressTriggered = false;
@@ -231,7 +328,7 @@ export class WardrobeManager implements PhotoUploadHandler {
     let cardRect: DOMRect | null = null;
     let isProcessing = false; // Флаг для предотвращения двойных вызовов
 
-    const startPress = (e: MouseEvent | TouchEvent) => {
+    const startPress = (e: TouchEvent) => {
       // Предотвращаем обработку если уже обрабатываем
       if (isProcessing) {
         e.preventDefault();
@@ -244,10 +341,8 @@ export class WardrobeManager implements PhotoUploadHandler {
       cardRect = card.getBoundingClientRect();
 
       // Получаем позицию нажатия
-      if (e instanceof TouchEvent && e.touches[0]) {
+      if (e.touches[0]) {
         startPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      } else if (e instanceof MouseEvent) {
-        startPos = { x: e.clientX, y: e.clientY };
       }
 
       // Запускаем таймер долгого нажатия
@@ -286,14 +381,14 @@ export class WardrobeManager implements PhotoUploadHandler {
       }, 600); // Уменьшили время до 600ms для лучшего UX
     };
 
-    const endPress = (e: MouseEvent | TouchEvent) => {
+    const endPress = (e: TouchEvent) => {
       // Очищаем таймер
       if (longPressTimer !== null) {
         clearTimeout(longPressTimer);
         longPressTimer = null;
       }
 
-      // Если уже обрабатываем или было долгое нажатие - не показываем превью
+      // Если уже обрабатываем или было долгое нажатие - не обрабатываем
       if (isProcessing || longPressTriggered || !startPos) {
         return;
       }
@@ -302,17 +397,15 @@ export class WardrobeManager implements PhotoUploadHandler {
 
       // Получаем позицию отпускания
       let endPos: { x: number; y: number } | null = null;
-      if (e instanceof TouchEvent && e.changedTouches[0]) {
+      if (e.changedTouches[0]) {
         endPos = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
-      } else if (e instanceof MouseEvent) {
-        endPos = { x: e.clientX, y: e.clientY };
       }
 
       if (!endPos) return;
 
       // Проверяем, что нажатие было коротким (менее 500ms)
       if (pressDuration < 500) {
-        // Легкая вибрация при открытии превью
+        // Легкая вибрация
         if (window.Telegram?.WebApp?.HapticFeedback) {
           window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
         }
@@ -320,27 +413,33 @@ export class WardrobeManager implements PhotoUploadHandler {
         // Получаем актуальный ID из DOM элемента
         const currentId = parseInt(card.dataset['itemId'] || '0');
 
-        logger.info('Short press detected, showing preview', { itemId: currentId, duration: pressDuration });
-
         // Находим актуальную вещь по ID из DOM
         const currentItem = this.wardrobeItems.find(wardrobeItem => wardrobeItem.id === currentId);
+        
         if (currentItem) {
-          this.showPreviewModal(currentItem);
+          // Проверяем в каком гриде мы находимся
+          const isModalGrid = this.currentGridId.includes('modal');
+          
+          if (isModalGrid) {
+            // В модальном окне капсулы - переключаем выделение через событие
+            this.toggleItemSelection(currentItem);
+          } else {
+            // В основном гардеробе - показываем превью
+            this.showPreviewModal(currentItem);
+          }
         } else {
-          logger.warn('Item not found for preview', { itemId: currentId });
+          logger.warn('Item not found', { itemId: currentId });
         }
       }
     };
 
-    const handleMove = (e: MouseEvent | TouchEvent) => {
+    const handleMove = (e: TouchEvent) => {
       if (!startPos || !cardRect || longPressTriggered) return;
 
       // Получаем текущую позицию
       let currentPos: { x: number; y: number } | null = null;
-      if (e instanceof TouchEvent && e.touches[0]) {
+      if (e.touches[0]) {
         currentPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      } else if (e instanceof MouseEvent) {
-        currentPos = { x: e.clientX, y: e.clientY };
       }
 
       if (!currentPos) return;
@@ -369,12 +468,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       // Не сбрасываем isProcessing здесь, чтобы избежать конфликтов
     };
 
-    // Добавляем обработчики событий
-    card.addEventListener('mousedown', startPress, { passive: false });
-    card.addEventListener('mouseup', endPress, { passive: false });
-    card.addEventListener('mouseleave', cancelPress);
-    card.addEventListener('mousemove', handleMove);
-
+    // Добавляем обработчики событий (только touch для мобильных)
     card.addEventListener('touchstart', startPress, { passive: false });
     card.addEventListener('touchend', endPress, { passive: false });
     card.addEventListener('touchmove', handleMove, { passive: false });
@@ -395,7 +489,7 @@ export class WardrobeManager implements PhotoUploadHandler {
     }
 
     try {
-      logger.info('Removing wardrobe item', { itemId });
+      logger.info('Removing wardrobe item', { itemId, currentGridId: this.currentGridId });
       await wardrobeService.deleteItem(itemId);
 
       // Удаляем из локального массива
@@ -404,10 +498,13 @@ export class WardrobeManager implements PhotoUploadHandler {
         this.wardrobeItems.splice(index, 1);
       }
 
-      // Перерисовываем без анимации
-      this.renderGrid(false);
+      // Перерисовываем без анимации в ТЕКУЩЕМ активном гриде
+      this.renderGrid(false, this.currentGridId);
 
-      logger.info(`Item removed successfully. Remaining: ${this.wardrobeItems.length}`, { itemId });
+      logger.info(`Item removed successfully. Remaining: ${this.wardrobeItems.length}`, {
+        itemId,
+        gridId: this.currentGridId
+      });
     } catch (error) {
       logger.error('Error removing wardrobe item', { itemId, error });
       alert('Ошибка при удалении предмета. Попробуйте еще раз.');
@@ -562,8 +659,8 @@ export class WardrobeManager implements PhotoUploadHandler {
       // Очищаем оригинальные данные
       this.originalItemData = null;
 
-      // Перерисовываем без анимации СРАЗУ с обновленными данными
-      this.renderGrid(false);
+      // Перерисовываем без анимации СРАЗУ с обновленными данными в ТЕКУЩЕМ активном гриде
+      this.renderGrid(false, this.currentGridId);
 
       // Отправляем изменения на сервер в фоне (без ожидания)
       wardrobeService.updateItem(item.id, updates).catch(error => {
@@ -628,8 +725,12 @@ export class WardrobeManager implements PhotoUploadHandler {
 
   /**
    * Обработать загрузку фото
+   * @param onItemAdded - callback который вызывается после успешного добавления вещи
    */
-  async handlePhotoUpload(): Promise<void> {
+  async handlePhotoUpload(onItemAdded?: (item: WardrobeItem) => void): Promise<void> {
+    // Сохраняем callback (грид уже установлен в handleWardrobeOpen)
+    this.onItemAddedCallback = onItemAdded || null;
+
     try {
 
       const input = document.createElement('input');
@@ -738,12 +839,13 @@ export class WardrobeManager implements PhotoUploadHandler {
     // СРАЗУ добавляем в кэш (оптимистично)
     dataCacheManager.addWardrobeItem(optimisticItem);
 
-    // СРАЗУ перерисовываем грид с новой вещью
-    this.renderGrid(false);
+    // СРАЗУ перерисовываем грид с новой вещью в ТЕКУЩЕМ активном гриде
+    this.renderGrid(false, this.currentGridId);
 
     logger.info('Optimistic item created and rendered', {
       tempId: optimisticItem.id,
-      category: classification.category
+      category: classification.category,
+      currentGridId: this.currentGridId
     });
 
     try {
@@ -774,6 +876,13 @@ export class WardrobeManager implements PhotoUploadHandler {
         detail: { item: serverItem }
       }));
 
+      // Вызываем callback если он был передан
+      if (this.onItemAddedCallback) {
+        this.onItemAddedCallback(serverItem);
+        this.onItemAddedCallback = null; // Очищаем после использования
+        logger.info('onItemAdded callback called', { itemId: serverItem.id });
+      }
+
       logger.info('Wardrobe item added successfully', { id: serverItem.id });
 
     } catch (error) {
@@ -781,7 +890,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       const tempIndex = this.wardrobeItems.findIndex(item => item.id === optimisticItem.id);
       if (tempIndex !== -1) {
         this.wardrobeItems.splice(tempIndex, 1);
-        this.renderGrid(false);
+        this.renderGrid(false, this.currentGridId);
         logger.error('Optimistic item removed due to error', { tempId: optimisticItem.id });
       }
 
@@ -795,6 +904,22 @@ export class WardrobeManager implements PhotoUploadHandler {
   private cancelPreview(): void {
     this.currentPreviewImage = null;
     this.currentClassification = null;
+  }
+
+  /**
+   * Переключить выделение вещи (для модального окна капсулы)
+   * 
+   * Использует событийную систему для связи с CapsulesManager:
+   * 1. WardrobeManager отправляет событие 'wardrobe:item-selection-toggle'
+   * 2. CapsulesManager слушает это событие и обновляет список выбранных вещей
+   * 3. Визуальное выделение (класс 'selected') добавляется/убирается в CapsulesManager
+   * 
+   * Это позволяет избежать прямой зависимости между модулями.
+   */
+  private toggleItemSelection(item: WardrobeItem): void {
+    window.dispatchEvent(new CustomEvent('wardrobe:item-selection-toggle', {
+      detail: { item }
+    }));
   }
 
   /**
@@ -839,14 +964,14 @@ export class WardrobeManager implements PhotoUploadHandler {
     showAddButton?: boolean;
     onAddClick?: () => void;
   }): void {
-    logger.info('Rendering grid in external container', { 
+    logger.info('Rendering grid in external container', {
       containerId: config.containerId,
-      itemsCount: config.items.length 
+      itemsCount: config.items.length
     });
 
     // Создаем фильтры в указанном контейнере
     this.createFiltersInContainer(config.filtersContainerId);
-    
+
     // Рендерим грид в указанном контейнере
     this.renderGridInSpecificContainer(config);
   }
@@ -897,7 +1022,7 @@ export class WardrobeManager implements PhotoUploadHandler {
   private updateFilterButtonsInContainer(containerId: string): void {
     const container = document.getElementById(containerId);
     if (!container) return;
-    
+
     const buttons = container.querySelectorAll('.wardrobe-filter-btn');
     buttons.forEach(btn => {
       const category = (btn as HTMLElement).dataset['category'];
@@ -945,7 +1070,7 @@ export class WardrobeManager implements PhotoUploadHandler {
    * Создать карточку с возможностью выбора (для модального окна)
    */
   private createSelectableItemCard(
-    item: WardrobeItem, 
+    item: WardrobeItem,
     selectedIds?: Set<number>,
     onItemClick?: (item: WardrobeItem) => void
   ): HTMLElement {

@@ -12,8 +12,8 @@
     <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
     <script src="https://unpkg.com/fabric@6.7.1/dist/fabric.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" crossorigin src="/assets/main-C89Aomyq.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-1Ls4s_IH.css">
+  <script type="module" crossorigin src="/assets/main-CVI12dPY.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-CA8qkZCa.css">
 </head>
 
 <body>
@@ -63,7 +63,7 @@
 
                 <div class="wardrobe-clothes-grid" id="wardrobe-clothes-grid">
                     <!-- Кнопка добавить предмет -->
-                    <div class="add-item-btn" id="add-item-btn" aria-label="Добавить предмет">
+                    <div class="add-item-btn" id="wardrobe-add-item-btn" aria-label="Добавить предмет">
                         <div class="add-item-btn-content">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                 stroke="currentColor">
@@ -99,10 +99,7 @@
             </div>
 
             <!-- Кнопка генерации капсул -->
-            <button 
-                id="capsule-generate-btn" 
-                class="capsule-generate-btn hidden" 
-                aria-label="Сгенерировать капсулы"
+            <button id="capsule-generate-btn" class="capsule-generate-btn hidden" aria-label="Сгенерировать капсулы"
                 onclick="window.handleGenerateClick && window.handleGenerateClick();">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" stroke-width="2">
@@ -473,12 +470,21 @@
             </div>
 
             <!-- Фильтры категорий (используем те же классы что и в гардеробе) -->
-            <div class="wardrobe-filters" id="capsules-filters">
+            <div class="wardrobe-filters" id="capsules-modal-filters">
                 <!-- Кнопки фильтров будут добавляться динамически -->
             </div>
 
             <!-- Грид с элементами гардероба (используем те же классы что и в гардеробе) -->
-            <div class="wardrobe-clothes-grid" id="capsules-grid">
+            <div class="wardrobe-clothes-grid" id="capsules-modal-clothes-grid">
+                <!-- Кнопка добавить предмет -->
+                <div class="add-item-btn" id="capsules-modal-add-item-btn" aria-label="Добавить предмет">
+                    <div class="add-item-btn-content">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor">
+                                <path d="M12 5v14M5 12h14"></path>
+                            </svg>
+                        </div>
+                </div>
                 <!-- Элементы будут добавляться динамически -->
             </div>
 

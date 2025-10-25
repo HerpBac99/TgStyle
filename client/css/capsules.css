@@ -671,6 +671,44 @@
     /* Более заметный disabled стиль */
 }
 
+/* Стили для грида и фильтров внутри модального окна капсул */
+.capsules-modal-content #capsules-modal-filters {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+    padding: 8px 0;
+    flex-shrink: 0; /* Не сжимать фильтры */
+}
+
+.capsules-modal-content #capsules-modal-clothes-grid {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    padding: 10px 8px 120px 8px; /* Добавлен padding снизу для кнопки "Далее" */
+    margin: 0;
+    /* Грид должен быть как в основном гардеробе */
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 12px !important;
+}
+
+/* Карточки в модальном окне должны быть квадратными как в основном гардеробе */
+.capsules-modal-content #capsules-modal-clothes-grid .wardrobe-item-card {
+    position: relative !important;
+    width: 100% !important;
+    padding-bottom: 100% !important; /* Квадратная карточка */
+    height: 0 !important; /* Обязательно для padding-bottom trick */
+}
+
+.capsules-modal-content #capsules-modal-clothes-grid .add-item-btn {
+    position: relative !important;
+    width: 100% !important;
+    padding-bottom: 100% !important; /* Квадратная кнопка */
+    height: 0 !important; /* Обязательно для padding-bottom trick */
+}
+
 /* Модальное окно загрузки для canvas операций */
 .canvas-loading-modal {
     position: fixed;
