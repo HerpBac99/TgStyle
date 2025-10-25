@@ -629,64 +629,48 @@
     /* Contain как в wardrobe для правильного отображения */
 }
 
-/* Кнопки действий - фиксированная позиция внизу поверх грида */
-.capsules-modal-actions {
-    position: fixed;
-    bottom: 10vh; /* 10% от низа экрана */
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    justify-content: center;
-    z-index: 1001; /* Поверх грида */
-    pointer-events: none; /* Не блокируем клики по гриду */
-}
-
-.capsules-next-btn {
-    padding: 12px 32px;
-    background: rgba(218, 109, 163, 0.9) !important;
-    color: var(--tg-theme-text-color);
-    border: none;
-    border-radius: 12px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(20px);
-    -webkit-tap-highlight-color: transparent;
-
-
-    position: absolute;
-    bottom: 10vh;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 12px 30px;
-    background: rgba(218, 109, 163, 0.9) !important;
+/* Общий стиль для кнопок "Далее" в процессе создания капсулы */
+/* ВАЖНО: position: fixed для одинаковой позиции на обоих экранах */
+.capsules-next-btn,
+.canvas-next-btn {
+    position: fixed !important;
+    bottom: 10vh !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    padding: 14px 36px;
+    background: rgba(218, 109, 163, 0.95) !important;
     color: white;
     border: none;
     border-radius: 24px;
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-    z-index: 2010;
+    z-index: 2010 !important;
     -webkit-tap-highlight-color: transparent;
-    pointer-events: auto; /* Кнопка кликабельна */
+    pointer-events: auto;
+    backdrop-filter: blur(10px);
 }
 
-.capsules-next-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.capsules-next-btn:hover:not(:disabled),
+.canvas-next-btn:hover {
+    transform: translateX(-50%) translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.capsules-next-btn:active,
+.canvas-next-btn:active {
+    transform: translateX(-50%) translateY(0) !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 }
 
 .capsules-next-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    transform: none;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    background: rgba(200, 200, 200, 0.8);
-    /* Более заметный disabled стиль */
+    transform: translateX(-50%);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    background: rgba(150, 150, 150, 0.8) !important;
 }
 
 /* Стили для грида и фильтров внутри модального окна капсул */
@@ -695,7 +679,8 @@
     z-index: 1;
     background: transparent;
     padding: 8px 0;
-    flex-shrink: 0; /* Не сжимать фильтры */
+    flex-shrink: 0;
+    /* Не сжимать фильтры */
 }
 
 .capsules-modal-content #capsules-modal-clothes-grid {
@@ -704,7 +689,8 @@
     flex: 1;
     overflow-y: auto !important;
     overflow-x: hidden;
-    padding: 10px 8px 120px 8px; /* Добавлен padding снизу для кнопки "Далее" */
+    padding: 10px 8px 120px 8px;
+    /* Добавлен padding снизу для кнопки "Далее" */
     margin: 0;
     /* Грид должен быть как в основном гардеробе */
     display: grid !important;
@@ -716,15 +702,19 @@
 .capsules-modal-content #capsules-modal-clothes-grid .wardrobe-item-card {
     position: relative !important;
     width: 100% !important;
-    padding-bottom: 100% !important; /* Квадратная карточка */
-    height: 0 !important; /* Обязательно для padding-bottom trick */
+    padding-bottom: 100% !important;
+    /* Квадратная карточка */
+    height: 0 !important;
+    /* Обязательно для padding-bottom trick */
 }
 
 .capsules-modal-content #capsules-modal-clothes-grid .add-item-btn {
     position: relative !important;
     width: 100% !important;
-    padding-bottom: 100% !important; /* Квадратная кнопка */
-    height: 0 !important; /* Обязательно для padding-bottom trick */
+    padding-bottom: 100% !important;
+    /* Квадратная кнопка */
+    height: 0 !important;
+    /* Обязательно для padding-bottom trick */
 }
 
 /* Модальное окно загрузки для canvas операций */
@@ -734,7 +724,8 @@
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 1002; /* Поверх модального окна капсул */
+    z-index: 1002;
+    /* Поверх модального окна капсул */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -784,34 +775,7 @@
     text-align: center;
 }
 
-/* Кнопка "Далее" на canvas */
-.canvas-next-btn {
-    position: absolute;
-    bottom: 10vh;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 12px 30px;
-    background: rgba(218, 109, 163, 0.9) !important;
-    color: white;
-    border: none;
-    border-radius: 24px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    z-index: 2010;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.canvas-next-btn:hover {
-    transform: translateX(-50%) translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
-}
-
-.canvas-next-btn:active {
-    transform: translateX(-50%) translateY(0);
-}
+/* Стили для canvas-next-btn определены выше вместе с capsules-next-btn */
 
 /* Экран результата капсулы */
 .capsule-result-screen {
@@ -999,9 +963,11 @@
     0% {
         background-position: 0% 0%;
     }
+
     50% {
         background-position: 100% 100%;
     }
+
     100% {
         background-position: 0% 0%;
     }
@@ -1016,30 +982,30 @@
     bottom: 100px;
     right: 20px;
     z-index: 2000;
-    
+
     /* Эффект liquid glass */
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 50px;
-    
+
     /* Размеры и отступы */
     padding: 12px 24px;
     display: flex;
     align-items: center;
     gap: 8px;
-    
+
     /* Типографика */
     font-size: 16px;
     font-weight: 600;
     color: var(--tg-theme-text-color);
-    
+
     /* Тени и эффекты */
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
-    
+
     /* Убираем стандартные стили кнопки */
     outline: none;
     -webkit-tap-highlight-color: transparent;
@@ -1086,6 +1052,7 @@
     from {
         transform: rotate(0deg);
     }
+
     to {
         transform: rotate(360deg);
     }
@@ -1420,15 +1387,15 @@
         padding: 20px;
         max-height: 90vh;
     }
-    
+
     .generation-variant-preview {
         height: 150px;
     }
-    
+
     .generation-actions {
         flex-direction: column;
     }
-    
+
     .generation-action-btn {
         width: 100%;
     }
@@ -1436,63 +1403,63 @@
 
 /* Индикатор загрузки генерации */
 .capsule-generation-loading {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 10000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .capsule-generation-loading.hidden {
-  display: none;
+    display: none;
 }
 
 .capsule-generation-loading .loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(5px);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
 }
 
 .capsule-generation-loading .loading-content {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  padding: 40px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .capsule-generation-loading .loading-spinner {
-  width: 50px;
-  height: 50px;
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  border-top-color: var(--tg-theme-button-color, #3390ec);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top-color: var(--tg-theme-button-color, #3390ec);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .capsule-generation-loading .loading-text {
-  color: var(--tg-theme-text-color, #ffffff);
-  font-size: 16px;
-  font-weight: 500;
-  text-align: center;
-  margin: 0;
+    color: var(--tg-theme-text-color, #ffffff);
+    font-size: 16px;
+    font-weight: 500;
+    text-align: center;
+    margin: 0;
 }
