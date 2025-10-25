@@ -844,8 +844,8 @@ export class UICanvasEditor {
 
     // Базовый масштаб - 25% от размера canvas
     let baseScale = Math.min(
-      (canvasWidth * 0.25) / imgWidth,
-      (canvasHeight * 0.25) / imgHeight
+      (canvasWidth * 0.4) / imgWidth,
+      (canvasHeight * 0.4) / imgHeight
     );
 
     // Для OUTERWEAR увеличиваем масштаб
@@ -864,22 +864,22 @@ export class UICanvasEditor {
       case 'INNERWEAR':
       case 'BODYWEAR':
         x = canvasCenterX;
-        y = canvasCenterY - 90;
+        y = canvasCenterY - 120;
         break;
 
       case 'LEGWEAR':
         x = canvasCenterX;
-        y = canvasCenterY + 60;
+        y = canvasCenterY + 100;
         break;
 
       case 'FOOTWEAR':
         x = canvasCenterX;
-        y = canvasCenterY + 150;
+        y = canvasCenterY + 220;
         break;
 
       case 'OUTERWEAR':
-        x = canvasCenterX - 100;
-        y = canvasCenterY - 30;
+        x = canvasCenterX - 80;
+        y = canvasCenterY - 100;
         break;
 
       case 'FULLBODY':

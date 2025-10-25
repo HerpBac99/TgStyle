@@ -891,10 +891,19 @@
 }
 
 .capsule-result-btn:active,
-.capsule-result-done-btn:active {
+.capsule-result-done-btn:active,
+.capsule-result-btn.pressed,
+.capsule-result-done-btn.pressed {
     /* ЭФФЕКТ НАЖАТИЯ - ВДАВЛЕННОСТЬ */
     transform: translateY(0) scale(0.98);
     box-shadow: inset 4px 4px 8px #c7cbd1, inset -4px -4px 8px #ffffff;
+}
+
+.capsule-result-btn.pressed,
+.capsule-result-done-btn.pressed {
+    /* Дополнительно уменьшаем opacity для визуальной индикации загрузки */
+    opacity: 0.7;
+    cursor: not-allowed;
 }
 
 .capsule-result-btn svg,

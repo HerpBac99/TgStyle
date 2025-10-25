@@ -844,49 +844,63 @@ export class CapsulesManager implements PhotoUploadHandler {
     try {
       logger.info('Saving capsule from result screen');
 
-      // Получаем состояние canvas
-      const state = await this.canvasEditor.getState();
-
-      if (this.currentCapsuleId) {
-        // Обновление существующей капсулы
-        const updated = await capsulesService.updateCapsule(this.currentCapsuleId, {
-          canvasData: state.canvasData,
-          thumbnailImage: state.thumbnailImage,
-          itemIds: state.canvasData.selected_items?.map((item: WardrobeItem) => item.id) || []
-        });
-
-        // Обновляем в массиве
-        const index = this.capsules.findIndex(c => c.id === this.currentCapsuleId);
-        if (index !== -1) {
-          this.capsules[index] = updated as StyleCapsule;
-        }
-
-        logger.info('Capsule updated', { id: this.currentCapsuleId });
-
-      } else {
-        // Создание новой капсулы
-        // Проверяем есть ли metadata от сгенерированной капсулы
-        const metadata = (this.canvasEditor as any)?.generatedCapsuleMetadata;
-        const generatedName = (this.canvasEditor as any)?.generatedCapsuleName;
-
-        const created = await capsulesService.createCapsule({
-          name: generatedName || `Капсула ${new Date().toLocaleDateString()}`,
-          canvasData: state.canvasData,
-          thumbnailImage: state.thumbnailImage,
-          itemIds: state.canvasData.selected_items?.map((item: WardrobeItem) => item.id) || [],
-          metadata: metadata || undefined
-        });
-
-        // Очищаем временные данные
-        if (this.canvasEditor) {
-          delete (this.canvasEditor as any).generatedCapsuleMetadata;
-          delete (this.canvasEditor as any).generatedCapsuleName;
-        }
-
-        // Добавляем в массив
-        this.capsules.unshift(created as StyleCapsule);
-        logger.info('Capsule created', { id: created.id, source: metadata?.source || 'manual' });
+      // Блокируем кнопку "Готово" и добавляем визуальный эффект нажатия
+      const doneBtn = document.getElementById('capsule-result-done-btn') as HTMLButtonElement;
+      if (doneBtn) {
+        doneBtn.disabled = true;
+        doneBtn.classList.add('pressed');
       }
+
+      // Показываем оверлей СРАЗУ и выполняем всю логику внутри
+      await uiModalManager.executeWithLoadingModal({
+        modalType: 'canvas',
+        loadingText: 'Сохраняем образ...',
+        asyncOperation: async () => {
+          // Получаем состояние canvas (долгая операция с удалением фона)
+          const state = await this.canvasEditor!.getState();
+
+          if (this.currentCapsuleId) {
+            // Обновление существующей капсулы
+            const updated = await capsulesService.updateCapsule(this.currentCapsuleId, {
+              canvasData: state.canvasData,
+              thumbnailImage: state.thumbnailImage,
+              itemIds: state.canvasData.selected_items?.map((item: WardrobeItem) => item.id) || []
+            });
+
+            // Обновляем в массиве
+            const index = this.capsules.findIndex(c => c.id === this.currentCapsuleId);
+            if (index !== -1) {
+              this.capsules[index] = updated as StyleCapsule;
+            }
+
+            logger.info('Capsule updated', { id: this.currentCapsuleId });
+
+          } else {
+            // Создание новой капсулы
+            // Проверяем есть ли metadata от сгенерированной капсулы
+            const metadata = (this.canvasEditor as any)?.generatedCapsuleMetadata;
+            const generatedName = (this.canvasEditor as any)?.generatedCapsuleName;
+
+            const created = await capsulesService.createCapsule({
+              name: generatedName || `Капсула ${new Date().toLocaleDateString()}`,
+              canvasData: state.canvasData,
+              thumbnailImage: state.thumbnailImage,
+              itemIds: state.canvasData.selected_items?.map((item: WardrobeItem) => item.id) || [],
+              metadata: metadata || undefined
+            });
+
+            // Очищаем временные данные
+            if (this.canvasEditor) {
+              delete (this.canvasEditor as any).generatedCapsuleMetadata;
+              delete (this.canvasEditor as any).generatedCapsuleName;
+            }
+
+            // Добавляем в массив
+            this.capsules.unshift(created as StyleCapsule);
+            logger.info('Capsule created', { id: created.id, source: metadata?.source || 'manual' });
+          }
+        }
+      });
 
       // Скрываем экран результата
       if (this.resultScreen) {
@@ -912,6 +926,14 @@ export class CapsulesManager implements PhotoUploadHandler {
 
     } catch (error) {
       logger.error('Error saving capsule from result screen', error);
+      
+      // Разблокируем кнопку и убираем визуальный эффект при ошибке
+      const doneBtn = document.getElementById('capsule-result-done-btn') as HTMLButtonElement;
+      if (doneBtn) {
+        doneBtn.disabled = false;
+        doneBtn.classList.remove('pressed');
+      }
+      
       alert('Ошибка при сохранении капсулы. Попробуйте еще раз.');
     }
   }

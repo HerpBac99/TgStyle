@@ -417,9 +417,9 @@ export class WardrobeManager implements PhotoUploadHandler {
 
       // Если палец сдвинулся больше чем на threshold - это был скролл, не тап
       if (distance > TAP_THRESHOLD) {
-        logger.info('Tap cancelled - movement detected', { 
-          itemId: item.id, 
-          distance: distance.toFixed(1) 
+        logger.info('Tap cancelled - movement detected', {
+          itemId: item.id,
+          distance: distance.toFixed(1)
         });
         return;
       }
@@ -436,11 +436,11 @@ export class WardrobeManager implements PhotoUploadHandler {
 
         // Находим актуальную вещь по ID из DOM
         const currentItem = this.wardrobeItems.find(wardrobeItem => wardrobeItem.id === currentId);
-        
+
         if (currentItem) {
           // Проверяем в каком гриде мы находимся
           const isModalGrid = this.currentGridId.includes('modal');
-          
+
           if (isModalGrid) {
             // В модальном окне капсулы - переключаем выделение через событие
             this.toggleItemSelection(currentItem);
@@ -480,14 +480,9 @@ export class WardrobeManager implements PhotoUploadHandler {
           clearTimeout(longPressTimer);
           longPressTimer = null;
         }
-        
+
         // Помечаем что был скролл (чтобы не обрабатывать как тап)
         isProcessing = true;
-        
-        logger.info('Scroll detected, cancelling tap', { 
-          itemId: item.id, 
-          distance: distance.toFixed(1) 
-        });
       }
 
       // Дополнительно проверяем выход за границы карточки

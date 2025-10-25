@@ -640,7 +640,9 @@ async function updateCapsule(req, res) {
 async function deleteCapsule(req, res) {
   try {
     const { id } = req.params;
-    const { initData } = req.query;
+    
+    // FIXED: получаем initData из header или query
+    const initData = getInitData(req);
 
     // Валидация Telegram данных
     if (!initData) {

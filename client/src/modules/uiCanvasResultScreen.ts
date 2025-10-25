@@ -271,8 +271,12 @@ export class UICanvasResultScreen {
     }
 
     // Кнопка "Готово"
-    const doneBtn = document.getElementById('capsule-result-done-btn') as HTMLElement;
+    const doneBtn = document.getElementById('capsule-result-done-btn') as HTMLButtonElement;
     if (doneBtn && this.config.onDone) {
+      // ВАЖНО: Сбрасываем disabled и pressed класс при каждом показе result screen
+      doneBtn.disabled = false;
+      doneBtn.classList.remove('pressed');
+      
       const handleDone = () => {
         logger.info('Result done button clicked');
         this.config.onDone!();
