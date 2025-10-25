@@ -390,6 +390,10 @@ export class WardrobeManager implements PhotoUploadHandler {
 
       // Если уже обрабатываем или было долгое нажатие - не обрабатываем
       if (isProcessing || longPressTriggered || !startPos) {
+        // Сбрасываем флаг для следующего касания
+        setTimeout(() => {
+          isProcessing = false;
+        }, 100);
         return;
       }
 
@@ -402,6 +406,23 @@ export class WardrobeManager implements PhotoUploadHandler {
       }
 
       if (!endPos) return;
+
+      // Вычисляем расстояние движения от начала до конца
+      const deltaX = Math.abs(endPos.x - startPos.x);
+      const deltaY = Math.abs(endPos.y - startPos.y);
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+      // Threshold для определения тапа (10px)
+      const TAP_THRESHOLD = 10;
+
+      // Если палец сдвинулся больше чем на threshold - это был скролл, не тап
+      if (distance > TAP_THRESHOLD) {
+        logger.info('Tap cancelled - movement detected', { 
+          itemId: item.id, 
+          distance: distance.toFixed(1) 
+        });
+        return;
+      }
 
       // Проверяем, что нажатие было коротким (менее 500ms)
       if (pressDuration < 500) {
@@ -434,7 +455,7 @@ export class WardrobeManager implements PhotoUploadHandler {
     };
 
     const handleMove = (e: TouchEvent) => {
-      if (!startPos || !cardRect || longPressTriggered) return;
+      if (!startPos || longPressTriggered) return;
 
       // Получаем текущую позицию
       let currentPos: { x: number; y: number } | null = null;
@@ -444,19 +465,45 @@ export class WardrobeManager implements PhotoUploadHandler {
 
       if (!currentPos) return;
 
-      // Проверяем, вышел ли палец за границы карточки
-      const isOutsideCard = (
-        currentPos.x < cardRect.left ||
-        currentPos.x > cardRect.right ||
-        currentPos.y < cardRect.top ||
-        currentPos.y > cardRect.bottom
-      );
+      // Вычисляем расстояние движения
+      const deltaX = Math.abs(currentPos.x - startPos.x);
+      const deltaY = Math.abs(currentPos.y - startPos.y);
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-      // Отменяем долгое нажатие только если палец вышел за границы карточки
-      if (isOutsideCard && longPressTimer !== null) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-        logger.info('Long press cancelled - finger moved outside card', { itemId: item.id });
+      // Threshold для определения скролла (10px)
+      const SCROLL_THRESHOLD = 10;
+
+      // Если палец сдвинулся больше чем на threshold - это скролл
+      if (distance > SCROLL_THRESHOLD) {
+        // Отменяем долгое нажатие
+        if (longPressTimer !== null) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+        
+        // Помечаем что был скролл (чтобы не обрабатывать как тап)
+        isProcessing = true;
+        
+        logger.info('Scroll detected, cancelling tap', { 
+          itemId: item.id, 
+          distance: distance.toFixed(1) 
+        });
+      }
+
+      // Дополнительно проверяем выход за границы карточки
+      if (cardRect) {
+        const isOutsideCard = (
+          currentPos.x < cardRect.left ||
+          currentPos.x > cardRect.right ||
+          currentPos.y < cardRect.top ||
+          currentPos.y > cardRect.bottom
+        );
+
+        if (isOutsideCard && longPressTimer !== null) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+          logger.info('Long press cancelled - finger moved outside card', { itemId: item.id });
+        }
       }
     };
 

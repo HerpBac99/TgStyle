@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs').promises;
 const path = require('path');
+const sharp = require('sharp');
 const { logger } = require('../controllers/logsController');
 const prisma = require('../lib/prisma');
 const { validateTelegramWebAppData } = require('../utils/telegram');
@@ -30,7 +31,7 @@ function parseBase64Image(dataString) {
 }
 
 /**
- * Сохранить изображение на диск
+ * Сохранить изображение на диск с оптимизацией
  */
 async function saveImageToDisk(telegramId, imageBase64) {
     try {
@@ -39,15 +40,52 @@ async function saveImageToDisk(telegramId, imageBase64) {
         await fs.mkdir(userDir, { recursive: true });
 
         // Парсим base64
-        const { buffer, extension } = parseBase64Image(imageBase64);
+        const { buffer } = parseBase64Image(imageBase64);
 
-        // Генерируем уникальное имя файла: item_{telegramId}_{уникальныйКлюч}.png
+        // Проверяем наличие альфа-канала (прозрачности)
+        const metadata = await sharp(buffer).metadata();
+        const hasAlpha = metadata.hasAlpha || metadata.channels === 4;
+
+        let optimizedBuffer;
+        let extension;
+
+        if (hasAlpha) {
+            // Для изображений с прозрачностью используем PNG
+            optimizedBuffer = await sharp(buffer)
+                .rotate() // Применяет EXIF orientation автоматически
+                .resize(1200, 1200, {
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                .png({
+                    quality: 90,
+                    compressionLevel: 9
+                })
+                .toBuffer();
+            extension = 'png';
+        } else {
+            // Для обычных изображений используем JPEG
+            optimizedBuffer = await sharp(buffer)
+                .rotate() // Применяет EXIF orientation автоматически
+                .resize(1200, 1200, {
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                .jpeg({
+                    quality: 85,
+                    progressive: true
+                })
+                .toBuffer();
+            extension = 'jpg';
+        }
+
+        // Генерируем уникальное имя файла
         const randomString = Math.random().toString(36).substring(2, 10);
         const filename = `item_${telegramId}_${randomString}.${extension}`;
         const filePath = path.join(userDir, filename);
 
-        // Сохраняем файл
-        await fs.writeFile(filePath, buffer);
+        // Сохраняем оптимизированный файл
+        await fs.writeFile(filePath, optimizedBuffer);
 
         // Возвращаем относительный путь для БД
         const relativePath = path.join('wardrobe', telegramId.toString(), filename);
@@ -55,7 +93,11 @@ async function saveImageToDisk(telegramId, imageBase64) {
         logger.info('Image saved to disk', {
             telegramId,
             filename,
-            size: buffer.length
+            hasAlpha,
+            format: extension,
+            originalSize: buffer.length,
+            optimizedSize: optimizedBuffer.length,
+            compressionRatio: ((1 - optimizedBuffer.length / buffer.length) * 100).toFixed(1) + '%'
         });
 
         return relativePath;

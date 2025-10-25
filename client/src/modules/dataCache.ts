@@ -259,11 +259,24 @@ class DataCacheManager {
     try {
       // Сохраняем только первые 30 элементов
       const itemsToCache = this.wardrobeItems.slice(0, WARDROBE_CONSTRAINTS.CACHE_ITEMS);
-      const json = safeJsonStringify(itemsToCache);
+      
+      // Фильтруем base64 изображения (они слишком большие для localStorage)
+      const itemsWithoutBase64 = itemsToCache.map(item => {
+        // Если imageUrl начинается с data:image - это base64, не сохраняем в кэш
+        if (item.imageUrl && item.imageUrl.startsWith('data:image')) {
+          return {
+            ...item,
+            imageUrl: '' // Очищаем base64, чтобы не переполнить localStorage
+          };
+        }
+        return item;
+      });
+      
+      const json = safeJsonStringify(itemsWithoutBase64);
       localStorage.setItem(STORAGE_KEYS.WARDROBE_CACHE, json);
 
       logger.info('Wardrobe cache saved to localStorage', {
-        count: itemsToCache.length,
+        count: itemsWithoutBase64.length,
         sizeKB: (json.length / 1024).toFixed(2)
       });
     } catch (error) {

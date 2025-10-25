@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs').promises;
 const path = require('path');
+const sharp = require('sharp');
 const { logger } = require('../controllers/logsController');
 const prisma = require('../lib/prisma');
 const { validateTelegramWebAppData } = require('../utils/telegram');
@@ -81,7 +82,7 @@ async function deleteOldCapsuleThumbnail(telegramId, oldFilename) {
 }
 
 /**
- * Сохранить thumbnail изображение капсулы на диск
+ * Сохранить thumbnail изображение капсулы на диск с оптимизацией
  */
 async function saveCapsuleThumbnail(telegramId, thumbnailImage) {
     try {
@@ -90,20 +91,60 @@ async function saveCapsuleThumbnail(telegramId, thumbnailImage) {
         await fs.mkdir(userDir, { recursive: true });
 
         // Парсим base64
-        const { buffer, extension } = parseBase64Image(thumbnailImage);
+        const { buffer } = parseBase64Image(thumbnailImage);
 
-        // Генерируем уникальное имя файла: capsule_{telegramId}_{timestamp}.png
+        // Проверяем наличие альфа-канала (прозрачности)
+        const metadata = await sharp(buffer).metadata();
+        const hasAlpha = metadata.hasAlpha || metadata.channels === 4;
+
+        let optimizedBuffer;
+        let extension;
+
+        if (hasAlpha) {
+            // Для изображений с прозрачностью используем PNG
+            optimizedBuffer = await sharp(buffer)
+                .rotate()
+                .resize(800, 800, {
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                .png({
+                    quality: 90,
+                    compressionLevel: 9
+                })
+                .toBuffer();
+            extension = 'png';
+        } else {
+            // Для обычных изображений используем JPEG
+            optimizedBuffer = await sharp(buffer)
+                .rotate()
+                .resize(800, 800, {
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                .jpeg({
+                    quality: 80,
+                    progressive: true
+                })
+                .toBuffer();
+            extension = 'jpg';
+        }
+
+        // Генерируем уникальное имя файла
         const timestamp = Date.now();
         const filename = `capsule_${telegramId}_${timestamp}.${extension}`;
         const filePath = path.join(userDir, filename);
 
-        // Сохраняем файл
-        await fs.writeFile(filePath, buffer);
+        // Сохраняем оптимизированный файл
+        await fs.writeFile(filePath, optimizedBuffer);
 
         logger.info('Capsule thumbnail saved', {
             telegramId: telegramId.toString(),
             filename,
-            path: filePath
+            hasAlpha,
+            format: extension,
+            originalSizeKB: Math.round(buffer.length / 1024),
+            optimizedSizeKB: Math.round(optimizedBuffer.length / 1024)
         });
 
         return filename;

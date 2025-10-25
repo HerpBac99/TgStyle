@@ -5,13 +5,14 @@
 
 const fs = require('fs').promises;
 const path = require('path');
+const sharp = require('sharp');
 const { logger } = require('../controllers/logsController');
 
 const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
 const ANALYSIS_DIR = path.join(UPLOADS_DIR, 'analysis');
 
 /**
- * Сохранить фото анализа
+ * Сохранить фото анализа с оптимизацией
  * 
  * @param {string|number} telegramId - ID пользователя в Telegram
  * @param {string} imageBase64 - Изображение в base64 (с префиксом data:image/...)
@@ -30,22 +31,62 @@ async function saveAnalysisImage(telegramId, imageBase64) {
       throw new Error('Invalid base64 image format');
     }
     
-    const extension = matches[1] === 'jpeg' ? 'jpg' : matches[1];
     const data = matches[2];
     const buffer = Buffer.from(data, 'base64');
+    
+    // Анализы обычно без прозрачности, но проверим на всякий случай
+    const metadata = await sharp(buffer).metadata();
+    const hasAlpha = metadata.hasAlpha || metadata.channels === 4;
+    
+    let optimizedBuffer;
+    let extension;
+    
+    if (hasAlpha) {
+      // Для изображений с прозрачностью используем PNG
+      optimizedBuffer = await sharp(buffer)
+        .rotate()
+        .resize(1200, 1200, {
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .png({
+          quality: 90,
+          compressionLevel: 9
+        })
+        .toBuffer();
+      extension = 'png';
+    } else {
+      // Для обычных изображений используем JPEG
+      optimizedBuffer = await sharp(buffer)
+        .rotate()
+        .resize(1200, 1200, {
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .jpeg({
+          quality: 85,
+          progressive: true
+        })
+        .toBuffer();
+      extension = 'jpg';
+    }
     
     // Генерируем имя файла
     const timestamp = Date.now();
     const filename = `analysis_${timestamp}.${extension}`;
     const filePath = path.join(userDir, filename);
     
-    // Сохраняем файл
-    await fs.writeFile(filePath, buffer);
+    // Сохраняем оптимизированный файл
+    await fs.writeFile(filePath, optimizedBuffer);
     
     logger.info('Analysis image saved', {
       telegramId,
       filename,
-      sizeKB: Math.round(buffer.length / 1024)
+      hasAlpha,
+      format: extension,
+      originalSizeKB: Math.round(buffer.length / 1024),
+      optimizedSizeKB: Math.round(optimizedBuffer.length / 1024),
+      compressionRatio: ((1 - optimizedBuffer.length / buffer.length) * 100).toFixed(1) + '%'
     });
     
     return filename; // Возвращаем только имя файла
