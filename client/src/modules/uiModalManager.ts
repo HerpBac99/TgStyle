@@ -593,7 +593,7 @@ export class UIModalManager {
     });
 
     // Показываем экран БЕЗ кнопок (showButtons = false)
-    previewScreen.show(imageUrl, false);
+    previewScreen.show(imageUrl, undefined, false);
 
     logger.info('Capsule preview shown successfully');
   }

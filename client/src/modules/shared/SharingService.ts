@@ -39,9 +39,9 @@ export class SharingService {
 
     // Добавление в DOM ПОСЛЕ like-контейнера
     const likeContainer = parentElement.querySelector('.like-container');
-    if (likeContainer && likeContainer.nextSibling) {
+    if (likeContainer && likeContainer.nextElementSibling) {
       // Если есть элемент после like-контейнера, вставляем перед ним
-      parentElement.insertBefore(container, likeContainer.nextSibling);
+      parentElement.insertBefore(container, likeContainer.nextElementSibling);
     } else if (likeContainer) {
       // Если like-контейнер последний, добавляем после него
       likeContainer.after(container);

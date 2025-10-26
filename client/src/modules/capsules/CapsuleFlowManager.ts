@@ -441,6 +441,14 @@ export class CapsuleFlowManager {
   }
 
   /**
+   * Установить ID капсулы (после создания)
+   */
+  setCapsuleId(capsuleId: number): void {
+    this.state.capsuleId = capsuleId;
+    logger.info('Capsule ID set in flow state', { capsuleId });
+  }
+
+  /**
    * Получить режим работы
    */
   getMode(): CapsuleFlowMode {
@@ -492,11 +500,12 @@ export class CapsuleFlowManager {
 
   /**
    * Настроить навигацию для этапа результата
+   * НОВАЯ ЛОГИКА: BackButton закрывает результат (не возвращает на canvas)
    */
   private setupNavigationForResult(): void {
     navigationManager.push(async () => {
-      await this.goBack();
-    }, 'Return from capsule result');
+      await this.complete(); // Закрываем результат и возвращаемся к гриду
+    }, 'Close capsule result');
   }
 
   /**

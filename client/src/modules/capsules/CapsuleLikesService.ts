@@ -47,8 +47,8 @@ export class CapsuleLikesService {
     container.appendChild(likeBtn);
     container.appendChild(likesCountEl);
 
-    // Добавление в DOM ПОСЛЕ like-контейнера (если это не первый контейнер)
-    parentElement.appendChild(container);
+    // Добавление в DOM В НАЧАЛО контейнера (как в анализе)
+    parentElement.prepend(container);
 
     // 2. Начальная отрисовка
     let currentState = { ...initialData };

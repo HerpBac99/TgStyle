@@ -699,6 +699,9 @@ export class CapsulesManager implements PhotoUploadHandler {
             this.flowManager.setCanvasState(state);
             this.flowManager.setResultImage(imageWithWatermark);
 
+            // НОВАЯ ЛОГИКА: Сохраняем капсулу сразу при нажатии "Далее"
+            await this.saveCapsuleFromCanvas(state);
+
             return imageWithWatermark;
           },
           { message: 'Обрабатываем образ...' },
@@ -744,14 +747,20 @@ export class CapsulesManager implements PhotoUploadHandler {
         screenId: 'capsule-result-screen',
         onSave: () => this.handleResultSave(),
         onShare: () => this.handleResultShare(),
-        onDone: () => this.handleResultDone()
+        onDone: () => this.handleResultDone(),
+        onClose: () => this.handleResultClose()
       });
     }
 
-    // Показываем экран
-    this.resultScreen.show(imageBase64);
+    // Получаем capsuleId из состояния flow
+    const flowState = this.flowManager.getState();
+    const capsuleId = flowState.capsuleId || undefined;
+
+    // Показываем экран с кнопками like и share
+    this.resultScreen.show(imageBase64, capsuleId);
 
     // BackButton управляется через navigationManager в CapsuleFlowManager
+    // setupNavigationForResult() уже настроил BackButton для возврата на грид
 
     logger.info('Result screen shown');
   }
@@ -836,8 +845,60 @@ export class CapsulesManager implements PhotoUploadHandler {
   }
 
   /**
-   * Обработчик кнопки "Готово"
-   * Сохраняет капсулу и завершает flow
+   * Сохранить капсулу при нажатии "Далее" на canvas
+   */
+  private async saveCapsuleFromCanvas(state: any): Promise<void> {
+    logger.info('Saving capsule from canvas');
+
+    const capsuleId = this.flowManager.getCapsuleId();
+    const metadata = this.flowManager.getMetadata();
+
+    if (capsuleId) {
+      // Обновление существующей капсулы
+      const updated = await capsulesService.updateCapsule(capsuleId, {
+        canvasData: state.canvasData,
+        thumbnailImage: state.thumbnailImage,
+        itemIds: state.itemIds
+      });
+
+      // Обновляем в массиве
+      const index = this.capsules.findIndex(c => c.id === capsuleId);
+      if (index !== -1) {
+        this.capsules[index] = updated as StyleCapsule;
+      }
+
+      logger.info('Capsule updated', { id: capsuleId });
+
+    } else {
+      // Создание новой капсулы
+      const generatedName = (this.canvasEditor as any)?.generatedCapsuleName;
+
+      const created = await capsulesService.createCapsule({
+        name: generatedName || `Капсула ${new Date().toLocaleDateString()}`,
+        canvasData: state.canvasData,
+        thumbnailImage: state.thumbnailImage,
+        itemIds: state.itemIds,
+        metadata: metadata || undefined
+      });
+
+      // Очищаем временные данные
+      if (this.canvasEditor) {
+        delete (this.canvasEditor as any).generatedCapsuleName;
+      }
+
+      // Добавляем в массив
+      this.capsules.unshift(created as StyleCapsule);
+      
+      // ВАЖНО: Устанавливаем capsuleId в flowManager для кнопки like
+      this.flowManager.setCapsuleId(created.id);
+      
+      logger.info('Capsule created', { id: created.id, source: metadata?.['source'] || 'manual' });
+    }
+  }
+
+  /**
+   * Обработчик кнопки "Готово" (теперь только завершает flow)
+   * Капсула уже сохранена при нажатии "Далее"
    */
   private async handleResultDone(): Promise<void> {
     if (!this.canvasEditor) {
@@ -925,6 +986,17 @@ export class CapsulesManager implements PhotoUploadHandler {
         ...(this.flowManager.getCapsuleId() && { capsuleId: this.flowManager.getCapsuleId()! })
       })
     );
+  }
+
+  /**
+   * Обработчик кнопки "Закрыть" (завершает flow)
+   * Капсула уже сохранена при нажатии "Далее"
+   */
+  private async handleResultClose(): Promise<void> {
+    logger.info('Result close - completing flow (capsule already saved)');
+    
+    // Завершаем flow через flowManager
+    await this.flowManager.complete();
   }
 
   // ============================================

@@ -12,8 +12,8 @@
     <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
     <script src="https://unpkg.com/fabric@6.7.1/dist/fabric.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" crossorigin src="/assets/main-SLfv87tM.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-BeKKHT_v.css">
+  <script type="module" crossorigin src="/assets/main-D4nlQbVE.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-BN7xj7X5.css">
 </head>
 
 <body>
@@ -432,24 +432,18 @@
 
             <!-- Кнопки действий (внизу) -->
             <div class="capsule-result-actions">
-                <button id="capsule-result-share-btn" class="capsule-result-btn" aria-label="Поделиться в Telegram">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2">
-                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-                        <polyline points="16 6 12 2 8 6"></polyline>
-                        <line x1="12" y1="2" x2="12" y2="15"></line>
-                    </svg>
-                    <span>Поделиться</span>
-                </button>
-                <!-- Кнопка "Готово" -->
-                <button id="capsule-result-done-btn" class="capsule-result-btn capsule-result-done-btn"
-                    aria-label="Готово">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                    <span>Готово</span>
-                </button>
+                <!-- Динамические кнопки like и share будут добавляться сюда -->
+                
+                <!-- Кнопка закрыть (статичная) - в конце -->
+                <button id="close-capsule-btn" class="action-btn close-btn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="21" y1="3" x2="3" y2="21"></line>
+                            <line x1="3" y1="3" x2="21" y2="21"></line>
+                        </svg>
+                    </button>
+                
+
             </div>
         </div>
     </div>

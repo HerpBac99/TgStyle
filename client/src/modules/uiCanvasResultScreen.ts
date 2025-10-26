@@ -4,6 +4,8 @@
  */
 
 import { logger } from './logger';
+import { capsuleLikesService } from './capsules/CapsuleLikesService';
+import { SharingService } from './shared/SharingService';
 
 /**
  * Конфигурация экрана результата
@@ -13,6 +15,7 @@ export interface CanvasResultScreenConfig {
   onSave?: () => void;    // Callback для кнопки "Сохранить в галерею"
   onShare?: () => void;   // Callback для кнопки "Поделиться"
   onDone?: () => void;    // Callback для кнопки "Готово"
+  onClose?: () => void;   // Callback для кнопки "Закрыть"
 }
 
 /**
@@ -36,9 +39,10 @@ export class UICanvasResultScreen {
    * Показать экран результата с изображением
    * 
    * @param imageBase64 - Base64 изображение с watermark
+   * @param capsuleId - ID капсулы (для кнопок like и share)
    * @param showButtons - Показывать ли кнопки действий (по умолчанию true)
    */
-  show(imageBase64: string, showButtons: boolean = true): void {
+  show(imageBase64: string, capsuleId?: number, showButtons: boolean = true): void {
     const screen = document.getElementById(this.config.screenId);
     if (!screen) {
       logger.error('Result screen not found', { screenId: this.config.screenId });
@@ -81,6 +85,7 @@ export class UICanvasResultScreen {
     // Настраиваем кнопки только если нужно показывать
     if (showButtons) {
       this.setupButtons();
+      this.addDynamicButtons(capsuleId, imageBase64);
     } else {
       // Если кнопки не показываем, добавляем обработчик закрытия по клику на экран
       this.setupPreviewMode();
@@ -143,6 +148,78 @@ export class UICanvasResultScreen {
   // ============================================
   // ПРИВАТНЫЕ МЕТОДЫ - НАСТРОЙКА
   // ============================================
+
+  /**
+   * Добавить динамические кнопки like и share
+   */
+  private addDynamicButtons(capsuleId?: number, imageBase64?: string): void {
+    const actionsContainer = document.querySelector('.capsule-result-actions') as HTMLElement;
+    if (!actionsContainer) {
+      logger.error('Actions container not found');
+      return;
+    }
+
+    // Удаляем существующие динамические кнопки (как в анализе)
+    const existingLikeComponent = actionsContainer.querySelector('.capsule-result-like-btn');
+    if (existingLikeComponent) {
+      existingLikeComponent.parentElement?.remove();
+    }
+
+    const existingShareComponent = actionsContainer.querySelector('.capsule-result-share-btn');
+    if (existingShareComponent) {
+      existingShareComponent.parentElement?.remove();
+    }
+
+    // Добавляем кнопку like (только для сохраненных капсул)
+    if (capsuleId) {
+      try {
+        // Получаем начальные данные для кнопки like
+        const initialLikeData = { isLiked: false, likesCount: 0 }; // По умолчанию
+        
+        // Используем сервис для создания компонента like прямо в actionsContainer
+        capsuleLikesService.createLikeComponent(
+          actionsContainer,
+          capsuleId,
+          initialLikeData,
+          'capsule-result' // componentClass для специфичных стилей
+        );
+
+        logger.info('Like button added to result screen', { capsuleId });
+      } catch (error) {
+        logger.error('Failed to add like button', { error, capsuleId });
+      }
+    } else {
+      logger.info('Like button not added - no capsuleId (unsaved capsule)');
+    }
+
+    // Добавляем кнопку share (если есть изображение)
+    if (imageBase64) {
+      try {
+        // Конфигурация для sharing
+        const shareConfig = {
+          type: 'capsule' as const,
+          title: 'Мой образ',
+          text: 'Посмотри на мой новый образ!',
+          image: imageBase64,
+          metadata: {
+            capsuleId: capsuleId
+          }
+        };
+
+        // Используем сервис для создания кнопки share прямо в actionsContainer
+        const sharingService = new SharingService();
+        sharingService.createShareButton(
+          actionsContainer,
+          shareConfig,
+          'capsule-result' // componentClass для специфичных стилей
+        );
+
+        logger.info('Share button added to result screen', { hasCapsuleId: !!capsuleId });
+      } catch (error) {
+        logger.error('Failed to add share button', { error });
+      }
+    }
+  }
 
   /**
    * Настроить режим предпросмотра (без кнопок, закрытие по клику и swipe)
@@ -242,49 +319,21 @@ export class UICanvasResultScreen {
     // Очищаем старые обработчики
     this.cleanup();
 
-    // Кнопка "Сохранить в галерею"
-    const saveBtn = document.getElementById('capsule-result-save-btn') as HTMLElement;
-    if (saveBtn && this.config.onSave) {
-      const handleSave = () => {
-        logger.info('Result save button clicked');
-        this.config.onSave!();
+    // Кнопка закрытия (статичная)
+    const closeBtn = document.getElementById('close-capsule-btn') as HTMLElement;
+    if (closeBtn) {
+      const handleClose = () => {
+        logger.info('Result close button clicked');
+        if (this.config.onClose) {
+          this.config.onClose();
+        } else {
+          this.hide();
+        }
       };
 
-      saveBtn.addEventListener('click', handleSave);
+      closeBtn.addEventListener('click', handleClose);
       this.cleanupFunctions.push(() => {
-        saveBtn.removeEventListener('click', handleSave);
-      });
-    }
-
-    // Кнопка "Поделиться в Telegram"
-    const shareBtn = document.getElementById('capsule-result-share-btn') as HTMLElement;
-    if (shareBtn && this.config.onShare) {
-      const handleShare = () => {
-        logger.info('Result share button clicked');
-        this.config.onShare!();
-      };
-
-      shareBtn.addEventListener('click', handleShare);
-      this.cleanupFunctions.push(() => {
-        shareBtn.removeEventListener('click', handleShare);
-      });
-    }
-
-    // Кнопка "Готово"
-    const doneBtn = document.getElementById('capsule-result-done-btn') as HTMLButtonElement;
-    if (doneBtn && this.config.onDone) {
-      // ВАЖНО: Сбрасываем disabled и pressed класс при каждом показе result screen
-      doneBtn.disabled = false;
-      doneBtn.classList.remove('pressed');
-      
-      const handleDone = () => {
-        logger.info('Result done button clicked');
-        this.config.onDone!();
-      };
-
-      doneBtn.addEventListener('click', handleDone);
-      this.cleanupFunctions.push(() => {
-        doneBtn.removeEventListener('click', handleDone);
+        closeBtn.removeEventListener('click', handleClose);
       });
     }
 

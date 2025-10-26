@@ -447,39 +447,6 @@
     margin: 0;
 }
 
-.capsules-modal-close-btn {
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    outline: none !important;
-    box-shadow: none !important;
-    cursor: pointer;
-    padding: 8px;
-    transition: background-color 0.2s ease;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    /* Дополнительные свойства для полной прозрачности */
-    opacity: 1;
-    filter: none;
-    backdrop-filter: none;
-}
-
-.capsules-modal-close-btn:hover {
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    outline: none !important;
-    box-shadow: none !important;
-}
-
-.capsules-modal-close-btn svg {
-    width: 20px;
-    height: 20px;
-    stroke: var(--tg-theme-text-color);
-}
-
 /* Фильтры категорий (используем стили из wardrobe.css) */
 .capsules-filters {
     display: flex;
@@ -832,7 +799,7 @@
     transform: translateY(0);
     opacity: 1;
     width: 100%;
-    height: 70vh;
+    height: 80vh;
     overflow: hidden;
     border-radius: 16px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
@@ -847,78 +814,31 @@
 /* Кнопки действий - нижние 10% экрана */
 .capsule-result-actions {
     position: absolute;
-    top: 80vh;
-    height: 20vh;
+    top: 90vh;
+    height: 10vh;
     display: flex;
-    gap: 16px;
+    flex-direction: row; /* Явно указываем направление */
+    gap: 50px;
     justify-content: center;
     align-items: center;
     width: 100%;
     padding: 0 16px;
 }
 
-/* НЕОМОРФНЫЕ ПАРЯЩИЕ КНОПКИ - ЕДИНЫЙ СТИЛЬ */
-.capsule-result-btn,
-.capsule-result-done-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 12px 20px 10px 20px;
-    border: none;
-    border-radius: 20px;
-    cursor: pointer;
-    flex: 1;
-    max-width: 160px;
-    -webkit-tap-highlight-color: transparent;
+/* Порядок кнопок теперь правильный через DOM: LIKE → SHARE → CLOSE */
 
-    /* НЕОМОРФНЫЙ ГРАДИЕНТ */
-    background: linear-gradient(145deg, #e8ecf2, #d4dbe4);
-
-    /* НЕОМОРФНЫЕ ТЕНИ - ВЫПУКЛЫЙ ЭФФЕКТ */
-    box-shadow: 8px 8px 16px #c7cbd1, -8px -8px 16px #ffffff;
-
-    /* СОВРЕМЕННЫЕ АНИМАЦИИ */
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.capsule-result-like-btn svg {
+    width: 20px;
+    height: 20px;
 }
 
-.capsule-result-btn:hover,
-.capsule-result-done-btn:hover {
-    /* НЕОМОРФНЫЙ HOVER */
-    transform: translateY(-3px) scale(1.02);
-    box-shadow: 12px 12px 24px #c7cbd1, -12px -12px 24px #ffffff;
+.capsule-result-like-count {
+    font-size: 16px;
 }
 
-.capsule-result-btn:active,
-.capsule-result-done-btn:active,
-.capsule-result-btn.pressed,
-.capsule-result-done-btn.pressed {
-    /* ЭФФЕКТ НАЖАТИЯ - ВДАВЛЕННОСТЬ */
-    transform: translateY(0) scale(0.98);
-    box-shadow: inset 4px 4px 8px #c7cbd1, inset -4px -4px 8px #ffffff;
-}
-
-.capsule-result-btn.pressed,
-.capsule-result-done-btn.pressed {
-    /* Дополнительно уменьшаем opacity для визуальной индикации загрузки */
-    opacity: 0.7;
-    cursor: not-allowed;
-}
-
-.capsule-result-btn svg,
-.capsule-result-done-btn svg {
-    width: 28px;
-    height: 28px;
-    stroke: #2c2c30;
-    stroke-width: 2;
-}
-
-.capsule-result-btn span,
-.capsule-result-done-btn span {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #2c2c30;
+.capsule-result-share-btn svg {
+    width: 20px;
+    height: 20px;
 }
 
 /* =======================================
