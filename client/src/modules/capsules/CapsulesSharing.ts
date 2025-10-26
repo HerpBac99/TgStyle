@@ -1,10 +1,12 @@
 /**
  * Модуль для sharing капсул
  * Использует универсальные сервисы (SharingService, ImageRenderService)
+ * ДЕЛЕГИРОВАНИЕ: ImageProcessingService для обработки изображений
  */
 
 import { logger } from '../logger';
 import { sharingService } from '../shared/SharingService';
+import { imageProcessingService } from '../shared/ImageProcessingService';
 import type { ShareConfig } from '@/types/sharing';
 import { UICanvasEditor } from '../uiCanvasEditor';
 
@@ -89,6 +91,7 @@ export class CapsulesSharing {
 
   /**
    * Получить изображение canvas
+   * ДЕЛЕГИРОВАНИЕ: используем ImageProcessingService
    * 
    * @param canvasEditor - Canvas editor
    * @returns Base64 изображение canvas
@@ -103,13 +106,13 @@ export class CapsulesSharing {
         return null;
       }
 
-      // Конвертируем в base64
-      const canvasElement = fabricCanvas.getElement() as HTMLCanvasElement;
-      const canvasImage = canvasElement.toDataURL('image/png');
+      // ДЕЛЕГИРОВАНИЕ: используем ImageProcessingService для конвертации
+      const canvasImage = await imageProcessingService.canvasToBase64(
+        fabricCanvas.getElement() as HTMLCanvasElement,
+        { format: 'png', quality: 1.0 }
+      );
 
-      logger.info('Canvas image captured', {
-        sizeKB: Math.round((canvasImage.length * 3) / 4 / 1024)
-      });
+      logger.info('Canvas image captured via ImageProcessingService');
 
       return canvasImage;
 

@@ -71,6 +71,27 @@ export interface CanvasItem {
 }
 
 /**
+ * Состояние canvas
+ * Используется для сохранения и восстановления состояния canvas
+ */
+export interface CanvasState {
+  /** Данные canvas (объекты, позиции) */
+  canvasData: any;
+  
+  /** Thumbnail (кэшируется) */
+  thumbnailImage: string;
+  
+  /** ID вещей на canvas */
+  itemIds: number[];
+  
+  /** Timestamp для кэша */
+  timestamp: number;
+  
+  /** Флаг изменений */
+  isDirty?: boolean;
+}
+
+/**
  * Сгенерированная капсула
  */
 export interface GeneratedCapsule {

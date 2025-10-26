@@ -1,132 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const fs = require('fs').promises;
-const path = require('path');
-const sharp = require('sharp');
 const { logger } = require('../controllers/logsController');
 const prisma = require('../lib/prisma');
 const { validateTelegramWebAppData } = require('../utils/telegram');
 const { getInitData } = require('../utils/authHelper');
+const FileService = require('../services/FileService');
 
-/**
- * Папка для хранения изображений гардероба
- */
-const WARDROBE_UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'wardrobe');
 
-/**
- * Конвертировать base64 в Buffer и определить расширение
- */
-function parseBase64Image(dataString) {
-    const matches = dataString.match(/^data:image\/([a-z]+);base64,(.+)$/);
 
-    if (!matches || matches.length !== 3) {
-        throw new Error('Invalid base64 image format');
-    }
 
-    const extension = matches[1] === 'jpeg' ? 'jpg' : matches[1];
-    const data = matches[2];
-    const buffer = Buffer.from(data, 'base64');
-
-    return { buffer, extension };
-}
-
-/**
- * Сохранить изображение на диск с оптимизацией
- */
-async function saveImageToDisk(telegramId, imageBase64) {
-    try {
-        // Создаем папку для пользователя если её нет
-        const userDir = path.join(WARDROBE_UPLOADS_DIR, telegramId.toString());
-        await fs.mkdir(userDir, { recursive: true });
-
-        // Парсим base64
-        const { buffer } = parseBase64Image(imageBase64);
-
-        // Проверяем наличие альфа-канала (прозрачности)
-        const metadata = await sharp(buffer).metadata();
-        const hasAlpha = metadata.hasAlpha || metadata.channels === 4;
-
-        let optimizedBuffer;
-        let extension;
-
-        if (hasAlpha) {
-            // Для изображений с прозрачностью используем PNG
-            optimizedBuffer = await sharp(buffer)
-                .rotate() // Применяет EXIF orientation автоматически
-                .resize(1200, 1200, {
-                    fit: 'inside',
-                    withoutEnlargement: true
-                })
-                .png({
-                    quality: 90,
-                    compressionLevel: 9
-                })
-                .toBuffer();
-            extension = 'png';
-        } else {
-            // Для обычных изображений используем JPEG
-            optimizedBuffer = await sharp(buffer)
-                .rotate() // Применяет EXIF orientation автоматически
-                .resize(1200, 1200, {
-                    fit: 'inside',
-                    withoutEnlargement: true
-                })
-                .jpeg({
-                    quality: 85,
-                    progressive: true
-                })
-                .toBuffer();
-            extension = 'jpg';
-        }
-
-        // Генерируем уникальное имя файла
-        const randomString = Math.random().toString(36).substring(2, 10);
-        const filename = `item_${telegramId}_${randomString}.${extension}`;
-        const filePath = path.join(userDir, filename);
-
-        // Сохраняем оптимизированный файл
-        await fs.writeFile(filePath, optimizedBuffer);
-
-        // Возвращаем относительный путь для БД
-        const relativePath = path.join('wardrobe', telegramId.toString(), filename);
-
-        logger.info('Image saved to disk', {
-            telegramId,
-            filename,
-            hasAlpha,
-            format: extension,
-            originalSize: buffer.length,
-            optimizedSize: optimizedBuffer.length,
-            compressionRatio: ((1 - optimizedBuffer.length / buffer.length) * 100).toFixed(1) + '%'
-        });
-
-        return relativePath;
-
-    } catch (error) {
-        logger.error('Error saving image to disk', {
-            telegramId,
-            error: error.message
-        });
-        throw error;
-    }
-}
-
-/**
- * Удалить изображение с диска
- */
-async function deleteImageFromDisk(imagePath) {
-    try {
-        const fullPath = path.join(WARDROBE_UPLOADS_DIR, '..', imagePath);
-        await fs.unlink(fullPath);
-        logger.info('Image deleted from disk', { imagePath });
-    } catch (error) {
-        // Не бросаем ошибку если файл уже удален
-        logger.warn('Failed to delete image from disk', {
-            imagePath,
-            error: error.message
-        });
-    }
-}
 
 // Удалено - больше не нужно получать пользователя
 
@@ -175,7 +57,7 @@ router.post('/', async (req, res) => {
         });
 
         // Сохраняем изображение на диск
-        const imagePath = await saveImageToDisk(telegramId, imageBase64);
+        const imagePath = await FileService.saveWardrobeImage(telegramId, imageBase64);
 
         // Создаем запись в БД
         const wardrobeItem = await prisma.wardrobeItem.create({
@@ -202,7 +84,7 @@ router.post('/', async (req, res) => {
         });
 
         // Формируем URL для доступа к изображению
-        const imageUrl = `/uploads/${imagePath}`;
+        const imageUrl = FileService.getImageUrl(imagePath, 'wardrobe');
 
         return res.json({
             success: true,
@@ -280,7 +162,7 @@ router.get('/', async (req, res) => {
         // Формируем ответ с URL для изображений
         const itemsWithUrls = items.map(item => ({
             id: item.id,
-            imageUrl: `/uploads/${item.imagePath}`,
+            imageUrl: FileService.getImageUrl(item.imagePath, 'wardrobe'),
             name: item.name,
             category: item.category,
             subtype: item.subtype,
@@ -533,7 +415,7 @@ router.delete('/:id', async (req, res) => {
         }
 
         // Удаляем изображение с диска
-        await deleteImageFromDisk(item.imagePath);
+        await FileService.deleteWardrobeImage(telegramId, item.imagePath);
 
         // Удаляем запись из БД
         await prisma.wardrobeItem.delete({

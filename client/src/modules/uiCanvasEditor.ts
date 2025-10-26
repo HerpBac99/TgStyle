@@ -1,10 +1,13 @@
 /**
  * Унифицированный редактор canvas для капсул
  * Использует Fabric.js для манипуляций с изображениями одежды
+ * 
+ * SINGLETON PATTERN: Используется единственный экземпляр для всей сессии
+ * Это предотвращает повторную инициализацию и утечки памяти
  */
 
 import { logger } from './logger';
-import { api } from './api';
+import { imageProcessingService } from './shared/ImageProcessingService';
 import { WardrobeItem } from './photoUploadManager';
 import type { GeneratedCapsule } from '@/types/capsules';
 import * as fabric from 'fabric';
@@ -20,6 +23,7 @@ export interface CanvasEditorConfig {
   canvasId: string;     // ID элемента canvas
   onAddItem?: () => void;  // Callback для кнопки "Добавить одежду"
   onNext?: () => void;     // Callback для кнопки "Далее"
+  onItemDeleted?: (itemId: number) => void;  // Callback при удалении элемента с канваса
 }
 
 /**
@@ -41,16 +45,64 @@ export interface CanvasState {
 }
 
 /**
- * Унифицированный редактор canvas
+ * Унифицированный редактор canvas (Singleton)
  */
 export class UICanvasEditor {
+  // Singleton instance
+  private static instance: UICanvasEditor | null = null;
+
   private fabricCanvas: fabric.Canvas | null = null;
   private config: CanvasEditorConfig;
   private cleanupFunctions: (() => void)[] = [];
   private isVisible: boolean = false;
 
-  constructor(config: CanvasEditorConfig) {
+  // Приватный конструктор для Singleton
+  private constructor(config: CanvasEditorConfig) {
     this.config = config;
+    logger.info('UICanvasEditor: Singleton instance created');
+  }
+
+  /**
+   * Получить единственный экземпляр UICanvasEditor (Singleton)
+   * 
+   * @param config - Конфигурация (используется только при первом вызове)
+   * @returns Единственный экземпляр UICanvasEditor
+   */
+  static getInstance(config: CanvasEditorConfig): UICanvasEditor {
+    if (!UICanvasEditor.instance) {
+      UICanvasEditor.instance = new UICanvasEditor(config);
+    } else {
+      // Обновляем callbacks если они изменились
+      UICanvasEditor.instance.updateConfig(config);
+    }
+    return UICanvasEditor.instance;
+  }
+
+  /**
+   * Обновить конфигурацию (callbacks)
+   * Используется когда getInstance вызывается с новыми callbacks
+   */
+  private updateConfig(config: CanvasEditorConfig): void {
+    const configChanged =
+      this.config.onAddItem !== config.onAddItem ||
+      this.config.onNext !== config.onNext;
+
+    if (configChanged) {
+      logger.debug('UICanvasEditor: Updating config callbacks');
+
+      // Обновляем callbacks (с проверкой на undefined)
+      if (config.onAddItem !== undefined) {
+        this.config.onAddItem = config.onAddItem;
+      }
+      if (config.onNext !== undefined) {
+        this.config.onNext = config.onNext;
+      }
+
+      // Переустанавливаем обработчики кнопок с новыми callbacks
+      if (this.fabricCanvas) {
+        this.setupCanvasButtons();
+      }
+    }
   }
 
   // ============================================
@@ -159,6 +211,8 @@ export class UICanvasEditor {
    * 1. Создания новой капсулы (без сохраненных позиций)
    * 2. Редактирования капсулы (с сохраненными позициями)
    * 
+   * ОПТИМИЗАЦИЯ: Переиспользует существующие объекты если они уже на canvas
+   * 
    * @param items - Массив элементов для добавления
    */
   async loadItems(items: CanvasItem[]): Promise<void> {
@@ -169,18 +223,65 @@ export class UICanvasEditor {
 
     logger.info('Loading items to canvas', { itemsCount: items.length });
 
-    // Очищаем canvas
-    this.fabricCanvas.clear();
-    (this.fabricCanvas as any).backgroundColor = '#f5f5f5';
-    this.fabricCanvas.renderAll();
+    // Получаем текущие объекты на canvas
+    const existingObjects = this.fabricCanvas.getObjects();
+    const existingItemIds = new Set<number>();
 
-    // Загружаем элементы последовательно для сохранения порядка слоев
-    for (const canvasItem of items) {
-      await this.addItem(canvasItem);
+    existingObjects.forEach(obj => {
+      const fabricObj = obj as any;
+      const itemData = fabricObj.itemData || fabricObj._element?.itemData;
+      if (itemData && itemData.id) {
+        existingItemIds.add(itemData.id);
+      }
+    });
+
+    // Определяем какие элементы нужно добавить, а какие уже есть
+    const itemsToAdd: CanvasItem[] = [];
+    const itemIdsToKeep = new Set<number>();
+
+    items.forEach(canvasItem => {
+      itemIdsToKeep.add(canvasItem.item.id);
+      if (!existingItemIds.has(canvasItem.item.id)) {
+        itemsToAdd.push(canvasItem);
+      }
+    });
+
+    // Удаляем объекты, которых нет в новом списке
+    const itemIdsToRemove: number[] = [];
+    existingItemIds.forEach(id => {
+      if (!itemIdsToKeep.has(id)) {
+        itemIdsToRemove.push(id);
+      }
+    });
+
+    if (itemIdsToRemove.length > 0) {
+      logger.debug('Removing obsolete items from canvas', { count: itemIdsToRemove.length });
+      await this.removeItems(itemIdsToRemove);
+    }
+
+    // Если нужно полностью очистить и загрузить заново
+    if (itemsToAdd.length === items.length) {
+      logger.debug('Full reload: clearing canvas');
+      this.fabricCanvas.clear();
+      (this.fabricCanvas as any).backgroundColor = '#f5f5f5';
+      this.fabricCanvas.renderAll();
+    }
+
+    // Добавляем только новые элементы
+    if (itemsToAdd.length > 0) {
+      logger.debug('Adding new items to canvas', { count: itemsToAdd.length });
+      for (const canvasItem of itemsToAdd) {
+        await this.addItem(canvasItem);
+      }
     }
 
     this.fabricCanvas.renderAll();
-    logger.info('Items loaded to canvas successfully');
+    logger.info('Items loaded to canvas successfully', {
+      total: items.length,
+      added: itemsToAdd.length,
+      removed: itemIdsToRemove.length,
+      reused: items.length - itemsToAdd.length
+    });
   }
 
   /**
@@ -260,14 +361,14 @@ export class UICanvasEditor {
     // Позиционируем каждую категорию
     Object.entries(itemsByCategory).forEach(([category, categoryItems]) => {
       const baseY = categoryPositions[category] || canvasHeight * 0.5;
-      
+
       // Если несколько вещей в категории, располагаем их горизонтально
       const itemCount = categoryItems.length;
       const horizontalSpacing = Math.min(150, canvasWidth / (itemCount + 1));
 
       categoryItems.forEach((item, index) => {
         let x: number;
-        
+
         if (itemCount === 1) {
           // Одна вещь - по центру
           x = canvasCenterX;
@@ -405,6 +506,64 @@ export class UICanvasEditor {
     this.addImageToCanvas(imageObj, item, finalX, finalY, finalScale, finalAngle);
   }
 
+  /**
+   * ИНКРЕМЕНТАЛЬНОЕ ДОБАВЛЕНИЕ: Добавить несколько элементов на canvas
+   * Не очищает существующие элементы, только добавляет новые
+   * 
+   * @param items - Массив элементов для добавления
+   */
+  async addItems(items: CanvasItem[]): Promise<void> {
+    if (!this.fabricCanvas) {
+      throw new Error('Canvas not initialized');
+    }
+
+    logger.info('Adding items to canvas incrementally', { itemsCount: items.length });
+
+    // Добавляем элементы последовательно для сохранения порядка слоев
+    for (const canvasItem of items) {
+      await this.addItem(canvasItem);
+    }
+
+    this.fabricCanvas.renderAll();
+    logger.info('Items added to canvas successfully');
+  }
+
+  /**
+   * ИНКРЕМЕНТАЛЬНОЕ УДАЛЕНИЕ: Удалить несколько элементов с canvas по ID
+   * 
+   * @param itemIds - Массив ID элементов для удаления
+   * @returns Количество удаленных элементов
+   */
+  async removeItems(itemIds: number[]): Promise<number> {
+    if (!this.fabricCanvas) {
+      logger.warn('Canvas not initialized');
+      return 0;
+    }
+
+    logger.info('Removing items from canvas', { itemIds });
+
+    let removedCount = 0;
+    const objects = this.fabricCanvas.getObjects();
+
+    for (const obj of objects) {
+      const fabricObj = obj as any;
+      const itemData = fabricObj.itemData || fabricObj._element?.itemData;
+
+      if (itemData && itemIds.includes(itemData.id)) {
+        this.fabricCanvas.remove(obj);
+        removedCount++;
+        logger.debug('Item removed from canvas', { itemId: itemData.id });
+      }
+    }
+
+    if (removedCount > 0) {
+      this.fabricCanvas.renderAll();
+      logger.info('Items removed from canvas', { removedCount });
+    }
+
+    return removedCount;
+  }
+
   // ============================================
   // ПУБЛИЧНЫЕ МЕТОДЫ - СОСТОЯНИЕ
   // ============================================
@@ -418,8 +577,9 @@ export class UICanvasEditor {
 
   /**
    * Получить текущее состояние canvas для сохранения
+   * @param removeBackground - Удалять ли фон с изображения (по умолчанию false)
    */
-  async getState(): Promise<CanvasState> {
+  async getState(removeBackground: boolean = false): Promise<CanvasState> {
     if (!this.fabricCanvas) {
       throw new Error('Canvas not initialized');
     }
@@ -463,8 +623,8 @@ export class UICanvasEditor {
       }
     };
 
-    // Получаем thumbnail с удаленным фоном
-    const thumbnailImage = await this.canvasToImage();
+    // Получаем thumbnail с опциональным удалением фона
+    const thumbnailImage = await this.canvasToImage(removeBackground);
 
     logger.debug('Canvas state collected', {
       objectsCount: objects.length,
@@ -473,7 +633,7 @@ export class UICanvasEditor {
 
     return {
       canvasData,
-      thumbnailImage
+      thumbnailImage: thumbnailImage || '' // Гарантируем, что thumbnailImage не undefined
     };
   }
 
@@ -649,6 +809,7 @@ export class UICanvasEditor {
   /**
    * Настроить обработчики выделения объектов
    * При выделении объект автоматически поднимается на самый верх
+   * ОПТИМИЗАЦИЯ: Отслеживает изменения для установки флага dirty
    */
   private setupSelectionHandlers(): void {
     if (!this.fabricCanvas) {
@@ -678,7 +839,26 @@ export class UICanvasEditor {
     // Обработчик для смены выделения (когда выбираем другой объект)
     this.fabricCanvas.on('selection:updated', handleSelection);
 
-    logger.info('Selection handlers configured');
+    // ОПТИМИЗАЦИЯ: Отслеживаем изменения объектов для установки флага dirty
+    this.fabricCanvas.on('object:modified', () => {
+      // Отправляем событие об изменении canvas
+      window.dispatchEvent(new CustomEvent('canvas:modified'));
+      logger.debug('Canvas modified - object changed');
+    });
+
+    this.fabricCanvas.on('object:added', () => {
+      // Отправляем событие об изменении canvas
+      window.dispatchEvent(new CustomEvent('canvas:modified'));
+      logger.debug('Canvas modified - object added');
+    });
+
+    this.fabricCanvas.on('object:removed', () => {
+      // Отправляем событие об изменении canvas
+      window.dispatchEvent(new CustomEvent('canvas:modified'));
+      logger.debug('Canvas modified - object removed');
+    });
+
+    logger.info('Selection and modification handlers configured');
   }
 
   /**
@@ -938,12 +1118,19 @@ export class UICanvasEditor {
         return false;
       }
 
+      const itemId = (target as any).id;
+
       this.fabricCanvas.remove(target);
       this.fabricCanvas.renderAll();
 
       logger.info('Object deleted from canvas', {
-        itemId: (target as any).id
+        itemId: itemId
       });
+
+      // Уведомляем о удалении объекта через callback
+      if (this.config.onItemDeleted && itemId) {
+        this.config.onItemDeleted(itemId);
+      }
 
       return true;
 
@@ -997,11 +1184,15 @@ export class UICanvasEditor {
   /**
    * Конвертировать canvas в изображение base64 с удалением фона
    * Делаем фон прозрачным перед сохранением для правильной обрезки на сервере
+   * 
+   * ДЕЛЕГИРОВАНИЕ: Использует ImageProcessingService для удаления фона
    */
-  private async canvasToImage(): Promise<string> {
+  private async canvasToImage(removeBackground: boolean = false): Promise<string> {
     if (!this.fabricCanvas) {
       throw new Error('No canvas available');
     }
+
+    logger.info('canvasToImage called', { removeBackground });
 
     // Сохраняем текущий цвет фона
     const originalBgColor = this.fabricCanvas.backgroundColor;
@@ -1017,37 +1208,51 @@ export class UICanvasEditor {
       backgroundColor: 'transparent (temp)'
     });
 
-    // Получаем canvas element с прозрачным фоном
+    // ДЕЛЕГИРОВАНИЕ: используем ImageProcessingService для конвертации canvas
     const canvasElement = this.fabricCanvas.getElement() as HTMLCanvasElement;
-    const canvasBase64 = canvasElement.toDataURL('image/png');
+    const canvasBase64 = await imageProcessingService.canvasToBase64(canvasElement, {
+      format: 'png',
+      quality: 1.0
+    });
 
     // Восстанавливаем оригинальный фон
     this.fabricCanvas.backgroundColor = originalBgColor;
     this.fabricCanvas.renderAll();
 
-    try {
-      logger.info('Sending canvas to background removal');
+    // Удаляем фон только если это необходимо (например, для AI-generated капсул)
+    if (removeBackground) {
+      try {
+        logger.info('Sending canvas to background removal via ImageProcessingService');
 
-      // REFACTORED: используем api клиент вместо fetch
-      const result = await api.removeBackground(canvasBase64) as any;
+        // ДЕЛЕГИРОВАНИЕ: используем ImageProcessingService для удаления фона
+        const processedImage = await imageProcessingService.removeBackground(canvasBase64);
 
-      if (!result.success) {
-        throw new Error(result.error || 'Background removal failed');
+        // Проверяем что результат не пустой (base64 изображения обычно длиннее 1000 символов)
+        if (!processedImage || processedImage.length < 1000) {
+          logger.warn('Background removal returned empty or invalid image, using original', {
+            resultLength: processedImage?.length || 0
+          });
+          return canvasBase64 || '';
+        }
+
+        logger.info('Canvas background removed successfully via ImageProcessingService', {
+          originalLength: canvasBase64.length,
+          processedLength: processedImage.length
+        });
+
+        return processedImage;
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error('Error removing canvas background, using original', { error: errorMessage });
+
+        // Fallback: возвращаем оригинальное изображение без удаления фона
+        return canvasBase64 || '';
       }
-
-      logger.info('Canvas background removed successfully', {
-        originalSize: result.image_info?.original_size,
-        resultSize: result.image_info?.result_size
-      });
-
-      return result.image_base64;
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Error removing canvas background, using original', { error: errorMessage });
-
-      // Fallback: возвращаем оригинальное изображение без удаления фона
-      return canvasBase64;
+    } else {
+      // Фон не удаляется - возвращаем как есть
+      logger.info('Skipping background removal - removeBackground is false');
+      return canvasBase64 || '';
     }
   }
 

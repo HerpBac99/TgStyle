@@ -1,6 +1,13 @@
 /**
- * Менеджер капсул
+ * Менеджер капсул (РЕФАКТОРЕННЫЙ)
  * Координирует UI, сервисы и обработку данных
+ * 
+ * ДЕЛЕГИРОВАНИЕ:
+ * - Flow управление → CapsuleFlowManager
+ * - Выбор вещей → CapsuleSelectionManager
+ * - Состояние canvas → CanvasStateManager
+ * - Обработка изображений → ImageProcessingService
+ * - Модальные окна → ModalService
  */
 
 import { logger } from '../logger';
@@ -10,7 +17,6 @@ import { StyleCapsule } from '../uiCapsulesGrid';
 import { PhotoUploadHandler, ClothingCategory } from '../photoUploadManager';
 import { capsulesService } from './CapsulesService';
 import { wardrobeService } from '../wardrobe/WardrobeService';
-import { wardrobeManager } from '../wardrobe/WardrobeManager';
 import { photoProcessor } from '../shared/PhotoProcessor';
 import { dataLoader } from '../shared/DataLoader';
 import { fileToBase64 } from '../shared/utils';
@@ -19,43 +25,68 @@ import { UICapsulesGrid } from '../uiCapsulesGrid';
 import { UICanvasEditor } from '../uiCanvasEditor';
 import { UICanvasResultScreen } from '../uiCanvasResultScreen';
 import { uiModalManager } from '../uiModalManager';
-import { navigationManager } from '../navigationManager';
 import { capsulesSharing } from './CapsulesSharing';
-import { addWatermark } from '@/utils/watermarkUtils';
 import { capsuleGenerationService } from './CapsuleGenerationService';
 
+// НОВЫЕ МОДУЛИ
+import { capsuleFlowManager, CapsuleFlowManager } from './CapsuleFlowManager';
+import { capsuleSelectionManager, CapsuleSelectionManager } from './CapsuleSelectionManager';
+import { canvasStateManager, CanvasStateManager } from './CanvasStateManager';
+import { imageProcessingService } from '../shared/ImageProcessingService';
+import { modalService, ModalService } from '../shared/ModalService';
+import { CapsuleErrorHandler } from './CapsuleErrorHandler';
+
 /**
- * Менеджер капсул
+ * Менеджер капсул (РЕФАКТОРЕННЫЙ)
  */
 export class CapsulesManager implements PhotoUploadHandler {
+  // НОВЫЕ ЗАВИСИМОСТИ
+  private flowManager: CapsuleFlowManager;
+  private selectionManager: CapsuleSelectionManager;
+  private stateManager: CanvasStateManager;
+  private imageService: typeof imageProcessingService;
+  private modalSvc: ModalService;
+
   // Компоненты UI
   private capsulesGrid: UICapsulesGrid;
   private canvasEditor: UICanvasEditor | null = null;
   private resultScreen: UICanvasResultScreen | null = null;
 
   // Данные
-  private wardrobeItems: WardrobeItem[] = [];
   private capsules: StyleCapsule[] = [];
-  private currentCapsuleId: number | null = null;
 
-  // Состояние
-  private mode: 'grid' | 'selection' | 'canvas' | 'result' | null = null;
-  private selectedItems: WardrobeItem[] = [];
-  private currentResultImage: string | null = null;
-
-  // Предпросмотр фото
+  // Предпросмотр фото (для PhotoUploadHandler)
   private currentPreviewImage: string | null = null;
   private currentClassification: any = null;
 
-  // Оптимистичное добавление вещей
-  private lastOptimisticItemId: number | null = null;
-
-  // Event listener для очистки
+  // Event listeners для очистки
   private wardrobeItemSavedHandler: EventListener;
-  private cleanupFunctions: (() => void)[] = [];
+  private canvasModifiedHandler: EventListener;
 
   constructor() {
-    // CapsulesManager initialized
+    logger.info('CapsulesManager initialized (REFACTORED)');
+
+    // ВНЕДРЕНИЕ ЗАВИСИМОСТЕЙ
+    this.flowManager = capsuleFlowManager;
+    this.selectionManager = capsuleSelectionManager;
+    this.stateManager = canvasStateManager;
+    this.imageService = imageProcessingService;
+    this.modalSvc = modalService;
+
+    // Настраиваем callbacks для flowManager
+    this.flowManager.setCallbacks({
+      onMoveToSelection: () => this.showSelectionModal(),
+      onMoveToCanvas: () => this.showCanvas(),
+      onMoveToResult: () => this.showResultScreen(),
+      onGoBack: () => this.handleGoBack(),
+      onComplete: () => this.handleFlowComplete(),
+      onCancel: () => this.handleFlowCancel()
+    });
+
+    // Настраиваем callbacks для selectionManager
+    this.selectionManager.updateConfig({
+      onAddItem: () => this.handleSelectionAddItem()
+    });
 
     // Инициализируем грид капсул
     this.capsulesGrid = new UICapsulesGrid({
@@ -72,6 +103,13 @@ export class CapsulesManager implements PhotoUploadHandler {
     }) as EventListener;
 
     window.addEventListener('wardrobe:item-saved', this.wardrobeItemSavedHandler);
+
+    // ОПТИМИЗАЦИЯ: Подписываемся на событие изменения canvas для установки флага dirty
+    this.canvasModifiedHandler = (() => {
+      this.handleCanvasModified();
+    }) as EventListener;
+
+    window.addEventListener('canvas:modified', this.canvasModifiedHandler);
   }
 
   // ============================================
@@ -80,22 +118,34 @@ export class CapsulesManager implements PhotoUploadHandler {
 
   /**
    * Открыть грид капсул
+   * ОПТИМИЗАЦИЯ: Инвалидирует старый кэш при открытии
    */
   async handleCapsulesOpen(): Promise<void> {
-    try {
-      this.mode = 'grid';
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        // ОПТИМИЗАЦИЯ: Инвалидируем старый кэш (старше 1 часа)
+        this.stateManager.invalidateOldCache(60 * 60 * 1000);
 
-      // Загружаем капсулы
-      await this.loadCapsules();
+        // Загружаем капсулы
+        await this.loadCapsules();
 
-      // Показываем грид
-      this.capsulesGrid.show();
-      this.capsulesGrid.render(this.capsules);
+        // Показываем грид
+        this.capsulesGrid.show();
+        this.capsulesGrid.render(this.capsules);
 
-      logger.info('Capsules opened', { count: this.capsules.length });
-    } catch (error) {
-      logger.error('Error opening capsules grid', error);
-    }
+        logger.info('Capsules opened', { 
+          count: this.capsules.length,
+          cacheStats: this.stateManager.getCacheStats()
+        });
+      },
+      () => {
+        // Fallback: показываем грид с пустым массивом
+        this.capsules = [];
+        this.capsulesGrid.show();
+        this.capsulesGrid.render(this.capsules);
+      },
+      CapsuleErrorHandler.createContext('Открытие капсул')
+    );
   }
 
   /**
@@ -104,7 +154,8 @@ export class CapsulesManager implements PhotoUploadHandler {
   closeCapsules(): void {
     logger.info('Closing capsules');
 
-    navigationManager.clear();
+    // Отменяем flow если активен
+    this.flowManager.cancel();
 
     if (this.canvasEditor) {
       this.canvasEditor.hide();
@@ -114,407 +165,413 @@ export class CapsulesManager implements PhotoUploadHandler {
 
     uiModalManager.hide();
     this.capsulesGrid.hide();
-
-    this.mode = null;
-    this.currentCapsuleId = null;
-    this.selectedItems = [];
   }
 
   // ============================================
-  // СОЗДАНИЕ НОВОЙ КАПСУЛЫ
+  // СОЗДАНИЕ НОВОЙ КАПСУЛЫ (ДЕЛЕГИРОВАНО)
   // ============================================
 
   /**
    * Обработчик клика "Добавить капсулу"
+   * ДЕЛЕГИРУЕТ в CapsuleFlowManager
    */
   private async handleAddCapsuleClick(): Promise<void> {
-    try {
-      this.mode = 'selection';
-      this.currentCapsuleId = null;
-      this.selectedItems = [];
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('Starting new capsule creation');
 
-      this.capsulesGrid.hide();
+        // Скрываем грид
+        this.capsulesGrid.hide();
 
-      // Показываем модальное окно выбора вещей
-      this.showCapsuleCreationModal();
-
-      // Загружаем гардероб через WardrobeManager с префиксом 'capsules-modal'
-      await wardrobeManager.handleWardrobeOpen('capsules-modal');
-      this.wardrobeItems = dataCacheManager.getWardrobeItems();
-
-      // Подписываемся на событие выделения вещи
-      const handleSelectionToggle = (event: CustomEvent) => {
-        this.handleItemSelectionToggle(event.detail.item);
-      };
-      window.addEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
-
-      // Сохраняем для очистки
-      this.cleanupFunctions.push(() => {
-        window.removeEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
-      });
-    } catch (error) {
-      logger.error('Error opening add capsule modal', error);
-    }
+        // ДЕЛЕГИРУЕМ управление flow в CapsuleFlowManager
+        await this.flowManager.startNewCapsule();
+      },
+      () => {
+        // Fallback: возвращаемся к гриду
+        this.capsulesGrid.show();
+      },
+      CapsuleErrorHandler.createContext('Создание новой капсулы')
+    );
   }
 
   /**
-   * Показать модальное окно создания капсулы с гридом гардероба
+   * Показать модальное окно выбора вещей
+   * Вызывается через callback из CapsuleFlowManager
+   */
+  private async showSelectionModal(): Promise<void> {
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('Showing selection modal for new capsule');
+
+        // Получаем уже выбранные элементы из flowManager (для возврата с канваса)
+        const currentSelectedItems = this.flowManager.getSelectedItems();
+        const preselectedIds = currentSelectedItems.map(item => item.id);
+
+        // ДЕЛЕГИРУЕМ в единый метод выбора с предвыбранными элементами
+        const selectedItems = await this.showItemSelection(preselectedIds, 'new-capsule');
+
+        if (selectedItems.length > 0) {
+          // Сохраняем выбранные вещи в flowManager
+          this.flowManager.setSelectedItems(selectedItems);
+
+          // Переходим на canvas
+          this.flowManager.moveToCanvas();
+        } else {
+          // Отмена - возвращаемся к гриду
+          this.flowManager.cancel();
+        }
+      },
+      () => {
+        // Fallback: отменяем flow
+        this.flowManager.cancel();
+      },
+      CapsuleErrorHandler.createContext('Выбор вещей для капсулы')
+    );
+  }
+
+  /**
+   * ЕДИНЫЙ МЕТОД для показа выбора вещей
+   * Используется как для создания новой капсулы, так и для добавления вещей на canvas
    * 
-   * Примечание: Грид рендерится через wardrobeManager.handleWardrobeOpen('capsules-modal')
-   * который вызывается в handleAddCapsule() перед этим методом.
+   * @param preselectedIds - ID предварительно выбранных вещей (опционально)
+   * @param context - контекст вызова ('new-capsule' | 'canvas-add')
+   * @returns Promise с выбранными вещами
    */
-  private showCapsuleCreationModal(): void {
-    const modal = document.getElementById('capsules-modal');
-    if (!modal) {
-      logger.error('Capsules modal not found');
-      return;
-    }
+  private async showItemSelection(
+    preselectedIds?: number[],
+    context: 'new-capsule' | 'canvas-add' = 'new-capsule'
+  ): Promise<WardrobeItem[]> {
+    return await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('Showing item selection', { 
+          context, 
+          preselectedCount: preselectedIds?.length || 0 
+        });
 
-    // Показываем модальное окно
-    modal.classList.remove('hidden');
+        // ДЕЛЕГИРУЕМ в CapsuleSelectionManager
+        const selectedItems = await this.selectionManager.show(preselectedIds);
 
-    // Настраиваем обработчики модального окна
-    this.setupCapsuleModalHandlers();
+        logger.info('Item selection completed', {
+          context,
+          selectedCount: selectedItems.length
+        });
 
-    logger.info('Capsule creation modal shown', {
-      itemsCount: this.wardrobeItems.length,
-      selectedCount: this.selectedItems.length
-    });
-  }
-
-  /**
-   * Обработчик переключения выбора вещи
-   * Вызывается через событие 'wardrobe:item-selection-toggle' из WardrobeManager
-   */
-  private handleItemSelectionToggle(item: WardrobeItem): void {
-    const index = this.selectedItems.findIndex(selected => selected.id === item.id);
-    const cardElement = document.querySelector(`#capsules-modal-clothes-grid [data-item-id="${item.id}"]`);
-
-    if (index === -1) {
-      // Добавляем в выбранные
-      this.selectedItems.push(item);
-      if (cardElement) {
-        cardElement.classList.add('selected');
-      }
-    } else {
-      // Убираем из выбранных
-      this.selectedItems.splice(index, 1);
-      if (cardElement) {
-        cardElement.classList.remove('selected');
-      }
-    }
-
-    // Обновляем состояние кнопки "Далее"
-    this.updateNextButtonState();
-  }
-
-  /**
-   * Обновить состояние кнопки "Далее"
-   */
-  private updateNextButtonState(): void {
-    const nextBtn = document.getElementById('capsules-next-btn') as HTMLButtonElement;
-    if (nextBtn) {
-      const hasSelection = this.selectedItems.length > 0;
-      nextBtn.disabled = !hasSelection;
-    }
-  }
-
-  /**
-   * Настроить обработчики модального окна
-   */
-  private setupCapsuleModalHandlers(): void {
-    const modal = document.getElementById('capsules-modal');
-    const closeBtn = document.getElementById('capsules-modal-close');
-    const nextBtn = document.getElementById('capsules-next-btn');
-
-    if (!modal) return;
-
-    // Обработчик закрытия по клику на overlay
-    const overlay = modal.querySelector('.capsules-modal-overlay') as HTMLElement;
-    if (overlay) {
-      const handleOverlayClick = () => this.handleClothingCancelled();
-      overlay.addEventListener('click', handleOverlayClick);
-
-      // Сохраняем для cleanup
-      this.cleanupFunctions.push(() => overlay.removeEventListener('click', handleOverlayClick));
-    }
-
-    // Обработчик кнопки закрытия
-    if (closeBtn) {
-      const handleClose = () => this.handleClothingCancelled();
-      closeBtn.addEventListener('click', handleClose);
-
-      // Сохраняем для cleanup
-      this.cleanupFunctions.push(() => closeBtn.removeEventListener('click', handleClose));
-    }
-
-    // Обработчик кнопки "Далее"
-    if (nextBtn) {
-      const handleNext = () => this.handleClothingConfirmed();
-      nextBtn.addEventListener('click', handleNext);
-
-      // Сохраняем для cleanup
-      this.cleanupFunctions.push(() => nextBtn.removeEventListener('click', handleNext));
-    }
-  }
-
-  /**
-   * Обработчик подтверждения выбора одежды
-   */
-  private handleClothingConfirmed(): void {
-    this.mode = 'canvas';
-
-    // Скрываем модальное окно
-    const modal = document.getElementById('capsules-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-    }
-
-    // Очищаем обработчики
-    this.cleanupFunctions.forEach(cleanup => cleanup());
-    this.cleanupFunctions = [];
-
-    // Инициализируем canvas
-    this.initializeCanvasEditor();
-
-    // Загружаем выбранные элементы БЕЗ сохраненных позиций
-    const items: CanvasItem[] = capsulesService.sortItemsByLayer(this.selectedItems).map(item => ({ item }));
-    this.canvasEditor!.loadItems(items);
-
-    // Настраиваем навигацию
-    navigationManager.push(() => {
-      this.returnToClothingSelection();
-    }, 'Return to clothing selection from new capsule');
-
-    logger.info('Clothing selection confirmed', {
-      selectedCount: this.selectedItems.length,
-      items: this.selectedItems.map(item => ({ id: item.id, category: item.category }))
-    });
-  }
-
-  /**
-   * Обработчик отмены выбора одежды
-   */
-  private handleClothingCancelled(): void {
-    // Скрываем модальное окно
-    const modal = document.getElementById('capsules-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-    }
-
-    // Очищаем обработчики
-    this.cleanupFunctions.forEach(cleanup => cleanup());
-    this.cleanupFunctions = [];
-
-    this.mode = 'grid';
-    this.selectedItems = [];
-    this.capsulesGrid.show();
-
-    logger.info('Clothing selection cancelled');
-  }
-
-  /**
-   * Вернуться к выбору одежды
-   */
-  private returnToClothingSelection(): void {
-    if (this.canvasEditor) {
-      this.canvasEditor.hide();
-    }
-
-    navigationManager.pop();
-    
-    // Возвращаемся к модальному окну выбора вещей
-    this.showCapsuleCreationModal();
-    
-    // ВАЖНО: Восстанавливаем обработчик события выбора вещей
-    // Он был удален при переходе на canvas
-    const handleSelectionToggle = (event: CustomEvent) => {
-      this.handleItemSelectionToggle(event.detail.item);
-    };
-    window.addEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
-    
-    // Сохраняем для очистки
-    this.cleanupFunctions.push(() => {
-      window.removeEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
-    });
-    
-    logger.info('Returned to clothing selection, event handler restored', {
-      selectedCount: this.selectedItems.length
-    });
+        return selectedItems;
+      },
+      () => {
+        // Fallback: возвращаем пустой массив
+        logger.warn('Item selection failed, returning empty array');
+        return [];
+      },
+      CapsuleErrorHandler.createContext('Выбор вещей', {
+        additionalData: { context, preselectedCount: preselectedIds?.length || 0 }
+      })
+    );
   }
 
   // ============================================
-  // РЕДАКТИРОВАНИЕ СУЩЕСТВУЮЩЕЙ КАПСУЛЫ
+  // РЕДАКТИРОВАНИЕ СУЩЕСТВУЮЩЕЙ КАПСУЛЫ (ДЕЛЕГИРОВАНО)
   // ============================================
 
   /**
    * Обработчик просмотра капсулы
+   * ДЕЛЕГИРУЕТ в CapsuleFlowManager
+   * ОПТИМИЗАЦИЯ: Использует кэш для быстрого восстановления
    */
   private async handleViewCapsule(capsuleId: number): Promise<void> {
-    try {
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('Starting capsule edit', { capsuleId });
 
-      this.mode = 'canvas';
-      this.currentCapsuleId = capsuleId;
+        this.capsulesGrid.hide();
 
-      this.capsulesGrid.hide();
+        // ДЕЛЕГИРУЕМ управление flow в CapsuleFlowManager
+        await this.flowManager.editCapsule(capsuleId);
 
-      // Загружаем данные капсулы
-      const capsuleData = await capsulesService.loadCapsule(capsuleId);
+        // Генерируем ключ кэша
+        const cacheKey = `capsule-${capsuleId}`;
 
-      // Загружаем гардероб
-      await this.loadWardrobeItems();
+        // ОПТИМИЗАЦИЯ: Проверяем кэш перед загрузкой с сервера
+        let cachedState = this.stateManager.getCachedState(cacheKey);
 
-      // Инициализируем canvas
-      this.initializeCanvasEditor();
+        if (!cachedState) {
+          // Загружаем данные капсулы с сервера
+          const capsuleData = await capsulesService.loadCapsule(capsuleId);
 
-      // Восстанавливаем состояние
-      await this.canvasEditor!.restoreState((capsuleData as any).canvasData);
+          // Создаем состояние для кэширования
+          cachedState = {
+            canvasData: (capsuleData as any).canvasData,
+            thumbnailImage: (capsuleData as any).thumbnailImage || '',
+            itemIds: (capsuleData as any).itemIds || [],
+            timestamp: Date.now(),
+            isDirty: false
+          };
 
-      // Настраиваем навигацию
-      navigationManager.push(() => {
-        this.returnToCapsulesGrid();
-      }, 'Return to capsules grid from edit');
-    } catch (error) {
-      logger.error('Error viewing capsule', error);
-      // Даже если некоторые изображения не загружаются, canvas восстанавливает остальные
-      // Поэтому показываем alert только для серьезных ошибок
-      if (error instanceof Error && error.message.includes('Canvas')) {
-        alert('Ошибка при просмотре капсулы. Попробуйте еще раз.');
-      }
-      this.returnToCapsulesGrid();
-    }
+          logger.info('Capsule loaded from server', { capsuleId });
+        } else {
+          logger.info('Capsule loaded from cache', { capsuleId });
+        }
+
+        // Инициализируем canvas
+        this.initializeCanvasEditor();
+
+        // Восстанавливаем состояние через CanvasStateManager с кэшированием
+        await this.stateManager.restoreState(this.canvasEditor!, cachedState);
+
+        // Сохраняем в кэш если еще не было
+        if (!this.stateManager.hasCachedState(cacheKey)) {
+          await this.stateManager.saveState(this.canvasEditor!, cacheKey);
+        }
+      },
+      () => {
+        // Fallback: возвращаемся к гриду
+        this.capsulesGrid.show();
+        this.flowManager.cancel();
+      },
+      CapsuleErrorHandler.createContext('Просмотр капсулы', { capsuleId })
+    );
   }
 
   /**
    * Обработчик удаления капсулы
    */
   private async handleDeleteCapsule(capsuleId: number): Promise<void> {
-    try {
-      await capsulesService.deleteCapsule(capsuleId);
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        await capsulesService.deleteCapsule(capsuleId);
 
-      // Удаляем из массива
-      const index = this.capsules.findIndex(capsule => capsule.id === capsuleId);
-      if (index !== -1) {
-        this.capsules.splice(index, 1);
-      }
+        // Удаляем из массива
+        const index = this.capsules.findIndex(capsule => capsule.id === capsuleId);
+        if (index !== -1) {
+          this.capsules.splice(index, 1);
+        }
 
-      // Перерисовываем грид
-      this.capsulesGrid.render(this.capsules);
+        // Перерисовываем грид
+        this.capsulesGrid.render(this.capsules);
 
-      logger.info('Capsule deleted', { capsuleId, remaining: this.capsules.length });
-
-    } catch (error) {
-      logger.error('Error removing capsule', error);
-      alert('Ошибка при удалении капсулы. Попробуйте еще раз.');
-    }
+        logger.info('Capsule deleted', { capsuleId, remaining: this.capsules.length });
+      },
+      () => {
+        // Fallback: перерисовываем грид без изменений
+        this.capsulesGrid.render(this.capsules);
+      },
+      CapsuleErrorHandler.createContext('Удаление капсулы', { capsuleId })
+    );
   }
 
   /**
    * Обработчик выбора сгенерированной капсулы
-   * Создает капсулу с metadata и открывает canvas editor
    */
   private async handleGeneratedCapsule(capsule: GeneratedCapsule): Promise<void> {
-    try {
-      logger.info('Handling generated capsule', { name: capsule.name });
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('Handling generated capsule', { name: capsule.name });
 
-      // Инициализируем canvas editor если еще не инициализирован
-      if (!this.canvasEditor) {
-        this.initializeCanvasEditor();
-      }
+        // Инициализируем canvas editor если еще не инициализирован
+        if (!this.canvasEditor) {
+          this.initializeCanvasEditor();
+        }
 
-      if (!this.canvasEditor) {
-        throw new Error('Canvas editor not initialized');
-      }
+        if (!this.canvasEditor) {
+          throw new Error('Canvas editor not initialized');
+        }
 
-      // Скрываем грид капсул
-      this.capsulesGrid.hide();
+        // Скрываем грид капсул
+        this.capsulesGrid.hide();
 
-      // Показываем canvas editor
-      this.canvasEditor.show();
+        // Показываем canvas editor
+        this.canvasEditor.show();
 
-      // Загружаем сгенерированную капсулу на canvas
-      await this.canvasEditor.loadGeneratedCapsule(capsule);
+        // Загружаем сгенерированную капсулу на canvas
+        await this.canvasEditor.loadGeneratedCapsule(capsule);
 
-      // Сохраняем metadata для последующего сохранения
-      (this.canvasEditor as any).generatedCapsuleMetadata = {
-        source: 'ai_generated',
-        recommendations: capsule.recommendations,
-        reasoning: capsule.reasoning,
-        description: capsule.description,
-        season: capsuleGenerationService.getCurrentSeason()
-      };
+        // Сохраняем metadata в flowManager
+        this.flowManager.setMetadata({
+          isGenerated: true,
+          source: 'ai_generated',
+          recommendations: capsule.recommendations,
+          reasoning: capsule.reasoning,
+          description: capsule.description,
+          season: capsuleGenerationService.getCurrentSeason()
+        });
 
-      // Сохраняем название капсулы
-      (this.canvasEditor as any).generatedCapsuleName = capsule.name;
+        // Сохраняем название капсулы
+        (this.canvasEditor as any).generatedCapsuleName = capsule.name;
 
-      // Настраиваем навигацию
-      navigationManager.push(() => {
-        this.returnToCapsulesGrid();
-      }, 'Return to capsules grid from generated capsule');
+        logger.info('Generated capsule loaded to canvas', { name: capsule.name });
+      },
+      () => {
+        // Fallback: возвращаемся к гриду
+        this.capsulesGrid.show();
+        this.flowManager.cancel();
+      },
+      CapsuleErrorHandler.createContext('Загрузка сгенерированной капсулы', {
+        additionalData: { capsuleName: capsule.name }
+      })
+    );
+  }
 
-      this.mode = 'canvas';
+  // ============================================
+  // CANVAS EDITOR (УПРОЩЕНО)
+  // ============================================
 
-      logger.info('Generated capsule loaded to canvas', { name: capsule.name });
+  /**
+   * Показать canvas
+   * Вызывается через callback из CapsuleFlowManager
+   * ОПТИМИЗАЦИЯ: Использует кэш для быстрого восстановления состояния
+   */
+  private async showCanvas(): Promise<void> {
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('Showing canvas');
 
-    } catch (error) {
-      logger.error('Error handling generated capsule', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-      alert('Ошибка при загрузке капсулы. Попробуйте еще раз.');
-      this.returnToCapsulesGrid();
-    }
+        // Инициализируем canvas если нужно
+        if (!this.canvasEditor) {
+          this.initializeCanvasEditor();
+        }
+
+        // Получаем выбранные вещи из flowManager
+        const selectedItems = this.flowManager.getSelectedItems();
+
+        if (selectedItems.length > 0) {
+          // ОПТИМИЗАЦИЯ: Проверяем кэш состояния canvas
+          const capsuleId = this.flowManager.getCapsuleId();
+          const cacheKey = capsuleId ? `capsule-${capsuleId}` : `temp-canvas`;
+          const cachedState = this.stateManager.getCachedState(cacheKey);
+
+          // Если есть кэш и элементы совпадают - восстанавливаем из кэша
+          if (cachedState && this.itemsMatch(cachedState.itemIds, selectedItems.map(i => i.id))) {
+            logger.info('Restoring canvas from cache', { cacheKey });
+            await this.stateManager.restoreState(this.canvasEditor!, cachedState);
+          } else {
+            // Иначе загружаем элементы заново
+            const items: CanvasItem[] = capsulesService.sortItemsByLayer(selectedItems).map(item => ({ item }));
+            await this.canvasEditor!.loadItems(items);
+            
+            // Сохраняем в кэш для будущего использования
+            await this.stateManager.saveState(this.canvasEditor!, cacheKey);
+            logger.info('Canvas state saved to cache', { cacheKey });
+          }
+        }
+
+        // Скрываем экран результата если он показан
+        if (this.resultScreen) {
+          this.resultScreen.hide();
+        }
+
+        // Показываем canvas
+        this.canvasEditor!.show();
+      },
+      () => {
+        // Fallback: отменяем flow
+        this.flowManager.cancel();
+      },
+      CapsuleErrorHandler.createContext('Показ canvas редактора')
+    );
   }
 
   /**
-   * Вернуться к гриду капсул
+   * ОПТИМИЗАЦИЯ: Проверить совпадают ли списки ID элементов
    */
-  private returnToCapsulesGrid(): void {
-
-    if (this.canvasEditor) {
-      this.canvasEditor.hide();
+  private itemsMatch(cachedIds: number[], currentIds: number[]): boolean {
+    if (cachedIds.length !== currentIds.length) {
+      return false;
     }
 
-    navigationManager.pop();
-
-    this.mode = 'grid';
-    this.currentCapsuleId = null;
-    this.capsulesGrid.show();
+    const cachedSet = new Set(cachedIds);
+    return currentIds.every(id => cachedSet.has(id));
   }
-
-  // ============================================
-  // CANVAS EDITOR
-  // ============================================
 
   /**
    * Инициализировать canvas editor
+   * SINGLETON: Использует UICanvasEditor.getInstance()
    */
   private initializeCanvasEditor(): void {
-    logger.debug('initializeCanvasEditor called', {
-      canvasEditorExists: !!this.canvasEditor,
-      stackTrace: new Error().stack?.split('\n').slice(1, 4).join('\n')
-    });
+    logger.debug('initializeCanvasEditor called');
 
-    if (this.canvasEditor) {
-      logger.debug('Canvas editor already exists, showing it');
-      this.canvasEditor.show();
-      this.canvasEditor.initializeCanvas();
-      return;
-    }
-
-    logger.debug('Creating new canvas editor');
-    this.canvasEditor = new UICanvasEditor({
+    // SINGLETON: Получаем единственный экземпляр
+    this.canvasEditor = UICanvasEditor.getInstance({
       containerId: 'capsules-canvas-container',
       canvasId: 'capsules-canvas',
       onAddItem: () => this.handleCanvasAddItem(),
-      onNext: () => this.handleCanvasNext()
+      onNext: () => this.handleCanvasNext(),
+      onItemDeleted: (itemId: number) => this.handleCanvasItemDeleted(itemId)
     });
 
+    logger.debug('Canvas editor singleton obtained');
     this.canvasEditor.show();
     this.canvasEditor.initializeCanvas();
   }
 
   /**
+   * Обработчик возврата назад
+   * Сохраняет состояние канваса перед переходом
+   */
+  private async handleGoBack(): Promise<void> {
+    try {
+      // Если находимся на канвасе, сохраняем его состояние
+      if (this.flowManager.getCurrentStep() === 'canvas' && this.canvasEditor) {
+        logger.info('Saving canvas state before going back');
+        
+        // Сохраняем состояние канваса в stateManager
+        await this.stateManager.saveState(this.canvasEditor, 'temp-canvas');
+        
+        logger.info('Canvas state saved before going back');
+      }
+    } catch (error) {
+      logger.error('Error saving canvas state before going back', { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+      // Не блокируем переход назад из-за ошибки сохранения
+    }
+  }
+
+  /**
+   * Обработчик кнопки "Добавить вещь" в модальном окне выбора
+   * Открывает загрузку фото для добавления новой вещи в гардероб
+   */
+  private async handleSelectionAddItem(): Promise<void> {
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('Add item button clicked in selection modal');
+        
+        // Используем существующий метод для загрузки фото
+        await this.handleWardrobePhotoUpload();
+      },
+      () => {
+        logger.warn('Failed to handle add item in selection modal');
+      },
+      CapsuleErrorHandler.createContext('Добавление вещи из модального окна выбора')
+    );
+  }
+
+  /**
+   * Обработчик удаления элемента с канваса
+   * Синхронизирует состояние flowManager с актуальным состоянием канваса
+   */
+  private handleCanvasItemDeleted(itemId: number): void {
+    logger.info('Item deleted from canvas, updating flowManager', { itemId });
+
+    // Получаем текущие выбранные элементы из flowManager
+    const currentSelectedItems = this.flowManager.getSelectedItems();
+    
+    // Удаляем элемент из списка выбранных
+    const updatedSelectedItems = currentSelectedItems.filter(item => item.id !== itemId);
+    
+    // Обновляем состояние в flowManager
+    this.flowManager.setSelectedItems(updatedSelectedItems);
+
+    logger.info('FlowManager updated after item deletion', {
+      removedItemId: itemId,
+      remainingItemsCount: updatedSelectedItems.length,
+      remainingItemIds: updatedSelectedItems.map(item => item.id)
+    });
+  }
+
+  /**
    * Обработчик кнопки "Добавить одежду" на canvas
+   * ИСПОЛЬЗУЕТ ЕДИНЫЙ МЕТОД showItemSelection()
+   * ОПТИМИЗАЦИЯ: Помечает состояние как dirty при изменениях
    */
   private async handleCanvasAddItem(): Promise<void> {
     if (!this.canvasEditor) {
@@ -522,146 +579,65 @@ export class CapsulesManager implements PhotoUploadHandler {
       return;
     }
 
-    try {
-      // Получаем текущие вещи на canvas
-      const currentItemIds = this.canvasEditor.getItemIds();
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        // Получаем текущие вещи на canvas
+        const currentItemIds = this.canvasEditor!.getItemIds();
 
-      // Скрываем canvas
-      this.canvasEditor.hide();
+        // Скрываем canvas
+        this.canvasEditor!.hide();
 
-      // Сохраняем текущий режим
-      const previousMode = this.mode;
-      this.mode = 'selection';
+        // ИСПОЛЬЗУЕМ ЕДИНЫЙ МЕТОД выбора с предвыбранными вещами
+        const selectedItems = await this.showItemSelection(currentItemIds, 'canvas-add');
 
-      // Показываем модальное окно БЕЗ setupCapsuleModalHandlers
-      const modal = document.getElementById('capsules-modal');
-      if (!modal) {
-        logger.error('Capsules modal not found');
-        return;
-      }
-      modal.classList.remove('hidden');
+        // Показываем canvas обратно
+        this.canvasEditor!.show();
 
-      // Загружаем гардероб через WardrobeManager с префиксом 'capsules-modal'
-      await wardrobeManager.handleWardrobeOpen('capsules-modal');
-      this.wardrobeItems = dataCacheManager.getWardrobeItems();
+        if (selectedItems.length > 0) {
+          // ОПТИМИЗАЦИЯ: Используем инкрементальные методы
+          
+          // 1. Добавляем новые вещи
+          const previousIdsSet = new Set(currentItemIds);
+          const newItems = selectedItems.filter(item => !previousIdsSet.has(item.id));
 
-      logger.info('Capsule creation modal shown', {
-        itemsCount: this.wardrobeItems.length,
-        selectedCount: 0
-      });
+          if (newItems.length > 0) {
+            const canvasItems = newItems.map(item => ({ item }));
+            await this.canvasEditor!.addItems(canvasItems);
+            logger.info('Added new items to canvas', { count: newItems.length });
+          }
 
-      // Устанавливаем предварительно выбранные вещи (после загрузки грида)
-      this.selectedItems = this.wardrobeItems.filter(item => currentItemIds.includes(item.id));
+          // 2. Удаляем снятые с выбора
+          const selectedIdsSet = new Set(selectedItems.map(item => item.id));
+          const itemsToRemove = currentItemIds.filter(id => !selectedIdsSet.has(id));
 
-      // Отмечаем выбранные карточки визуально
-      this.selectedItems.forEach(item => {
-        const cardElement = document.querySelector(`#capsules-modal-clothes-grid [data-item-id="${item.id}"]`);
-        if (cardElement) {
-          cardElement.classList.add('selected');
+          if (itemsToRemove.length > 0) {
+            await this.canvasEditor!.removeItems(itemsToRemove);
+            logger.info('Removed items from canvas', { count: itemsToRemove.length });
+          }
+
+          // ОПТИМИЗАЦИЯ: Помечаем состояние как dirty если были изменения
+          if (newItems.length > 0 || itemsToRemove.length > 0) {
+            const capsuleId = this.flowManager.getCapsuleId();
+            const cacheKey = capsuleId ? `capsule-${capsuleId}` : `temp-${Date.now()}`;
+            this.stateManager.markDirty(cacheKey);
+            logger.debug('Canvas state marked as dirty after item changes', { cacheKey });
+          }
         }
-      });
-
-      // Обновляем состояние кнопки "Далее"
-      this.updateNextButtonState();
-
-      // Изменяем заголовок модального окна
-      const modalHeader = document.querySelector('#capsules-modal .capsules-modal-header h2');
-      if (modalHeader) {
-        modalHeader.textContent = 'Добавить вещи в капсулу';
-      }
-
-      // Настраиваем обработчики модального окна для добавления на canvas
-      const closeBtn = document.getElementById('capsules-modal-close');
-      const nextBtn = document.getElementById('capsules-next-btn');
-
-      // Обработчик закрытия по клику на overlay
-      const overlay = modal.querySelector('.capsules-modal-overlay') as HTMLElement;
-      if (overlay) {
-        const handleOverlayClick = () => {
-          this.handleClothingCancelled();
-          this.mode = previousMode;
-        };
-        overlay.addEventListener('click', handleOverlayClick);
-        this.cleanupFunctions.push(() => overlay.removeEventListener('click', handleOverlayClick));
-      }
-
-      // Обработчик кнопки закрытия
-      if (closeBtn) {
-        const handleClose = () => {
-          this.handleClothingCancelled();
-          this.mode = previousMode;
-        };
-        closeBtn.addEventListener('click', handleClose);
-        this.cleanupFunctions.push(() => closeBtn.removeEventListener('click', handleClose));
-      }
-
-      // Обработчик кнопки "Далее" для добавления на canvas
-      if (nextBtn) {
-        const handleConfirm = () => {
-          this.handleAddToCanvasConfirmed(this.selectedItems, currentItemIds);
-          this.mode = previousMode;
-        };
-        nextBtn.addEventListener('click', handleConfirm);
-        this.cleanupFunctions.push(() => nextBtn.removeEventListener('click', handleConfirm));
-      }
-
-      // Подписываемся на событие выделения вещи (ПОСЛЕ навешивания обработчиков)
-      const handleSelectionToggle = (event: CustomEvent) => {
-        this.handleItemSelectionToggle(event.detail.item);
-      };
-      window.addEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
-
-      // Сохраняем для очистки
-      this.cleanupFunctions.push(() => {
-        window.removeEventListener('wardrobe:item-selection-toggle', handleSelectionToggle as EventListener);
-      });
-
-    } catch (error) {
-      logger.error('Error opening add to canvas modal', error);
-    }
-  }
-
-  /**
-   * Обработчик подтверждения добавления вещей на canvas
-   */
-  private async handleAddToCanvasConfirmed(selectedItems: WardrobeItem[], previousItemIds: number[]): Promise<void> {
-    // Скрываем модальное окно
-    const modal = document.getElementById('capsules-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-    }
-
-    // Очищаем обработчики
-    this.cleanupFunctions.forEach(cleanup => cleanup());
-    this.cleanupFunctions = [];
-
-    if (this.canvasEditor) {
-      this.canvasEditor.show();
-
-      // Добавляем новые вещи
-      const previousIdsSet = new Set(previousItemIds);
-      const newItems = selectedItems.filter(item => !previousIdsSet.has(item.id));
-
-      for (const item of newItems) {
-        await this.canvasEditor.addItem({ item });
-      }
-
-      // Удаляем снятые с выбора
-      const selectedIdsSet = new Set(selectedItems.map(item => item.id));
-      const itemsToRemove = previousItemIds.filter(id => !selectedIdsSet.has(id));
-
-      if (itemsToRemove.length > 0) {
-        for (const itemId of itemsToRemove) {
-          await this.canvasEditor.removeItemById(itemId);
+      },
+      () => {
+        // Fallback: показываем canvas обратно
+        if (this.canvasEditor) {
+          this.canvasEditor.show();
         }
-      }
-    }
+      },
+      CapsuleErrorHandler.createContext('Добавление вещей на canvas')
+    );
   }
-
 
   /**
    * Обработчик кнопки "Далее" на canvas
-   * Обрабатывает изображение и показывает экран результата
+   * ДЕЛЕГИРУЕТ обработку изображений в ImageProcessingService
+   * ОПТИМИЗАЦИЯ: Использует кэширование для избежания повторной обработки
    */
   private async handleCanvasNext(): Promise<void> {
     if (!this.canvasEditor) {
@@ -669,53 +645,99 @@ export class CapsulesManager implements PhotoUploadHandler {
       return;
     }
 
-    try {
-      logger.info('Processing canvas for result screen');
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('Processing canvas for result screen');
 
-      // Получаем состояние canvas с показом модального окна
-      const state = await uiModalManager.executeWithLoadingModal({
-        modalType: 'canvas',
-        loadingText: 'Обрабатываем образ...',
-        asyncOperation: async () => {
-          // Получаем состояние (включая thumbnailImage с удаленным фоном)
-          const canvasState = await this.canvasEditor!.getState();
+        // Генерируем ключ кэша на основе ID капсулы или временный
+        const capsuleId = this.flowManager.getCapsuleId();
+        const cacheKey = capsuleId ? `capsule-${capsuleId}` : `temp-${Date.now()}`;
 
-          // Добавляем watermark
-          const imageWithWatermark = await addWatermark(canvasState.thumbnailImage);
+        // ДЕЛЕГИРУЕМ в ModalService + CanvasStateManager + ImageProcessingService
+        await this.modalSvc.executeWithLoading(
+          async () => {
+            // ОПТИМИЗАЦИЯ: Проверяем кэш и флаг dirty
+            let state = this.stateManager.getCachedState(cacheKey);
+            const isDirty = !state || this.stateManager.isDirty(cacheKey);
 
-          return {
-            ...canvasState,
-            finalImage: imageWithWatermark
-          };
-        }
-      });
+            if (isDirty || !state) {
+              // Получаем состояние через CanvasStateManager с удалением фона для компактного изображения
+              state = await this.stateManager.saveState(this.canvasEditor!, cacheKey, true);
+              logger.info('Canvas state saved to cache with background removal', { cacheKey, isDirty });
+            } else {
+              logger.info('Using cached canvas state', { cacheKey });
+            }
 
-      // Сохраняем финальное изображение и состояние
-      this.currentResultImage = (state as any).finalImage;
+            // ОПТИМИЗАЦИЯ: Кэшируем обработанное изображение
+            const watermarkCacheKey = `${cacheKey}-watermark`;
+            let imageWithWatermark = this.imageService.getCachedImage(watermarkCacheKey);
 
-      // Скрываем canvas
-      this.canvasEditor.hide();
+            if (!imageWithWatermark || isDirty) {
+              // Проверяем что изображение не пустое
+              if (!state.thumbnailImage || state.thumbnailImage.length < 100) {
+                logger.error('Canvas state has empty thumbnail image');
+                throw new Error('Empty thumbnail image after background removal');
+              }
 
-      // Показываем экран результата
-      this.showResultScreen((state as any).finalImage);
+              // Добавляем watermark через ImageProcessingService
+              imageWithWatermark = await this.imageService.addWatermark(state.thumbnailImage);
+              
+              // Проверяем результат watermark
+              if (!imageWithWatermark || imageWithWatermark.length < 100) {
+                logger.warn('Watermark failed, using original image');
+                imageWithWatermark = state.thumbnailImage;
+              }
+              
+              // Кэшируем результат
+              this.imageService.cacheImage(watermarkCacheKey, imageWithWatermark);
+              logger.info('Watermarked image cached', { cacheKey: watermarkCacheKey });
+            } else {
+              logger.info('Using cached watermarked image', { cacheKey: watermarkCacheKey });
+            }
 
-      // Меняем mode
-      this.mode = 'result';
+            // Сохраняем в flowManager
+            this.flowManager.setCanvasState(state);
+            this.flowManager.setResultImage(imageWithWatermark);
 
-    } catch (error) {
-      logger.error('Error processing canvas for result', error);
-      alert('Ошибка при обработке капсулы. Попробуйте еще раз.');
-    }
+            return imageWithWatermark;
+          },
+          { message: 'Обрабатываем образ...' },
+          'canvas'
+        );
+
+        // Скрываем canvas
+        this.canvasEditor!.hide();
+
+        // Переходим к результату через flowManager
+        this.flowManager.moveToResult();
+      },
+      () => {
+        // Fallback: остаемся на canvas
+        logger.warn('Failed to process canvas, staying on canvas screen');
+      },
+      CapsuleErrorHandler.createContext('Обработка canvas для результата', {
+        ...(this.flowManager.getCapsuleId() && { capsuleId: this.flowManager.getCapsuleId()! })
+      })
+    );
   }
 
   // ============================================
-  // ЭКРАН РЕЗУЛЬТАТА
+  // ЭКРАН РЕЗУЛЬТАТА (УПРОЩЕНО)
   // ============================================
 
   /**
-   * Показать экран результата с изображением
+   * Показать экран результата
+   * Вызывается через callback из CapsuleFlowManager
    */
-  private showResultScreen(imageBase64: string): void {
+  private showResultScreen(): void {
+    // Получаем изображение из flowManager
+    const imageBase64 = this.flowManager.getResultImage();
+
+    if (!imageBase64) {
+      logger.error('No result image available');
+      return;
+    }
+
     // Инициализируем экран результата если нужно
     if (!this.resultScreen) {
       this.resultScreen = new UICanvasResultScreen({
@@ -729,42 +751,18 @@ export class CapsulesManager implements PhotoUploadHandler {
     // Показываем экран
     this.resultScreen.show(imageBase64);
 
-    // Настраиваем BackButton для возврата на canvas
-    navigationManager.push(() => {
-      this.returnToCanvasFromResult();
-    }, 'Return to canvas from result screen');
+    // BackButton управляется через navigationManager в CapsuleFlowManager
 
     logger.info('Result screen shown');
-  }
-
-  /**
-   * Вернуться на canvas с экрана результата
-   */
-  private returnToCanvasFromResult(): void {
-    logger.info('Returning to canvas from result screen');
-
-    // Скрываем экран результата
-    if (this.resultScreen) {
-      this.resultScreen.hide();
-    }
-
-    // Показываем canvas
-    if (this.canvasEditor) {
-      this.canvasEditor.show();
-    }
-
-    // Меняем mode обратно на canvas
-    this.mode = 'canvas';
-
-    // Убираем один уровень из стека навигации
-    navigationManager.pop();
   }
 
   /**
    * Обработчик кнопки "Сохранить в галерею"
    */
   private handleResultSave(): void {
-    if (!this.currentResultImage) {
+    const resultImage = this.flowManager.getResultImage();
+
+    if (!resultImage) {
       logger.warn('No result image to save');
       return;
     }
@@ -774,13 +772,12 @@ export class CapsulesManager implements PhotoUploadHandler {
       const tg = (window as any).Telegram?.WebApp;
 
       if (tg && tg.openLink) {
-        // Telegram может открыть data URL, пользователь сможет скачать
-        tg.openLink(this.currentResultImage);
+        tg.openLink(resultImage);
         logger.info('Opened image for download via Telegram');
       } else {
         // Fallback: создаем ссылку для скачивания
         const link = document.createElement('a');
-        link.href = this.currentResultImage;
+        link.href = resultImage;
         link.download = `capsule_${Date.now()}.png`;
         link.click();
         logger.info('Downloaded image via browser');
@@ -796,44 +793,51 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Обработчик кнопки "Поделиться в Telegram"
    */
   private async handleResultShare(): Promise<void> {
-    if (!this.currentResultImage) {
+    const resultImage = this.flowManager.getResultImage();
+
+    if (!resultImage) {
       logger.warn('No result image to share');
       return;
     }
 
-    try {
-      // Получаем данные капсулы (если сохранена)
-      const capsule = this.capsules.find(c => c.id === this.currentCapsuleId);
-      const capsuleName = capsule?.name || `Капсула ${new Date().toLocaleDateString()}`;
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        const capsuleId = this.flowManager.getCapsuleId();
+        const capsule = this.capsules.find(c => c.id === capsuleId);
+        const capsuleName = capsule?.name || `Капсула ${new Date().toLocaleDateString()}`;
 
-      logger.info('Sharing capsule from result screen', {
-        id: this.currentCapsuleId,
-        name: capsuleName
-      });
+        logger.info('Sharing capsule from result screen', {
+          id: capsuleId,
+          name: capsuleName
+        });
 
-      // Используем финальное изображение с watermark
-      const success = await capsulesSharing.shareCapsule(
-        this.canvasEditor!,
-        capsuleName,
-        this.currentCapsuleId || undefined,
-        this.currentResultImage  // Используем готовое изображение с watermark
-      );
+        // Используем финальное изображение с watermark
+        const success = await capsulesSharing.shareCapsule(
+          this.canvasEditor!,
+          capsuleName,
+          capsuleId || undefined,
+          resultImage
+        );
 
-      if (success) {
-        logger.info('Capsule shared successfully', { id: this.currentCapsuleId });
-      } else {
-        logger.error('Failed to share capsule');
-      }
+        if (!success) {
+          throw new Error('Failed to share capsule');
+        }
 
-    } catch (error) {
-      logger.error('Error sharing capsule from result screen', error);
-      alert('Не удалось поделиться образом');
-    }
+        logger.info('Capsule shared successfully', { id: capsuleId });
+      },
+      () => {
+        // Fallback: ничего не делаем, пользователь уже видит сообщение об ошибке
+        logger.warn('Capsule sharing failed');
+      },
+      CapsuleErrorHandler.createContext('Шеринг капсулы', {
+        ...(this.flowManager.getCapsuleId() && { capsuleId: this.flowManager.getCapsuleId()! })
+      })
+    );
   }
 
   /**
    * Обработчик кнопки "Готово"
-   * Сохраняет капсулу и возвращается к гриду
+   * Сохраняет капсулу и завершает flow
    */
   private async handleResultDone(): Promise<void> {
     if (!this.canvasEditor) {
@@ -841,101 +845,149 @@ export class CapsulesManager implements PhotoUploadHandler {
       return;
     }
 
-    try {
-      logger.info('Saving capsule from result screen');
-
-      // Блокируем кнопку "Готово" и добавляем визуальный эффект нажатия
-      const doneBtn = document.getElementById('capsule-result-done-btn') as HTMLButtonElement;
-      if (doneBtn) {
-        doneBtn.disabled = true;
-        doneBtn.classList.add('pressed');
-      }
-
-      // Показываем оверлей СРАЗУ и выполняем всю логику внутри
-      await uiModalManager.executeWithLoadingModal({
-        modalType: 'canvas',
-        loadingText: 'Сохраняем образ...',
-        asyncOperation: async () => {
-          // Получаем состояние canvas (долгая операция с удалением фона)
-          const state = await this.canvasEditor!.getState();
-
-          if (this.currentCapsuleId) {
-            // Обновление существующей капсулы
-            const updated = await capsulesService.updateCapsule(this.currentCapsuleId, {
-              canvasData: state.canvasData,
-              thumbnailImage: state.thumbnailImage,
-              itemIds: state.canvasData.selected_items?.map((item: WardrobeItem) => item.id) || []
-            });
-
-            // Обновляем в массиве
-            const index = this.capsules.findIndex(c => c.id === this.currentCapsuleId);
-            if (index !== -1) {
-              this.capsules[index] = updated as StyleCapsule;
-            }
-
-            logger.info('Capsule updated', { id: this.currentCapsuleId });
-
-          } else {
-            // Создание новой капсулы
-            // Проверяем есть ли metadata от сгенерированной капсулы
-            const metadata = (this.canvasEditor as any)?.generatedCapsuleMetadata;
-            const generatedName = (this.canvasEditor as any)?.generatedCapsuleName;
-
-            const created = await capsulesService.createCapsule({
-              name: generatedName || `Капсула ${new Date().toLocaleDateString()}`,
-              canvasData: state.canvasData,
-              thumbnailImage: state.thumbnailImage,
-              itemIds: state.canvasData.selected_items?.map((item: WardrobeItem) => item.id) || [],
-              metadata: metadata || undefined
-            });
-
-            // Очищаем временные данные
-            if (this.canvasEditor) {
-              delete (this.canvasEditor as any).generatedCapsuleMetadata;
-              delete (this.canvasEditor as any).generatedCapsuleName;
-            }
-
-            // Добавляем в массив
-            this.capsules.unshift(created as StyleCapsule);
-            logger.info('Capsule created', { id: created.id, source: metadata?.source || 'manual' });
-          }
-        }
-      });
-
-      // Скрываем экран результата
-      if (this.resultScreen) {
-        this.resultScreen.hide();
-      }
-
-      // Скрываем canvas
-      if (this.canvasEditor) {
-        this.canvasEditor.hide();
-      }
-
-      // Очищаем навигацию (убираем все: result->canvas, canvas->selection)
-      navigationManager.clear();
-
-      // Показываем грид
-      this.mode = 'grid';
-      this.currentCapsuleId = null;
-      this.currentResultImage = null;
-      this.capsulesGrid.show();
-      this.capsulesGrid.render(this.capsules);
-
-      logger.info('Returned to capsules grid after save');
-
-    } catch (error) {
-      logger.error('Error saving capsule from result screen', error);
-      
-      // Разблокируем кнопку и убираем визуальный эффект при ошибке
-      const doneBtn = document.getElementById('capsule-result-done-btn') as HTMLButtonElement;
-      if (doneBtn) {
-        doneBtn.disabled = false;
-        doneBtn.classList.remove('pressed');
-      }
-      
-      alert('Ошибка при сохранении капсулы. Попробуйте еще раз.');
+    // Блокируем кнопку "Готово"
+    const doneBtn = document.getElementById('capsule-result-done-btn') as HTMLButtonElement;
+    if (doneBtn) {
+      doneBtn.disabled = true;
+      doneBtn.classList.add('pressed');
     }
+
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('Saving capsule from result screen');
+
+        // ДЕЛЕГИРУЕМ в ModalService
+        await this.modalSvc.executeWithLoading(
+          async () => {
+            // Получаем состояние из flowManager (уже с удаленным фоном)
+            const state = this.flowManager.getCanvasState();
+            const capsuleId = this.flowManager.getCapsuleId();
+            const metadata = this.flowManager.getMetadata();
+
+            if (!state) {
+              throw new Error('No canvas state available');
+            }
+
+            if (capsuleId) {
+              // Обновление существующей капсулы
+              const updated = await capsulesService.updateCapsule(capsuleId, {
+                canvasData: state.canvasData,
+                thumbnailImage: state.thumbnailImage,
+                itemIds: state.itemIds
+              });
+
+              // Обновляем в массиве
+              const index = this.capsules.findIndex(c => c.id === capsuleId);
+              if (index !== -1) {
+                this.capsules[index] = updated as StyleCapsule;
+              }
+
+              logger.info('Capsule updated', { id: capsuleId });
+
+            } else {
+              // Создание новой капсулы
+              const generatedName = (this.canvasEditor as any)?.generatedCapsuleName;
+
+              const created = await capsulesService.createCapsule({
+                name: generatedName || `Капсула ${new Date().toLocaleDateString()}`,
+                canvasData: state.canvasData,
+                thumbnailImage: state.thumbnailImage,
+                itemIds: state.itemIds,
+                metadata: metadata || undefined
+              });
+
+              // Очищаем временные данные
+              if (this.canvasEditor) {
+                delete (this.canvasEditor as any).generatedCapsuleName;
+              }
+
+              // Добавляем в массив
+              this.capsules.unshift(created as StyleCapsule);
+              logger.info('Capsule created', { id: created.id, source: metadata?.['source'] || 'manual' });
+            }
+          },
+          { message: 'Сохраняем образ...' },
+          'canvas'
+        );
+
+        // Завершаем flow через flowManager
+        await this.flowManager.complete();
+      },
+      () => {
+        // Fallback: разблокируем кнопку
+        const doneBtn = document.getElementById('capsule-result-done-btn') as HTMLButtonElement;
+        if (doneBtn) {
+          doneBtn.disabled = false;
+          doneBtn.classList.remove('pressed');
+        }
+      },
+      CapsuleErrorHandler.createContext('Сохранение капсулы', {
+        ...(this.flowManager.getCapsuleId() && { capsuleId: this.flowManager.getCapsuleId()! })
+      })
+    );
+  }
+
+  // ============================================
+  // FLOW CALLBACKS
+  // ============================================
+
+  /**
+   * Обработчик завершения flow
+   * Вызывается из CapsuleFlowManager при complete()
+   */
+  private handleFlowComplete(): void {
+    logger.info('Flow completed');
+
+    // Очищаем кэш временной капсулы после успешного сохранения
+    this.stateManager.clearCacheForKey('temp-canvas');
+    logger.info('Temporary canvas cache cleared after successful save');
+
+    // Очищаем канвас после успешного сохранения
+    if (this.canvasEditor) {
+      this.canvasEditor.clear();
+      logger.info('Canvas cleared after successful save');
+      this.canvasEditor.hide();
+    }
+
+    // Скрываем экран результата
+    if (this.resultScreen) {
+      this.resultScreen.hide();
+    }
+
+    // Показываем грид
+    this.capsulesGrid.show();
+    this.capsulesGrid.render(this.capsules);
+
+    logger.info('Returned to capsules grid after save');
+  }
+
+  /**
+   * Обработчик отмены flow
+   * Вызывается из CapsuleFlowManager при cancel()
+   */
+  private handleFlowCancel(): void {
+    logger.info('Flow cancelled');
+
+    // Очищаем кэш временной капсулы при отмене
+    this.stateManager.clearCacheForKey('temp-canvas');
+    logger.info('Temporary canvas cache cleared on flow cancel');
+
+    // Очищаем канвас от всех объектов при отмене
+    if (this.canvasEditor) {
+      this.canvasEditor.clear();
+      logger.info('Canvas cleared on flow cancel');
+      this.canvasEditor.hide();
+    }
+
+    // Скрываем все UI компоненты
+    if (this.resultScreen) {
+      this.resultScreen.hide();
+    }
+
+    this.selectionManager.hide();
+
+    // Показываем грид
+    this.capsulesGrid.show();
   }
 
   // ============================================
@@ -946,112 +998,110 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Загрузить капсулы
    */
   private async loadCapsules(): Promise<void> {
-    try {
-      this.capsules = await dataLoader.loadWithCacheFallback<StyleCapsule>(
-        () => dataCacheManager.getCapsules() as StyleCapsule[],
-        async () => {
-          const data = await capsulesService.loadCapsules();
-          return data as StyleCapsule[];
-        }
-      );
-      logger.info(`Loaded ${this.capsules.length} capsules`);
-    } catch (error) {
-      logger.error('Error loading capsules', error);
-      this.capsules = [];
-    }
-  }
-
-  /**
-   * Загрузить элементы гардероба
-   */
-  private async loadWardrobeItems(): Promise<void> {
-    try {
-      // Используем wardrobeService вместо прямого fetch
-      this.wardrobeItems = await wardrobeService.loadWardrobe();
-      logger.info(`Loaded ${this.wardrobeItems.length} wardrobe items`);
-    } catch (error) {
-      logger.error('Error loading wardrobe items', error);
-      this.wardrobeItems = [];
-    }
+    this.capsules = await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        const capsules = await dataLoader.loadWithCacheFallback<StyleCapsule>(
+          () => dataCacheManager.getCapsules() as StyleCapsule[],
+          async () => {
+            const data = await capsulesService.loadCapsules();
+            return data as StyleCapsule[];
+          }
+        );
+        logger.info(`Loaded ${capsules.length} capsules`);
+        return capsules;
+      },
+      () => {
+        // Fallback: возвращаем пустой массив
+        logger.warn('Failed to load capsules, using empty array');
+        return [];
+      },
+      CapsuleErrorHandler.createContext('Загрузка капсул')
+    );
   }
 
   // ============================================
   // PhotoUploadHandler интерфейс
   // ============================================
 
-
-
   /**
    * Показать/скрыть индикатор загрузки
+   * ДЕЛЕГИРУЕТ в ModalService
    */
   showLoadingInModal(show: boolean): void {
-    uiModalManager.showLoadingInModal(show);
+    if (show) {
+      this.modalSvc.showLoading({ message: 'Загрузка...' }, 'wardrobe');
+    } else {
+      this.modalSvc.hideLoading();
+    }
   }
 
   /**
    * Обработать фото с удалением фона
+   * ДЕЛЕГИРУЕТ в PhotoProcessor и ImageProcessingService
    */
   async processPhotoWithBackgroundRemoval(file: File): Promise<void> {
-    try {
-      const base64 = await fileToBase64(file);
-      logger.info('Processing photo with background removal');
-
-      // Показываем лоадинг
-      this.showLoadingInModal(true);
-
-      // Классифицируем и удаляем фон
-      const result = await photoProcessor.classifyAndRemoveBackground(base64);
-
-      // Скрываем индикатор загрузки
-      this.showLoadingInModal(false);
-
-      // Сохраняем для подтверждения
-      this.currentPreviewImage = result.processedImage;
-      this.currentClassification = result.classification;
-
-      // Показываем модальное окно с результатом
-      uiModalManager.showItemModal({
-        type: 'item-modal',
-        modalId: 'wardrobe-preview-modal',
-        data: {
-          imageUrl: result.processedImage,
-          category: result.classification.category,
-          color: result.classification.color || '',
-          material: result.classification.material
-        },
-        allowEditCategory: false,
-        allowEditColorMaterial: false,
-        onConfirm: () => this.confirmPreview(),
-        onCancel: () => this.cancelPreview()
-      });
-
-    } catch (error) {
-      this.showLoadingInModal(false);
-      logger.error('Error processing photo', error);
-
-      // Fallback - показываем оригинальное фото
-      try {
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
         const base64 = await fileToBase64(file);
-        this.currentPreviewImage = base64;
+        logger.info('Processing photo with background removal');
 
+        // ДЕЛЕГИРУЕМ в ModalService
+        this.modalSvc.showLoading({ message: 'Загрузка...' }, 'wardrobe');
+
+        // Классифицируем и удаляем фон через PhotoProcessor
+        const result = await photoProcessor.classifyAndRemoveBackground(base64);
+
+        // Скрываем индикатор загрузки
+        this.modalSvc.hideLoading();
+
+        // Сохраняем для подтверждения
+        this.currentPreviewImage = result.processedImage;
+        this.currentClassification = result.classification;
+
+        // Показываем модальное окно с результатом
         uiModalManager.showItemModal({
           type: 'item-modal',
           modalId: 'wardrobe-preview-modal',
           data: {
-            imageUrl: base64,
-            category: ClothingCategory.ACCESSORIES, // default
-            color: ''
+            imageUrl: result.processedImage,
+            category: result.classification.category,
+            color: result.classification.color || '',
+            material: result.classification.material
           },
-          allowEditCategory: true,
-          allowEditColorMaterial: true,
+          allowEditCategory: false,
+          allowEditColorMaterial: false,
           onConfirm: () => this.confirmPreview(),
           onCancel: () => this.cancelPreview()
         });
-      } catch (fallbackError) {
-        logger.error('Error showing original photo', fallbackError);
-        uiModalManager.hide();
-      }
-    }
+      },
+      async () => {
+        // Fallback - показываем оригинальное фото
+        this.modalSvc.hideLoading();
+        
+        try {
+          const base64 = await fileToBase64(file);
+          this.currentPreviewImage = base64;
+
+          uiModalManager.showItemModal({
+            type: 'item-modal',
+            modalId: 'wardrobe-preview-modal',
+            data: {
+              imageUrl: base64,
+              category: ClothingCategory.ACCESSORIES,
+              color: ''
+            },
+            allowEditCategory: true,
+            allowEditColorMaterial: true,
+            onConfirm: () => this.confirmPreview(),
+            onCancel: () => this.cancelPreview()
+          });
+        } catch (fallbackError) {
+          logger.error('Error showing original photo', fallbackError);
+          uiModalManager.hide();
+        }
+      },
+      CapsuleErrorHandler.createContext('Обработка фото с удалением фона')
+    );
   }
 
   /**
@@ -1062,28 +1112,30 @@ export class CapsulesManager implements PhotoUploadHandler {
   }
 
   /**
-   * Обработать загрузку фото через WardrobeManager (новый метод)
-   * Использует тот же процесс что и основной гардероб
+   * Обработать загрузку фото через событие
+   * ОПТИМИЗАЦИЯ: Использует событийную систему вместо прямого вызова WardrobeManager
    */
   async handleWardrobePhotoUpload(): Promise<void> {
-    try {
-      logger.info('Starting wardrobe photo upload process');
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('Starting wardrobe photo upload process via event');
 
-      // Используем статически импортированный wardrobeManager с callback
-      // currentGridId уже установлен в wardrobeManager.handleWardrobeOpen('capsules-modal')
-      await wardrobeManager.handlePhotoUpload((newItem) => {
-        logger.info('🟢 Item added callback received in capsules', { itemId: newItem.id });
-
-        // Синхронизируем наш локальный массив с новой вещью
-        this.loadWardrobeItems();
-
-        // Оптимистичное добавление уже произошло в правильный грид (capsules-modal-clothes-grid)
-        // через WardrobeManager.confirmPreview() → renderGrid(false, currentGridId)
-      });
-
-    } catch (error) {
-      logger.error('Error in handleWardrobePhotoUpload', error);
-    }
+        // Отправляем событие запроса на загрузку фото
+        window.dispatchEvent(new CustomEvent('wardrobe:photo-upload-requested', {
+          detail: {
+            source: 'capsules',
+            onItemAdded: (newItem: WardrobeItem) => {
+              logger.info('Item added callback received in capsules', { itemId: newItem.id });
+            }
+          }
+        }));
+      },
+      () => {
+        // Fallback: ничего не делаем
+        logger.warn('Failed to trigger wardrobe photo upload');
+      },
+      CapsuleErrorHandler.createContext('Загрузка фото в гардероб')
+    );
   }
 
   /**
@@ -1106,7 +1158,6 @@ export class CapsulesManager implements PhotoUploadHandler {
 
           if (file) {
             logger.info('Photo selected for upload', { fileName: file.name });
-
             await this.processPhotoWithBackgroundRemoval(file);
           }
         } catch (error) {
@@ -1143,20 +1194,24 @@ export class CapsulesManager implements PhotoUploadHandler {
     this.currentPreviewImage = null;
     this.currentClassification = null;
 
-    try {
-      // Сохраняем через wardrobeService
-      const item = await wardrobeService.addItem(imageToSave, classification);
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        // Сохраняем через wardrobeService
+        const item = await wardrobeService.addItem(imageToSave, classification);
 
-      logger.info('Item saved successfully', { id: item.id });
+        logger.info('Item saved successfully', { id: item.id });
 
-      // Отправляем событие
-      window.dispatchEvent(new CustomEvent('wardrobe:item-saved', {
-        detail: { item }
-      }));
-
-    } catch (error) {
-      alert('Ошибка при сохранении предмета. Попробуйте еще раз.');
-    }
+        // Отправляем событие
+        window.dispatchEvent(new CustomEvent('wardrobe:item-saved', {
+          detail: { item }
+        }));
+      },
+      () => {
+        // Fallback: ничего не делаем, пользователь уже видит сообщение об ошибке
+        logger.warn('Failed to save wardrobe item');
+      },
+      CapsuleErrorHandler.createContext('Сохранение вещи в гардероб')
+    );
   }
 
   /**
@@ -1171,52 +1226,49 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Обработчик сохранения нового элемента гардероба
    */
   private async handleNewItemSaved(item: WardrobeItem): Promise<void> {
-    // Обновляем наш локальный массив (синхронизируем с гардеробом)
-    await this.loadWardrobeItems();
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('New wardrobe item synced to capsules', {
+          itemId: item.id
+        });
 
-    // Если есть temp ID для обновления - обновляем карточку в модальном окне
-    if (this.lastOptimisticItemId !== null) {
-      // Используем imageUrl из item (уже сформирован правильно в гардеробе)
-      this.updateItemCardInModal(this.lastOptimisticItemId, item.id, item.imageUrl);
-      this.lastOptimisticItemId = null;
-    }
-
-    // Если canvas активен - добавляем на него
-    if (this.canvasEditor && this.mode === 'canvas') {
-      await this.canvasEditor.addItem({ item });
-    }
-
-    logger.info('New wardrobe item synced to capsules', {
-      itemId: item.id,
-      totalItems: this.wardrobeItems.length,
-      updatedOptimisticCard: this.lastOptimisticItemId !== null
-    });
+        // Если canvas активен - добавляем на него
+        if (this.canvasEditor && this.flowManager.getCurrentStep() === 'canvas') {
+          await this.canvasEditor.addItem({ item });
+        }
+      },
+      () => {
+        // Fallback: просто логируем, не критично
+        logger.warn('Failed to add new item to canvas', { itemId: item.id });
+      },
+      CapsuleErrorHandler.createContext('Синхронизация новой вещи с canvas', {
+        itemIds: [item.id]
+      })
+    );
   }
 
   /**
-   * Обновить ID и URL карточки после ответа сервера
+   * ОПТИМИЗАЦИЯ: Обработчик изменения canvas
+   * Автоматически помечает состояние как dirty при любых изменениях
    */
-  private updateItemCardInModal(oldId: number, newId: number, newImageUrl: string): void {
-    const cardElement = document.querySelector(`#capsules-modal-clothes-grid [data-item-id="${oldId}"]`) as HTMLElement;
-    if (cardElement) {
-      // Обновляем ID в dataset
-      cardElement.dataset['itemId'] = newId.toString();
-
-      // Обновляем изображение если URL изменился
-      const imageElement = cardElement.querySelector('.wardrobe-item-image') as HTMLImageElement;
-      if (imageElement && newImageUrl !== imageElement.src) {
-        imageElement.src = newImageUrl;
-      }
-
-      logger.info('Modal card updated with server data', {
-        oldId,
-        newId,
-        imageUpdated: newImageUrl !== imageElement?.src
+  private handleCanvasModified(): void {
+    // Помечаем состояние как dirty только если canvas активен
+    if (this.canvasEditor && this.flowManager.getCurrentStep() === 'canvas') {
+      const capsuleId = this.flowManager.getCapsuleId();
+      const cacheKey = capsuleId ? `capsule-${capsuleId}` : `temp-canvas`;
+      
+      this.stateManager.markDirty(cacheKey);
+      
+      logger.debug('Canvas state marked as dirty after modification', { 
+        cacheKey,
+        step: this.flowManager.getCurrentStep()
       });
-    } else {
-      logger.warn('Modal card not found for update', { oldId, newId });
     }
   }
+
+  // ============================================
+  // УТИЛИТЫ И ОТЛАДКА
+  // ============================================
 
   /**
    * Получить статус менеджера
@@ -1224,15 +1276,10 @@ export class CapsulesManager implements PhotoUploadHandler {
   getStatus() {
     return {
       initialized: true,
-      mode: this.mode,
+      flowStatus: this.flowManager.getStatus(),
       canvasVisible: this.canvasEditor?.getStatus().isVisible || false,
       canvasReady: this.canvasEditor?.getStatus().isInitialized || false,
-      itemsCount: this.wardrobeItems.length,
-      capsulesCount: this.capsules.length,
-      selectedCount: this.selectedItems.length,
-      currentCapsuleId: this.currentCapsuleId,
-      isEditMode: !!this.currentCapsuleId,
-      navigationStackSize: navigationManager.getStackSize()
+      capsulesCount: this.capsules.length
     };
   }
 
@@ -1244,14 +1291,11 @@ export class CapsulesManager implements PhotoUploadHandler {
 
     this.closeCapsules();
 
-    // Удаляем event listener для предотвращения утечки памяти
+    // Удаляем event listeners
     window.removeEventListener('wardrobe:item-saved', this.wardrobeItemSavedHandler);
+    window.removeEventListener('canvas:modified', this.canvasModifiedHandler);
 
-    this.wardrobeItems = [];
     this.capsules = [];
-    this.selectedItems = [];
-    this.currentCapsuleId = null;
-    this.currentResultImage = null;
 
     if (this.canvasEditor) {
       this.canvasEditor.destroy();
@@ -1264,6 +1308,8 @@ export class CapsulesManager implements PhotoUploadHandler {
     }
 
     this.capsulesGrid.destroy();
+    this.flowManager.destroy();
+    this.selectionManager.destroy();
   }
 }
 

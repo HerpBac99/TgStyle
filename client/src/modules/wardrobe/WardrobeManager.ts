@@ -11,6 +11,7 @@ import { photoProcessor } from '../shared/PhotoProcessor';
 import { fileToBase64, stringToClothingCategory } from '../shared/utils';
 import { uiModalManager, ItemModalData } from '../uiModalManager';
 import { dataCacheManager } from '../dataCache';
+import { modalService } from '../shared/ModalService';
 
 /**
  * Менеджер гардероба
@@ -27,6 +28,18 @@ export class WardrobeManager implements PhotoUploadHandler {
 
   constructor() {
     // WardrobeManager initialized
+    
+    // Подписываемся на событие запроса рендеринга грида
+    window.addEventListener('wardrobe:render-requested', ((event: CustomEvent) => {
+      this.handleRenderRequest(event.detail);
+    }) as EventListener);
+
+    // Подписываемся на событие запроса загрузки фото
+    window.addEventListener('wardrobe:photo-upload-requested', ((event: CustomEvent) => {
+      const { source, onItemAdded } = event.detail;
+      logger.info('Photo upload requested via event', { source });
+      this.handlePhotoUpload(onItemAdded);
+    }) as EventListener);
   }
 
   /**
@@ -720,9 +733,14 @@ export class WardrobeManager implements PhotoUploadHandler {
 
   /**
    * Показать/скрыть индикатор загрузки
+   * Использует ModalService напрямую
    */
   showLoadingInModal(show: boolean): void {
-    uiModalManager.showLoadingInModal(show);
+    if (show) {
+      modalService.showLoading({ message: 'Загрузка...' }, 'wardrobe');
+    } else {
+      modalService.hideLoading();
+    }
   }
 
   /**
@@ -926,6 +944,11 @@ export class WardrobeManager implements PhotoUploadHandler {
       }
 
       logger.info('Wardrobe item added successfully', { id: serverItem.id });
+
+      // Отправляем событие о добавлении вещи для обновления UI в других модулях
+      window.dispatchEvent(new CustomEvent('wardrobe:item-added', {
+        detail: { item: serverItem }
+      }));
 
     } catch (error) {
       // При ошибке удаляем оптимистичную вещь
@@ -1184,6 +1207,43 @@ export class WardrobeManager implements PhotoUploadHandler {
       hasPreviewImage: !!this.currentPreviewImage,
       cleanupFunctionsCount: this.cleanupFunctions.length
     };
+  }
+
+  /**
+   * Обработать запрос на рендеринг грида (через событие)
+   * Используется для рендеринга грида в модальных окнах капсул
+   */
+  private handleRenderRequest(detail: {
+    gridId: string;
+    filtersId: string;
+    items: WardrobeItem[];
+    mode: 'selection' | 'preview';
+  }): void {
+    logger.info('Handling render request via event', {
+      gridId: detail.gridId,
+      filtersId: detail.filtersId,
+      itemsCount: detail.items.length,
+      mode: detail.mode
+    });
+
+    // Устанавливаем текущий грид
+    this.currentGridId = detail.gridId;
+    
+    // Обновляем локальные данные
+    this.wardrobeItems = detail.items;
+
+    // Создаем фильтры
+    this.createFilters(detail.filtersId);
+
+    // Рендерим грид
+    this.renderGrid(true, detail.gridId);
+
+    logger.info('Grid rendered via event', { gridId: detail.gridId });
+
+    // Отправляем событие о завершении рендеринга для применения предвыбора
+    window.dispatchEvent(new CustomEvent('wardrobe:grid-rendered', {
+      detail: { gridId: detail.gridId }
+    }));
   }
 
   /**

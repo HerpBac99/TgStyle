@@ -1,14 +1,16 @@
 /**
  * Сервис для генерации капсул через AI
  * Управляет логикой приоритизации вещей, вычисления статистики использования и взаимодействия с API
+ * ДЕЛЕГИРОВАНИЕ: ImageProcessingService для обработки изображений
  */
 
 import { logger } from '../logger';
 import { api } from '../api';
-import type { 
+import { imageProcessingService } from '../shared/ImageProcessingService';
+import type {
   WardrobeItemWithUsage,
   GenerationRequest,
-  GenerationResponse 
+  GenerationResponse
 } from '@/types/index';
 import type { WardrobeItem } from '@/types/wardrobe';
 
@@ -134,7 +136,7 @@ export class CapsuleGenerationService {
             error: 'Генерация заняла слишком много времени. Попробуйте снова'
           };
         }
-        
+
         if (error.message.includes('сеть') || error.message.includes('Network')) {
           return {
             success: false,
@@ -222,7 +224,7 @@ export class CapsuleGenerationService {
    */
   getCurrentSeason(): string {
     const month = new Date().getMonth() + 1; // 1-12
-    
+
     if (month >= 12 || month <= 2) return 'winter';
     if (month >= 3 && month <= 5) return 'spring';
     if (month >= 6 && month <= 8) return 'summer';
@@ -271,7 +273,10 @@ export class CapsuleGenerationService {
 
         // Если нет вещей, возвращаем пустой canvas
         if (items.length === 0) {
-          resolve(canvas.toDataURL('image/png'));
+          // ДЕЛЕГИРОВАНИЕ: используем ImageProcessingService
+          imageProcessingService.canvasToBase64(canvas, { format: 'png', quality: 1.0 })
+            .then(resolve)
+            .catch(reject);
           return;
         }
 
@@ -280,7 +285,7 @@ export class CapsuleGenerationService {
           return new Promise<void>((resolveImg) => {
             const img = new Image();
             img.crossOrigin = 'anonymous';
-            
+
             img.onload = () => {
               // Вычисляем позицию для сетки 2x2
               const col = index % 2;
@@ -321,7 +326,7 @@ export class CapsuleGenerationService {
             if (items.length > 4) {
               ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
               ctx.fillRect(canvas.width / 2, canvas.height / 2, canvas.width / 2, canvas.height / 2);
-              
+
               ctx.fillStyle = '#ffffff';
               ctx.font = 'bold 48px Arial';
               ctx.textAlign = 'center';
@@ -333,7 +338,10 @@ export class CapsuleGenerationService {
               );
             }
 
-            resolve(canvas.toDataURL('image/png'));
+            // ДЕЛЕГИРОВАНИЕ: используем ImageProcessingService
+            imageProcessingService.canvasToBase64(canvas, { format: 'png', quality: 1.0 })
+              .then(resolve)
+              .catch(reject);
           })
           .catch(reject);
       } catch (error) {

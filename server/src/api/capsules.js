@@ -5,20 +5,14 @@
 
 const express = require('express');
 const router = express.Router();
-const fs = require('fs').promises;
-const path = require('path');
-const sharp = require('sharp');
 const { logger } = require('../controllers/logsController');
 const prisma = require('../lib/prisma');
-const { validateTelegramWebAppData } = require('../utils/telegram');
-const { getInitData } = require('../utils/authHelper');
+const { requireTelegramAuth, optionalTelegramAuth } = require('../middleware/telegramAuth');
 const wardrobeUsageService = require('../services/wardrobeUsageService');
 const capsuleSimilarityService = require('../services/capsuleSimilarityService');
+const FileService = require('../services/FileService');
 
-/**
- * Папка для хранения изображений капсул
- */
-const CAPSULES_UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'capsules');
+
 
 /**
  * Константы для FastVLM интеграции
@@ -30,130 +24,7 @@ const FASTVLM_CONFIG = {
   ENDPOINT: '/generate-capsules'
 };
 
-/**
- * Конвертировать base64 в Buffer и определить расширение
- */
-function parseBase64Image(dataString) {
-    const matches = dataString.match(/^data:image\/([a-z]+);base64,(.+)$/);
 
-    if (!matches || matches.length !== 3) {
-        throw new Error('Invalid base64 image format');
-    }
-
-    const extension = matches[1] === 'jpeg' ? 'jpg' : matches[1];
-    const data = matches[2];
-    const buffer = Buffer.from(data, 'base64');
-
-    return { buffer, extension };
-}
-
-/**
- * Удалить старый файл миниатюры капсулы
- */
-async function deleteOldCapsuleThumbnail(telegramId, oldFilename) {
-    if (!oldFilename) return;
-    
-    try {
-        const userDir = path.join(CAPSULES_UPLOADS_DIR, telegramId.toString());
-        const oldFilePath = path.join(userDir, oldFilename);
-        
-        // Проверяем существует ли файл
-        try {
-            await fs.access(oldFilePath);
-            // Файл существует - удаляем
-            await fs.unlink(oldFilePath);
-            logger.info('Old capsule thumbnail deleted', {
-                telegramId: telegramId.toString(),
-                filename: oldFilename
-            });
-        } catch (err) {
-            // Файл не существует - ничего не делаем
-            if (err.code !== 'ENOENT') {
-                throw err;
-            }
-        }
-    } catch (error) {
-        logger.error('Error deleting old capsule thumbnail', { 
-            error: error.message,
-            filename: oldFilename 
-        });
-        // Не бросаем ошибку, чтобы не прерывать обновление капсулы
-    }
-}
-
-/**
- * Сохранить thumbnail изображение капсулы на диск с оптимизацией
- */
-async function saveCapsuleThumbnail(telegramId, thumbnailImage) {
-    try {
-        // Создаем папку для пользователя если её нет
-        const userDir = path.join(CAPSULES_UPLOADS_DIR, telegramId.toString());
-        await fs.mkdir(userDir, { recursive: true });
-
-        // Парсим base64
-        const { buffer } = parseBase64Image(thumbnailImage);
-
-        // Проверяем наличие альфа-канала (прозрачности)
-        const metadata = await sharp(buffer).metadata();
-        const hasAlpha = metadata.hasAlpha || metadata.channels === 4;
-
-        let optimizedBuffer;
-        let extension;
-
-        if (hasAlpha) {
-            // Для изображений с прозрачностью используем PNG
-            optimizedBuffer = await sharp(buffer)
-                .rotate()
-                .resize(800, 800, {
-                    fit: 'inside',
-                    withoutEnlargement: true
-                })
-                .png({
-                    quality: 90,
-                    compressionLevel: 9
-                })
-                .toBuffer();
-            extension = 'png';
-        } else {
-            // Для обычных изображений используем JPEG
-            optimizedBuffer = await sharp(buffer)
-                .rotate()
-                .resize(800, 800, {
-                    fit: 'inside',
-                    withoutEnlargement: true
-                })
-                .jpeg({
-                    quality: 80,
-                    progressive: true
-                })
-                .toBuffer();
-            extension = 'jpg';
-        }
-
-        // Генерируем уникальное имя файла
-        const timestamp = Date.now();
-        const filename = `capsule_${telegramId}_${timestamp}.${extension}`;
-        const filePath = path.join(userDir, filename);
-
-        // Сохраняем оптимизированный файл
-        await fs.writeFile(filePath, optimizedBuffer);
-
-        logger.info('Capsule thumbnail saved', {
-            telegramId: telegramId.toString(),
-            filename,
-            hasAlpha,
-            format: extension,
-            originalSizeKB: Math.round(buffer.length / 1024),
-            optimizedSizeKB: Math.round(optimizedBuffer.length / 1024)
-        });
-
-        return filename;
-
-    } catch (error) {
-        logger.error('Error saving capsule thumbnail', { error: error.message });
-        throw error;
-    }
-}
 
 /**
  * Создать новую капсулу
@@ -162,24 +33,8 @@ async function createCapsule(req, res) {
   try {
     const { name, canvasData, thumbnailImage, itemIds, metadata } = req.body;
 
-    // Валидация Telegram данных из headers (как в других эндпоинтах)
-    const initData = getInitData(req);
-    if (!initData) {
-        return res.status(401).json({
-            success: false,
-            error: 'Missing Telegram authentication data'
-        });
-    }
-
-    const validationResult = validateTelegramWebAppData(initData);
-    if (!validationResult.isValid) {
-        return res.status(401).json({
-            success: false,
-            error: validationResult.error || 'Invalid Telegram authentication'
-        });
-    }
-
-    const telegramId = BigInt(validationResult.data.user.id);
+    // Telegram данные уже валидированы middleware
+    const telegramId = req.telegramId;
 
     // Валидация входных данных
     if (!canvasData) {
@@ -192,7 +47,7 @@ async function createCapsule(req, res) {
     // Сохраняем thumbnail изображение если оно передано
     let thumbnailPath = null;
     if (thumbnailImage) {
-      thumbnailPath = await saveCapsuleThumbnail(telegramId, thumbnailImage);
+      thumbnailPath = await FileService.saveCapsuleThumbnail(telegramId, thumbnailImage);
     }
 
     // Проверяем, что у пользователя есть доступ к wardrobe items
@@ -268,7 +123,7 @@ async function createCapsule(req, res) {
       capsule: {
         id: capsule.id,
         name: capsule.name,
-        thumbnailUrl: capsule.thumbnailPath ? `/uploads/capsules/${telegramId}/${capsule.thumbnailPath}` : null,
+        thumbnailUrl: FileService.getImageUrl(capsule.thumbnailPath, 'capsule', telegramId),
         canvasData: capsule.canvasData,
         metadata: capsule.metadata,
         createdAt: capsule.createdAt,
@@ -292,27 +147,9 @@ async function createCapsule(req, res) {
  */
 async function getUserCapsules(req, res) {
   try {
-    // FIXED: получаем initData из header или query
-    const initData = getInitData(req);
+    // Telegram данные уже валидированы middleware
+    const telegramId = req.telegramId;
 
-    // Валидация Telegram данных
-    if (!initData) {
-        return res.status(401).json({
-            success: false,
-            error: 'Missing Telegram authentication data'
-        });
-    }
-
-    const validationResult = validateTelegramWebAppData(initData);
-    if (!validationResult.isValid) {
-        return res.status(401).json({
-            success: false,
-            error: validationResult.error || 'Invalid Telegram authentication'
-        });
-    }
-
-    const telegramId = BigInt(validationResult.data.user.id);
-    
     // Получаем пользователя для проверки лайков
     const user = await prisma.user.findUnique({
       where: { telegramId }
@@ -375,8 +212,7 @@ async function getUserCapsules(req, res) {
       capsules: capsules.map(capsule => ({
         id: capsule.id,
         name: capsule.name,
-        thumbnailUrl: capsule.thumbnailPath ?
-          `/uploads/capsules/${telegramId}/${capsule.thumbnailPath}` : null,
+        thumbnailUrl: FileService.getImageUrl(capsule.thumbnailPath, 'capsule', telegramId),
         canvasData: capsule.canvasData,
         metadata: capsule.metadata,
         analysis: capsule.analysis,
@@ -444,7 +280,7 @@ async function getCapsule(req, res) {
       const user = await prisma.user.findUnique({
         where: { telegramId: BigInt(telegramId) }
       });
-      
+
       if (user) {
         const userLike = await prisma.capsuleLike.findUnique({
           where: {
@@ -493,24 +329,8 @@ async function updateCapsule(req, res) {
     const { id } = req.params;
     const { canvasData, thumbnailImage, itemIds } = req.body;
 
-    // Валидация Telegram данных из headers (как в других эндпоинтах)
-    const initData = getInitData(req);
-    if (!initData) {
-        return res.status(401).json({
-            success: false,
-            error: 'Missing Telegram authentication data'
-        });
-    }
-
-    const validationResult = validateTelegramWebAppData(initData);
-    if (!validationResult.isValid) {
-        return res.status(401).json({
-            success: false,
-            error: validationResult.error || 'Invalid Telegram authentication'
-        });
-    }
-
-    const telegramId = BigInt(validationResult.data.user.id);
+    // Telegram данные уже валидированы middleware
+    const telegramId = req.telegramId;
 
     // Получаем пользователя для проверки лайков
     const user = await prisma.user.findUnique({
@@ -535,9 +355,9 @@ async function updateCapsule(req, res) {
     let thumbnailPath = capsule.thumbnailPath; // сохраняем старый путь по умолчанию
     if (thumbnailImage) {
       // Удаляем старый файл перед сохранением нового
-      await deleteOldCapsuleThumbnail(telegramId, capsule.thumbnailPath);
+      await FileService.deleteOldCapsuleThumbnail(telegramId, capsule.thumbnailPath);
       // Сохраняем новый файл
-      thumbnailPath = await saveCapsuleThumbnail(telegramId, thumbnailImage);
+      thumbnailPath = await FileService.saveCapsuleThumbnail(telegramId, thumbnailImage);
     }
 
     // Обновляем связи с wardrobe items если переданы новые
@@ -614,7 +434,7 @@ async function updateCapsule(req, res) {
       capsule: {
         id: updatedCapsule.id,
         name: updatedCapsule.name,
-        thumbnailUrl: updatedCapsule.thumbnailPath ? `/uploads/capsules/${telegramId}/${updatedCapsule.thumbnailPath}` : null,
+        thumbnailUrl: FileService.getImageUrl(updatedCapsule.thumbnailPath, 'capsule', telegramId),
         canvasData: updatedCapsule.canvasData,
         metadata: updatedCapsule.metadata,
         createdAt: updatedCapsule.createdAt,
@@ -640,27 +460,9 @@ async function updateCapsule(req, res) {
 async function deleteCapsule(req, res) {
   try {
     const { id } = req.params;
-    
-    // FIXED: получаем initData из header или query
-    const initData = getInitData(req);
 
-    // Валидация Telegram данных
-    if (!initData) {
-        return res.status(401).json({
-            success: false,
-            error: 'Missing Telegram authentication data'
-        });
-    }
-
-    const validationResult = validateTelegramWebAppData(initData);
-    if (!validationResult.isValid) {
-        return res.status(401).json({
-            success: false,
-            error: validationResult.error || 'Invalid Telegram authentication'
-        });
-    }
-
-    const telegramId = BigInt(validationResult.data.user.id);
+    // Telegram данные уже валидированы middleware
+    const telegramId = req.telegramId;
 
     const capsule = await prisma.capsule.findFirst({
       where: {
@@ -677,7 +479,7 @@ async function deleteCapsule(req, res) {
     }
 
     // Удаляем файл миниатюры перед удалением капсулы
-    await deleteOldCapsuleThumbnail(telegramId, capsule.thumbnailPath);
+    await FileService.deleteOldCapsuleThumbnail(telegramId, capsule.thumbnailPath);
 
     await prisma.capsule.delete({
       where: { id: parseInt(id) }
@@ -707,24 +509,8 @@ async function generateCapsules(req, res) {
   try {
     const { excludeCombinations } = req.body;
 
-    // Валидация Telegram данных из headers
-    const initData = getInitData(req);
-    if (!initData) {
-      return res.status(401).json({
-        success: false,
-        error: 'Missing Telegram authentication data'
-      });
-    }
-
-    const validationResult = validateTelegramWebAppData(initData);
-    if (!validationResult.isValid) {
-      return res.status(401).json({
-        success: false,
-        error: validationResult.error || 'Invalid Telegram authentication'
-      });
-    }
-
-    const telegramId = BigInt(validationResult.data.user.id);
+    // Telegram данные уже валидированы middleware
+    const telegramId = req.telegramId;
 
     logger.info('Capsule generation requested', {
       telegramId: telegramId.toString(),
@@ -847,7 +633,7 @@ async function generateCapsules(req, res) {
       clearTimeout(timeoutId);
     } catch (fetchError) {
       clearTimeout(timeoutId);
-      
+
       if (fetchError.name === 'AbortError') {
         logger.error('FastVLM request timeout', {
           telegramId: telegramId.toString()
@@ -919,7 +705,7 @@ async function generateCapsules(req, res) {
       );
 
       // Получаем полные данные вещей для каждой капсулы с правильными imageUrl
-      const capsuleItems = wardrobeItems.filter(item => 
+      const capsuleItems = wardrobeItems.filter(item =>
         capsule.itemIds.includes(item.id)
       ).map(item => ({
         ...item,
@@ -974,23 +760,19 @@ async function generateCapsules(req, res) {
 async function getPublicCapsules(req, res) {
   try {
     const { page = 1, limit = 20 } = req.query;
-    const initData = getInitData(req) || '';
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
 
     // Получаем текущего пользователя для проверки лайков и исключения его капсул
+    // Данные могут быть null если пользователь не авторизован (optional middleware)
     let currentUser = null;
-    let currentUserTelegramId = null;
-    if (initData) {
-      const validation = validateTelegramWebAppData(initData);
-      if (validation.isValid) {
-        const telegramId = BigInt(validation.data.user.id);
-        currentUserTelegramId = telegramId;
-        currentUser = await prisma.user.findUnique({
-          where: { telegramId }
-        });
-      }
+    const currentUserTelegramId = req.telegramId;
+
+    if (currentUserTelegramId) {
+      currentUser = await prisma.user.findUnique({
+        where: { telegramId: currentUserTelegramId }
+      });
     }
 
     // Загружаем капсулы всех пользователей, КРОМЕ текущего
@@ -1059,8 +841,7 @@ async function getPublicCapsules(req, res) {
         id: capsule.id,
         name: capsule.name,
         description: capsule.description,
-        thumbnailUrl: capsule.thumbnailPath ?
-          `/uploads/capsules/${capsule.user.telegramId}/${capsule.thumbnailPath}` : null,
+        thumbnailUrl: FileService.getImageUrl(capsule.thumbnailPath, 'capsule', capsule.user.telegramId),
         canvasData: capsule.canvasData,
         metadata: capsule.metadata,
         analysis: capsule.analysis,
@@ -1099,43 +880,50 @@ async function getPublicCapsules(req, res) {
  * POST /api/capsules/generate
  * Генерация 3 вариантов капсул через Gemini AI
  * ВАЖНО: Должен быть ПЕРЕД POST /api/capsules
+ * Требует обязательной авторизации
  */
-router.post('/generate', generateCapsules);
+router.post('/generate', requireTelegramAuth, generateCapsules);
 
 /**
  * POST /api/capsules
  * Создать новую капсулу
+ * Требует обязательной авторизации
  */
-router.post('/', createCapsule);
+router.post('/', requireTelegramAuth, createCapsule);
 
 /**
  * GET /api/capsules
  * Получить капсулы пользователя
+ * Требует обязательной авторизации
  */
-router.get('/', getUserCapsules);
+router.get('/', requireTelegramAuth, getUserCapsules);
 
 /**
  * GET /api/capsules/public
  * Получить публичные капсулы (ДОЛЖЕН БЫТЬ ПЕРЕД /:id)
+ * Опциональная авторизация для проверки лайков
  */
-router.get('/public', getPublicCapsules);
+router.get('/public', optionalTelegramAuth, getPublicCapsules);
 
 /**
  * GET /api/capsules/:id
  * Получить капсулу по ID
+ * Не требует авторизации (публичный доступ)
  */
 router.get('/:id', getCapsule);
 
 /**
  * PUT /api/capsules/:id
  * Обновить капсулу
+ * Требует обязательной авторизации
  */
-router.put('/:id', updateCapsule);
+router.put('/:id', requireTelegramAuth, updateCapsule);
 
 /**
  * DELETE /api/capsules/:id
  * Удалить капсулу
+ * Требует обязательной авторизации
  */
-router.delete('/:id', deleteCapsule);
+router.delete('/:id', requireTelegramAuth, deleteCapsule);
 
 module.exports = router;
