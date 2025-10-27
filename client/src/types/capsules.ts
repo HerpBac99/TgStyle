@@ -12,6 +12,7 @@ export interface Capsule {
   name: string;
   description?: string;
   thumbnailPath?: string;
+  thumbnailUrl?: string;
   canvasData?: any;
   createdAt: string;
   updatedAt?: string;

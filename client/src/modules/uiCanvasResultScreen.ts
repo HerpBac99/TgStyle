@@ -16,6 +16,7 @@ export interface CanvasResultScreenConfig {
   onShare?: () => void;   // Callback для кнопки "Поделиться"
   onDone?: () => void;    // Callback для кнопки "Готово"
   onClose?: () => void;   // Callback для кнопки "Закрыть"
+  onEdit?: () => void;    // Callback для кнопки "Редактировать"
 }
 
 /**
@@ -41,8 +42,9 @@ export class UICanvasResultScreen {
    * @param imageBase64 - Base64 изображение с watermark
    * @param capsuleId - ID капсулы (для кнопок like и share)
    * @param showButtons - Показывать ли кнопки действий (по умолчанию true)
+   * @param showEditButton - Показывать ли кнопку редактирования (по умолчанию false)
    */
-  show(imageBase64: string, capsuleId?: number, showButtons: boolean = true): void {
+  show(imageBase64: string, capsuleId?: number, showButtons: boolean = true, showEditButton: boolean = false): void {
     const screen = document.getElementById(this.config.screenId);
     if (!screen) {
       logger.error('Result screen not found', { screenId: this.config.screenId });
@@ -74,6 +76,16 @@ export class UICanvasResultScreen {
       actionsContainer.style.display = showButtons ? 'flex' : 'none';
     }
 
+    // Показываем/скрываем кнопку редактирования
+    const editButton = document.getElementById('edit-capsule-btn') as HTMLElement;
+    if (editButton) {
+      if (showEditButton) {
+        editButton.classList.remove('hidden');
+      } else {
+        editButton.classList.add('hidden');
+      }
+    }
+
     // Показываем экран с анимацией
     screen.classList.remove('hidden');
     // Небольшая задержка для запуска анимации
@@ -84,7 +96,7 @@ export class UICanvasResultScreen {
 
     // Настраиваем кнопки только если нужно показывать
     if (showButtons) {
-      this.setupButtons();
+      this.setupButtons(showEditButton);
       this.addDynamicButtons(capsuleId, imageBase64);
     } else {
       // Если кнопки не показываем, добавляем обработчик закрытия по клику на экран
@@ -315,7 +327,7 @@ export class UICanvasResultScreen {
   /**
    * Настроить кнопки экрана результата
    */
-  private setupButtons(): void {
+  private setupButtons(showEditButton: boolean = false): void {
     // Очищаем старые обработчики
     this.cleanup();
 
@@ -337,7 +349,25 @@ export class UICanvasResultScreen {
       });
     }
 
-    logger.info('Result screen buttons configured');
+    // Кнопка редактирования (если нужна)
+    if (showEditButton) {
+      const editBtn = document.getElementById('edit-capsule-btn') as HTMLElement;
+      if (editBtn) {
+        const handleEdit = () => {
+          logger.info('Result edit button clicked');
+          if (this.config.onEdit) {
+            this.config.onEdit();
+          }
+        };
+
+        editBtn.addEventListener('click', handleEdit);
+        this.cleanupFunctions.push(() => {
+          editBtn.removeEventListener('click', handleEdit);
+        });
+      }
+    }
+
+    logger.info('Result screen buttons configured', { showEditButton });
   }
 
   /**

@@ -11,6 +11,7 @@
  */
 
 import { logger } from '../logger';
+import { navigationManager } from '../navigationManager';
 import { WardrobeItem } from '@/types/wardrobe';
 import { CanvasItem, GeneratedCapsule } from '@/types/capsules';
 import { StyleCapsule } from '../uiCapsulesGrid';
@@ -274,16 +275,49 @@ export class CapsulesManager implements PhotoUploadHandler {
   // ============================================
 
   /**
-   * Обработчик просмотра капсулы
-   * ДЕЛЕГИРУЕТ в CapsuleFlowManager
-   * ОПТИМИЗАЦИЯ: Использует кэш для быстрого восстановления
+   * Обработчик просмотра капсулы (показ результата с кнопкой редактирования)
    */
   private async handleViewCapsule(capsuleId: number): Promise<void> {
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Starting capsule edit', { capsuleId });
+        logger.info('Starting capsule view', { capsuleId });
 
         this.capsulesGrid.hide();
+
+        // Сначала пытаемся получить изображение из кэша капсул
+        const cachedCapsules = dataCacheManager.getCapsules();
+        const cachedCapsule = cachedCapsules.find(c => c.id === capsuleId);
+        
+        let thumbnailUrl: string;
+        if (cachedCapsule && cachedCapsule.thumbnailUrl) {
+          // Используем изображение из кэша
+          thumbnailUrl = cachedCapsule.thumbnailUrl;
+        } else {
+          // Загружаем данные капсулы с сервера
+          const capsuleData = await capsulesService.loadCapsule(capsuleId);
+          
+          // Используем thumbnailUrl из API или fallback
+          thumbnailUrl = capsuleData.thumbnailUrl || `/api/capsules/${capsuleId}/thumbnail`;
+        }
+        
+        // Показываем экран результата с кнопкой редактирования
+        await this.showCapsuleResult(capsuleId, thumbnailUrl);
+      },
+      () => {
+        logger.error('Failed to view capsule, returning to grid');
+        this.capsulesGrid.show();
+      },
+      CapsuleErrorHandler.createContext('Просмотр капсулы', { capsuleId })
+    );
+  }
+
+  /**
+   * Обработчик редактирования капсулы (переход на канвас)
+   */
+  private async handleEditCapsule(capsuleId: number): Promise<void> {
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('Starting capsule edit', { capsuleId });
 
         // ДЕЛЕГИРУЕМ управление flow в CapsuleFlowManager
         await this.flowManager.editCapsule(capsuleId);
@@ -328,7 +362,7 @@ export class CapsulesManager implements PhotoUploadHandler {
         this.capsulesGrid.show();
         this.flowManager.cancel();
       },
-      CapsuleErrorHandler.createContext('Просмотр капсулы', { capsuleId })
+      CapsuleErrorHandler.createContext('Редактирование капсулы', { capsuleId })
     );
   }
 
@@ -729,6 +763,34 @@ export class CapsulesManager implements PhotoUploadHandler {
   // ============================================
 
   /**
+   * Показать экран результата капсулы (для просмотра из грида)
+   */
+  private async showCapsuleResult(capsuleId: number, thumbnailUrl: string): Promise<void> {
+    // Инициализируем экран результата если нужно
+    if (!this.resultScreen) {
+      this.resultScreen = new UICanvasResultScreen({
+        screenId: 'capsule-result-screen',
+        onSave: () => this.handleResultSave(),
+        onShare: () => this.handleResultShare(),
+        onDone: () => this.handleResultDone(),
+        onClose: () => this.handleResultClose(),
+        onEdit: () => this.handleEditCapsule(capsuleId) // Новый callback для редактирования
+      });
+    }
+
+    // Показываем экран с кнопками like, share и кнопкой редактирования
+    this.resultScreen.show(thumbnailUrl, capsuleId, true, true); // showButtons=true, showEditButton=true
+
+    // Настраиваем BackButton для возврата на грид
+    navigationManager.push(() => {
+      this.resultScreen?.hide();
+      this.capsulesGrid.show();
+    }, 'Return from capsule view to grid');
+
+    logger.info('Capsule result screen shown', { capsuleId });
+  }
+
+  /**
    * Показать экран результата
    * Вызывается через callback из CapsuleFlowManager
    */
@@ -756,8 +818,8 @@ export class CapsulesManager implements PhotoUploadHandler {
     const flowState = this.flowManager.getState();
     const capsuleId = flowState.capsuleId || undefined;
 
-    // Показываем экран с кнопками like и share
-    this.resultScreen.show(imageBase64, capsuleId);
+    // Показываем экран с кнопками like и share (без кнопки редактирования)
+    this.resultScreen.show(imageBase64, capsuleId, true, false); // showButtons=true, showEditButton=false
 
     // BackButton управляется через navigationManager в CapsuleFlowManager
     // setupNavigationForResult() уже настроил BackButton для возврата на грид

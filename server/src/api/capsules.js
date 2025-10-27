@@ -300,6 +300,7 @@ async function getCapsule(req, res) {
         id: capsule.id,
         name: capsule.name,
         description: capsule.description,
+        thumbnailUrl: FileService.getImageUrl(capsule.thumbnailPath, 'capsule', capsule.telegramId),
         canvasData: capsule.canvasData,
         metadata: capsule.metadata,
         analysis: capsule.analysis,
