@@ -865,6 +865,59 @@
     height: 16px;
 }
 
+/* Стили для shared капсулы */
+
+/* Информация об авторе поверх изображения */
+.capsule-author-overlay {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 10;
+    pointer-events: none;
+}
+
+.capsule-author-overlay span {
+    color: white;
+}
+
+.shared-capsule-copy-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Стили SVG для кнопки копирования (как у share кнопки) */
+.shared-capsule-copy-btn svg {
+    display: block;
+    will-change: transform;
+}
+
+.shared-capsule-copy-btn svg path,
+.shared-capsule-copy-btn svg rect {
+    fill: none;
+    stroke: #2c2c2c;
+    stroke-width: 2;
+    transition: stroke 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.shared-capsule-copy-btn:hover svg path,
+.shared-capsule-copy-btn:hover svg rect {
+    stroke: var(--tg-theme-button-color);
+}
+
+/* Стили для лайка shared капсулы */
+.shared-capsule-like-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
 .capsule-like-count {
     font-size: 16px;
     min-width: 16px;

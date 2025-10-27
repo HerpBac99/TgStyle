@@ -685,10 +685,10 @@ class DataCacheManager {
   }
 
   /**
-   * Добавить капсулу в кэш
+   * Добавить капсулу в кэш (в начало списка как самую новую)
    */
   addCapsule(capsule: Capsule): void {
-    this.capsules.push(capsule);
+    this.capsules.unshift(capsule);
 
     // Обновляем localStorage кэш
     this.saveCapsulesCacheToStorage();

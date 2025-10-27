@@ -46,13 +46,20 @@ export class PublicFeedService {
 
       const result = await capsuleLikesService.toggleLike(capsuleId, currentlyLiked);
 
+      if (!result.success || typeof result.isLiked !== 'boolean' || typeof result.likesCount !== 'number') {
+        throw new Error('Invalid API response');
+      }
+
       logger.info('Like toggled on public capsule', {
         capsuleId,
         isLiked: result.isLiked,
         likesCount: result.likesCount
       });
 
-      return result;
+      return {
+        isLiked: result.isLiked,
+        likesCount: result.likesCount
+      };
 
     } catch (error) {
       logger.error('Error toggling like on public capsule', error);

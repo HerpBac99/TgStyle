@@ -5,7 +5,6 @@
 import { logger } from '../logger';
 import { api } from '../api';
 import { createElement } from '@/utils/helpers';
-import { dataCacheManager } from '../dataCache';
 
 export interface CapsuleLikeStatus {
   isLiked: boolean;
@@ -26,7 +25,7 @@ export class CapsuleLikesService {
    * @param parentElement - DOM-элемент, куда будет встроен компонент.
    * @param capsuleId - ID капсулы.
    * @param initialData - Начальные данные для мгновенной отрисовки.
-   * @param componentClass - Класс для специфичных стилей (напр. 'capsule').
+   * @param componentClass - Класс для специфичных стилей.
    */
   public createLikeComponent(
     parentElement: HTMLElement,
@@ -36,7 +35,7 @@ export class CapsuleLikesService {
   ): void {
     const container = createElement('div', { class: `like-container` });
     const likeBtnClass = componentClass ? `like-btn ${componentClass}-like-btn` : 'like-btn';
-    const likeBtn = createElement('button', { class: likeBtnClass, 'aria-label': 'Лайкнуть капсулу' });
+    const likeBtn = createElement('button', { class: likeBtnClass, 'aria-label': 'Поставить лайк' });
     likeBtn.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
@@ -47,183 +46,170 @@ export class CapsuleLikesService {
     container.appendChild(likeBtn);
     container.appendChild(likesCountEl);
 
-    // Добавление в DOM В НАЧАЛО контейнера (как в анализе)
-    parentElement.prepend(container);
-
-    // 2. Начальная отрисовка
+    // Начальная отрисовка
     let currentState = { ...initialData };
-    if (currentState.isLiked) {
-      likeBtn.classList.add('liked');
-    }
+    this.updateLikeButton(likeBtn, likesCountEl, currentState);
 
-    // 3. Обработчик клика с оптимистичным UI
+    // Добавление в DOM
+    parentElement.appendChild(container);
+
+    // Обработчик клика
     likeBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
       e.preventDefault();
 
-      const previousState = { ...currentState };
-      const isLiking = !currentState.isLiked;
-
-      // Оптимистичное обновление UI
-      currentState.isLiked = isLiking;
-      currentState.likesCount += isLiking ? 1 : -1;
-      likeBtn.classList.toggle('liked', isLiking);
-      likesCountEl.textContent = String(currentState.likesCount);
-
       try {
-        // Асинхронный запрос к API
-        const updatedStatus = await this.toggleLike(capsuleId, !isLiking);
+        logger.info('Capsule like button clicked', { capsuleId, currentState });
         
-        // Корректировка UI, если ответ сервера отличается
-        currentState = updatedStatus;
-        likesCountEl.textContent = String(currentState.likesCount);
-        if (currentState.isLiked !== isLiking) {
-           likeBtn.classList.toggle('liked', currentState.isLiked);
-        }
+        // Оптимистичное обновление UI
+        const newState = {
+          isLiked: !currentState.isLiked,
+          likesCount: currentState.isLiked 
+            ? Math.max(0, currentState.likesCount - 1)
+            : currentState.likesCount + 1
+        };
 
+        // Мгновенно обновляем UI
+        this.updateLikeButton(likeBtn, likesCountEl, newState);
+        currentState = newState;
+
+        // Отправляем запрос на сервер
+        const response = await this.toggleLike(capsuleId, newState.isLiked);
+
+        if (response.success && typeof response.isLiked === 'boolean' && typeof response.likesCount === 'number') {
+          // Синхронизируем с ответом сервера
+          const serverState = {
+            isLiked: response.isLiked,
+            likesCount: response.likesCount
+          };
+
+          if (serverState.isLiked !== currentState.isLiked || serverState.likesCount !== currentState.likesCount) {
+            logger.info('Syncing capsule like state with server', { 
+              client: currentState, 
+              server: serverState 
+            });
+            this.updateLikeButton(likeBtn, likesCountEl, serverState);
+            currentState = serverState;
+          }
+        } else {
+          logger.warn('Invalid server response for capsule like', response);
+          // Откатываем изменения при ошибке
+          const revertedState = {
+            isLiked: !newState.isLiked,
+            likesCount: newState.isLiked 
+              ? Math.max(0, newState.likesCount - 1)
+              : newState.likesCount + 1
+          };
+          this.updateLikeButton(likeBtn, likesCountEl, revertedState);
+          currentState = revertedState;
+        }
       } catch (error) {
-        logger.error('Failed to toggle like, rolling back UI', { capsuleId, error });
-        // Молчаливый откат UI в случае ошибки
-        currentState = previousState;
-        likeBtn.classList.toggle('liked', currentState.isLiked);
-        likesCountEl.textContent = String(currentState.likesCount);
+        logger.error('Error toggling capsule like', { capsuleId, error });
+        
+        // Откатываем изменения при ошибке
+        const revertedState = {
+          isLiked: !currentState.isLiked,
+          likesCount: currentState.isLiked 
+            ? Math.max(0, currentState.likesCount - 1)
+            : currentState.likesCount + 1
+        };
+        this.updateLikeButton(likeBtn, likesCountEl, revertedState);
+        currentState = revertedState;
       }
+    });
+
+    logger.info('Capsule like component created', { 
+      capsuleId, 
+      initialState: initialData,
+      componentClass 
     });
   }
 
   /**
-   * Поставить лайк капсуле
+   * Обновляет визуальное состояние кнопки лайка
    */
-  async likeCapsule(capsuleId: number): Promise<CapsuleLikeStatus> {
-    try {
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
-      const response = await api.post(`/capsule-likes/${capsuleId}`, {
-        initData
-      }) as LikeApiResponse;
-
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to like capsule');
-      }
-
-      const status: CapsuleLikeStatus = {
-        isLiked: true,
-        likesCount: response.likesCount || 0
-      };
-
-      logger.info('Capsule liked successfully', {
-        capsuleId,
-        likesCount: status.likesCount
-      });
-
-      // Обновляем капсулу в кэше
-      this.updateCapsuleInCache(capsuleId, status);
-
-      return status;
-
-    } catch (error) {
-      logger.error('Error liking capsule', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Удалить лайк с капсулы
-   */
-  async unlikeCapsule(capsuleId: number): Promise<CapsuleLikeStatus> {
-    try {
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
-
-      logger.info('Unliking capsule', { capsuleId });
-
-      const response = await api.delete(
-        `/capsule-likes/${capsuleId}?initData=${encodeURIComponent(initData)}`
-      ) as LikeApiResponse;
-
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to unlike capsule');
-      }
-
-      const status: CapsuleLikeStatus = {
-        isLiked: false,
-        likesCount: response.likesCount || 0
-      };
-
-      logger.info('Capsule unliked successfully', {
-        capsuleId,
-        likesCount: status.likesCount
-      });
-
-      // Обновляем капсулу в кэше
-      this.updateCapsuleInCache(capsuleId, status);
-
-      return status;
-
-    } catch (error) {
-      logger.error('Error unliking capsule', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Переключить лайк (toggle)
-   */
-  async toggleLike(capsuleId: number, currentlyLiked: boolean): Promise<CapsuleLikeStatus> {
-    if (currentlyLiked) {
-      return this.unlikeCapsule(capsuleId);
+  private updateLikeButton(
+    likeBtn: HTMLElement, 
+    likesCountEl: HTMLElement, 
+    state: CapsuleLikeStatus
+  ): void {
+    // Обновляем стили кнопки
+    if (state.isLiked) {
+      likeBtn.classList.add('liked');
+      likeBtn.setAttribute('aria-label', 'Убрать лайк');
     } else {
-      return this.likeCapsule(capsuleId);
+      likeBtn.classList.remove('liked');
+      likeBtn.setAttribute('aria-label', 'Поставить лайк');
+    }
+
+    // Обновляем счетчик
+    likesCountEl.textContent = String(state.likesCount);
+
+    // Добавляем анимацию при изменении
+    likeBtn.classList.add('like-animation');
+    setTimeout(() => {
+      likeBtn.classList.remove('like-animation');
+    }, 300);
+  }
+
+  /**
+   * Переключает лайк капсулы на сервере
+   */
+  public async toggleLike(capsuleId: number, isLiked: boolean): Promise<LikeApiResponse> {
+    try {
+      let response: LikeApiResponse;
+      
+      // Получаем initData для аутентификации
+      const initData = (window as any).Telegram?.WebApp?.initData || '';
+      
+      if (isLiked) {
+        // Ставим лайк
+        response = await api.post(`/capsule-likes/${capsuleId}`, {
+          initData: initData
+        }) as LikeApiResponse;
+      } else {
+        // Убираем лайк
+        response = await api.delete(`/capsule-likes/${capsuleId}?initData=${encodeURIComponent(initData)}`) as LikeApiResponse;
+      }
+
+      logger.info('Capsule like API response', { 
+        capsuleId, 
+        isLiked, 
+        response 
+      });
+
+      return response;
+    } catch (error) {
+      logger.error('Capsule like API error', { capsuleId, isLiked, error });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 
   /**
-   * Получить статус лайка для текущего пользователя
+   * Получает текущий статус лайка капсулы
    */
-  async getLikeStatus(capsuleId: number): Promise<CapsuleLikeStatus> {
+  public async getLikeStatus(capsuleId: number): Promise<CapsuleLikeStatus | null> {
     try {
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
+      const response = await api.get(`/capsule-likes/status/${capsuleId}`) as LikeApiResponse;
 
-      const response = await api.get(
-        `/capsule-likes/${capsuleId}/status?initData=${encodeURIComponent(initData)}`
-      ) as LikeApiResponse;
-
-      if (!response.success) {
-        // Если ошибка - возвращаем состояние "не лайкнута"
+      if (response.success && typeof response.isLiked === 'boolean' && typeof response.likesCount === 'number') {
         return {
-          isLiked: false,
-          likesCount: 0
+          isLiked: response.isLiked,
+          likesCount: response.likesCount
         };
       }
 
-      return {
-        isLiked: response.isLiked || false,
-        likesCount: response.likesCount || 0
-      };
-
+      logger.warn('Invalid capsule like status response', response);
+      return null;
     } catch (error) {
-      logger.error('Error getting capsule like status', error);
-      return {
-        isLiked: false,
-        likesCount: 0
-      };
-    }
-  }
-
-  /**
-   * Обновить капсулу в кэше (для синхронизации)
-   */
-  private updateCapsuleInCache(capsuleId: number, status: CapsuleLikeStatus): void {
-    try {
-      const capsules = dataCacheManager.getCapsules() as any[];
-      const capsule = capsules.find(c => c.id === capsuleId);
-      if (capsule) {
-        capsule.isLiked = status.isLiked;
-        capsule.likesCount = status.likesCount;
-        logger.info('Capsule updated in cache', { capsuleId, ...status });
-      }
-    } catch (error) {
-      logger.warn('Failed to update capsule in cache', error);
+      logger.error('Error getting capsule like status', { capsuleId, error });
+      return null;
     }
   }
 }
 
+// Экспортируем синглтон
 export const capsuleLikesService = new CapsuleLikesService();

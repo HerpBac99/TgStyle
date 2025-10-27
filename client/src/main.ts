@@ -23,65 +23,93 @@ class TgStyleApp {
   private initStartTime = Date.now();
 
   /**
-   * Обработка shared анализов при инициализации
+   * Универсальная обработка shared контента при инициализации
    * Проверяет все возможные источники параметров один раз
    */
-  private handleSharedAnalysis(): void {
+  private handleShared(): void {
     const urlParams = new URLSearchParams(window.location.search);
     const tgStartParam = this.tg?.initDataUnsafe?.start_param;
-    let analysisId: string | null = null;
+    let sharedId: string | null = null;
+    let contentType: 'analysis' | 'capsule' | null = null;
 
     // Проверяем Telegram WebApp start_param (приоритет 1)
     if (tgStartParam) {
       if (tgStartParam.startsWith('analysis_')) {
-        analysisId = tgStartParam.replace('analysis_', '');
-        logger.info('Found shared analysis in Telegram start_param', { analysisId });
+        sharedId = tgStartParam.replace('analysis_', '');
+        contentType = 'analysis';
+        logger.info('Found shared analysis in Telegram start_param', { sharedId });
+      } else if (tgStartParam.startsWith('capsule_')) {
+        sharedId = tgStartParam.replace('capsule_', '');
+        contentType = 'capsule';
+        logger.info('Found shared capsule in Telegram start_param', { sharedId });
       } else if (tgStartParam.startsWith('shared_')) {
-        analysisId = tgStartParam.replace('shared_', '');
-        logger.info('Found shared analysis in Telegram start_param (old format)', { analysisId });
+        sharedId = tgStartParam.replace('shared_', '');
+        contentType = 'analysis'; // старый формат - всегда анализ
+        logger.info('Found shared analysis in Telegram start_param (old format)', { sharedId });
       }
     }
 
     // Проверяем параметр startapp (приоритет 2)
-    if (!analysisId) {
+    if (!sharedId) {
       const startAppParam = urlParams.get('startapp');
       if (startAppParam) {
         if (startAppParam.startsWith('analysis_')) {
-          analysisId = startAppParam.replace('analysis_', '');
-          logger.info('Found shared analysis in startapp param', { analysisId });
+          sharedId = startAppParam.replace('analysis_', '');
+          contentType = 'analysis';
+          logger.info('Found shared analysis in startapp param', { sharedId });
+        } else if (startAppParam.startsWith('capsule_')) {
+          sharedId = startAppParam.replace('capsule_', '');
+          contentType = 'capsule';
+          logger.info('Found shared capsule in startapp param', { sharedId });
         } else if (startAppParam.startsWith('shared_')) {
-          analysisId = startAppParam.replace('shared_', '');
-          logger.info('Found shared analysis in startapp param (old format)', { analysisId });
+          sharedId = startAppParam.replace('shared_', '');
+          contentType = 'analysis'; // старый формат - всегда анализ
+          logger.info('Found shared analysis in startapp param (old format)', { sharedId });
         }
       }
     }
 
     // Проверяем параметр start (приоритет 3, для обратной совместимости)
-    if (!analysisId) {
+    if (!sharedId) {
       const startParam = urlParams.get('start');
       if (startParam) {
         if (startParam.startsWith('analysis_')) {
-          analysisId = startParam.replace('analysis_', '');
-          logger.info('Found shared analysis in start param', { analysisId });
+          sharedId = startParam.replace('analysis_', '');
+          contentType = 'analysis';
+          logger.info('Found shared analysis in start param', { sharedId });
+        } else if (startParam.startsWith('capsule_')) {
+          sharedId = startParam.replace('capsule_', '');
+          contentType = 'capsule';
+          logger.info('Found shared capsule in start param', { sharedId });
         } else if (startParam.startsWith('shared_')) {
-          analysisId = startParam.replace('shared_', '');
-          logger.info('Found shared analysis in start param (old format)', { analysisId });
+          sharedId = startParam.replace('shared_', '');
+          contentType = 'analysis'; // старый формат - всегда анализ
+          logger.info('Found shared analysis in start param (old format)', { sharedId });
         }
       }
     }
 
     // Проверяем hash (приоритет 4, для прямых ссылок)
-    if (!analysisId) {
+    if (!sharedId) {
       const hash = window.location.hash;
       if (hash.startsWith('#shared-analysis-')) {
-        analysisId = hash.replace('#shared-analysis-', '');
-        logger.info('Found shared analysis in hash', { analysisId });
+        sharedId = hash.replace('#shared-analysis-', '');
+        contentType = 'analysis';
+        logger.info('Found shared analysis in hash', { sharedId });
+      } else if (hash.startsWith('#shared-capsule-')) {
+        sharedId = hash.replace('#shared-capsule-', '');
+        contentType = 'capsule';
+        logger.info('Found shared capsule in hash', { sharedId });
       }
     }
 
-    // Если нашли analysisId, загружаем анализ
-    if (analysisId) {
-      this.showSharedAnalysis(analysisId);
+    // Если нашли shared контент, загружаем его
+    if (sharedId && contentType) {
+      if (contentType === 'analysis') {
+        this.showSharedAnalysis(sharedId);
+      } else if (contentType === 'capsule') {
+        this.showSharedCapsule(sharedId);
+      }
     }
   }
 
@@ -91,15 +119,15 @@ class TgStyleApp {
   private async showSharedAnalysis(analysisId: string): Promise<void> {
     try {
       logger.info('Loading shared analysis from server', { analysisId });
-      
+
       // Добавляем initData для проверки статуса лайка
       const initData = this.tg?.initData || '';
       const apiUrl = `/shared-analysis/${analysisId}?initData=${encodeURIComponent(initData)}`;
-      
+
       const response = await api.get(apiUrl);
 
       if ((response as any).success && (response as any).data) {
-        logger.info('Shared analysis loaded from server', { 
+        logger.info('Shared analysis loaded from server', {
           analysisId,
           hasPhoto: !!(response as any).data.photo,
           hasAnalysis: !!(response as any).data.analysis,
@@ -109,21 +137,65 @@ class TgStyleApp {
         const data = (response as any).data;
 
         await uiManager.showSharedAnalysis(
-          data.photo, 
-          data.analysis, 
-          data.timestamp, 
+          data.photo,
+          data.analysis,
+          data.timestamp,
           data.historyItemId,
           data.likesCount,
           data.isLiked
         );
       } else {
-        logger.warn('Server returned no data for shared analysis', { 
+        logger.warn('Server returned no data for shared analysis', {
           analysisId,
-          response 
+          response
         });
       }
     } catch (error) {
       logger.error('Failed to show shared analysis', { analysisId, error });
+    }
+  }
+
+  /**
+   * Показать shared капсулу другого пользователя
+   */
+  private async showSharedCapsule(capsuleId: string): Promise<void> {
+    try {
+      logger.info('Loading shared capsule from server', { capsuleId });
+
+      // Добавляем initData для проверки статуса лайка
+      const initData = this.tg?.initData || '';
+      const apiUrl = `/shared-capsule/${capsuleId}?initData=${encodeURIComponent(initData)}`;
+
+      const response = await api.get(apiUrl);
+
+      if ((response as any).success && (response as any).data) {
+        logger.info('Shared capsule loaded from server', {
+          capsuleId,
+          hasImage: !!(response as any).data.thumbnailUrl,
+          hasCanvasData: !!(response as any).data.canvasData,
+          itemsCount: (response as any).data.items?.length || 0
+        });
+
+        const data = (response as any).data;
+
+        await uiManager.showSharedCapsule(
+          data.thumbnailUrl,
+          data.name,
+          data.canvasData,
+          data.items,
+          data.capsuleId,
+          data.likesCount,
+          data.isLiked,
+          data.author
+        );
+      } else {
+        logger.warn('Server returned no data for shared capsule', {
+          capsuleId,
+          response
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to show shared capsule', { capsuleId, error });
     }
   }
 
@@ -152,8 +224,8 @@ class TgStyleApp {
       // Предзагружаем данные в фоне
       this.preloadAppData();
 
-      // Обрабатываем shared анализы (один раз при инициализации)
-      this.handleSharedAnalysis();
+      // Обрабатываем shared контент (один раз при инициализации)
+      this.handleShared();
 
       // Завершаем инициализацию
       this.completeInitialization();
@@ -189,10 +261,10 @@ class TgStyleApp {
     try {
       // Разворачиваем приложение
       this.tg.expand();
-      
+
       // Включаем подтверждение закрытия
       this.tg.enableClosingConfirmation();
-      
+
       // Запрещаем вертикальные swipe жесты
       this.tg.disableVerticalSwipes();
 
@@ -276,7 +348,7 @@ class TgStyleApp {
     // Предотвращаем зум при двойном касании
     const viewport = document.querySelector('meta[name="viewport"]');
     if (viewport) {
-      viewport.setAttribute('content', 
+      viewport.setAttribute('content',
         'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
       );
     }
@@ -289,10 +361,10 @@ class TgStyleApp {
   private initializeUI(): void {
     try {
       uiManager.init();
-      
+
       // Инициализируем UI подписки из кэша (мгновенно)
       authManager.initializeSubscriptionUI();
-      
+
       logger.info('UI initialized successfully');
     } catch (error) {
       logger.error('Error initializing UI', error);
@@ -306,11 +378,11 @@ class TgStyleApp {
   private optimisticUIRender(): void {
     try {
       const startTime = performance.now();
-      
+
       // Мгновенно отрисовываем карусель, используя данные из localStorage,
       // которые уже были загружены в конструкторе historyManager.
       uiManager.updateHistoryDisplay();
-      
+
       const renderTime = performance.now() - startTime;
       logger.info('⚡ Optimistic UI render completed from cache', {
         renderTime: `${renderTime.toFixed(2)}ms`,
@@ -331,31 +403,31 @@ class TgStyleApp {
     try {
       const authResponse = await authManager.authenticate();
       const authDuration = performance.now() - authStartTime;
-      
+
       if (authResponse.success) {
         logger.info('✅ Authentication successful', {
           duration: `${authDuration.toFixed(2)}ms`,
           analysesLeft: authResponse.user?.subscription?.analysesLeft
         });
-        
+
         // Отправляем событие успешной авторизации
         this.dispatchAppEvent(APP_EVENTS.AUTH_SUCCESS, authResponse.user);
       } else {
-        logger.error('❌ Authentication failed', { 
+        logger.error('❌ Authentication failed', {
           error: authResponse.error,
           duration: `${authDuration.toFixed(2)}ms`
         });
-        
+
         // Отправляем событие неудачной авторизации
         this.dispatchAppEvent(APP_EVENTS.AUTH_FAILURE, { error: authResponse.error });
       }
     } catch (error) {
       const authDuration = performance.now() - authStartTime;
-      logger.error('❌ Authentication error', { 
+      logger.error('❌ Authentication error', {
         error,
         duration: `${authDuration.toFixed(2)}ms`
       });
-      
+
       // Отправляем событие ошибки авторизации
       this.dispatchAppEvent(APP_EVENTS.AUTH_FAILURE, { error: error instanceof Error ? error.message : 'Unknown error' });
     }
@@ -388,43 +460,43 @@ class TgStyleApp {
    */
   private async loadRemainingHistoryInBackground(): Promise<void> {
     const stats = historyManager.getStats();
-    
+
     // Если истории мало, загружаем полностью
     if (stats.filledSlots < 10) {
-      logger.info('Background history load decision', { 
+      logger.info('Background history load decision', {
         filledSlots: stats.filledSlots,
         willLoad: true,
         reason: 'Loading full history (< 10 items)'
       });
-      
+
       historyManager.loadHistoryFromServer().catch(err => {
         logger.error('Error loading history from server', err);
       });
       return;
     }
-    
+
     // Если истории много, загружаем только метаданные для синхронизации лайков
-    logger.info('Background metadata sync decision', { 
+    logger.info('Background metadata sync decision', {
       filledSlots: stats.filledSlots,
       willSync: true,
       reason: 'Syncing likes without reloading images'
     });
-    
+
     try {
       const initData = window.Telegram?.WebApp?.initData || '';
-      
+
       if (!initData) {
         logger.warn('No initData available for metadata sync');
         return;
       }
-      
+
       const response = await api.get(`/history-metadata?initData=${encodeURIComponent(initData)}`) as any;
-      
+
       if (response.success && response.metadata) {
         // Обновляем только метаданные в кэше без перерисовки
         historyManager.updateMetadata(response.metadata);
-        logger.info('History metadata synced', { 
-          itemsCount: response.metadata.length 
+        logger.info('History metadata synced', {
+          itemsCount: response.metadata.length
         });
       }
     } catch (err) {
@@ -463,7 +535,7 @@ class TgStyleApp {
    */
   private handleInitializationError(error: unknown): void {
     const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка инициализации';
-    
+
     // Отправляем событие ошибки
     this.dispatchAppEvent(APP_EVENTS.ERROR_OCCURRED, {
       error: errorMessage,
@@ -481,7 +553,7 @@ class TgStyleApp {
   private handleOrientationChange(): void {
     // Принудительно применяем стили после изменения ориентации
     uiManager.init();
-    
+
     logger.info('Orientation change handled');
   }
 
@@ -505,7 +577,7 @@ class TgStyleApp {
         timestamp: Date.now(),
       },
     });
-    
+
     window.dispatchEvent(event);
   }
 
@@ -544,14 +616,14 @@ class TgStyleApp {
    */
   async restart(): Promise<void> {
     logger.info('Restarting application');
-    
+
     // Сбрасываем состояние
     this.isInitialized = false;
     this.initStartTime = Date.now();
-    
+
     // Очищаем UI
     uiManager.destroy();
-    
+
     // Повторно инициализируем
     await this.initialize();
   }
@@ -561,10 +633,10 @@ class TgStyleApp {
    */
   shutdown(): void {
     logger.info('Shutting down application');
-    
+
     // Очищаем ресурсы UI
     uiManager.destroy();
-    
+
     // Закрываем Telegram WebApp если возможно
     if (this.tg?.close) {
       this.tg.close();

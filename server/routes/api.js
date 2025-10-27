@@ -7,8 +7,9 @@ const router = express.Router();
 // Импорт логгера Winston
 const { logger } = require('../src/controllers/logsController');
 
-// Импорт роутера для shared анализов
+// Импорт роутера для shared анализов и капсул
 const sharedAnalysisRouter = require('../src/api/sharedAnalysis');
+const sharedCapsuleRouter = require('../src/api/sharedCapsule');
 
 /**
  * Универсальный маршрут для логирования клиентских данных
@@ -139,7 +140,8 @@ router.get('/ping', (req, res) => {
     });
 });
 
-// Регистрация роутера для shared анализов
+// Регистрация роутера для shared анализов и капсул
 router.use('/shared-analysis', sharedAnalysisRouter);
+router.use('/shared-capsule', sharedCapsuleRouter);
 
 module.exports = router; 

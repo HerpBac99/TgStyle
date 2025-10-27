@@ -209,6 +209,22 @@ export class UIManager {
   }
 
   /**
+   * Показать shared капсулу
+   */
+  async showSharedCapsule(
+    thumbnailUrl: string,
+    name: string,
+    canvasData: any,
+    items: any[],
+    capsuleId: number,
+    likesCount: number,
+    isLiked: boolean,
+    author: any
+  ): Promise<void> {
+    await uiCoreManager.showSharedCapsule(thumbnailUrl, name, canvasData, items, capsuleId, likesCount, isLiked, author);
+  }
+
+  /**
    * Показать toast уведомление
    */
   showToast(message: string, type: 'success' | 'error' | 'info' = 'info'): void {

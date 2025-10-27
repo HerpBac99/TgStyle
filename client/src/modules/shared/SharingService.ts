@@ -105,8 +105,8 @@ export class SharingService {
       const shareLink = this.createShareLink(shareId);
 
       // 2. Отправляем на сервер
-      if (opts.saveToServer && config.type === 'analysis') {
-        await this.sendAnalysisToServer(shareId, config);
+      if (opts.saveToServer) {
+        await this.sendContentToServer(shareId, config);
       }
 
       // 3. Пытаемся поделиться через Web Share API
@@ -281,52 +281,103 @@ export class SharingService {
   }
 
   /**
+   * Отправка контента на сервер
+   * Поддерживает анализы и капсулы
+   */
+  private async sendContentToServer(shareId: string, config: ShareConfig): Promise<void> {
+    try {
+      if (config.type === 'analysis') {
+        await this.sendAnalysisToServer(shareId, config);
+      } else if (config.type === 'capsule') {
+        await this.sendCapsuleToServer(shareId, config);
+      }
+    } catch (error) {
+      logger.warn('Failed to send content to server', {
+        shareId,
+        type: config.type,
+        error
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Отправка анализа на сервер
    * Теперь передаем только shareId и historyItemId, сервер загрузит данные из БД
    */
   private async sendAnalysisToServer(shareId: string, config: ShareConfig): Promise<void> {
-    try {
-      const historyItemId = config.metadata?.['historyItemId'];
+    const historyItemId = config.metadata?.['historyItemId'];
 
-      if (!historyItemId) {
-        logger.warn('No historyItemId for sharing, skipping server save', { shareId });
-        return;
-      }
+    if (!historyItemId) {
+      logger.warn('No historyItemId for sharing, skipping server save', { shareId });
+      return;
+    }
 
-      // Удаляем префикс "analysis_" для хранения в БД
-      // В БД храним чистый ID, префикс только для Telegram ссылок
-      const cleanShareId = shareId.startsWith('analysis_') 
-        ? shareId.replace('analysis_', '') 
-        : shareId;
+    // Удаляем префикс "analysis_" для хранения в БД
+    // В БД храним чистый ID, префикс только для Telegram ссылок
+    const cleanShareId = shareId.startsWith('analysis_') 
+      ? shareId.replace('analysis_', '') 
+      : shareId;
 
-      const requestBody = {
-        analysisId: cleanShareId,  // Отправляем БЕЗ префикса
-        historyItemId: historyItemId
-      };
+    const requestBody = {
+      analysisId: cleanShareId,  // Отправляем БЕЗ префикса
+      historyItemId: historyItemId
+    };
 
-      logger.info('Sending analysis to server', { 
-        originalShareId: shareId, 
+    logger.info('Sending analysis to server', { 
+      originalShareId: shareId, 
+      cleanShareId, 
+      historyItemId 
+    });
+
+    const response = await api.post('/shared-analysis', requestBody) as any;
+
+    if (response.success) {
+      logger.info('Analysis shared successfully (DB mapping created)', { 
         cleanShareId, 
         historyItemId 
       });
+    } else {
+      logger.warn('Server save failed', { error: response.error });
+    }
+  }
 
-      const response = await api.post('/shared-analysis', requestBody) as any;
+  /**
+   * Отправка капсулы на сервер
+   */
+  private async sendCapsuleToServer(shareId: string, config: ShareConfig): Promise<void> {
+    const capsuleId = config.metadata?.['capsuleId'];
 
-      if (response.success) {
-        logger.info('Analysis shared successfully (DB mapping created)', { 
-          cleanShareId, 
-          historyItemId 
-        });
-      } else {
-        logger.warn('Server save failed', { error: response.error });
-      }
+    if (!capsuleId) {
+      logger.warn('No capsuleId for sharing, skipping server save', { shareId });
+      return;
+    }
 
-    } catch (error) {
-      logger.warn('Failed to send analysis to server', {
-        shareId,
-        error
+    // Удаляем префикс "capsule_" для хранения в БД
+    const cleanShareId = shareId.startsWith('capsule_') 
+      ? shareId.replace('capsule_', '') 
+      : shareId;
+
+    const requestBody = {
+      capsuleId: capsuleId,
+      shareId: cleanShareId  // Отправляем БЕЗ префикса
+    };
+
+    logger.info('Sending capsule to server', { 
+      originalShareId: shareId, 
+      cleanShareId, 
+      capsuleId 
+    });
+
+    const response = await api.post('/shared-capsule', requestBody) as any;
+
+    if (response.success) {
+      logger.info('Capsule shared successfully (DB mapping created)', { 
+        cleanShareId, 
+        capsuleId 
       });
-      throw error; // Пробрасываем ошибку наверх
+    } else {
+      logger.warn('Server save failed', { error: response.error });
     }
   }
 
