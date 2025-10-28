@@ -12,6 +12,7 @@
 
 import { logger } from '../logger';
 import { navigationManager } from '../navigationManager';
+import { authManager } from '../auth';
 import { WardrobeItem } from '@/types/wardrobe';
 import { CanvasItem, GeneratedCapsule } from '@/types/capsules';
 import { StyleCapsule } from '../uiCapsulesGrid';
@@ -134,7 +135,7 @@ export class CapsulesManager implements PhotoUploadHandler {
         this.capsulesGrid.show();
         this.capsulesGrid.render(this.capsules);
 
-        logger.info('Capsules opened', { 
+        logger.info('Capsules opened', {
           count: this.capsules.length,
           cacheStats: this.stateManager.getCacheStats()
         });
@@ -244,9 +245,9 @@ export class CapsulesManager implements PhotoUploadHandler {
   ): Promise<WardrobeItem[]> {
     return await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Showing item selection', { 
-          context, 
-          preselectedCount: preselectedIds?.length || 0 
+        logger.info('Showing item selection', {
+          context,
+          preselectedCount: preselectedIds?.length || 0
         });
 
         // ДЕЛЕГИРУЕМ в CapsuleSelectionManager
@@ -287,21 +288,30 @@ export class CapsulesManager implements PhotoUploadHandler {
         // Сначала пытаемся получить изображение из кэша капсул
         const cachedCapsules = dataCacheManager.getCapsules();
         const cachedCapsule = cachedCapsules.find(c => c.id === capsuleId);
-        
+
         let thumbnailUrl: string;
+        
         if (cachedCapsule && cachedCapsule.thumbnailUrl) {
           // Используем изображение из кэша
           thumbnailUrl = cachedCapsule.thumbnailUrl;
         } else {
-          // Загружаем данные капсулы с сервера
+          // Загружаем данные капсулы с сервера только для получения изображения
           const capsuleData = await capsulesService.loadCapsule(capsuleId);
           
           // Используем thumbnailUrl из API или fallback
           thumbnailUrl = capsuleData.thumbnailUrl || `/api/capsules/${capsuleId}/thumbnail`;
         }
-        
+
+        // Получаем информацию о текущем пользователе (авторе капсулы)
+        // Поскольку пользователь видит только свои капсулы, автор всегда текущий пользователь
+        const currentUser = authManager.getCurrentUser();
+        const author = currentUser ? {
+          firstName: currentUser.first_name,
+          ...(currentUser.last_name && { lastName: currentUser.last_name })
+        } : undefined;
+
         // Показываем экран результата с кнопкой редактирования
-        await this.showCapsuleResult(capsuleId, thumbnailUrl);
+        await this.showCapsuleResult(capsuleId, thumbnailUrl, author);
       },
       () => {
         logger.error('Failed to view capsule, returning to grid');
@@ -481,7 +491,7 @@ export class CapsulesManager implements PhotoUploadHandler {
             // Иначе загружаем элементы заново
             const items: CanvasItem[] = capsulesService.sortItemsByLayer(selectedItems).map(item => ({ item }));
             await this.canvasEditor!.loadItems(items);
-            
+
             // Сохраняем в кэш для будущего использования
             await this.stateManager.saveState(this.canvasEditor!, cacheKey);
             logger.info('Canvas state saved to cache', { cacheKey });
@@ -546,15 +556,15 @@ export class CapsulesManager implements PhotoUploadHandler {
       // Если находимся на канвасе, сохраняем его состояние
       if (this.flowManager.getCurrentStep() === 'canvas' && this.canvasEditor) {
         logger.info('Saving canvas state before going back');
-        
+
         // Сохраняем состояние канваса в stateManager
         await this.stateManager.saveState(this.canvasEditor, 'temp-canvas');
-        
+
         logger.info('Canvas state saved before going back');
       }
     } catch (error) {
-      logger.error('Error saving canvas state before going back', { 
-        error: error instanceof Error ? error.message : String(error) 
+      logger.error('Error saving canvas state before going back', {
+        error: error instanceof Error ? error.message : String(error)
       });
       // Не блокируем переход назад из-за ошибки сохранения
     }
@@ -568,7 +578,7 @@ export class CapsulesManager implements PhotoUploadHandler {
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
         logger.info('Add item button clicked in selection modal');
-        
+
         // Используем существующий метод для загрузки фото
         await this.handleWardrobePhotoUpload();
       },
@@ -588,10 +598,10 @@ export class CapsulesManager implements PhotoUploadHandler {
 
     // Получаем текущие выбранные элементы из flowManager
     const currentSelectedItems = this.flowManager.getSelectedItems();
-    
+
     // Удаляем элемент из списка выбранных
     const updatedSelectedItems = currentSelectedItems.filter(item => item.id !== itemId);
-    
+
     // Обновляем состояние в flowManager
     this.flowManager.setSelectedItems(updatedSelectedItems);
 
@@ -629,7 +639,7 @@ export class CapsulesManager implements PhotoUploadHandler {
 
         if (selectedItems.length > 0) {
           // ОПТИМИЗАЦИЯ: Используем инкрементальные методы
-          
+
           // 1. Добавляем новые вещи
           const previousIdsSet = new Set(currentItemIds);
           const newItems = selectedItems.filter(item => !previousIdsSet.has(item.id));
@@ -715,13 +725,13 @@ export class CapsulesManager implements PhotoUploadHandler {
 
               // Добавляем watermark через ImageProcessingService
               imageWithWatermark = await this.imageService.addWatermark(state.thumbnailImage);
-              
+
               // Проверяем результат watermark
               if (!imageWithWatermark || imageWithWatermark.length < 100) {
                 logger.warn('Watermark failed, using original image');
                 imageWithWatermark = state.thumbnailImage;
               }
-              
+
               // Кэшируем результат
               this.imageService.cacheImage(watermarkCacheKey, imageWithWatermark);
               logger.info('Watermarked image cached', { cacheKey: watermarkCacheKey });
@@ -765,7 +775,7 @@ export class CapsulesManager implements PhotoUploadHandler {
   /**
    * Показать экран результата капсулы (для просмотра из грида)
    */
-  private async showCapsuleResult(capsuleId: number, thumbnailUrl: string): Promise<void> {
+  private async showCapsuleResult(capsuleId: number, thumbnailUrl: string, author?: { firstName: string; lastName?: string }): Promise<void> {
     // Инициализируем экран результата если нужно
     if (!this.resultScreen) {
       this.resultScreen = new UICanvasResultScreen({
@@ -778,16 +788,18 @@ export class CapsulesManager implements PhotoUploadHandler {
       });
     }
 
-    // Показываем экран с кнопками like, share и кнопкой редактирования
-    this.resultScreen.show(thumbnailUrl, capsuleId, true, true); // showButtons=true, showEditButton=true
+    // Показываем экран с кнопками like, share, кнопкой редактирования и автором
+    this.resultScreen.show(thumbnailUrl, capsuleId, true, true, author); // showButtons=true, showEditButton=true, author
 
     // Настраиваем BackButton для возврата на грид
     navigationManager.push(() => {
       this.resultScreen?.hide();
       this.capsulesGrid.show();
+      // Удаляем обработчик из стека после выполнения
+      navigationManager.pop();
     }, 'Return from capsule view to grid');
 
-    logger.info('Capsule result screen shown', { capsuleId });
+    logger.info('Capsule result screen shown', { capsuleId, hasAuthor: !!author });
   }
 
   /**
@@ -818,13 +830,20 @@ export class CapsulesManager implements PhotoUploadHandler {
     const flowState = this.flowManager.getState();
     const capsuleId = flowState.capsuleId || undefined;
 
-    // Показываем экран с кнопками like и share (без кнопки редактирования)
-    this.resultScreen.show(imageBase64, capsuleId, true, false); // showButtons=true, showEditButton=false
+    // Получаем информацию о текущем пользователе (авторе капсулы)
+    const currentUser = authManager.getCurrentUser();
+    const author = currentUser ? {
+      firstName: currentUser.first_name,
+      ...(currentUser.last_name && { lastName: currentUser.last_name })
+    } : undefined;
+
+    // Показываем экран с кнопками like и share (без кнопки редактирования) и автором
+    this.resultScreen.show(imageBase64, capsuleId, true, false, author); // showButtons=true, showEditButton=false, author
 
     // BackButton управляется через navigationManager в CapsuleFlowManager
     // setupNavigationForResult() уже настроил BackButton для возврата на грид
 
-    logger.info('Result screen shown');
+    logger.info('Result screen shown', { hasAuthor: !!author });
   }
 
   /**
@@ -950,10 +969,10 @@ export class CapsulesManager implements PhotoUploadHandler {
 
       // Добавляем в массив
       this.capsules.unshift(created as StyleCapsule);
-      
+
       // ВАЖНО: Устанавливаем capsuleId в flowManager для кнопки like
       this.flowManager.setCapsuleId(created.id);
-      
+
       logger.info('Capsule created', { id: created.id, source: metadata?.['source'] || 'manual' });
     }
   }
@@ -1056,7 +1075,7 @@ export class CapsulesManager implements PhotoUploadHandler {
    */
   private async handleResultClose(): Promise<void> {
     logger.info('Result close - completing flow (capsule already saved)');
-    
+
     // Завершаем flow через flowManager
     await this.flowManager.complete();
   }
@@ -1211,7 +1230,7 @@ export class CapsulesManager implements PhotoUploadHandler {
       async () => {
         // Fallback - показываем оригинальное фото
         this.modalSvc.hideLoading();
-        
+
         try {
           const base64 = await fileToBase64(file);
           this.currentPreviewImage = base64;
@@ -1390,10 +1409,10 @@ export class CapsulesManager implements PhotoUploadHandler {
     if (this.canvasEditor && this.flowManager.getCurrentStep() === 'canvas') {
       const capsuleId = this.flowManager.getCapsuleId();
       const cacheKey = capsuleId ? `capsule-${capsuleId}` : `temp-canvas`;
-      
+
       this.stateManager.markDirty(cacheKey);
-      
-      logger.debug('Canvas state marked as dirty after modification', { 
+
+      logger.debug('Canvas state marked as dirty after modification', {
         cacheKey,
         step: this.flowManager.getCurrentStep()
       });

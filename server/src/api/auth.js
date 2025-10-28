@@ -94,7 +94,7 @@ async function createOrUpdateUser(telegramUserData) {
                     lastName: telegramUserData.last_name || null,
                     username: telegramUserData.username || null,
                     avatarUrl: telegramUserData.photo_url || null,
-                    analysesCount: 3, // Стартовый лимит для free пользователей
+                    analysesCount: 10, // Стартовый лимит для free пользователей
                     subscriptionType: 'free',
                     subscriptionEndDate: null,
                     totalAnalyses: 0,

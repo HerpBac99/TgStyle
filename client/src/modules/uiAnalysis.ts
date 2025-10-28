@@ -686,9 +686,59 @@ export class UIAnalysisManager {
   }
 
   /**
+   * Очистить все динамические кнопки с экрана результата анализа
+   */
+  private clearAnalysisResultButtons(): void {
+    const actionsContainer = getElement('.result-actions');
+    if (!actionsContainer) {
+      return;
+    }
+
+    // Список всех возможных селекторов для динамических кнопок анализа
+    const buttonSelectors = [
+      // Like кнопки с разными префиксами
+      '.result-like-btn',
+      '.analysis-like-btn',
+      '.shared-analysis-like-btn',
+      
+      // Share кнопки с разными префиксами
+      '.result-share-btn',
+      '.analysis-share-btn',
+      '.shared-analysis-share-btn',
+      
+      // Контейнеры кнопок
+      '.like-container',
+      '.share-container'
+    ];
+
+    // Удаляем все найденные кнопки
+    let removedCount = 0;
+    buttonSelectors.forEach(selector => {
+      const elements = actionsContainer.querySelectorAll(selector);
+      elements.forEach(element => {
+        // Удаляем родительский контейнер если он есть, иначе сам элемент
+        const container = element.closest('.like-container, .share-container');
+        if (container) {
+          container.remove();
+        } else {
+          element.remove();
+        }
+        removedCount++;
+      });
+    });
+
+    if (removedCount > 0) {
+      logger.info('Cleared dynamic buttons from analysis screen', { removedCount });
+    }
+  }
+
+  /**
    * Закрытие экрана анализа
    */
   private async closePreview(): Promise<void> {
+    // Очищаем все динамические кнопки перед закрытием
+    this.clearAnalysisResultButtons();
+    
     // Закрываем экран анализа
     const analysisScreen = getElement('#analysis-screen');
     if (analysisScreen) {

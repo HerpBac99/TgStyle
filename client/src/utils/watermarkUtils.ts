@@ -7,11 +7,11 @@ import { logger } from '../modules/logger';
 // Настройки watermark
 const WATERMARK_TEXT = '@TgStyleBot';
 const WATERMARK_FONT_SIZE = 24; // px
-const WATERMARK_FONT = 'bold 24px Arial, sans-serif';
+const WATERMARK_FONT = `bold ${WATERMARK_FONT_SIZE}px Manrope, sans-serif`;
 const WATERMARK_COLOR = 'rgba(255, 255, 255, 0.8)';
 const WATERMARK_STROKE_COLOR = 'rgba(0, 0, 0, 0.5)';
 const WATERMARK_STROKE_WIDTH = 2;
-const WATERMARK_PADDING = 16; // Отступ от краев
+const WATERMARK_PADDING = 10; // Отступ от краев
 
 /**
  * Добавить watermark на изображение
@@ -101,15 +101,4 @@ function loadImage(base64: string): Promise<HTMLImageElement> {
   });
 }
 
-/**
- * Получить конфигурацию watermark (для отображения в UI)
- */
-export function getWatermarkConfig() {
-  return {
-    text: WATERMARK_TEXT,
-    fontSize: WATERMARK_FONT_SIZE,
-    color: WATERMARK_COLOR,
-    position: 'bottom-right',
-    padding: WATERMARK_PADDING
-  };
-}
+

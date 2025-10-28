@@ -408,6 +408,9 @@ export class UICoreManager {
       `;
       
       closeBtn.addEventListener('click', () => {
+        // Очищаем все динамические кнопки перед закрытием
+        this.clearCapsuleResultButtons();
+        
         resultScreen.classList.add('hidden');
         resultScreen.classList.remove('show');
         this.switchToCapsules();
@@ -477,6 +480,61 @@ export class UICoreManager {
     });
 
     logger.info('Copy button created for shared capsule', { capsuleId });
+  }
+
+  /**
+   * Очистить все динамические кнопки с экрана результата капсулы
+   */
+  private clearCapsuleResultButtons(): void {
+    const actionsContainer = getElement('.capsule-result-actions');
+    if (!actionsContainer) {
+      return;
+    }
+
+    // Список всех возможных селекторов для динамических кнопок
+    const buttonSelectors = [
+      // Like кнопки с разными префиксами
+      '.capsule-result-like-btn',
+      '.shared-capsule-like-btn', 
+      '.capsule-like-btn',
+      '.result-like-btn',
+      
+      // Share кнопки с разными префиксами
+      '.capsule-result-share-btn',
+      '.shared-capsule-share-btn',
+      '.capsule-share-btn',
+      '.result-share-btn',
+      
+      // Copy кнопки
+      '.shared-capsule-copy-btn',
+      '.capsule-copy-btn',
+      '.copy-btn',
+      
+      // Контейнеры кнопок
+      '.like-container',
+      '.share-container',
+      '.copy-container'
+    ];
+
+    // Удаляем все найденные кнопки
+    let removedCount = 0;
+    buttonSelectors.forEach(selector => {
+      const elements = actionsContainer.querySelectorAll(selector);
+      elements.forEach(element => {
+        // Удаляем родительский контейнер если он есть, иначе сам элемент
+        const container = element.closest('.like-container, .share-container, .copy-container');
+        if (container) {
+          container.remove();
+        } else {
+          element.remove();
+        }
+        removedCount++;
+      });
+    });
+
+    if (removedCount > 0) {
+      logger.info('Cleared dynamic buttons from shared capsule screen', { removedCount });
+    }
   }
 
   /**
@@ -644,6 +702,9 @@ export class UICoreManager {
 
       // Закрываем экран и переключаемся на капсулы через небольшую задержку
       setTimeout(() => {
+        // Очищаем все динамические кнопки перед закрытием
+        this.clearCapsuleResultButtons();
+        
         const resultScreen = getElement('#capsule-result-screen');
         if (resultScreen) {
           resultScreen.classList.add('hidden');

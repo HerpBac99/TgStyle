@@ -51,7 +51,7 @@ export class CapsuleLikesService {
     this.updateLikeButton(likeBtn, likesCountEl, currentState);
 
     // Добавление в DOM
-    parentElement.appendChild(container);
+    parentElement.prepend(container);
 
     // Обработчик клика
     likeBtn.addEventListener('click', async (e) => {

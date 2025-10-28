@@ -6,6 +6,7 @@
 import { logger } from './logger';
 import { capsuleLikesService } from './capsules/CapsuleLikesService';
 import { SharingService } from './shared/SharingService';
+import { createElement } from '@/utils/helpers';
 
 /**
  * Конфигурация экрана результата
@@ -43,8 +44,9 @@ export class UICanvasResultScreen {
    * @param capsuleId - ID капсулы (для кнопок like и share)
    * @param showButtons - Показывать ли кнопки действий (по умолчанию true)
    * @param showEditButton - Показывать ли кнопку редактирования (по умолчанию false)
+   * @param author - Информация об авторе капсулы (опционально)
    */
-  show(imageBase64: string, capsuleId?: number, showButtons: boolean = true, showEditButton: boolean = false): void {
+  show(imageBase64: string, capsuleId?: number, showButtons: boolean = true, showEditButton: boolean = false, author?: { firstName: string; lastName?: string }): void {
     const screen = document.getElementById(this.config.screenId);
     if (!screen) {
       logger.error('Result screen not found', { screenId: this.config.screenId });
@@ -68,6 +70,22 @@ export class UICanvasResultScreen {
       imageContainer.style.transform = '';
       imageContainer.style.opacity = '';
       imageContainer.style.transition = '';
+
+      // Удаляем старую информацию об авторе если есть
+      const existingAuthorInfo = imageContainer.querySelector('.capsule-author-overlay');
+      if (existingAuthorInfo) {
+        existingAuthorInfo.remove();
+      }
+
+      // Добавляем информацию об авторе если передана
+      if (author) {
+        const authorOverlay = createElement('div', { class: 'capsule-author-overlay' });
+        authorOverlay.innerHTML = `
+          <span>Автор: ${author.firstName}${author.lastName ? ' ' + author.lastName : ''}</span>
+        `;
+        imageContainer.appendChild(authorOverlay);
+        logger.info('Author overlay added to result screen', { author: author.firstName });
+      }
     }
 
     // Показываем/скрываем кнопки действий
@@ -123,6 +141,9 @@ export class UICanvasResultScreen {
         imageContainer.style.transition = '';
       }
       
+      // Очищаем все динамические кнопки перед закрытием
+      this.clearAllDynamicButtons();
+      
       // После завершения анимации скрываем экран
       setTimeout(() => {
         screen.classList.add('hidden');
@@ -160,6 +181,62 @@ export class UICanvasResultScreen {
   // ============================================
   // ПРИВАТНЫЕ МЕТОДЫ - НАСТРОЙКА
   // ============================================
+
+  /**
+   * Очистить все динамические кнопки (like, share, copy)
+   * Удаляет кнопки со всеми возможными префиксами
+   */
+  private clearAllDynamicButtons(): void {
+    const actionsContainer = document.querySelector('.capsule-result-actions') as HTMLElement;
+    if (!actionsContainer) {
+      return;
+    }
+
+    // Список всех возможных селекторов для динамических кнопок
+    const buttonSelectors = [
+      // Like кнопки с разными префиксами
+      '.capsule-result-like-btn',
+      '.shared-capsule-like-btn', 
+      '.capsule-like-btn',
+      '.result-like-btn',
+      
+      // Share кнопки с разными префиксами
+      '.capsule-result-share-btn',
+      '.shared-capsule-share-btn',
+      '.capsule-share-btn',
+      '.result-share-btn',
+      
+      // Copy кнопки
+      '.shared-capsule-copy-btn',
+      '.capsule-copy-btn',
+      '.copy-btn',
+      
+      // Контейнеры кнопок
+      '.like-container',
+      '.share-container',
+      '.copy-container'
+    ];
+
+    // Удаляем все найденные кнопки
+    let removedCount = 0;
+    buttonSelectors.forEach(selector => {
+      const elements = actionsContainer.querySelectorAll(selector);
+      elements.forEach(element => {
+        // Удаляем родительский контейнер если он есть, иначе сам элемент
+        const container = element.closest('.like-container, .share-container, .copy-container');
+        if (container) {
+          container.remove();
+        } else {
+          element.remove();
+        }
+        removedCount++;
+      });
+    });
+
+    if (removedCount > 0) {
+      logger.info('Cleared dynamic buttons from result screen', { removedCount });
+    }
+  }
 
   /**
    * Добавить динамические кнопки like и share
