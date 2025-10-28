@@ -195,17 +195,17 @@ export class UIManager {
   }
 
   /**
-   * Показать модальное окно подписки
+   * Показать модальное окно лимитов
    */
-  showSubscriptionModal(): void {
-    uiCoreManager.showSubscriptionModal();
+  showLimitModal(): void {
+    uiCoreManager.showLimitModal();
   }
 
   /**
    * Показать shared анализ
    */
   async showSharedAnalysis(photoBase64: string, analysisText: string, timestamp: string, historyItemId?: number, likesCount?: number, isLiked?: boolean): Promise<void> {
-    await uiCoreManager.showSharedAnalysis(photoBase64, analysisText, timestamp, historyItemId, likesCount, isLiked);
+    await uiCoreManager.showSharedAnalysis(photoBase64, analysisText, timestamp, historyItemId || 0, likesCount || 0, isLiked || false);
   }
 
   /**

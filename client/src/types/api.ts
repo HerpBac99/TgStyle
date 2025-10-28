@@ -24,13 +24,8 @@ export interface AuthResponse {
     lastName?: string;
     username?: string;
     avatarUrl?: string;
-    subscription?: {
-      type: 'free' | 'premium';
-      analysesLeft: number;
-      totalAnalyses: number;
-      weeklyResetDate: string;
-      subscriptionEndDate?: string | null;
-    };
+    analysesLeft: number;
+    totalAnalyses: number;
   };
   error?: string;
 }
@@ -51,13 +46,8 @@ export interface AnalysisResponse {
   analysis?: string;
   error?: string;
   historyItemId?: number;
-  subscription?: {
-    type: 'free' | 'premium';
-    analysesLeft: number;
-    totalAnalyses: number;
-    weeklyResetDate: string;
-    subscriptionEndDate?: string | null;
-  };
+  analysesLeft?: number;
+  totalAnalyses?: number;
   multi_pass_results?: {
     person: string;
     accessories: string;

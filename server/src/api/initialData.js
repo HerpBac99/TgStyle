@@ -171,12 +171,8 @@ router.get('/', async (req, res) => {
                     username: dbUser.username,
                     avatarUrl: dbUser.avatarUrl
                 },
-                subscription: {
-                    type: dbUser.subscriptionType || 'free',
-                    analysesLeft: dbUser.subscriptionType === 'premium' ? -1 : dbUser.analysesCount,
-                    totalAnalyses: dbUser.totalAnalyses || 0,
-                    weeklyResetDate: dbUser.weeklyResetDate
-                },
+                analysesLeft: dbUser.analysesCount,
+                totalAnalyses: dbUser.totalAnalyses || 0,
                 history: {
                     items: historyItems.map(item => ({
                         id: item.id,

@@ -17,7 +17,7 @@ model User {
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
   isActive             Boolean        @default(true)
-  analysesCount        Int            @default(3)
+  analysesCount        Int            @default(10)
   subscriptionType     String         @default("free")
   subscriptionEndDate  DateTime?
   totalAnalyses        Int            @default(0)

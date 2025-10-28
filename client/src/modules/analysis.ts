@@ -164,9 +164,12 @@ class AnalysisManager {
       // Обновляем карусель истории (event history:updated уже вызовется автоматически)
       uiManager.updateHistoryDisplay();
 
-      // Обновляем информацию о подписке (если вернулся новый статус)
-      if (response.subscription) {
-        authManager.updateSubscription(response.subscription);
+      // Обновляем информацию о лимитах (если вернулся новый статус)
+      if (response.analysesLeft !== undefined) {
+        authManager.updateUserLimits({
+          analysesLeft: response.analysesLeft,
+          totalAnalyses: response.totalAnalyses || 0
+        });
       }
 
       // Показываем результат в UI (один раз, напрямую - избегаем дубликатов через события)

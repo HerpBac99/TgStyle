@@ -45,42 +45,19 @@ function checkAnalysisLimits(user) {
         };
     }
 
-    // Проверяем активность Premium подписки
-    const isPremiumActive = user.subscriptionType === 'premium' && 
-                           user.subscriptionEndDate && 
-                           new Date(user.subscriptionEndDate) > new Date();
-
-    if (isPremiumActive) {
+    // Проверяем лимит анализов
+    if (user.analysesCount <= 0) {
         return {
-            allowed: true,
-            reason: 'premium_subscription',
-            subscription: 'premium'
+            allowed: false,
+            reason: 'limit_exceeded',
+            analysesLeft: 0
         };
     }
 
-    // Для Free пользователей проверяем лимиты
-    if (user.subscriptionType === 'free') {
-        if (user.analysesCount <= 0) {
-            return {
-                allowed: false,
-                reason: 'weekly_limit_exceeded',
-                analysesLeft: 0,
-                weeklyResetDate: user.weeklyResetDate
-            };
-        }
-
-        return {
-            allowed: true,
-            reason: 'free_subscription_limit_ok',
-            analysesLeft: user.analysesCount,
-            weeklyResetDate: user.weeklyResetDate
-        };
-    }
-
-    // Неизвестный тип подписки - разрешаем как fallback
     return {
         allowed: true,
-        reason: 'unknown_subscription_fallback'
+        reason: 'limit_ok',
+        analysesLeft: user.analysesCount
     };
 }
 
@@ -457,7 +434,6 @@ router.post('/', async (req, res) => {
             if (dbUser) {
                 logger.info('Пользователь найден в БД', {
                     userId: dbUser.id,
-                    subscriptionType: dbUser.subscriptionType,
                     analysesLeft: dbUser.analysesCount
                 });
 
@@ -474,10 +450,8 @@ router.post('/', async (req, res) => {
                     return res.status(429).json({
                         success: false,
                         error: 'Analysis limit exceeded',
-                        message: 'Превышен недельный лимит анализов',
-                        analysesLeft: limitsCheck.analysesLeft,
-                        weeklyResetDate: limitsCheck.weeklyResetDate,
-                        subscriptionType: dbUser.subscriptionType
+                        message: 'Превышен лимит анализов',
+                        analysesLeft: limitsCheck.analysesLeft
                     });
                 }
 
@@ -542,11 +516,9 @@ router.post('/', async (req, res) => {
                         analysisResult.technical_analysis  // Технический анализ
                     );
 
-                    // Обновляем счетчики только для free пользователей
-                    if (dbUser.subscriptionType === 'free') {
-                        await updateUserCounters(dbUser.id);
-                        logger.info('Счетчики пользователя обновлены после анализа');
-                    }
+                    // Обновляем счетчики пользователя
+                    await updateUserCounters(dbUser.id);
+                    logger.info('Счетчики пользователя обновлены после анализа');
                 } else {
                     logger.warn('Пользователь не найден в БД, анализ не сохранен в историю');
                 }
@@ -569,11 +541,8 @@ router.post('/', async (req, res) => {
             if (dbUser) {
                 const updatedUser = await getUserByTelegramId(telegramUser.id);
                 if (updatedUser) {
-                    response.subscription = {
-                        type: updatedUser.subscriptionType,
-                        analysesLeft: updatedUser.subscriptionType === 'premium' ? -1 : updatedUser.analysesCount,
-                        totalAnalyses: updatedUser.totalAnalyses
-                    };
+                    response.analysesLeft = updatedUser.analysesCount;
+                    response.totalAnalyses = updatedUser.totalAnalyses;
                 }
             }
 

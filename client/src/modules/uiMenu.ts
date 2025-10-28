@@ -73,12 +73,12 @@ export class UIMenuManager {
     historyCells: NodeListOf<HTMLElement>;
     appContainer: HTMLElement | null;
   } = {
-    userName: null,
-    userPhoto: null,
-    cameraBtn: null,
-    historyCells: null! as NodeListOf<HTMLElement>,
-    appContainer: null,
-  };
+      userName: null,
+      userPhoto: null,
+      cameraBtn: null,
+      historyCells: null! as NodeListOf<HTMLElement>,
+      appContainer: null,
+    };
 
   private cleanupFunctions: (() => void)[] = [];
   private longPressState: LongPressState = {
@@ -209,11 +209,10 @@ export class UIMenuManager {
 
       // Проверяем лимиты перед открытием камеры
       if (!authManager.canAnalyze()) {
-        logger.info('Analysis limit reached, showing subscription modal', {
-          analysesLeft: authManager.getAnalysesLeft(),
-          isPremium: authManager.isPremium()
+        logger.info('Analysis limit reached, showing limit modal', {
+          analysesLeft: authManager.getAnalysesLeft()
         });
-        uiCoreManager.showSubscriptionModal();
+        uiCoreManager.showLimitModal();
         return;
       }
 
@@ -273,7 +272,7 @@ export class UIMenuManager {
         userId: analysisData.telegramId
       });
       savedAnalysisPhoto.src = photoUrl;
-    } 
+    }
 
     // Формируем текст анализа
     let analysisContent = '';
@@ -320,19 +319,19 @@ export class UIMenuManager {
   private async syncHistoryMetadata(): Promise<void> {
     try {
       const initData = window.Telegram?.WebApp?.initData || '';
-      
+
       if (!initData) {
         logger.warn('No initData available for metadata sync');
         return;
       }
-      
+
       logger.info('Syncing history metadata from server');
       const response = await api.get(`/history-metadata?initData=${encodeURIComponent(initData)}`) as any;
-      
+
       if (response.success && response.metadata) {
         historyManager.updateMetadata(response.metadata);
-        logger.info('History metadata synced successfully', { 
-          itemsCount: response.metadata.length 
+        logger.info('History metadata synced successfully', {
+          itemsCount: response.metadata.length
         });
       }
     } catch (err) {
@@ -355,10 +354,10 @@ export class UIMenuManager {
 
     // Очищаем текущее изображение в менеджере камеры
     cameraManager.clearCurrentImage();
-    
+
     // OPTIMIZATION: Загружаем только метаданные если история большая
     const stats = historyManager.getStats();
-    
+
     try {
       if (stats.filledSlots < 10) {
         // Мало элементов - загружаем полностью
@@ -372,295 +371,295 @@ export class UIMenuManager {
     } catch (error) {
       logger.warn('Failed to update history from server', { error });
     }
-    
+
     // Пересчитываем карусель после закрытия экрана (с сохранением позиции)
     this.updateHistoryDisplay({ preservePosition: true });
   }
 
-    /**
-     * @description Обновление отображения истории
-     * @param {object} options - Опции обновления.
-     * @param {boolean} [options.preservePosition=false] - Сохранить ли текущую позицию карусели.
-     * #UPDATE-HISTORY-DISPLAY #UI-MENU #UI-UPDATE-HISTORY-DISPLAY
-     */
-    updateHistoryDisplay(options: { preservePosition?: boolean } = {}): void {
-      const { preservePosition = false } = options;
-      const filledItems = historyManager.getAllItems();
+  /**
+   * @description Обновление отображения истории
+   * @param {object} options - Опции обновления.
+   * @param {boolean} [options.preservePosition=false] - Сохранить ли текущую позицию карусели.
+   * #UPDATE-HISTORY-DISPLAY #UI-MENU #UI-UPDATE-HISTORY-DISPLAY
+   */
+  updateHistoryDisplay(options: { preservePosition?: boolean } = {}): void {
+    const { preservePosition = false } = options;
+    const filledItems = historyManager.getAllItems();
 
-      // Обновление карусели (debug логи отключены)
+    // Обновление карусели (debug логи отключены)
 
-      // Сервер возвращает в порядке desc (новые первые), а нам нужно asc (старые первые)
-      const sortedItems = [...filledItems].reverse();
+    // Сервер возвращает в порядке desc (новые первые), а нам нужно asc (старые первые)
+    const sortedItems = [...filledItems].reverse();
 
-      // Создаем карусель динамически
-      this.createCarouselCards(sortedItems);
+    // Создаем карусель динамически
+    this.createCarouselCards(sortedItems);
 
-      // Позиционируем карусель
-      this.positionCarousel(preservePosition);
+    // Позиционируем карусель
+    this.positionCarousel(preservePosition);
 
-      // Карусель отрисована (debug логи отключены)
+    // Карусель отрисована (debug логи отключены)
 
-      // OPTIMIZATION: Progressive image loading - грузим только видимые карты
-      this.loadVisibleCardImages();
+    // OPTIMIZATION: Progressive image loading - грузим только видимые карты
+    this.loadVisibleCardImages();
 
-      // Обновляем навигацию
-      this.updateCarouselNavigation();
+    // Обновляем навигацию
+    this.updateCarouselNavigation();
+  }
+
+  /**
+   * Загрузка всех изображений карусели
+   * SIMPLIFIED: Загружаем все изображения последовательно без приоритетов
+   */
+  private loadVisibleCardImages(): void {
+    // Предотвращаем повторную загрузку если уже идет процесс
+    if (this.isLoadingImages) {
+      logger.debug('⏭️ Skipping image loading - already in progress', {
+        currentState: {
+          priorityLoaded: this.imageLoadMetrics.priorityImagesLoaded,
+          backgroundLoaded: this.imageLoadMetrics.backgroundImagesLoaded,
+          totalToLoad: this.imageLoadMetrics.totalImagesToLoad
+        }
+      });
+      return;
     }
 
-    /**
-     * Загрузка всех изображений карусели
-     * SIMPLIFIED: Загружаем все изображения последовательно без приоритетов
-     */
-    private loadVisibleCardImages(): void {
-      // Предотвращаем повторную загрузку если уже идет процесс
-      if (this.isLoadingImages) {
-        logger.debug('⏭️ Skipping image loading - already in progress', {
-          currentState: {
-            priorityLoaded: this.imageLoadMetrics.priorityImagesLoaded,
-            backgroundLoaded: this.imageLoadMetrics.backgroundImagesLoaded,
-            totalToLoad: this.imageLoadMetrics.totalImagesToLoad
-          }
-        });
+    this.isLoadingImages = true;
+
+    const totalCards = this.carouselState.totalCards;
+    const totalImagesToLoad = totalCards - 1; // -1 потому что последняя карта пустая
+
+    // Сбрасываем счетчики
+    this.imageLoadMetrics.priorityImagesLoaded = 0;
+    this.imageLoadMetrics.backgroundImagesLoaded = 0;
+    this.imageLoadMetrics.totalImagesToLoad = totalImagesToLoad;
+    this.imageLoadMetrics.priorityLoadStartTime = performance.now();
+
+    logger.info('Loading all carousel images', {
+      totalCards: totalImagesToLoad
+    });
+
+    let loadedCount = 0;
+
+    // Загружаем все изображения последовательно
+    for (let i = 0; i < totalCards; i++) {
+      this.loadCardImageWithCallback(i, () => {
+        loadedCount++;
+
+        // Когда все изображения загружены
+        if (loadedCount === totalImagesToLoad) {
+          this.imageLoadMetrics.priorityLoadEndTime = performance.now();
+          const totalLoadTime = Math.round(this.imageLoadMetrics.priorityLoadEndTime - this.imageLoadMetrics.priorityLoadStartTime);
+          logger.info('✅ All carousel images loaded', {
+            count: totalImagesToLoad,
+            loadTime: `${totalLoadTime}ms`
+          });
+
+          // Сбрасываем флаг загрузки
+          this.isLoadingImages = false;
+        }
+      });
+    }
+  }
+
+  /**
+   * Загрузить изображение для одной карты с callback
+   */
+  private loadCardImageWithCallback(index: number, onLoad: () => void): Promise<void> {
+    return new Promise((resolve) => {
+      if (index < 0 || index >= this.carouselState.totalCards) {
+        resolve();
         return;
       }
 
-      this.isLoadingImages = true;
+      const card = document.querySelector(`.history-card[data-index="${index}"]`) as HTMLElement;
+      if (!card) {
+        resolve();
+        return;
+      }
 
-      const totalCards = this.carouselState.totalCards;
-      const totalImagesToLoad = totalCards - 1; // -1 потому что последняя карта пустая
-      
-      // Сбрасываем счетчики
-      this.imageLoadMetrics.priorityImagesLoaded = 0;
-      this.imageLoadMetrics.backgroundImagesLoaded = 0;
-      this.imageLoadMetrics.totalImagesToLoad = totalImagesToLoad;
-      this.imageLoadMetrics.priorityLoadStartTime = performance.now();
-      
-      logger.info('Loading all carousel images', { 
-        totalCards: totalImagesToLoad
+      const photoUrl = card.dataset['photoUrl'];
+      if (!photoUrl) {
+        resolve();
+        return;
+      }
+
+      // Если изображение уже загружено, пропускаем
+      if (card.style.backgroundImage) {
+        onLoad();
+        resolve();
+        return;
+      }
+
+      // Создаем Image объект для отслеживания загрузки
+      const img = new Image();
+      img.onload = () => {
+        card.style.backgroundImage = `url(${photoUrl})`;
+        card.classList.remove('image-loading');
+        card.classList.add('image-loaded');
+        delete card.dataset['photoUrl'];
+
+        onLoad();
+        resolve();
+      };
+      img.onerror = () => {
+        logger.warn('Failed to load card image', { index, photoUrl });
+        onLoad(); // Все равно считаем загруженным чтобы счетчик не застрял
+        resolve();
+      };
+
+      // Начинаем загрузку (debug логи отключены для производительности)
+      img.src = photoUrl;
+    });
+  }
+
+  /**
+   * Создание карт карусели динамически
+   * #uiMenu #MainMenu #Carousel #createCarouselCards #createCards #Card
+   */
+  private createCarouselCards(filledItems: HistoryItem[]): void {
+    const carousel = getElement(DOM_SELECTORS.HISTORY_CAROUSEL);
+    if (!carousel) return;
+
+    // Очищаем карусель
+    carousel.innerHTML = '';
+
+    // Всегда создаем минимум одну карту (пустую для новых фото)
+    const totalCards = Math.max(1, filledItems.length + 1);
+    this.carouselState.totalCards = totalCards;
+
+    // Создаем карты
+    for (let i = 0; i < totalCards; i++) {
+      const card = this.createCard(i, filledItems[i] || null);
+      carousel.appendChild(card);
+    }
+
+    // Обновляем ссылку на карты
+    this.elements.historyCells = getElements(DOM_SELECTORS.HISTORY_CARDS);
+
+  }
+
+  /**
+   * @description Метод создания одной карты
+   * #createCard #UI-MENU #UI-CREATE-CARD
+   */
+  private createCard(index: number, data: HistoryItem | null): HTMLElement {
+    const card = this.createCardElement(index);
+    const content = this.createCardContent();
+
+    if (data && data.id) {
+      // Все элементы в истории теперь заполнены (нет isEmpty)
+      this.setupFilledCard(card, content, data);
+    } else {
+      this.setupEmptyCard(card, content, index);
+    }
+
+    card.appendChild(content);
+    return card;
+  }
+
+  /**
+   * @description Метод создания базового элемента карты
+   * #createCardElement #UI-MENU #UI-CREATE-CARD-ELEMENT
+   */
+  private createCardElement(index: number): HTMLElement {
+    return createElement('div', {
+      class: 'history-card',
+      'data-index': index.toString(),
+    });
+  }
+
+  /**
+   * @description Метод создания контейнера контента карты
+   * #createCardContent #UI-MENU #UI-CREATE-CARD-CONTENT
+   */
+  private createCardContent(): HTMLElement {
+    return createElement('div', {
+      class: 'history-card-content',
+    });
+  }
+
+  /**
+   * Настраивает заполненную карту
+   */
+  private setupFilledCard(card: HTMLElement, content: HTMLElement, data: HistoryItem): void {
+    card.classList.add(CSS_CLASSES.FILLED);
+
+    // Добавляем data-id для возможности точечного обновления метаданных
+    if (data.id) {
+      card.setAttribute('data-id', data.id.toString());
+    }
+
+    // OPTIMIZATION: Lazy loading - НЕ загружаем изображения сразу
+    // Сохраняем URL в data-атрибут для отложенной загрузки
+    if (data.photoPath) {
+      const backgroundUrl = `/uploads/analysis/${data.telegramId}/${data.photoPath}`;
+      card.dataset['photoUrl'] = backgroundUrl;
+      // Добавляем класс для skeleton UI
+      card.classList.add('image-loading');
+    } else {
+      logger.warn('DEBUG: photoPath is empty or null!', {
+        itemId: data.id,
+        allData: JSON.stringify(data).substring(0, 300)
       });
-      
-      let loadedCount = 0;
-      
-      // Загружаем все изображения последовательно
-      for (let i = 0; i < totalCards; i++) {
-        this.loadCardImageWithCallback(i, () => {
-          loadedCount++;
-          
-          // Когда все изображения загружены
-          if (loadedCount === totalImagesToLoad) {
-            this.imageLoadMetrics.priorityLoadEndTime = performance.now();
-            const totalLoadTime = Math.round(this.imageLoadMetrics.priorityLoadEndTime - this.imageLoadMetrics.priorityLoadStartTime);
-            logger.info('✅ All carousel images loaded', { 
-              count: totalImagesToLoad,
-              loadTime: `${totalLoadTime}ms` 
-            });
-            
-            // Сбрасываем флаг загрузки
-            this.isLoadingImages = false;
+    }
+
+    const caption = createElement('div', {
+      class: 'history-card-caption',
+    });
+
+    // Добавляем дату
+    /*
+    const dateElement = createElement('div', {
+      class: 'history-card-date',
+    }, formatHistoryDate(new Date(data.createdAt).toISOString()));
+    caption.appendChild(dateElement);
+    */
+    content.appendChild(caption);
+
+    // Используем единый сервис для создания компонента лайков
+    // #REFACTOR #UNIFIED-LIKES-SERVICE
+    if (data.id) {
+      analysisLikesService.createLikeComponent(
+        caption,
+        data.id,
+        {
+          isLiked: !!data.isLiked,
+          likesCount: data.likesCount || 0
+        },
+        'carousel' // Добавляем класс для карусели
+      );
+
+      // Создаем кнопку share в карусели
+      sharingService.createShareButton(
+        caption,
+        {
+          type: 'analysis',
+          image: data.photoPath ? `/uploads/analysis/${data.telegramId}/${data.photoPath}` : '',
+          text: data.analysisText || data.technicalAnalysis || 'Анализ стиля',
+          title: '🤖 AI Анализ стиля',
+          metadata: {
+            historyItemId: data.id
           }
-        });
+        },
+        'carousel' // Добавляем класс для карусели
+      );
+    }
+
+    // Находим реальный индекс элемента в общем массиве истории
+    const realIndex = this.findRealHistoryIndex(data);
+
+    // Обработчики
+    this.addLongPressHandlers(card, realIndex);
+
+    // Обработчик клика на карточку - НО не на лайк или share!
+    card.addEventListener('click', (e: Event) => {
+      const target = e.target as HTMLElement;
+      // Проверяем что клик НЕ на кнопку лайка, share или их содержимое
+      if (!target.closest('.like-container') && !target.closest('.share-container')) {
+        this.showSavedAnalysis(data);
       }
-    }
-
-    /**
-     * Загрузить изображение для одной карты с callback
-     */
-    private loadCardImageWithCallback(index: number, onLoad: () => void): Promise<void> {
-      return new Promise((resolve) => {
-        if (index < 0 || index >= this.carouselState.totalCards) {
-          resolve();
-          return;
-        }
-
-        const card = document.querySelector(`.history-card[data-index="${index}"]`) as HTMLElement;
-        if (!card) {
-          resolve();
-          return;
-        }
-
-        const photoUrl = card.dataset['photoUrl'];
-        if (!photoUrl) {
-          resolve();
-          return;
-        }
-
-        // Если изображение уже загружено, пропускаем
-        if (card.style.backgroundImage) {
-          onLoad();
-          resolve();
-          return;
-        }
-
-        // Создаем Image объект для отслеживания загрузки
-        const img = new Image();
-        img.onload = () => {
-          card.style.backgroundImage = `url(${photoUrl})`;
-          card.classList.remove('image-loading');
-          card.classList.add('image-loaded');
-          delete card.dataset['photoUrl'];
-          
-          onLoad();
-          resolve();
-        };
-        img.onerror = () => {
-          logger.warn('Failed to load card image', { index, photoUrl });
-          onLoad(); // Все равно считаем загруженным чтобы счетчик не застрял
-          resolve();
-        };
-        
-        // Начинаем загрузку (debug логи отключены для производительности)
-        img.src = photoUrl;
-      });
-    }
-
-    /**
-     * Создание карт карусели динамически
-     * #uiMenu #MainMenu #Carousel #createCarouselCards #createCards #Card
-     */
-    private createCarouselCards(filledItems: HistoryItem[]): void {
-      const carousel = getElement(DOM_SELECTORS.HISTORY_CAROUSEL);
-      if (!carousel) return;
-
-      // Очищаем карусель
-      carousel.innerHTML = '';
-
-      // Всегда создаем минимум одну карту (пустую для новых фото)
-      const totalCards = Math.max(1, filledItems.length + 1);
-      this.carouselState.totalCards = totalCards;
-
-      // Создаем карты
-      for (let i = 0; i < totalCards; i++) {
-        const card = this.createCard(i, filledItems[i] || null);
-        carousel.appendChild(card);
-      }
-
-      // Обновляем ссылку на карты
-      this.elements.historyCells = getElements(DOM_SELECTORS.HISTORY_CARDS);
-
-    }
-
-    /**
-     * @description Метод создания одной карты
-     * #createCard #UI-MENU #UI-CREATE-CARD
-     */
-    private createCard(index: number, data: HistoryItem | null): HTMLElement {
-      const card = this.createCardElement(index);
-      const content = this.createCardContent();
-
-      if (data && data.id) {
-        // Все элементы в истории теперь заполнены (нет isEmpty)
-        this.setupFilledCard(card, content, data);
-      } else {
-        this.setupEmptyCard(card, content, index);
-      }
-
-      card.appendChild(content);
-      return card;
-    }
-
-    /**
-     * @description Метод создания базового элемента карты
-     * #createCardElement #UI-MENU #UI-CREATE-CARD-ELEMENT
-     */
-    private createCardElement(index: number): HTMLElement {
-      return createElement('div', {
-        class: 'history-card',
-        'data-index': index.toString(),
-      });
-    }
-
-    /**
-     * @description Метод создания контейнера контента карты
-     * #createCardContent #UI-MENU #UI-CREATE-CARD-CONTENT
-     */
-    private createCardContent(): HTMLElement {
-      return createElement('div', {
-        class: 'history-card-content',
-      });
-    }
-
-    /**
-     * Настраивает заполненную карту
-     */
-    private setupFilledCard(card: HTMLElement, content: HTMLElement, data: HistoryItem): void {
-      card.classList.add(CSS_CLASSES.FILLED);
-      
-      // Добавляем data-id для возможности точечного обновления метаданных
-      if (data.id) {
-        card.setAttribute('data-id', data.id.toString());
-      }
-
-      // OPTIMIZATION: Lazy loading - НЕ загружаем изображения сразу
-      // Сохраняем URL в data-атрибут для отложенной загрузки
-      if (data.photoPath) {
-        const backgroundUrl = `/uploads/analysis/${data.telegramId}/${data.photoPath}`;
-        card.dataset['photoUrl'] = backgroundUrl;
-        // Добавляем класс для skeleton UI
-        card.classList.add('image-loading');
-      } else {
-        logger.warn('DEBUG: photoPath is empty or null!', {
-          itemId: data.id,
-          allData: JSON.stringify(data).substring(0, 300)
-        });
-      } 
-
-      const caption = createElement('div', {
-        class: 'history-card-caption',
-      });
-
-      // Добавляем дату
-      /*
-      const dateElement = createElement('div', {
-        class: 'history-card-date',
-      }, formatHistoryDate(new Date(data.createdAt).toISOString()));
-      caption.appendChild(dateElement);
-      */
-      content.appendChild(caption);
-
-      // Используем единый сервис для создания компонента лайков
-      // #REFACTOR #UNIFIED-LIKES-SERVICE
-      if (data.id) {
-        analysisLikesService.createLikeComponent(
-          caption,
-          data.id,
-          {
-            isLiked: !!data.isLiked,
-            likesCount: data.likesCount || 0
-          },
-          'carousel' // Добавляем класс для карусели
-        );
-
-        // Создаем кнопку share в карусели
-        sharingService.createShareButton(
-          caption,
-          {
-            type: 'analysis',
-            image: data.photoPath ? `/uploads/analysis/${data.telegramId}/${data.photoPath}` : '',
-            text: data.analysisText || data.technicalAnalysis || 'Анализ стиля',
-            title: '🤖 AI Анализ стиля',
-            metadata: {
-              historyItemId: data.id
-            }
-          },
-          'carousel' // Добавляем класс для карусели
-        );
-      }
-
-      // Находим реальный индекс элемента в общем массиве истории
-      const realIndex = this.findRealHistoryIndex(data);
-
-      // Обработчики
-      this.addLongPressHandlers(card, realIndex);
-
-      // Обработчик клика на карточку - НО не на лайк или share!
-      card.addEventListener('click', (e: Event) => {
-        const target = e.target as HTMLElement;
-        // Проверяем что клик НЕ на кнопку лайка, share или их содержимое
-        if (!target.closest('.like-container') && !target.closest('.share-container')) {
-          this.showSavedAnalysis(data);
-        }
-      });
-    }
+    });
+  }
 
   /**
    * Настраивает пустую карту
@@ -696,7 +695,7 @@ export class UIMenuManager {
 
     // Ищем по ID (самый надежный способ)
     const index = allItems.findIndex(item => item && item.id === data.id);
-    
+
     if (index === -1) {
       logger.warn('Could not find history item by ID', { id: data.id });
       return -1;
@@ -1042,7 +1041,7 @@ export class UIMenuManager {
       const { historyItemId, likesCount, isLiked } = customEvent.detail;
       this.updateCardMetadata(historyItemId, likesCount, isLiked);
     };
-    
+
     window.addEventListener('history:metadata-updated', metadataUpdateHandler);
     this.cleanupFunctions.push(() => {
       window.removeEventListener('history:metadata-updated', metadataUpdateHandler);

@@ -407,7 +407,7 @@ class TgStyleApp {
       if (authResponse.success) {
         logger.info('✅ Authentication successful', {
           duration: `${authDuration.toFixed(2)}ms`,
-          analysesLeft: authResponse.user?.subscription?.analysesLeft
+          analysesLeft: authResponse.user?.analysesLeft
         });
 
         // Отправляем событие успешной авторизации

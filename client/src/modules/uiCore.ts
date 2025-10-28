@@ -31,144 +31,21 @@ export class UICoreManager {
   constructor() { }
 
   /**
-   * Показать модальное окно покупки подписки
+   * Показать уведомление о том, что анализы закончились
    */
-  showSubscriptionModal(): void {
-    logger.info('Showing subscription modal');
+  showLimitModal(): void {
+    logger.info('Showing limit notification');
 
-    const modal = getElement('#subscription-modal');
-    if (!modal) {
-      logger.error('Subscription modal not found');
-      return;
-    }
+    // Показываем простое уведомление
+    this.showToast('Анализы закончились! У вас было 10 анализов при регистрации.', 'info');
 
-    // Обновляем дату сброса лимитов
-    this.updateWeeklyResetDate();
-
-    // Показываем модальное окно
-    modal.classList.remove('hidden');
-
-    // Настраиваем обработчики событий
-    this.setupSubscriptionModalHandlers();
-
-    // Вибрация при открытии модального окна
+    // Вибрация при показе уведомления
     authManager.vibrate('medium');
 
-    logger.info('Subscription modal shown');
+    logger.info('Limit notification shown');
   }
 
-  /**
-   * Скрыть модальное окно покупки подписки
-   */
-  hideSubscriptionModal(): void {
-    logger.info('Hiding subscription modal');
-
-    const modal = getElement('#subscription-modal');
-    if (!modal) return;
-
-    // Скрываем модальное окно
-    modal.classList.add('hidden');
-
-    // Очищаем обработчики событий (если они были установлены)
-    this.cleanupSubscriptionModalHandlers();
-
-    logger.info('Subscription modal hidden');
-  }
-
-  /**
-   * Обновить дату еженедельного сброса лимитов
-   */
-  private updateWeeklyResetDate(): void {
-    const resetDateElement = getElement('#weekly-reset-date');
-    if (!resetDateElement) return;
-
-    // Вычисляем следующий понедельник
-    const now = new Date();
-    const nextMonday = new Date(now);
-    const daysUntilMonday = (8 - now.getDay()) % 7 || 7; // Если сегодня понедельник, то через 7 дней
-    nextMonday.setDate(now.getDate() + daysUntilMonday);
-    nextMonday.setHours(0, 0, 0, 0); // Устанавливаем начало дня
-
-    // Форматируем дату
-    const formattedDate = nextMonday.toLocaleDateString('ru-RU', {
-      day: 'numeric',
-      month: 'long'
-    });
-
-    resetDateElement.textContent = formattedDate;
-  }
-
-  /**
-   * Настроить обработчики событий для модального окна подписки
-   */
-  private setupSubscriptionModalHandlers(): void {
-    // Обработчик закрытия модального окна
-    const closeBtn = getElement('#close-subscription-modal');
-    if (closeBtn) {
-      const closeHandler = () => this.hideSubscriptionModal();
-      closeBtn.addEventListener('click', closeHandler);
-
-      // Сохраняем обработчик для очистки
-      this.cleanupFunctions.push(() => {
-        closeBtn.removeEventListener('click', closeHandler);
-      });
-    }
-
-    // Обработчик клика по оверлею для закрытия
-    const modal = getElement('#subscription-modal');
-    if (modal) {
-      const overlayHandler = (event: Event) => {
-        if (event.target === modal || (event.target as HTMLElement).classList.contains('subscription-modal-overlay')) {
-          this.hideSubscriptionModal();
-        }
-      };
-      modal.addEventListener('click', overlayHandler);
-
-      // Сохраняем обработчик для очистки
-      this.cleanupFunctions.push(() => {
-        modal.removeEventListener('click', overlayHandler);
-      });
-    }
-
-    // Обработчик кнопки "Оформить Premium"
-    const upgradeBtn = getElement('#upgrade-premium-btn');
-    if (upgradeBtn) {
-      const upgradeHandler = () => this.handleUpgradePremium();
-      upgradeBtn.addEventListener('click', upgradeHandler);
-
-      // Сохраняем обработчик для очистки
-      this.cleanupFunctions.push(() => {
-        upgradeBtn.removeEventListener('click', upgradeHandler);
-      });
-    }
-  }
-
-  /**
-   * Очистить обработчики событий модального окна подписки
-   */
-  private cleanupSubscriptionModalHandlers(): void {
-    // Обработчики очищаются автоматически через cleanupFunctions
-    // Этот метод оставлен для потенциального расширения
-  }
-
-  /**
-   * Обработчик кнопки "Оформить Premium"
-   */
-  private handleUpgradePremium(): void {
-    logger.info('Upgrade Premium button clicked');
-
-    // Здесь будет логика покупки подписки
-    // Пока показываем уведомление
-
-    // Скрываем модальное окно
-    this.hideSubscriptionModal();
-
-    // Показываем уведомление о том, что функция в разработке
-    this.showToast('Функция покупки подписки скоро будет доступна!', 'info');
-
-    // Вибрация
-    authManager.vibrate('light');
-  }
+  // Удалены методы subscription modal - система упрощена
 
   /**
    * Показать toast уведомление
