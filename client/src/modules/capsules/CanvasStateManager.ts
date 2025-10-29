@@ -30,16 +30,15 @@ export class CanvasStateManager {
    * 
    * @param canvasEditor - Экземпляр canvas editor
    * @param cacheKey - Ключ для кэширования (опционально)
-   * @param removeBackground - Удалять ли фон с изображения (по умолчанию false)
-   * @returns Состояние canvas
+   * @returns Состояние canvas (с автоматической обрезкой по содержимому)
    */
-  async saveState(canvasEditor: UICanvasEditor, cacheKey?: string, removeBackground: boolean = false): Promise<CanvasState> {
+  async saveState(canvasEditor: UICanvasEditor, cacheKey?: string): Promise<CanvasState> {
     return await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Saving canvas state', { cacheKey, removeBackground });
+        logger.info('Saving canvas state with auto-crop', { cacheKey });
 
-        // Получаем состояние из canvas editor
-        const editorState = await canvasEditor.getState(removeBackground);
+        // Получаем состояние из canvas editor (с автоматической обрезкой)
+        const editorState = await canvasEditor.getState(false);
         
         // Получаем ID элементов на canvas
         const itemIds = canvasEditor.getItemIds();

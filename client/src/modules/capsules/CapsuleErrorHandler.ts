@@ -11,7 +11,8 @@
  */
 
 import { logger } from '@/modules/logger';
-import { ModalService } from '@/modules/shared/ModalService';
+// ModalService больше не используется - не показываем alert пользователю
+// import { ModalService } from '@/modules/shared/ModalService';
 
 /**
  * Контекст ошибки для логирования
@@ -72,7 +73,8 @@ const ERROR_MESSAGES: Record<string, string> = {
  * Утилита для обработки ошибок в модуле капсул
  */
 export class CapsuleErrorHandler {
-  private static modalService = new ModalService();
+  // modalService больше не используется - не показываем alert пользователю
+  // private static modalService = new ModalService();
 
   /**
    * Выполнить операцию с обработкой ошибок и fallback
@@ -112,12 +114,19 @@ export class CapsuleErrorHandler {
    * @param operation - Название операции
    */
   static showUserError(error: unknown, operation: string): void {
+    // ВАЖНО: НЕ показываем alert пользователю!
+    // Только логируем ошибку для отладки
     const userMessage = this.getUserFriendlyMessage(error, operation);
-    
-    // Показываем alert через ModalService
-    this.modalService.showAlert(userMessage).catch(err => {
-      logger.error('Failed to show error alert', { error: err });
+    logger.warn('Error occurred (not shown to user)', { 
+      operation, 
+      userMessage,
+      error: error instanceof Error ? error.message : String(error)
     });
+    
+    // Не показываем alert - пользователь не должен видеть технические ошибки
+    // this.modalService.showAlert(userMessage).catch(err => {
+    //   logger.error('Failed to show error alert', { error: err });
+    // });
   }
 
   /**

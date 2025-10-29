@@ -601,14 +601,7 @@ async function generateCapsules(req, res) {
     logger.info('Sending request to FastVLM Mock', {
       telegramId: telegramId.toString(),
       url,
-      itemsCount: prioritizedItems.length,
-      wardrobeItems: prioritizedItems.map(item => ({
-        id: item.id,
-        category: item.category,
-        color: item.color,
-        usageCount: item.usageCount,
-        imagePath: item.imagePath
-      }))
+      itemsCount: prioritizedItems.length
     });
 
     // Создаем AbortController для таймаута
@@ -724,17 +717,6 @@ async function generateCapsules(req, res) {
       telegramId: telegramId.toString(),
       totalGenerated: enrichedCapsules.length,
       uniqueCapsules: enrichedCapsules.filter(c => c.isUnique).length,
-      generatedCapsules: enrichedCapsules.map(capsule => ({
-        id: capsule.id,
-        name: capsule.name,
-        itemIds: capsule.itemIds,
-        itemsWithImages: capsule.items.map(item => ({
-          id: item.id,
-          category: item.category,
-          imagePath: item.imagePath,
-          imageUrl: item.imagePath ? `/uploads/wardrobe/${telegramId}/${item.imagePath}` : null
-        }))
-      }))
     });
 
     res.json({

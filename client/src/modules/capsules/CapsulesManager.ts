@@ -159,14 +159,29 @@ export class CapsulesManager implements PhotoUploadHandler {
     // Отменяем flow если активен
     this.flowManager.cancel();
 
+    this.cleanupCanvas();
+    uiModalManager.hide();
+    this.capsulesGrid.hide();
+  }
+
+  /**
+   * Очистить и уничтожить canvas
+   * НОВЫЙ МЕТОД: Принудительная очистка canvas для предотвращения конфликтов
+   */
+  private cleanupCanvas(): void {
     if (this.canvasEditor) {
+      logger.info('Cleaning up canvas editor');
+      
+      // Очищаем canvas
       this.canvasEditor.hide();
       this.canvasEditor.destroy();
       this.canvasEditor = null;
-    }
 
-    uiModalManager.hide();
-    this.capsulesGrid.hide();
+      // Очищаем кэш состояний canvas
+      this.stateManager.clearCache();
+
+      logger.info('Canvas editor cleaned up');
+    }
   }
 
   // ============================================
@@ -318,6 +333,30 @@ export class CapsulesManager implements PhotoUploadHandler {
         this.capsulesGrid.show();
       },
       CapsuleErrorHandler.createContext('Просмотр капсулы', { capsuleId })
+    );
+  }
+
+  /**
+   * Обработчик редактирования капсулы с принудительной очисткой canvas
+   * НОВЫЙ МЕТОД: Гарантирует, что всегда загружается правильная капсула
+   */
+  private async handleEditCapsuleWithCleanup(capsuleId: number): Promise<void> {
+    await CapsuleErrorHandler.handleWithFallback(
+      async () => {
+        logger.info('Starting capsule edit with cleanup', { capsuleId });
+
+        // ПРИНУДИТЕЛЬНАЯ ОЧИСТКА: Всегда очищаем canvas перед загрузкой новой капсулы
+        this.cleanupCanvas();
+
+        // Теперь вызываем обычный метод редактирования
+        await this.handleEditCapsule(capsuleId);
+      },
+      () => {
+        // Fallback: возвращаемся к гриду
+        this.capsulesGrid.show();
+        this.flowManager.cancel();
+      },
+      CapsuleErrorHandler.createContext('Редактирование капсулы с очисткой', { capsuleId })
     );
   }
 
@@ -705,9 +744,9 @@ export class CapsulesManager implements PhotoUploadHandler {
             const isDirty = !state || this.stateManager.isDirty(cacheKey);
 
             if (isDirty || !state) {
-              // Получаем состояние через CanvasStateManager с удалением фона для компактного изображения
-              state = await this.stateManager.saveState(this.canvasEditor!, cacheKey, true);
-              logger.info('Canvas state saved to cache with background removal', { cacheKey, isDirty });
+              // Получаем состояние через CanvasStateManager (с автоматической обрезкой на клиенте)
+              state = await this.stateManager.saveState(this.canvasEditor!, cacheKey);
+              logger.info('Canvas state saved to cache with auto-crop', { cacheKey, isDirty });
             } else {
               logger.info('Using cached canvas state', { cacheKey });
             }
@@ -776,24 +815,28 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Показать экран результата капсулы (для просмотра из грида)
    */
   private async showCapsuleResult(capsuleId: number, thumbnailUrl: string, author?: { firstName: string; lastName?: string }): Promise<void> {
-    // Инициализируем экран результата если нужно
-    if (!this.resultScreen) {
-      this.resultScreen = new UICanvasResultScreen({
-        screenId: 'capsule-result-screen',
-        onSave: () => this.handleResultSave(),
-        onShare: () => this.handleResultShare(),
-        onDone: () => this.handleResultDone(),
-        onClose: () => this.handleResultClose(),
-        onEdit: () => this.handleEditCapsule(capsuleId) // Новый callback для редактирования
-      });
+    // ИСПРАВЛЕНО: Всегда пересоздаем экран результата с правильным capsuleId
+    // Это гарантирует, что кнопка "Редактировать" всегда открывает правильную капсулу
+    if (this.resultScreen) {
+      this.resultScreen.destroy();
     }
+
+    this.resultScreen = new UICanvasResultScreen({
+      screenId: 'capsule-result-screen',
+      onSave: () => this.handleResultSave(),
+      onShare: () => this.handleResultShare(),
+      onDone: () => this.handleResultDone(),
+      onClose: () => this.handleResultClose(),
+      onEdit: () => this.handleEditCapsuleWithCleanup(capsuleId) // ИСПРАВЛЕНО: используем новый метод с очисткой
+    });
 
     // Показываем экран с кнопками like, share, кнопкой редактирования и автором
     this.resultScreen.show(thumbnailUrl, capsuleId, true, true, author); // showButtons=true, showEditButton=true, author
 
-    // Настраиваем BackButton для возврата на грид
+    // Настраиваем BackButton для возврата на грид с очисткой canvas
     navigationManager.push(() => {
       this.resultScreen?.hide();
+      this.cleanupCanvas(); // ИСПРАВЛЕНО: очищаем canvas при возврате
       this.capsulesGrid.show();
       // Удаляем обработчик из стека после выполнения
       navigationManager.pop();
@@ -936,10 +979,12 @@ export class CapsulesManager implements PhotoUploadHandler {
 
     if (capsuleId) {
       // Обновление существующей капсулы
+      // ВАЖНО: НЕ отправляем itemIds при обновлении, только canvasData и thumbnailImage
+      // itemIds уже сохранены в БД и не должны изменяться при редактировании canvas
       const updated = await capsulesService.updateCapsule(capsuleId, {
         canvasData: state.canvasData,
-        thumbnailImage: state.thumbnailImage,
-        itemIds: state.itemIds
+        thumbnailImage: state.thumbnailImage
+        // itemIds: state.itemIds // УБРАНО: не отправляем itemIds при обновлении
       });
 
       // Обновляем в массиве

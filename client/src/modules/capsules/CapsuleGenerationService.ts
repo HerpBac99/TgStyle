@@ -267,8 +267,8 @@ export class CapsuleGenerationService {
           return;
         }
 
-        // Белый фон
-        ctx.fillStyle = '#ffffff';
+        // Светло-серый фон (как в основном canvas)
+        ctx.fillStyle = '#f5f5f5';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Если нет вещей, возвращаем пустой canvas
@@ -280,64 +280,42 @@ export class CapsuleGenerationService {
           return;
         }
 
-        // Загружаем и рисуем изображения вещей
-        const imagePromises = items.slice(0, 4).map((item, index) => {
+        // ИСПОЛЬЗУЕМ УМНОЕ ПОЗИЦИОНИРОВАНИЕ: группируем по категориям и позиционируем как в основном canvas
+        const positionedItems = this.calculatePreviewPositions(items, canvas.width, canvas.height);
+
+        // Загружаем и рисуем изображения вещей с умным позиционированием
+        const imagePromises = positionedItems.map((positionedItem) => {
           return new Promise<void>((resolveImg) => {
             const img = new Image();
             img.crossOrigin = 'anonymous';
 
             img.onload = () => {
-              // Вычисляем позицию для сетки 2x2
-              const col = index % 2;
-              const row = Math.floor(index / 2);
-              const cellWidth = canvas.width / 2;
-              const cellHeight = canvas.height / 2;
-              const x = col * cellWidth;
-              const y = row * cellHeight;
+              const { position, scale } = positionedItem;
 
-              // Вычисляем размеры с сохранением пропорций
-              const scale = Math.min(
-                cellWidth / img.width,
-                cellHeight / img.height
-              ) * 0.8; // 80% от размера ячейки для отступов
-
+              // Вычисляем размеры с учетом масштаба
               const scaledWidth = img.width * scale;
               const scaledHeight = img.height * scale;
-              const offsetX = x + (cellWidth - scaledWidth) / 2;
-              const offsetY = y + (cellHeight - scaledHeight) / 2;
+              
+              // Центрируем изображение относительно позиции
+              const x = position.x - scaledWidth / 2;
+              const y = position.y - scaledHeight / 2;
 
-              ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
+              ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
               resolveImg();
             };
 
             img.onerror = () => {
-              logger.warn('Failed to load image for preview', { imageUrl: item.imageUrl });
+              logger.warn('Failed to load image for preview', { imageUrl: positionedItem.item.imageUrl });
               resolveImg(); // Продолжаем даже если изображение не загрузилось
             };
 
-            img.src = item.imageUrl || '';
+            img.src = positionedItem.item.imageUrl || '';
           });
         });
 
         // Ждем загрузки всех изображений
         Promise.all(imagePromises)
           .then(() => {
-            // Если вещей больше 4, добавляем счетчик
-            if (items.length > 4) {
-              ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-              ctx.fillRect(canvas.width / 2, canvas.height / 2, canvas.width / 2, canvas.height / 2);
-
-              ctx.fillStyle = '#ffffff';
-              ctx.font = 'bold 48px Arial';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(
-                `+${items.length - 4}`,
-                canvas.width * 0.75,
-                canvas.height * 0.75
-              );
-            }
-
             // ДЕЛЕГИРОВАНИЕ: используем ImageProcessingService
             imageProcessingService.canvasToBase64(canvas, { format: 'png', quality: 1.0 })
               .then(resolve)
@@ -348,6 +326,165 @@ export class CapsuleGenerationService {
         reject(error);
       }
     });
+  }
+
+  /**
+   * Рассчитать позиции для предпросмотра используя ту же логику, что и в UICanvasEditor
+   * НОВЫЙ МЕТОД: Применяет умное позиционирование по категориям
+   */
+  private calculatePreviewPositions(items: WardrobeItem[], canvasWidth: number, canvasHeight: number): Array<{
+    item: WardrobeItem;
+    position: { x: number; y: number };
+    scale: number;
+  }> {
+    const canvasCenterX = canvasWidth / 2;
+    const canvasCenterY = canvasHeight / 2;
+
+    // Группируем вещи по категориям
+    const itemsByCategory: Record<string, WardrobeItem[]> = {};
+    items.forEach(item => {
+      const category = item.category?.toUpperCase() || 'BODYWEAR';
+      if (!itemsByCategory[category]) {
+        itemsByCategory[category] = [];
+      }
+      itemsByCategory[category]!.push(item);
+    });
+
+    const positionedItems: Array<{
+      item: WardrobeItem;
+      position: { x: number; y: number };
+      scale: number;
+    }> = [];
+
+    // Позиционируем каждую категорию используя ТЕ ЖЕ СМЕЩЕНИЯ, что и в UICanvasEditor
+    for (const [category, categoryItems] of Object.entries(itemsByCategory)) {
+      for (let index = 0; index < categoryItems.length; index++) {
+        const item = categoryItems[index]!;
+        let x: number;
+        let y: number;
+
+        // ИСПОЛЬЗУЕМ ТЕ ЖЕ СМЕЩЕНИЯ, что и в calculateImagePosition
+        switch (category) {
+          case 'INNERWEAR':
+          case 'BODYWEAR':
+            x = canvasCenterX;
+            y = canvasCenterY - 60; // Уменьшенное смещение для превью
+            break;
+
+          case 'LEGWEAR':
+            x = canvasCenterX;
+            y = canvasCenterY + 50; // Уменьшенное смещение для превью
+            break;
+
+          case 'FOOTWEAR':
+            x = canvasCenterX;
+            y = canvasCenterY + 110; // Уменьшенное смещение для превью
+            break;
+
+          case 'OUTERWEAR':
+            x = canvasCenterX - 40; // Уменьшенное смещение для превью
+            y = canvasCenterY - 50;
+            break;
+
+          case 'FULLBODY':
+            x = canvasCenterX;
+            y = canvasCenterY - 25;
+            break;
+
+          case 'HEADWEAR':
+            x = canvasCenterX;
+            y = canvasCenterY - 100; // Уменьшенное смещение для превью
+            break;
+
+          case 'ACCESSORIES':
+            // Для аксессуаров используем случайное позиционирование
+            const isLeftSide = Math.random() > 0.5;
+            x = isLeftSide ? canvasCenterX - 75 : canvasCenterX + 75; // Уменьшенное смещение
+            y = canvasCenterY - 25;
+            break;
+
+          default:
+            x = canvasCenterX;
+            y = canvasCenterY;
+            break;
+        }
+
+        // Если несколько вещей в одной категории, добавляем горизонтальное смещение
+        const itemCount = categoryItems.length;
+        if (itemCount > 1) {
+          const horizontalSpacing = Math.min(60, canvasWidth / (itemCount + 1)); // Уменьшенный spacing для превью
+          
+          if (itemCount === 2) {
+            // Две вещи - слева и справа от базовой позиции
+            x += (index === 0 ? -horizontalSpacing / 2 : horizontalSpacing / 2);
+          } else {
+            // Три и более - равномерно распределяем
+            const startOffset = -(horizontalSpacing * (itemCount - 1)) / 2;
+            x += startOffset + (index * horizontalSpacing);
+          }
+
+          // Небольшое вертикальное смещение для избежания полного перекрытия
+          y += (index % 2 === 0 ? -10 : 10); // Уменьшенное смещение для превью
+        }
+
+        // Рассчитываем масштаб для превью (меньше чем в основном canvas)
+        const scale = this.calculatePreviewScale(item, canvasWidth, canvasHeight);
+
+        positionedItems.push({
+          item,
+          position: { x, y },
+          scale
+        });
+      }
+    }
+
+    logger.debug('Preview positions calculated with smart positioning', {
+      totalItems: items.length,
+      categoriesCount: Object.keys(itemsByCategory).length
+    });
+
+    return positionedItems;
+  }
+
+  /**
+   * Рассчитать масштаб для предпросмотра
+   * НОВЫЙ МЕТОД: Использует адаптивный масштаб как в UICanvasEditor, но меньший для превью
+   */
+  private calculatePreviewScale(item: WardrobeItem, _canvasWidth: number, _canvasHeight: number): number {
+    const category = item.category?.toUpperCase() || '';
+
+    // Базовый масштаб для превью (меньше чем в основном canvas)
+    let baseScale = 0.15; // 15% для превью (вместо 25-40% в основном canvas)
+
+    // ИСПРАВЛЕННЫЕ коэффициенты по категориям для лучшего баланса
+    switch (category) {
+      case 'OUTERWEAR':
+        baseScale = 0.1; // Верхняя одежда крупнее (куртка ОК)
+        break;
+      case 'INNERWEAR':
+        baseScale = 0.1; // УВЕЛИЧЕНО: кофта должна быть больше футболки
+        break;
+      case 'BODYWEAR':
+        baseScale = 0.1; // Футболка чуть меньше кофты
+        break;
+      case 'LEGWEAR':
+        baseScale = 0.15; // УМЕНЬШЕНО: джинсы были слишком большие
+        break;
+      case 'FOOTWEAR':
+        baseScale = 0.15;
+        break;
+      case 'HEADWEAR':
+        baseScale = 0.11;
+        break;
+      case 'ACCESSORIES':
+        baseScale = 0.09; // Аксессуары мельче
+        break;
+      case 'FULLBODY':
+        baseScale = 0.22; // Полный образ крупнее
+        break;
+    }
+
+    return baseScale;
   }
 
   /**

@@ -737,7 +737,8 @@ button:active {
     background-color: rgba(93, 64, 55, 0.4); /* Полупрозрачный цвет фона */
     cursor: pointer; /* Курсор в виде руки */
     transition: all 0.3s ease; /* Анимация изменений */
-    backdrop-filter: blur(5px); /* Размытие фона */
+    background: transparent;
+    /*backdrop-filter: blur(5px); */
 }
 
 .dot.active {
@@ -764,7 +765,8 @@ button:active {
 
     /* Полупрозрачный черный фон с размытием */
     background-color: transparent !important; /* Полупрозрачный черный фон */
-    backdrop-filter: blur(5px); /* Размытие фона */
+    background: transparent;
+    /*backdrop-filter: blur(5px);*/ /* Размытие фона */
 
     /* Цвет текста белый */
     color: white; /* Белый цвет текста */

@@ -51,6 +51,9 @@ export class UICanvasEditor {
   // Singleton instance
   private static instance: UICanvasEditor | null = null;
 
+  // Константа для цвета фона canvas (белый - совпадает с фоном вещей из гардероба)
+  private static readonly CANVAS_BACKGROUND_COLOR = '#f5f5f5'; /*Capsule color*/
+
   private fabricCanvas: fabric.Canvas | null = null;
   private config: CanvasEditorConfig;
   private cleanupFunctions: (() => void)[] = [];
@@ -178,7 +181,7 @@ export class UICanvasEditor {
       this.fabricCanvas = new fabric.Canvas(this.config.canvasId, {
         width: canvasWidth,
         height: canvasHeight,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: UICanvasEditor.CANVAS_BACKGROUND_COLOR,
         selection: false,
         allowTouchScrolling: false,
         perPixelTargetFind: true,
@@ -186,6 +189,10 @@ export class UICanvasEditor {
         skipTargetFind: false,
         enableRetinaScaling: true
       });
+
+      // Устанавливаем цвет фона
+      this.fabricCanvas.backgroundColor = UICanvasEditor.CANVAS_BACKGROUND_COLOR;
+      this.fabricCanvas.renderAll();
 
       // Настраиваем обработчик выделения объектов
       this.setupSelectionHandlers();
@@ -263,7 +270,7 @@ export class UICanvasEditor {
     if (itemsToAdd.length === items.length) {
       logger.debug('Full reload: clearing canvas');
       this.fabricCanvas.clear();
-      (this.fabricCanvas as any).backgroundColor = '#f5f5f5';
+      this.fabricCanvas.backgroundColor = UICanvasEditor.CANVAS_BACKGROUND_COLOR;
       this.fabricCanvas.renderAll();
     }
 
@@ -303,11 +310,11 @@ export class UICanvasEditor {
 
     // Очищаем canvas
     this.fabricCanvas.clear();
-    (this.fabricCanvas as any).backgroundColor = '#f5f5f5';
+    this.fabricCanvas.backgroundColor = UICanvasEditor.CANVAS_BACKGROUND_COLOR;
     this.fabricCanvas.renderAll();
 
-    // Автоматически позиционируем вещи
-    const positionedItems = this.autoPositionItems(capsule.items);
+    // ИСПРАВЛЕНО: Ждем асинхронное позиционирование вещей
+    const positionedItems = await this.autoPositionItems(capsule.items);
 
     // Загружаем элементы последовательно для сохранения порядка слоев
     for (const canvasItem of positionedItems) {
@@ -325,7 +332,7 @@ export class UICanvasEditor {
    * @param items - Массив вещей для позиционирования
    * @returns Массив элементов с рассчитанными позициями
    */
-  private autoPositionItems(items: WardrobeItem[]): CanvasItem[] {
+  private async autoPositionItems(items: WardrobeItem[]): Promise<CanvasItem[]> {
     if (!this.fabricCanvas) {
       throw new Error('Canvas not initialized');
     }
@@ -333,18 +340,7 @@ export class UICanvasEditor {
     const canvasWidth = this.fabricCanvas.width!;
     const canvasHeight = this.fabricCanvas.height!;
     const canvasCenterX = canvasWidth / 2;
-
-    // Определяем вертикальные позиции для каждой категории
-    const categoryPositions: Record<string, number> = {
-      'HEADWEAR': canvasHeight * 0.15,      // Верх (15%)
-      'OUTERWEAR': canvasHeight * 0.35,     // Верхняя одежда (35%)
-      'INNERWEAR': canvasHeight * 0.40,     // Внутренняя одежда (40%)
-      'BODYWEAR': canvasHeight * 0.45,      // Основная одежда (45%)
-      'LEGWEAR': canvasHeight * 0.65,       // Низ (65%)
-      'FOOTWEAR': canvasHeight * 0.85,      // Обувь (85%)
-      'FULLBODY': canvasHeight * 0.50,      // Полный образ (50%)
-      'ACCESSORIES': canvasHeight * 0.40    // Аксессуары (40%)
-    };
+    const canvasCenterY = canvasHeight / 2;
 
     // Группируем вещи по категориям
     const itemsByCategory: Record<string, WardrobeItem[]> = {};
@@ -358,47 +354,90 @@ export class UICanvasEditor {
 
     const positionedItems: CanvasItem[] = [];
 
-    // Позиционируем каждую категорию
-    Object.entries(itemsByCategory).forEach(([category, categoryItems]) => {
-      const baseY = categoryPositions[category] || canvasHeight * 0.5;
-
-      // Если несколько вещей в категории, располагаем их горизонтально
-      const itemCount = categoryItems.length;
-      const horizontalSpacing = Math.min(150, canvasWidth / (itemCount + 1));
-
-      categoryItems.forEach((item, index) => {
+    // Позиционируем каждую категорию используя ТЕ ЖЕ СМЕЩЕНИЯ, что и в calculateImagePosition
+    for (const [category, categoryItems] of Object.entries(itemsByCategory)) {
+      for (let index = 0; index < categoryItems.length; index++) {
+        const item = categoryItems[index]!;
         let x: number;
+        let y: number;
 
-        if (itemCount === 1) {
-          // Одна вещь - по центру
-          x = canvasCenterX;
-        } else if (itemCount === 2) {
-          // Две вещи - слева и справа от центра
-          x = canvasCenterX + (index === 0 ? -horizontalSpacing / 2 : horizontalSpacing / 2);
-        } else {
-          // Три и более - равномерно распределяем
-          const startX = canvasCenterX - (horizontalSpacing * (itemCount - 1)) / 2;
-          x = startX + (index * horizontalSpacing);
+        // ИСПОЛЬЗУЕМ ТЕ ЖЕ СМЕЩЕНИЯ, что и в calculateImagePosition
+        switch (category) {
+          case 'INNERWEAR':
+          case 'BODYWEAR':
+            x = canvasCenterX;
+            y = canvasCenterY - 120;
+            break;
+
+          case 'LEGWEAR':
+            x = canvasCenterX;
+            y = canvasCenterY + 100;
+            break;
+
+          case 'FOOTWEAR':
+            x = canvasCenterX;
+            y = canvasCenterY + 220;
+            break;
+
+          case 'OUTERWEAR':
+            x = canvasCenterX - 80;
+            y = canvasCenterY - 100;
+            break;
+
+          case 'FULLBODY':
+            x = canvasCenterX;
+            y = canvasCenterY - 50;
+            break;
+
+          case 'HEADWEAR':
+            x = canvasCenterX;
+            y = canvasCenterY - 200;
+            break;
+
+          case 'ACCESSORIES':
+            // Для аксессуаров используем случайное позиционирование, как в calculateImagePosition
+            const isLeftSide = Math.random() > 0.5;
+            x = isLeftSide ? canvasCenterX - 150 : canvasCenterX + 150;
+            y = canvasCenterY - 50;
+            break;
+
+          default:
+            x = canvasCenterX;
+            y = canvasCenterY;
+            break;
         }
 
-        // Добавляем небольшое смещение для аксессуаров
-        let y = baseY;
-        if (category === 'ACCESSORIES') {
-          // Аксессуары располагаем чуть в стороне
-          x += (index % 2 === 0 ? -100 : 100);
-          y += (index % 2 === 0 ? -50 : 50);
+        // Если несколько вещей в одной категории, добавляем горизонтальное смещение
+        const itemCount = categoryItems.length;
+        if (itemCount > 1) {
+          const horizontalSpacing = Math.min(120, canvasWidth / (itemCount + 1));
+
+          if (itemCount === 2) {
+            // Две вещи - слева и справа от базовой позиции
+            x += (index === 0 ? -horizontalSpacing / 2 : horizontalSpacing / 2);
+          } else {
+            // Три и более - равномерно распределяем
+            const startOffset = -(horizontalSpacing * (itemCount - 1)) / 2;
+            x += startOffset + (index * horizontalSpacing);
+          }
+
+          // Небольшое вертикальное смещение для избежания полного перекрытия
+          y += (index % 2 === 0 ? -20 : 20);
         }
+
+        // ИСПРАВЛЕНО: Теперь ждем асинхронный расчет масштаба
+        const scale = await this.calculateAutoScale(item);
 
         positionedItems.push({
           item,
           position: { x, y },
-          scale: this.calculateAutoScale(item),
+          scale,
           angle: 0
         });
-      });
-    });
+      }
+    }
 
-    logger.debug('Items auto-positioned', {
+    logger.debug('Items auto-positioned with calculateImagePosition logic', {
       totalItems: items.length,
       categoriesCount: Object.keys(itemsByCategory).length
     });
@@ -408,44 +447,73 @@ export class UICanvasEditor {
 
   /**
    * Вычислить автоматический масштаб для вещи
+   * ИСПРАВЛЕНО: Теперь учитывает размер изображения, как в calculateImagePosition
    */
-  private calculateAutoScale(item: WardrobeItem): number {
+  private async calculateAutoScale(item: WardrobeItem): Promise<number> {
     if (!this.fabricCanvas) {
       return 0.3;
     }
 
+    const canvasWidth = this.fabricCanvas.width!;
+    const canvasHeight = this.fabricCanvas.height!;
     const category = item.category?.toUpperCase() || '';
 
-    // Базовый масштаб - 25% от размера canvas
-    let baseScale = 0.25;
+    try {
+      // Загружаем изображение для получения его размеров
+      const imageObj = await this.loadImage(item.imageUrl);
+      const imgWidth = imageObj.naturalWidth;
+      const imgHeight = imageObj.naturalHeight;
 
-    // Корректируем масштаб по категориям
-    switch (category) {
-      case 'OUTERWEAR':
-        baseScale = 0.35; // Верхняя одежда крупнее
-        break;
-      case 'INNERWEAR':
-      case 'BODYWEAR':
-        baseScale = 0.30;
-        break;
-      case 'LEGWEAR':
-        baseScale = 0.28;
-        break;
-      case 'FOOTWEAR':
-        baseScale = 0.22;
-        break;
-      case 'HEADWEAR':
-        baseScale = 0.18;
-        break;
-      case 'ACCESSORIES':
-        baseScale = 0.15; // Аксессуары мельче
-        break;
-      case 'FULLBODY':
-        baseScale = 0.40; // Полный образ крупнее
-        break;
+      // ИСПОЛЬЗУЕМ ТОТ ЖЕ АЛГОРИТМ, что и в calculateImagePosition
+      let baseScale = Math.min(
+        (canvasWidth * 0.4) / imgWidth,    // 40% от ширины canvas
+        (canvasHeight * 0.4) / imgHeight   // 40% от высоты canvas
+      );
+
+      // Применяем те же коэффициенты по категориям
+      if (category === 'OUTERWEAR') {
+        baseScale *= 1.5;
+      }
+      else if (category === 'INNERWEAR' || category === 'BODYWEAR') {
+        baseScale *= 1.3;
+      }
+      else if (category === 'LEGWEAR') {
+        baseScale *= 1.1;
+      }
+      else if (category === 'FOOTWEAR') {
+        baseScale *= 0.9;
+      }
+      else if (category === 'HEADWEAR') {
+        baseScale *= 0.8;
+      }
+      else if (category === 'ACCESSORIES') {
+        baseScale *= 0.7;
+      }
+      else if (category === 'FULLBODY') {
+        baseScale *= 1.4;
+      }
+
+      return baseScale;
+
+    } catch (error) {
+      logger.warn('Failed to load image for scale calculation, using fallback', {
+        itemId: item.id,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      // Fallback к старому алгоритму
+      switch (category) {
+        case 'OUTERWEAR': return 0.35;
+        case 'INNERWEAR':
+        case 'BODYWEAR': return 0.30;
+        case 'LEGWEAR': return 0.28;
+        case 'FOOTWEAR': return 0.22;
+        case 'HEADWEAR': return 0.18;
+        case 'ACCESSORIES': return 0.15;
+        case 'FULLBODY': return 0.40;
+        default: return 0.25;
+      }
     }
-
-    return baseScale;
   }
 
   /**
@@ -577,9 +645,9 @@ export class UICanvasEditor {
 
   /**
    * Получить текущее состояние canvas для сохранения
-   * @param removeBackground - Удалять ли фон с изображения (по умолчанию false)
+   * @param _removeBackground - DEPRECATED: Параметр больше не используется. Canvas автоматически обрезается по содержимому.
    */
-  async getState(removeBackground: boolean = false): Promise<CanvasState> {
+  async getState(_removeBackground: boolean = false): Promise<CanvasState> {
     if (!this.fabricCanvas) {
       throw new Error('Canvas not initialized');
     }
@@ -623,8 +691,8 @@ export class UICanvasEditor {
       }
     };
 
-    // Получаем thumbnail с опциональным удалением фона
-    const thumbnailImage = await this.canvasToImage(removeBackground);
+    // Получаем thumbnail с автоматической обрезкой (removeBackground игнорируется)
+    const thumbnailImage = await this.canvasToImage(false);
 
     logger.debug('Canvas state collected', {
       objectsCount: objects.length,
@@ -654,7 +722,8 @@ export class UICanvasEditor {
 
     // Очищаем canvas
     this.fabricCanvas.clear();
-    (this.fabricCanvas as any).backgroundColor = savedData.canvas?.backgroundColor || '#f5f5f5';
+    // Используем сохраненный фон или цвет по умолчанию
+    this.fabricCanvas.backgroundColor = savedData.canvas?.backgroundColor || UICanvasEditor.CANVAS_BACKGROUND_COLOR;
     this.fabricCanvas.renderAll();
 
     // Если нет объектов для отрисовки
@@ -778,7 +847,7 @@ export class UICanvasEditor {
   clear(): void {
     if (this.fabricCanvas) {
       this.fabricCanvas.clear();
-      (this.fabricCanvas as any).backgroundColor = '#f5f5f5';
+      this.fabricCanvas.backgroundColor = UICanvasEditor.CANVAS_BACKGROUND_COLOR;
       this.fabricCanvas.renderAll();
       logger.info('Canvas cleared');
     }
@@ -1182,6 +1251,122 @@ export class UICanvasEditor {
   // ============================================
 
   /**
+   * Обрезать canvas по содержимому с отступом
+   * @param padding - Отступ от краев содержимого в пикселях
+   * @returns Обрезанный canvas элемент или null если нечего обрезать
+   */
+  private cropCanvasToContent(padding: number = 25): HTMLCanvasElement | null {
+    if (!this.fabricCanvas) {
+      return null;
+    }
+
+    try {
+      // Получаем canvas элемент
+      const canvasElement = this.fabricCanvas.getElement() as HTMLCanvasElement;
+      const ctx = canvasElement.getContext('2d');
+
+      if (!ctx) {
+        logger.warn('Cannot get canvas context for cropping');
+        return null;
+      }
+
+      // Получаем данные изображения
+      const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+      const pixels = imageData.data;
+      const width = canvasElement.width;
+      const height = canvasElement.height;
+
+      // Получаем цвет фона (берем из угла canvas)
+      const bgIndex = 0; // Левый верхний угол
+      const bgR = pixels[bgIndex] || 0;
+      const bgG = pixels[bgIndex + 1] || 0;
+      const bgB = pixels[bgIndex + 2] || 0;
+
+      // Порог для определения "похожести" на фон (увеличен для лучшего определения)
+      const threshold = 50;
+
+      // Находим границы содержимого (пиксели отличающиеся от фона)
+      let minX = width;
+      let minY = height;
+      let maxX = 0;
+      let maxY = 0;
+
+      // Проходим по всем пикселям
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const index = (y * width + x) * 4;
+          const r = pixels[index] || 0;
+          const g = pixels[index + 1] || 0;
+          const b = pixels[index + 2] || 0;
+
+          // Вычисляем разницу с фоном
+          const diff = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+
+          // Если пиксель отличается от фона (это содержимое)
+          if (diff > threshold) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      // Проверяем что нашли содержимое
+      if (minX >= maxX || minY >= maxY) {
+        logger.warn('No content found on canvas for cropping');
+        return null;
+      }
+
+      // Добавляем отступ
+      minX = Math.max(0, minX - padding);
+      minY = Math.max(0, minY - padding);
+      maxX = Math.min(width - 1, maxX + padding);
+      maxY = Math.min(height - 1, maxY + padding);
+
+      // Вычисляем размеры обрезанного изображения
+      const croppedWidth = maxX - minX + 1;
+      const croppedHeight = maxY - minY + 1;
+
+      logger.info('Cropping canvas to content', {
+        original: { width, height },
+        bounds: { minX, minY, maxX, maxY },
+        cropped: { width: croppedWidth, height: croppedHeight },
+        padding
+      });
+
+      // Создаем новый canvas для обрезанного изображения
+      const croppedCanvas = document.createElement('canvas');
+      croppedCanvas.width = croppedWidth;
+      croppedCanvas.height = croppedHeight;
+      const croppedCtx = croppedCanvas.getContext('2d');
+
+      if (!croppedCtx) {
+        logger.warn('Cannot create cropped canvas context');
+        return null;
+      }
+
+      // ВАЖНО: Заполняем фон цветом canvas (#f5f5f5) перед копированием содержимого
+      // Это гарантирует что прозрачные области вещей будут иметь правильный цвет фона
+      croppedCtx.fillStyle = UICanvasEditor.CANVAS_BACKGROUND_COLOR;
+      croppedCtx.fillRect(0, 0, croppedWidth, croppedHeight);
+
+      // Копируем обрезанную область поверх фона
+      croppedCtx.drawImage(
+        canvasElement,
+        minX, minY, croppedWidth, croppedHeight,  // Источник
+        0, 0, croppedWidth, croppedHeight         // Назначение
+      );
+
+      return croppedCanvas;
+
+    } catch (error) {
+      logger.error('Error cropping canvas to content', { error });
+      return null;
+    }
+  }
+
+  /**
    * Конвертировать canvas в изображение base64 с удалением фона
    * Делаем фон прозрачным перед сохранением для правильной обрезки на сервере
    * 
@@ -1194,12 +1379,9 @@ export class UICanvasEditor {
 
     logger.info('canvasToImage called', { removeBackground });
 
-    // Сохраняем текущий цвет фона
-    const originalBgColor = this.fabricCanvas.backgroundColor;
-
-    // Временно делаем фон прозрачным
-    this.fabricCanvas.backgroundColor = 'transparent';
-    this.fabricCanvas.renderAll();
+    // НЕ делаем фон прозрачным - сохраняем градиент!
+    // Автоматически обрезаем canvas по содержимому с отступом 25px
+    const croppedCanvas = this.cropCanvasToContent(100);
 
     logger.info('Canvas size', {
       width: this.fabricCanvas.width,
@@ -1209,15 +1391,12 @@ export class UICanvasEditor {
     });
 
     // ДЕЛЕГИРОВАНИЕ: используем ImageProcessingService для конвертации canvas
-    const canvasElement = this.fabricCanvas.getElement() as HTMLCanvasElement;
+    // Используем обрезанный canvas если он есть, иначе оригинальный
+    const canvasElement = (croppedCanvas || this.fabricCanvas.getElement()) as HTMLCanvasElement;
     const canvasBase64 = await imageProcessingService.canvasToBase64(canvasElement, {
       format: 'png',
       quality: 1.0
     });
-
-    // Восстанавливаем оригинальный фон
-    this.fabricCanvas.backgroundColor = originalBgColor;
-    this.fabricCanvas.renderAll();
 
     // Удаляем фон только если это необходимо (например, для AI-generated капсул)
     if (removeBackground) {

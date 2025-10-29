@@ -2377,7 +2377,8 @@ def classify_clothing():
         # Шаг 2: Удаляем фон
         bg_removal_start = time.time()
         result_image, bg_processing_time = background_remover.remove_background(image)
-        result_image = background_remover.post_process_mask(result_image, feather=2)
+        # НЕ применяем дополнительное размытие - используем встроенную постобработку rembg
+        # result_image = background_remover.post_process_mask(result_image, feather=0)
         result_image = background_remover.crop_to_content(result_image, padding=10)
         bg_removal_time = time.time() - bg_removal_start
         app.logger.info(f"Фон удален за {bg_removal_time:.2f}с")
@@ -2593,8 +2594,8 @@ def remove_background():
         result_image, processing_time = background_remover.remove_background(image)
         app.logger.info(f"Фон удален за {processing_time:.2f}с")
 
-        # Постобработка краев
-        result_image = background_remover.post_process_mask(result_image, feather=2)
+        # НЕ применяем дополнительное размытие - используем встроенную постобработку rembg
+        # result_image = background_remover.post_process_mask(result_image, feather=0)
         
         # Обрезаем до содержимого
         result_image = background_remover.crop_to_content(result_image, padding=10)

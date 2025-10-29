@@ -135,11 +135,17 @@ class BackgroundRemover:
         if image.mode != 'RGBA':
             image = image.convert('RGBA')
 
-        # Удаляем фон
-        result = remove(image, session=self.rembg_session)
+        # Удаляем фон с оптимальными параметрами
+        result = remove(
+            image, 
+            session=self.rembg_session,
+            only_mask=False,  # Возвращаем изображение с альфа-каналом
+            post_process_mask=True,  # Включаем постобработку для сглаживания
+            bgcolor=None  # Прозрачный фон
+        )
 
         processing_time = time.time() - start_time
-        logger.info(".2f")
+        logger.info(f"rembg обработка завершена за {processing_time:.2f}с")
         return result, processing_time
 
     def remove_background(self, image: Image.Image) -> Tuple[Image.Image, float]:

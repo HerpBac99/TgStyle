@@ -528,7 +528,7 @@
     /* Автоматическая высота */
     aspect-ratio: 1;
     /* Квадратная форма */
-    background: rgba(255, 255, 255, 0.9);
+    background:#f5f5f5; /*Capsule color*/
     border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
@@ -886,9 +886,10 @@
     right: 0;
     display: flex;
     gap: 0;
-    background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.4) 100%);
+    background: transparent;
+    /*background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.4) 100%);*/
     padding: 8px;
-    backdrop-filter: blur(5px);
+    /*backdrop-filter: blur(5px);*/
 }
 
 /* Контейнеры лайков и sharing в карточках капсул (равны по ширине) */
@@ -1439,8 +1440,9 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(5px);
+    background: transparent;
+    /*background: rgba(0, 0, 0, 0.7);*/
+    /*backdrop-filter: blur(5px);*/
 }
 
 .capsule-generation-loading .loading-content {
