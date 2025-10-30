@@ -2374,14 +2374,14 @@ def classify_clothing():
                 'error': f'Invalid image data: {e}'
             }), 400
 
-        # Шаг 2: Удаляем фон
+        # Шаг 2: Удаляем фон с upscaling для лучшего качества краев
         bg_removal_start = time.time()
-        result_image, bg_processing_time = background_remover.remove_background(image)
+        result_image, bg_processing_time = background_remover.remove_background(image, upscale=True)
         # НЕ применяем дополнительное размытие - используем встроенную постобработку rembg
         # result_image = background_remover.post_process_mask(result_image, feather=0)
         result_image = background_remover.crop_to_content(result_image, padding=10)
         bg_removal_time = time.time() - bg_removal_start
-        app.logger.info(f"Фон удален за {bg_removal_time:.2f}с")
+        app.logger.info(f"Фон удален за {bg_removal_time:.2f}с (с upscaling)")
 
         # Конвертируем результат в base64 для анализа
         output_buffer = io.BytesIO()
@@ -2590,9 +2590,10 @@ def remove_background():
                 'error': f'Invalid image data: {e}'
             }), 400
 
-        # Удаляем фон
-        result_image, processing_time = background_remover.remove_background(image)
-        app.logger.info(f"Фон удален за {processing_time:.2f}с")
+        # Удаляем фон с upscaling для лучшего качества краев
+        # upscale=True увеличивает разрешение в 2x перед обработкой, затем возвращает к исходному
+        result_image, processing_time = background_remover.remove_background(image, upscale=True)
+        app.logger.info(f"Фон удален за {processing_time:.2f}с (с upscaling)")
 
         # НЕ применяем дополнительное размытие - используем встроенную постобработку rembg
         # result_image = background_remover.post_process_mask(result_image, feather=0)

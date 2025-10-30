@@ -148,17 +148,42 @@ class BackgroundRemover:
         logger.info(f"rembg обработка завершена за {processing_time:.2f}с")
         return result, processing_time
 
-    def remove_background(self, image: Image.Image) -> Tuple[Image.Image, float]:
+    def remove_background(self, image: Image.Image, upscale: bool = True) -> Tuple[Image.Image, float]:
         """
-        Удалить задний фон с помощью rembg
+        Удалить задний фон с помощью rembg с опциональным upscaling для лучшего качества
 
         Args:
             image: PIL изображение
+            upscale: Увеличить разрешение перед обработкой для лучшего качества краев
 
         Returns:
             Tuple[Image.Image, float]: результат и время обработки
         """
-        return self._rembg_remove(image)
+        original_size = image.size
+        max_dimension = max(image.width, image.height)
+        
+        # Определяем нужен ли upscale
+        # Upscale только если изображение меньше 2000px по большей стороне
+        should_upscale = upscale and max_dimension < 3000
+        
+        if should_upscale:
+            # Вычисляем scale_factor чтобы большая сторона стала ~2000px
+            target_size = 3000
+            scale_factor = target_size / max_dimension
+            upscaled_size = (int(image.width * scale_factor), int(image.height * scale_factor))
+            
+            logger.info(f"Upscaling image: {original_size} -> {upscaled_size} (scale: {scale_factor:.2f}x)")
+            image = image.resize(upscaled_size, Image.Resampling.LANCZOS)
+        
+        # Удаляем фон
+        result, processing_time = self._rembg_remove(image)
+        
+        # Downscale обратно к исходному размеру если делали upscale
+        if should_upscale:
+            logger.info(f"Downscaling result: {result.size} -> {original_size}")
+            result = result.resize(original_size, Image.Resampling.LANCZOS)
+        
+        return result, processing_time
 
     def post_process_mask(self, image: Image.Image, feather: int = 2) -> Image.Image:
         """Постобработка для улучшения краев"""
