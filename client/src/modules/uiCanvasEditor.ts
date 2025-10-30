@@ -354,8 +354,22 @@ export class UICanvasEditor {
 
     const positionedItems: CanvasItem[] = [];
 
-    // Позиционируем каждую категорию используя ТЕ ЖЕ СМЕЩЕНИЯ, что и в calculateImagePosition
-    for (const [category, categoryItems] of Object.entries(itemsByCategory)) {
+    // Определяем правильный порядок слоев (снизу вверх для z-index)
+    const layerOrder = [
+      'INNERWEAR',
+      'LEGWEAR',
+      'BODYWEAR',
+      'FOOTWEAR',  
+      'OUTERWEAR',  
+      'FULLBODY',    
+      'HEADWEAR',    
+      'ACCESSORIES'  
+    ];
+
+    // Позиционируем каждую категорию в правильном порядке
+    for (const category of layerOrder) {
+      const categoryItems = itemsByCategory[category];
+      if (!categoryItems) continue;
       for (let index = 0; index < categoryItems.length; index++) {
         const item = categoryItems[index]!;
         let x: number;
@@ -366,12 +380,12 @@ export class UICanvasEditor {
           case 'INNERWEAR':
           case 'BODYWEAR':
             x = canvasCenterX;
-            y = canvasCenterY - 120;
+            y = canvasCenterY - 100;
             break;
 
           case 'LEGWEAR':
             x = canvasCenterX;
-            y = canvasCenterY + 100;
+            y = canvasCenterY + 90;
             break;
 
           case 'FOOTWEAR':
@@ -478,10 +492,10 @@ export class UICanvasEditor {
         baseScale *= 1.3;
       }
       else if (category === 'LEGWEAR') {
-        baseScale *= 1.1;
+        baseScale *= 1.5;
       }
       else if (category === 'FOOTWEAR') {
-        baseScale *= 0.9;
+        baseScale *= 0.8;
       }
       else if (category === 'HEADWEAR') {
         baseScale *= 0.8;

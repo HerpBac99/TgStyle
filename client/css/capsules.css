@@ -447,6 +447,39 @@
     margin: 0;
 }
 
+.capsules-modal-close-btn {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    padding: 8px;
+    transition: background-color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    /* Дополнительные свойства для полной прозрачности */
+    opacity: 1;
+    filter: none;
+    backdrop-filter: none;
+}
+
+.capsules-modal-close-btn:hover {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.capsules-modal-close-btn svg {
+    width: 24px;
+    height: 24px;
+    stroke: var(--tg-theme-text-color);
+}
+
 /* Фильтры категорий (используем стили из wardrobe.css) */
 .capsules-filters {
     display: flex;
@@ -528,7 +561,8 @@
     /* Автоматическая высота */
     aspect-ratio: 1;
     /* Квадратная форма */
-    background:#f5f5f5; /*Capsule color*/
+    background: #f5f5f5;
+    /*Capsule color*/
     border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
@@ -663,6 +697,8 @@
     display: grid !important;
     grid-template-columns: repeat(4, 1fr) !important;
     gap: 12px !important;
+    /* Выравнивание элементов по началу */
+    align-content: start !important;
 }
 
 /* Карточки в модальном окне должны быть квадратными как в основном гардеробе */
@@ -818,7 +854,8 @@
     top: 90vh;
     height: 10vh;
     display: flex;
-    flex-direction: row; /* Явно указываем направление */
+    flex-direction: row;
+    /* Явно указываем направление */
     gap: 50px;
     justify-content: center;
     align-items: center;
@@ -856,7 +893,8 @@
     fill: none;
     stroke: var(--tg-theme-text-color);
     stroke-width: 2;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Анимация изменений */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Анимация изменений */
 }
 
 /* Порядок кнопок теперь правильный через DOM: LIKE → SHARE → CLOSE */
@@ -1118,7 +1156,8 @@
     position: relative;
     width: 90%;
     max-width: 500px;
-    max-height: 85vh;
+    max-height: 90vh;
+    margin-top: 10vh;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -1126,7 +1165,7 @@
     padding: 24px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 5px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     z-index: 1101;
     transform: scale(0.9) translateY(20px);
@@ -1154,17 +1193,30 @@
 }
 
 .generation-modal-close-btn {
-    background: transparent;
-    border: none;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
     cursor: pointer;
     padding: 8px;
-    border-radius: 8px;
     transition: background-color 0.2s ease;
     -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    /* Дополнительные свойства для полной прозрачности */
+    opacity: 1;
+    filter: none;
+    backdrop-filter: none;
 }
 
 .generation-modal-close-btn:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 .generation-modal-close-btn svg {

@@ -33,7 +33,7 @@ export interface CapsulesGridConfig {
   onAdd: () => void;           // Callback при клике на "Добавить капсулу"
   onView: (capsuleId: number) => void;  // Callback при клике на капсулу
   onDelete: (capsuleId: number) => void; // Callback при удалении капсулы
-  onGenerate?: (capsule: GeneratedCapsule) => void; // Callback при выборе сгенерированной капсулы
+  onGenerate?: (capsule: GeneratedCapsule, allCapsules: GeneratedCapsule[]) => void; // Callback при выборе сгенерированной капсулы
 }
 
 /**
@@ -460,8 +460,9 @@ export class UICapsulesGrid {
         this.generationModal.hide();
 
         // Вызываем callback для перехода к canvas editor
-        if (this.config.onGenerate) {
-          this.config.onGenerate(capsule);
+        // ИСПРАВЛЕНО: Передаем выбранную капсулу и весь массив для возможности возврата
+        if (this.config.onGenerate && result.capsules) {
+          this.config.onGenerate(capsule, result.capsules);
         }
       });
 

@@ -19,7 +19,7 @@ const UPLOADS_BASE_DIR = path.join(__dirname, '..', '..', 'uploads');
 const IMAGE_CONFIGS = {
   wardrobe: {
     dir: 'wardrobe',
-    maxSize: 1200,
+    maxSize: 800,  // ИСПРАВЛЕНО: единый размер 800x800 для всех изображений
     jpegQuality: 85,
     pngQuality: 90,
     pngCompressionLevel: 9,
@@ -76,20 +76,41 @@ class FileService {
       // Парсим base64
       const { buffer } = this.parseBase64Image(imageBase64);
 
-      // Проверяем наличие альфа-канала (прозрачности)
+      // Получаем метаданные изображения
       const metadata = await sharp(buffer).metadata();
       const hasAlpha = metadata.hasAlpha || metadata.channels === 4;
+      const { width: origWidth, height: origHeight } = metadata;
 
       let optimizedBuffer;
       let extension;
 
+      // ИСПРАВЛЕНО: Масштабируем большую сторону до 800px
+      // Находим большую сторону и масштабируем её до 800
+      const maxDimension = Math.max(origWidth, origHeight);
+      const scale = config.maxSize / maxDimension;
+      const scaledWidth = Math.round(origWidth * scale);
+      const scaledHeight = Math.round(origHeight * scale);
+
+      // Вычисляем padding для центрирования (будет 0 для большей стороны)
+      const paddingLeft = Math.floor((config.maxSize - scaledWidth) / 2);
+      const paddingTop = Math.floor((config.maxSize - scaledHeight) / 2);
+      const paddingRight = config.maxSize - scaledWidth - paddingLeft;
+      const paddingBottom = config.maxSize - scaledHeight - paddingTop;
+
       if (hasAlpha) {
         // Для изображений с прозрачностью используем PNG
+        // Масштабируем + добавляем padding для точного размера 800x800
         optimizedBuffer = await sharp(buffer)
           .rotate() // Применяет EXIF orientation автоматически
-          .resize(config.maxSize, config.maxSize, {
-            fit: 'inside',
-            withoutEnlargement: true
+          .resize(scaledWidth, scaledHeight, {
+            fit: 'fill'
+          })
+          .extend({
+            top: paddingTop,
+            bottom: paddingBottom,
+            left: paddingLeft,
+            right: paddingRight,
+            background: { r: 0, g: 0, b: 0, alpha: 0 } // Прозрачный фон
           })
           .png({
             quality: config.pngQuality,
@@ -98,12 +119,19 @@ class FileService {
           .toBuffer();
         extension = 'png';
       } else {
-        // Для обычных изображений используем JPEG
+        // Для обычных изображений используем JPEG с белым фоном
+        // Масштабируем + добавляем padding для точного размера 800x800
         optimizedBuffer = await sharp(buffer)
           .rotate() // Применяет EXIF orientation автоматически
-          .resize(config.maxSize, config.maxSize, {
-            fit: 'inside',
-            withoutEnlargement: true
+          .resize(scaledWidth, scaledHeight, {
+            fit: 'fill'
+          })
+          .extend({
+            top: paddingTop,
+            bottom: paddingBottom,
+            left: paddingLeft,
+            right: paddingRight,
+            background: { r: 255, g: 255, b: 255, alpha: 1 } // Белый фон
           })
           .jpeg({
             quality: config.jpegQuality,

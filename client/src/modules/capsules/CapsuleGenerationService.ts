@@ -254,7 +254,7 @@ export class CapsuleGenerationService {
    * Создать превью canvas в base64
    */
   async createPreview(items: WardrobeItem[]): Promise<string> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
         // Создаем временный canvas
         const canvas = document.createElement('canvas');
@@ -281,7 +281,7 @@ export class CapsuleGenerationService {
         }
 
         // ИСПОЛЬЗУЕМ УМНОЕ ПОЗИЦИОНИРОВАНИЕ: группируем по категориям и позиционируем как в основном canvas
-        const positionedItems = this.calculatePreviewPositions(items, canvas.width, canvas.height);
+        const positionedItems = await this.calculatePreviewPositions(items, canvas.width, canvas.height);
 
         // Загружаем и рисуем изображения вещей с умным позиционированием
         const imagePromises = positionedItems.map((positionedItem) => {
@@ -295,7 +295,7 @@ export class CapsuleGenerationService {
               // Вычисляем размеры с учетом масштаба
               const scaledWidth = img.width * scale;
               const scaledHeight = img.height * scale;
-              
+
               // Центрируем изображение относительно позиции
               const x = position.x - scaledWidth / 2;
               const y = position.y - scaledHeight / 2;
@@ -332,11 +332,11 @@ export class CapsuleGenerationService {
    * Рассчитать позиции для предпросмотра используя ту же логику, что и в UICanvasEditor
    * НОВЫЙ МЕТОД: Применяет умное позиционирование по категориям
    */
-  private calculatePreviewPositions(items: WardrobeItem[], canvasWidth: number, canvasHeight: number): Array<{
+  private async calculatePreviewPositions(items: WardrobeItem[], canvasWidth: number, canvasHeight: number): Promise<Array<{
     item: WardrobeItem;
     position: { x: number; y: number };
     scale: number;
-  }> {
+  }>> {
     const canvasCenterX = canvasWidth / 2;
     const canvasCenterY = canvasHeight / 2;
 
@@ -356,8 +356,22 @@ export class CapsuleGenerationService {
       scale: number;
     }> = [];
 
-    // Позиционируем каждую категорию используя ТЕ ЖЕ СМЕЩЕНИЯ, что и в UICanvasEditor
-    for (const [category, categoryItems] of Object.entries(itemsByCategory)) {
+    // Определяем правильный порядок слоев (снизу вверх для z-index)
+    const layerOrder = [
+      'INNERWEAR',
+      'LEGWEAR',
+      'BODYWEAR',
+      'FOOTWEAR',
+      'OUTERWEAR',
+      'FULLBODY',
+      'HEADWEAR',
+      'ACCESSORIES'
+    ];
+
+    // Позиционируем каждую категорию в правильном порядке
+    for (const category of layerOrder) {
+      const categoryItems = itemsByCategory[category];
+      if (!categoryItems) continue;
       for (let index = 0; index < categoryItems.length; index++) {
         const item = categoryItems[index]!;
         let x: number;
@@ -366,8 +380,12 @@ export class CapsuleGenerationService {
         // ИСПОЛЬЗУЕМ ТЕ ЖЕ СМЕЩЕНИЯ, что и в calculateImagePosition
         switch (category) {
           case 'INNERWEAR':
-          case 'BODYWEAR':
             x = canvasCenterX;
+            y = canvasCenterY - 60; // Уменьшенное смещение для превью
+            break;
+          
+          case 'BODYWEAR':
+            x = canvasCenterX + 60;
             y = canvasCenterY - 60; // Уменьшенное смещение для превью
             break;
 
@@ -413,7 +431,7 @@ export class CapsuleGenerationService {
         const itemCount = categoryItems.length;
         if (itemCount > 1) {
           const horizontalSpacing = Math.min(60, canvasWidth / (itemCount + 1)); // Уменьшенный spacing для превью
-          
+
           if (itemCount === 2) {
             // Две вещи - слева и справа от базовой позиции
             x += (index === 0 ? -horizontalSpacing / 2 : horizontalSpacing / 2);
@@ -428,7 +446,7 @@ export class CapsuleGenerationService {
         }
 
         // Рассчитываем масштаб для превью (меньше чем в основном canvas)
-        const scale = this.calculatePreviewScale(item, canvasWidth, canvasHeight);
+        const scale = await this.calculatePreviewScale(item, canvasWidth, canvasHeight);
 
         positionedItems.push({
           item,
@@ -448,43 +466,46 @@ export class CapsuleGenerationService {
 
   /**
    * Рассчитать масштаб для предпросмотра
-   * НОВЫЙ МЕТОД: Использует адаптивный масштаб как в UICanvasEditor, но меньший для превью
+   * ИСПРАВЛЕНО: Теперь все изображения сохраняются в размере 800x800 на сервере,
+   * поэтому можем использовать фиксированные масштабы
    */
-  private calculatePreviewScale(item: WardrobeItem, _canvasWidth: number, _canvasHeight: number): number {
+  private async calculatePreviewScale(item: WardrobeItem, _canvasWidth: number, _canvasHeight: number): Promise<number> {
     const category = item.category?.toUpperCase() || '';
 
-    // Базовый масштаб для превью (меньше чем в основном canvas)
-    let baseScale = 0.15; // 15% для превью (вместо 25-40% в основном canvas)
+    // Базовый целевой размер для превью (в пикселях на canvas 400x400)
+    // Изображения на сервере теперь всегда 800x800, поэтому масштаб = targetSize / 800
+    let targetSize = 120; // Базовый размер в пикселях
 
-    // ИСПРАВЛЕННЫЕ коэффициенты по категориям для лучшего баланса
+    // Коэффициенты по категориям
     switch (category) {
       case 'OUTERWEAR':
-        baseScale = 0.1; // Верхняя одежда крупнее (куртка ОК)
+        targetSize = 144; // 1.2x от базового (куртки/пальто)
         break;
       case 'INNERWEAR':
-        baseScale = 0.1; // УВЕЛИЧЕНО: кофта должна быть больше футболки
-        break;
       case 'BODYWEAR':
-        baseScale = 0.1; // Футболка чуть меньше кофты
+        targetSize = 120; // 1.0x базовый размер (футболки/рубашки)
         break;
       case 'LEGWEAR':
-        baseScale = 0.15; // УМЕНЬШЕНО: джинсы были слишком большие
+        targetSize = 120; // 0.85x от базового (джинсы/брюки)
         break;
       case 'FOOTWEAR':
-        baseScale = 0.15;
+        targetSize = 80;  // 0.6x от базового (обувь)
         break;
       case 'HEADWEAR':
-        baseScale = 0.11;
+        targetSize = 84;  // 0.7x от базового (головные уборы)
         break;
       case 'ACCESSORIES':
-        baseScale = 0.09; // Аксессуары мельче
+        targetSize = 72;  // 0.6x от базового (аксессуары)
         break;
       case 'FULLBODY':
-        baseScale = 0.22; // Полный образ крупнее
+        targetSize = 132; // 1.1x от базового (платья/комбинезоны)
         break;
     }
 
-    return baseScale;
+    // Рассчитываем масштаб: targetSize / 800 (размер изображения на сервере)
+    const scale = targetSize / 800;
+
+    return scale;
   }
 
   /**

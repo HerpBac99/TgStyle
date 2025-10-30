@@ -57,6 +57,9 @@ export class CapsulesManager implements PhotoUploadHandler {
   // Данные
   private capsules: StyleCapsule[] = [];
 
+  // Автогенерация капсул
+  private currentGeneratedCapsules: GeneratedCapsule[] | null = null;
+
   // Предпросмотр фото (для PhotoUploadHandler)
   private currentPreviewImage: string | null = null;
   private currentClassification: any = null;
@@ -95,7 +98,7 @@ export class CapsulesManager implements PhotoUploadHandler {
       onAdd: () => this.handleAddCapsuleClick(),
       onView: (id) => this.handleViewCapsule(id),
       onDelete: (id) => this.handleDeleteCapsule(id),
-      onGenerate: (capsule) => this.handleGeneratedCapsule(capsule)
+      onGenerate: (capsule, allCapsules) => this.handleGeneratedCapsule(capsule, allCapsules)
     });
 
     // Подписываемся на событие сохранения нового элемента гардероба
@@ -171,7 +174,7 @@ export class CapsulesManager implements PhotoUploadHandler {
   private cleanupCanvas(): void {
     if (this.canvasEditor) {
       logger.info('Cleaning up canvas editor');
-      
+
       // Очищаем canvas
       this.canvasEditor.hide();
       this.canvasEditor.destroy();
@@ -305,14 +308,14 @@ export class CapsulesManager implements PhotoUploadHandler {
         const cachedCapsule = cachedCapsules.find(c => c.id === capsuleId);
 
         let thumbnailUrl: string;
-        
+
         if (cachedCapsule && cachedCapsule.thumbnailUrl) {
           // Используем изображение из кэша
           thumbnailUrl = cachedCapsule.thumbnailUrl;
         } else {
           // Загружаем данные капсулы с сервера только для получения изображения
           const capsuleData = await capsulesService.loadCapsule(capsuleId);
-          
+
           // Используем thumbnailUrl из API или fallback
           thumbnailUrl = capsuleData.thumbnailUrl || `/api/capsules/${capsuleId}/thumbnail`;
         }
@@ -445,10 +448,13 @@ export class CapsulesManager implements PhotoUploadHandler {
   /**
    * Обработчик выбора сгенерированной капсулы
    */
-  private async handleGeneratedCapsule(capsule: GeneratedCapsule): Promise<void> {
+  private async handleGeneratedCapsule(capsule: GeneratedCapsule, allCapsules: GeneratedCapsule[]): Promise<void> {
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Handling generated capsule', { name: capsule.name });
+        logger.info('Handling generated capsule', { name: capsule.name, totalCapsules: allCapsules.length });
+
+        // Сохраняем все сгенерированные капсулы для возможности возврата
+        this.currentGeneratedCapsules = allCapsules;
 
         // Инициализируем canvas editor если еще не инициализирован
         if (!this.canvasEditor) {
@@ -481,6 +487,22 @@ export class CapsulesManager implements PhotoUploadHandler {
         // Сохраняем название капсулы
         (this.canvasEditor as any).generatedCapsuleName = capsule.name;
 
+        // ИСПРАВЛЕНО: Настраиваем BackButton для возврата к модалу с вариантами капсул
+        navigationManager.push(async () => {
+          logger.info('Back button pressed from generated capsule canvas');
+
+          // Скрываем canvas
+          if (this.canvasEditor) {
+            this.canvasEditor.hide();
+          }
+
+          // Очищаем canvas
+          this.cleanupCanvas();
+
+          // Показываем модал с вариантами капсул
+          this.showGenerationModal();
+        }, 'Return from generated capsule canvas');
+
         logger.info('Generated capsule loaded to canvas', { name: capsule.name });
       },
       () => {
@@ -492,6 +514,50 @@ export class CapsulesManager implements PhotoUploadHandler {
         additionalData: { capsuleName: capsule.name }
       })
     );
+  }
+
+  /**
+   * Показать модальное окно с вариантами сгенерированных капсул
+   */
+  private showGenerationModal(): void {
+    if (!this.currentGeneratedCapsules || this.currentGeneratedCapsules.length === 0) {
+      logger.warn('No generated capsules to show, returning to grid');
+      this.capsulesGrid.show();
+      return;
+    }
+
+    logger.info('Showing generation modal with capsules', { count: this.currentGeneratedCapsules.length });
+
+    // Получаем доступ к generationModal через capsulesGrid
+    // Используем метод грида для показа модала
+    (this.capsulesGrid as any).generationModal.show(this.currentGeneratedCapsules);
+
+    // Настраиваем callbacks заново
+    (this.capsulesGrid as any).generationModal.onSelect((capsule: GeneratedCapsule) => {
+      logger.info('Capsule selected from generation modal', { capsuleId: capsule.id });
+
+      // Закрываем модальное окно
+      (this.capsulesGrid as any).generationModal.hide();
+
+      // Загружаем выбранную капсулу
+      this.handleGeneratedCapsule(capsule, this.currentGeneratedCapsules!);
+    });
+
+    (this.capsulesGrid as any).generationModal.onRegenerate(() => {
+      logger.info('Regenerate button clicked from modal');
+      (this.capsulesGrid as any).generationModal.hide();
+
+      // Показываем грид и запускаем генерацию заново
+      this.capsulesGrid.show();
+      (this.capsulesGrid as any).handleGenerate();
+    });
+
+    // ИСПРАВЛЕНО: Удаляем обработчик BackButton, чтобы кнопка закрывала приложение
+    // Удаляем предыдущий обработчик BackButton (возврат к модалу)
+    navigationManager.pop();
+
+    // НЕ добавляем новый обработчик - BackButton будет закрывать приложение по умолчанию
+    logger.info('BackButton will close the app from generation modal');
   }
 
   // ============================================
