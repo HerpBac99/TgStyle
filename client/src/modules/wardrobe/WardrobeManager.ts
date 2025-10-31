@@ -75,7 +75,7 @@ export class WardrobeManager implements PhotoUploadHandler {
 
     // МГНОВЕННО отрисовываем из кэша (уже загружен в dataCacheManager при инициализации)
     await this.loadWardrobeFromCache();
-    this.renderGrid(true, gridId); // С анимацией при первом открытии
+    this.renderGrid(false, gridId); // С анимацией при первом открытии
 
     // Настраиваем обработчики ПОСЛЕ рендера (когда кнопка уже создана)
     this.setupEventListeners(addBtnId);
@@ -223,20 +223,8 @@ export class WardrobeManager implements PhotoUploadHandler {
       return;
     }
 
-    logger.info('✅ Grid element found', {
-      gridId,
-      gridClassName: grid.className,
-      gridChildrenCount: grid.children.length
-    });
-
     // Фильтруем вещи
     const filteredItems = wardrobeService.filterByCategory(this.wardrobeItems, this.currentFilter);
-
-    logger.info('🔍 Items filtered', {
-      totalItems: this.wardrobeItems.length,
-      filteredItems: filteredItems.length,
-      currentFilter: this.currentFilter
-    });
 
     // Определяем ID кнопки добавления по ID грида
     const prefix = gridId.replace('-clothes-grid', '');
@@ -254,12 +242,6 @@ export class WardrobeManager implements PhotoUploadHandler {
         logger.info('✅ Added missing ID to button', { addBtnId });
       }
     }
-
-    logger.info('🔍 Looking for add button', {
-      addBtnId,
-      found: !!addBtn,
-      gridChildrenBefore: grid.children.length
-    });
 
     // Очищаем грид
     grid.innerHTML = '';
@@ -286,14 +268,6 @@ export class WardrobeManager implements PhotoUploadHandler {
       logger.warn('Add button not found for grid', { addBtnId, gridId });
     }
 
-    // Добавляем карточки (новые вещи уже в начале массива)
-    logger.info('📦 Adding cards to grid', {
-      gridId,
-      filteredItemsCount: filteredItems.length,
-      totalItemsCount: this.wardrobeItems.length,
-      currentFilter: this.currentFilter
-    });
-
     filteredItems.forEach((item, index) => {
       const card = this.createItemCard(item);
       grid.appendChild(card);
@@ -305,12 +279,6 @@ export class WardrobeManager implements PhotoUploadHandler {
           cardHTML: card.outerHTML.substring(0, 100)
         });
       }
-    });
-
-    logger.info('✅ Grid rendering completed', {
-      gridId,
-      cardsAdded: filteredItems.length,
-      gridChildrenCount: grid.children.length
     });
   }
 
@@ -1236,7 +1204,7 @@ export class WardrobeManager implements PhotoUploadHandler {
     this.createFilters(detail.filtersId);
 
     // Рендерим грид
-    this.renderGrid(true, detail.gridId);
+    this.renderGrid(false, detail.gridId);
 
     logger.info('Grid rendered via event', { gridId: detail.gridId });
 

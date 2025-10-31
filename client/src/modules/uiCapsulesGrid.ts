@@ -130,7 +130,7 @@ export class UICapsulesGrid {
    * 
    * @param capsules - Массив капсул для отображения
    */
-  render(capsules: StyleCapsule[]): void {
+  render(capsules: StyleCapsule[], withAnimation: boolean = false): void {
     this.capsules = capsules;
 
     const grid = document.getElementById('capsules-clothes-grid');
@@ -148,6 +148,20 @@ export class UICapsulesGrid {
     // Очищаем грид
     grid.innerHTML = '';
 
+    // Управляем анимацией грида (аналогично WardrobeManager)
+    if (withAnimation) {
+      grid.classList.add('initial-load');
+      logger.info('Rendering capsules grid with initial animation');
+
+      // Удаляем класс после завершения анимации (0.5s + максимальная задержка 0.35s = 0.85s)
+      setTimeout(() => {
+        grid.classList.remove('initial-load');
+      }, 1000);
+    } else {
+      grid.classList.remove('initial-load');
+      logger.info('Rendering capsules grid without animation');
+    }
+
     // Возвращаем кнопку "Создать" обратно первой
     if (addBtn) {
       grid.appendChild(addBtn);
@@ -162,7 +176,7 @@ export class UICapsulesGrid {
     // Настраиваем обработчик кнопки добавления
     this.setupAddButton();
 
-    logger.info(`Capsules grid rendered with ${capsules.length} capsules`);
+    logger.info(`Capsules grid rendered with ${capsules.length} capsules, animation: ${withAnimation}`);
   }
 
   /**

@@ -50,8 +50,10 @@
     gap: 12px;
     padding: 20px 0;
     width: 100%;
+}
 
-    /* Анимация появления грида */
+/* Анимация появления грида только при первом открытии */
+.capsules-clothes-grid.initial-load {
     animation: fadeIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
@@ -75,56 +77,61 @@
     border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
-    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.3s ease, opacity 0.3s ease;
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.3s ease;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    
+    /* По умолчанию карточки видимы (без анимации) */
+    opacity: 1;
+}
 
-    /* Stagger animation - карточки появляются по очереди */
+/* Анимация появления карточек только при первом открытии */
+.capsules-clothes-grid.initial-load .capsules-item-card {
     opacity: 0;
     animation: cardFadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
-/* Задержка для каждой карточки */
-.capsules-item-card:nth-child(1) {
+/* Задержка для каждой карточки только при initial-load */
+.capsules-clothes-grid.initial-load .capsules-item-card:nth-child(1) {
     animation-delay: 0.05s;
 }
 
-.capsules-item-card:nth-child(2) {
+.capsules-clothes-grid.initial-load .capsules-item-card:nth-child(2) {
     animation-delay: 0.08s;
 }
 
-.capsules-item-card:nth-child(3) {
+.capsules-clothes-grid.initial-load .capsules-item-card:nth-child(3) {
     animation-delay: 0.11s;
 }
 
-.capsules-item-card:nth-child(4) {
+.capsules-clothes-grid.initial-load .capsules-item-card:nth-child(4) {
     animation-delay: 0.14s;
 }
 
-.capsules-item-card:nth-child(5) {
+.capsules-clothes-grid.initial-load .capsules-item-card:nth-child(5) {
     animation-delay: 0.17s;
 }
 
-.capsules-item-card:nth-child(6) {
+.capsules-clothes-grid.initial-load .capsules-item-card:nth-child(6) {
     animation-delay: 0.20s;
 }
 
-.capsules-item-card:nth-child(7) {
+.capsules-clothes-grid.initial-load .capsules-item-card:nth-child(7) {
     animation-delay: 0.23s;
 }
 
-.capsules-item-card:nth-child(8) {
+.capsules-clothes-grid.initial-load .capsules-item-card:nth-child(8) {
     animation-delay: 0.26s;
 }
 
-.capsules-item-card:nth-child(9) {
+.capsules-clothes-grid.initial-load .capsules-item-card:nth-child(9) {
     animation-delay: 0.29s;
 }
 
-.capsules-item-card:nth-child(10) {
+.capsules-clothes-grid.initial-load .capsules-item-card:nth-child(10) {
     animation-delay: 0.32s;
 }
 
-.capsules-item-card:nth-child(n+11) {
+.capsules-clothes-grid.initial-load .capsules-item-card:nth-child(n+11) {
     animation-delay: 0.35s;
 }
 

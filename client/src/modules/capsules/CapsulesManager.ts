@@ -134,9 +134,9 @@ export class CapsulesManager implements PhotoUploadHandler {
         // Загружаем капсулы
         await this.loadCapsules();
 
-        // Показываем грид
+        // Показываем грид без анимации
         this.capsulesGrid.show();
-        this.capsulesGrid.render(this.capsules);
+        this.capsulesGrid.render(this.capsules, false);
 
         logger.info('Capsules opened', {
           count: this.capsules.length,
@@ -144,10 +144,10 @@ export class CapsulesManager implements PhotoUploadHandler {
         });
       },
       () => {
-        // Fallback: показываем грид с пустым массивом
+        // Fallback: показываем грид с пустым массивом (без анимации при ошибке)
         this.capsules = [];
         this.capsulesGrid.show();
-        this.capsulesGrid.render(this.capsules);
+        this.capsulesGrid.render(this.capsules, false);
       },
       CapsuleErrorHandler.createContext('Открытие капсул')
     );
@@ -432,14 +432,14 @@ export class CapsulesManager implements PhotoUploadHandler {
           this.capsules.splice(index, 1);
         }
 
-        // Перерисовываем грид
-        this.capsulesGrid.render(this.capsules);
+        // Перерисовываем грид без анимации (обновление после удаления)
+        this.capsulesGrid.render(this.capsules, false);
 
         logger.info('Capsule deleted', { capsuleId, remaining: this.capsules.length });
       },
       () => {
-        // Fallback: перерисовываем грид без изменений
-        this.capsulesGrid.render(this.capsules);
+        // Fallback: перерисовываем грид без изменений и анимации
+        this.capsulesGrid.render(this.capsules, false);
       },
       CapsuleErrorHandler.createContext('Удаление капсулы', { capsuleId })
     );
@@ -1218,9 +1218,9 @@ export class CapsulesManager implements PhotoUploadHandler {
       this.resultScreen.hide();
     }
 
-    // Показываем грид
+    // Показываем грид без анимации (возврат после сохранения)
     this.capsulesGrid.show();
-    this.capsulesGrid.render(this.capsules);
+    this.capsulesGrid.render(this.capsules, false);
 
     logger.info('Returned to capsules grid after save');
   }
