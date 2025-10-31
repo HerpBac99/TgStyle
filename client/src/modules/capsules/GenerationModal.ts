@@ -277,6 +277,23 @@ export class GenerationModal {
       });
     }
 
+    const closebth = this.modal.querySelector('#generation-modal-close');
+    if (closebth) {
+      const handleCancel = () => {
+        logger.info('Cancel button clicked');
+        
+        if (this.callbacks.onCancel) {
+          this.callbacks.onCancel();
+        }
+        this.hide();
+      };
+
+      closebth.addEventListener('click', handleCancel);
+      this.cleanupFunctions.push(() => {
+        closebth.removeEventListener('click', handleCancel);
+      });
+    }
+
     // Клик по overlay для закрытия
     const overlay = this.modal.querySelector('.modal-overlay');
     if (overlay) {
