@@ -87,31 +87,50 @@
   - Добавить информацию о интеграции с лайками и комментариями
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 8. Создать API модуля Feed
+- [x] 8. Создать API модуля Feed
+
+
+
+
   - Проанализировать публичные методы классов модуля
   - Создать файл `.kiro/steering/feed-api.md`
   - Описать клиентские методы: loadFeed, likeItem, addComment, etc.
   - Описать серверные endpoints: GET /api/public-feed, POST /api/like, POST /api/comment
   - Добавить примеры пагинации и работы с лайками
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
+-
 
-- [ ] 9. Обновить архитектуру модуля Wardrobe
+- [x] 9. Обновить архитектуру модуля Wardrobe
+
+
+
+
   - Проанализировать актуальную структуру модуля wardrobe
   - Обновить файл `.kiro/steering/wardrobe-architecture.md`
   - Описать WardrobeManager и WardrobeService после последних изменений
   - Описать оптимистичное создание и трехуровневое кэширование
   - Добавить информацию о интеграции с PhotoProcessor и FastVLM
   - _Requirements: 9.1, 9.2, 9.3, 9.4_
+-
 
-- [ ] 10. Создать API модуля Wardrobe
+- [x] 10. Создать API модуля Wardrobe
+
+
+
+
   - Проанализировать публичные методы WardrobeManager и WardrobeService
   - Создать файл `.kiro/steering/wardrobe-api.md`
   - Описать клиентские методы: loadWardrobe, addItem, updateItem, deleteItem
   - Описать серверные endpoints: GET/POST/PUT/DELETE /api/wardrobe
   - Добавить примеры оптимистичного создания и обработки изображений
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
+-
 
-- [ ] 11. Обновить архитектуру модуля Capsules
+- [x] 11. Обновить архитектуру модуля Capsules
+
+
+
+
   - Проанализировать рефакторенную структуру модуля capsules
   - Обновить файл `.kiro/steering/capsules-architecture.md`
   - Описать новые модули: CapsuleFlowManager, CapsuleSelectionManager, CanvasStateManager, ImageProcessingService, ModalService
@@ -119,7 +138,12 @@
   - Добавить информацию о Singleton для UICanvasEditor
   - _Requirements: 11.1, 11.2, 11.3, 11.4_
 
-- [ ] 12. Обновить API модуля Capsules
+- [x] 12. Обновить API модуля Capsules
+
+
+
+
+
   - Проанализировать публичные методы всех классов модуля
   - Обновить файл `.kiro/steering/capsules-api.md`
   - Описать методы CapsulesManager, CapsuleFlowManager, CapsuleSelectionManager, CanvasStateManager
@@ -127,7 +151,11 @@
   - Добавить примеры создания и редактирования капсул с flow управлением
   - _Requirements: 12.1, 12.2, 12.3, 12.4_
 
-- [ ] 13. Создать серверную документацию
+- [x] 13. Создать серверную документацию
+
+
+
+
   - Проанализировать структуру server/ и db/prisma/schema.prisma
   - Создать файл `.kiro/steering/server.md`
   - Описать архитектуру: Express, Prisma, PostgreSQL
@@ -137,6 +165,16 @@
   - _Requirements: 13.1, 13.2, 13.3, 13.4_
 
 - [ ] 14. Обновить общие файлы
+
+
+
+
+
+
+
+
+
+
   - Проанализировать актуальную структуру проекта
   - Обновить `.kiro/steering/rules.md` с актуальными правилами разработки
   - Обновить `.kiro/steering/tech.md` с актуальным технологическим стеком
