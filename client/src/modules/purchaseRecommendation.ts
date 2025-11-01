@@ -89,11 +89,6 @@ class PurchaseRecommendationManager {
   private parseRecommendations(recommendationText: string): string | null {
     if (!recommendationText) return null;
 
-    logger.info('Parsing recommendations', { 
-      textLength: recommendationText.length,
-      textPreview: recommendationText.substring(0, 200)
-    });
-
     // Паттерн для поиска рекомендаций:
     // Вариант 1: 1. *Текст* [содержимое]
     // Вариант 2: 1.  Текст [содержимое] (без звездочек, может быть несколько пробелов)
@@ -130,16 +125,11 @@ class PurchaseRecommendationManager {
     }
 
     if (recommendations.length === 0) {
-      logger.warn('No recommendations found in text', { 
+      logger.error('No recommendations found in text', { 
         textPreview: recommendationText.substring(0, 300) 
       });
       return null;
     }
-
-    logger.info('Successfully parsed recommendations', { 
-      count: recommendations.length,
-      recommendations 
-    });
 
     // Формируем HTML список
     const listItems = recommendations.map((rec, index) => `${index + 1}. ${rec}`).join('<br>');
@@ -154,7 +144,7 @@ class PurchaseRecommendationManager {
   private generateLamodaUrlFromQuery(searchQuery: string): string | null {
     try {
       if (!searchQuery || searchQuery.length < 2) {
-        logger.warn('Search query too short', { searchQuery });
+        logger.error('Search query too short', { searchQuery });
         return null;
       }
 
@@ -189,11 +179,9 @@ class PurchaseRecommendationManager {
    */
   openLamodaLink(lamodaUrl: string): void {
     if (!lamodaUrl) {
-      logger.warn('No Lamoda URL provided');
+      logger.error('No Lamoda URL provided');
       return;
     }
-
-    logger.info('Opening Lamoda link', { url: lamodaUrl });
 
     try {
       // В Telegram WebApp используем tg.openLink для открытия внешних ссылок

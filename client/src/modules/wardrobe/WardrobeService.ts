@@ -52,8 +52,6 @@ export class WardrobeService {
    */
   async deleteItem(itemId: number): Promise<void> {
     try {
-      logger.info('Deleting wardrobe item', { itemId });
-
       const result = await api.deleteWardrobeItem(itemId);
 
       if (!result.success) {
@@ -98,22 +96,8 @@ export class WardrobeService {
    */
   async addItem(imageData: string, classification: ClassificationResult): Promise<WardrobeItem> {
     try {
-      logger.info('Adding new wardrobe item', {
-        category: classification.category,
-        subtype: classification.subtype,
-        color: classification.color
-      });
-
       // Оптимизируем изображение перед отправкой на сервер (PNG для сохранения прозрачности)
-      const originalSize = Math.round((imageData.length * 3) / 4 / 1024); // Примерный размер в KB
       const optimizedImage = await optimizeImageForUpload(imageData, 1200);
-      const optimizedSize = Math.round((optimizedImage.length * 3) / 4 / 1024);
-
-      logger.info('Image optimized for upload', {
-        originalSizeKB: originalSize,
-        optimizedSizeKB: optimizedSize,
-        compressionRatio: ((1 - optimizedSize / originalSize) * 100).toFixed(1) + '%'
-      });
 
       const result = await api.post('/wardrobe', {
         imageBase64: optimizedImage,

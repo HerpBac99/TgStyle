@@ -49,7 +49,7 @@ class HistoryManager {
       const parsedHistory = safeJsonParse<HistoryItem[]>(storedHistory, []);
 
       if (!Array.isArray(parsedHistory)) {
-        logger.warn('Invalid history format, resetting');
+        logger.error('Invalid history format, resetting');
         this.history = [];
         return;
       }
@@ -66,7 +66,7 @@ class HistoryManager {
       }
 
       if (validation.warnings.length > 0) {
-        logger.warn('History warnings', { warningCount: validation.warnings.length });
+        logger.error('History warnings', { warningCount: validation.warnings.length });
       }
 
       // Фильтруем только валидные заполненные элементы (NO пустые слоты!)
@@ -176,8 +176,6 @@ class HistoryManager {
 
     } catch (error) {
       logger.error('Failed to load history from server', error);
-      // Fallback на localStorage уже загружен в constructor
-      logger.info('Using localStorage as fallback');
       return false;
     }
   }
@@ -217,7 +215,7 @@ class HistoryManager {
       }
 
       if (validation.warnings.length > 0) {
-        logger.warn('History item warnings', { warnings: validation.warnings });
+        logger.error('History item warnings', { warnings: validation.warnings });
       }
 
       // Убедимся что все необходимые поля есть
@@ -283,7 +281,7 @@ class HistoryManager {
             }
           }
         } catch (error) {
-          logger.warn('Failed to delete item from server', { id: item.id, error });
+          logger.error('Failed to delete item from server', { id: item.id, error });
           // Продолжаем удаление локально даже если сервер недоступен
         }
       }
@@ -353,7 +351,7 @@ class HistoryManager {
         // Сохраняем все изменения в localStorage
         this.saveToStorage();
       } else {
-        logger.warn('Attempted to update like status for a non-existent history item', { itemId });
+        logger.error('Attempted to update like status for a non-existent history item', { itemId });
       }
     } catch (error) {
       logger.error('Error updating like status', { itemId, error });

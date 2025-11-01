@@ -13,8 +13,6 @@ export class PublicFeedService {
    */
   async loadPublicCapsules(page: number = 1, limit: number = 20): Promise<PublicFeedResponse> {
     try {
-      logger.info('Loading public capsules', { page, limit });
-
       const response = await api.get(
         `/capsules/public?page=${page}&limit=${limit}`
       ) as PublicFeedResponse;
@@ -42,8 +40,6 @@ export class PublicFeedService {
    */
   async toggleLike(capsuleId: number, currentlyLiked: boolean): Promise<{isLiked: boolean; likesCount: number}> {
     try {
-      logger.info('Toggling like on public capsule', { capsuleId, currentlyLiked });
-
       const result = await capsuleLikesService.toggleLike(capsuleId, currentlyLiked);
 
       if (!result.success || typeof result.isLiked !== 'boolean' || typeof result.likesCount !== 'number') {

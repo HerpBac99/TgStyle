@@ -216,10 +216,7 @@ class DataCacheManager {
     }
 
     try {
-      const startTime = Date.now();
-
       // Загружаем ВСЕ изображения параллельно
-      const results = await Promise.allSettled(
         imageUrls.map(relativeUrl => {
           return new Promise<void>((resolve, reject) => {
             try {
@@ -235,18 +232,6 @@ class DataCacheManager {
             }
           });
         })
-      );
-
-      const cachedCount = results.filter(r => r.status === 'fulfilled').length;
-      const failedCount = results.filter(r => r.status === 'rejected').length;
-      const loadTime = Date.now() - startTime;
-
-      logger.info('✅ Priority images cached (wardrobe + capsules)', {
-        cached: cachedCount,
-        failed: failedCount,
-        total: imageUrls.length,
-        loadTime: `${loadTime}ms`
-      });
     } catch (error) {
       logger.error('Error caching priority images', error);
     }
@@ -274,11 +259,6 @@ class DataCacheManager {
       
       const json = safeJsonStringify(itemsWithoutBase64);
       localStorage.setItem(STORAGE_KEYS.WARDROBE_CACHE, json);
-
-      logger.info('Wardrobe cache saved to localStorage', {
-        count: itemsWithoutBase64.length,
-        sizeKB: (json.length / 1024).toFixed(2)
-      });
     } catch (error) {
       logger.error('Error saving wardrobe cache to storage', error);
     }
@@ -291,11 +271,6 @@ class DataCacheManager {
     try {
       const json = safeJsonStringify(this.capsules);
       localStorage.setItem(STORAGE_KEYS.CAPSULES_CACHE, json);
-
-      logger.info('Capsules cache saved to localStorage', {
-        count: this.capsules.length,
-        sizeKB: (json.length / 1024).toFixed(2)
-      });
     } catch (error) {
       logger.error('Error saving capsules cache to storage', error);
     }
@@ -308,11 +283,6 @@ class DataCacheManager {
     try {
       const json = safeJsonStringify(this.publicFeed);
       localStorage.setItem(STORAGE_KEYS.PUBLIC_FEED_CACHE, json);
-
-      logger.info('Public feed cache saved to localStorage', {
-        count: this.publicFeed.length,
-        sizeKB: (json.length / 1024).toFixed(2)
-      });
     } catch (error) {
       logger.error('Error saving public feed cache to storage', error);
     }
@@ -327,11 +297,7 @@ class DataCacheManager {
     }
 
     this.isLoading = true;
-    const startTime = Date.now();
-
     try {
-      logger.info('Starting data preload');
-
       // Загружаем данные параллельно
       const [wardrobeResponse, capsulesResponse] = await Promise.allSettled([
         this.loadWardrobeItems(),
@@ -341,8 +307,6 @@ class DataCacheManager {
       // Обрабатываем результаты
       if (wardrobeResponse.status === 'fulfilled') {
         this.wardrobeItems = wardrobeResponse.value;
-        logger.info('Wardrobe items loaded', { count: this.wardrobeItems.length });
-
         // Всегда сохраняем в localStorage при успешной загрузке
         // (могли измениться данные элементов, не только количество)
         this.saveWardrobeCacheToStorage();
@@ -352,8 +316,6 @@ class DataCacheManager {
 
       if (capsulesResponse.status === 'fulfilled') {
         this.capsules = capsulesResponse.value;
-        logger.info('Capsules loaded', { count: this.capsules.length });
-
         // Всегда сохраняем в localStorage при успешной загрузке
         // (могли измениться данные капсул, не только количество)
         this.saveCapsulesCacheToStorage();
@@ -376,14 +338,6 @@ class DataCacheManager {
       }
 
       this.isLoaded = true;
-      const loadTime = Date.now() - startTime;
-      logger.info('Data preload completed', {
-        wardrobeCount: this.wardrobeItems.length,
-        capsulesCount: this.capsules.length,
-        imageUrlsCount: imageUrls.length,
-        loadTime: loadTime + 'ms'
-      });
-
     } catch (error) {
       logger.error('Error during data preload', error);
     } finally {
@@ -397,14 +351,7 @@ class DataCacheManager {
    */
   private async loadWardrobeItems(): Promise<WardrobeItem[]> {
     try {
-      const loadStart = Date.now();
       const result = await api.getWardrobe();
-
-      const loadTime = Date.now() - loadStart;
-      logger.info('Wardrobe items loaded from server', {
-        itemsCount: result.items.length,
-        loadTime: `${loadTime}ms`
-      });
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to load wardrobe items');
@@ -462,8 +409,6 @@ class DataCacheManager {
       });
     });
 
-    // Изображения из истории анализов
-    // FIXED: используем telegramId вместо userId для построения правильного пути
     const historyItems = historyManager.getAllItems();
     historyItems.forEach((item: HistoryItem) => {
       if (item.photoPath) {
@@ -516,8 +461,6 @@ class DataCacheManager {
       let cachedCount = 0;
       let failedCount = 0;
 
-      logger.info('Starting image cache', { totalImages: imageUrls.length });
-
       // Кэшируем изображения порциями для фоновой загрузки
       const batchSize = IMAGE_CACHE_CONFIG.BATCH_SIZE;
       for (let i = 0; i < imageUrls.length; i += batchSize) {
@@ -546,7 +489,7 @@ class DataCacheManager {
 
               } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
-                logger.warn('Failed to cache image', { url: relativeUrl, error: errorMessage });
+                logger.error('Failed to cache image', { url: relativeUrl, error: errorMessage });
                 reject(error);
               }
             });
@@ -566,13 +509,6 @@ class DataCacheManager {
           await new Promise(resolve => setTimeout(resolve, IMAGE_CACHE_CONFIG.BATCH_DELAY_MS));
         }
       }
-
-      logger.info('Image cache completed', {
-        cached: cachedCount,
-        failed: failedCount,
-        total: imageUrls.length
-      });
-
     } catch (error) {
       logger.error('Error caching images', error);
     }
@@ -623,7 +559,7 @@ class DataCacheManager {
         this.saveWardrobeCacheToStorage();
       }
     } else {
-      logger.warn('Item not found in cache for update', { itemId });
+      logger.error('Item not found in cache for update', { itemId });
     }
   }
 
@@ -644,7 +580,7 @@ class DataCacheManager {
         this.saveWardrobeCacheToStorage();
       }
     } else {
-      logger.warn('Item not found in cache for update', { itemId });
+      logger.error('Item not found in cache for update', { itemId });
     }
   }
 
@@ -660,14 +596,8 @@ class DataCacheManager {
       if (index < WARDROBE_CONSTRAINTS.CACHE_ITEMS) {
         this.saveWardrobeCacheToStorage();
       }
-
-      logger.info('Optimistic item replaced in cache', { 
-        oldId, 
-        newId: newItem.id,
-        index 
-      });
     } else {
-      logger.warn('Optimistic item not found in cache for replacement', { oldId });
+      logger.error('Optimistic item not found in cache for replacement', { oldId });
     }
   }
 

@@ -56,8 +56,7 @@ class AnalysisManager {
    */
   private updateState(newState: Partial<AnalysisState>): void {
     this.currentState = { ...this.currentState, ...newState };
-    logger.debug('Analysis state updated', this.currentState);
-    
+
     // Можно добавить событие для обновления UI
     this.dispatchStateChangeEvent();
   }
@@ -154,7 +153,7 @@ class AnalysisManager {
       // NEW: Перезагружаем историю с сервера для получения актуальных данных
       const { historyManager } = await import('./history.js');
       await historyManager.loadHistoryFromServer().catch(error => {
-        logger.warn('Failed to reload history from server after analysis', error);
+        logger.error('Failed to reload history from server after analysis', error);
       });
 
       // ОБНОВЛЯЕМ UI ПОСЛЕ СОХРАНЕНИЯ

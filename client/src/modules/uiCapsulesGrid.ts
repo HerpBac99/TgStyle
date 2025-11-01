@@ -370,7 +370,7 @@ export class UICapsulesGrid {
     const addBtn = document.getElementById('add-capsule-btn');
 
     if (!addBtn) {
-      logger.warn('Add capsule button not found');
+      logger.error('Add capsule button not found');
       return;
     }
 
@@ -415,7 +415,7 @@ export class UICapsulesGrid {
     const generateBtn = document.getElementById('capsule-generate-btn');
 
     if (!generateBtn) {
-      logger.warn('Generate capsule button not found');
+      logger.error('Generate capsule button not found');
       return;
     }
 
@@ -488,6 +488,14 @@ export class UICapsulesGrid {
         this.handleGenerate();
       });
 
+      // ИСПРАВЛЕНО: Обрабатываем отмену/закрытие модального окна
+      this.generationModal.onCancel(() => {
+        logger.info('Generation modal cancelled/closed');
+        this.generationModal.hide();
+        // Возвращаемся к гриду капсул
+        this.show();
+      });
+
     } catch (error) {
       this.hideLoadingIndicator();
 
@@ -507,27 +515,15 @@ export class UICapsulesGrid {
     existingCapsules: any[];
   }> {
     try {
-      logger.info('Starting to load generation data');
-
       // Загружаем вещи гардероба
-      logger.info('Loading wardrobe items from /wardrobe');
       const wardrobeResponse = await api.get<{ items: any[] }>('/wardrobe');
       const wardrobeItems = wardrobeResponse.items || [];
-      logger.info('Wardrobe items loaded successfully', { count: wardrobeItems.length });
 
       // Загружаем существующие капсулы
-      logger.info('Loading existing capsules from /capsules');
       const capsulesResponse = await api.get<{ capsules: any[] }>('/capsules');
       const existingCapsules = capsulesResponse.capsules || [];
-      logger.info('Existing capsules loaded successfully', { count: existingCapsules.length });
-
-      logger.info('Generation data loaded', {
-        wardrobeItemsCount: wardrobeItems.length,
-        existingCapsulesCount: existingCapsules.length
-      });
 
       return { wardrobeItems, existingCapsules };
-
     } catch (error) {
       logger.error('Failed to load generation data', {
         error: error instanceof Error ? error.message : String(error),

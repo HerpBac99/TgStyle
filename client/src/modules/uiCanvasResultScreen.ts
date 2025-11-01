@@ -272,8 +272,6 @@ export class UICanvasResultScreen {
           initialLikeData,
           'capsule-result' // componentClass для специфичных стилей
         );
-
-        logger.info('Like button added to result screen', { capsuleId });
       } catch (error) {
         logger.error('Failed to add like button', { error, capsuleId });
       }

@@ -37,12 +37,9 @@ class AuthManager {
       const cached = localStorage.getItem('tgStyleLimits');
       if (cached) {
         this.userLimits = JSON.parse(cached);
-        logger.debug('⚡ User limits loaded from cache (instant)', {
-          analysesLeft: this.userLimits?.analysesLeft
-        });
       }
     } catch (e) {
-      logger.warn('Failed to load user limits from cache', e);
+      logger.error('Failed to load user limits from cache', e);
     }
   }
 
@@ -53,7 +50,6 @@ class AuthManager {
   initializeSubscriptionUI(): void {
     if (this.userLimits) {
       this.displaySubscriptionInfo();
-      logger.debug('⚡ User limits UI initialized from cache');
     }
   }
 
@@ -64,7 +60,7 @@ class AuthManager {
     this.tg = window.Telegram?.WebApp || null;
 
     if (!this.tg) {
-      logger.warn('Telegram WebApp not available');
+      logger.error('Telegram WebApp not available');
       return;
     }
 
@@ -90,28 +86,8 @@ class AuthManager {
       if (this.tg.isVersionAtLeast('6.9') && this.tg.requestFullscreen) {
         this.tg.requestFullscreen();
       }
-
-      // Минимизируем заголовок для экономии места
-      this.minimizeHeader();
     } catch (error) {
       logger.error('Error configuring Telegram WebApp', error);
-    }
-  }
-
-  /**
-   * Минимизация заголовка Telegram WebApp для освобождения места
-   */
-  private minimizeHeader(): void {
-    if (!this.tg) return;
-
-    try {
-      // Устанавливаем цвет заголовка таким же как фон приложения
-      // чтобы визуально скрыть его
-      this.tg.setHeaderColor('#81D8D0');
-      this.tg.setBackgroundColor('#81D8D0');
-
-    } catch (error) {
-      logger.warn('Error minimizing Telegram header', error);
     }
   }
 
@@ -120,7 +96,7 @@ class AuthManager {
    */
   private extractUserData(): TelegramUser | null {
     if (!this.tg?.initDataUnsafe?.user) {
-      logger.warn('User data not available in Telegram');
+      logger.error('User data not available in Telegram');
       return null;
     }
 
@@ -162,8 +138,6 @@ class AuthManager {
     if (!this.userLimits) return;
 
     try {
-      const startTime = performance.now();
-
       // Ищем элементы для отображения лимитов
       const analysesLeft = document.getElementById('analyses-left');
 
@@ -172,18 +146,13 @@ class AuthManager {
         const leftCount = this.userLimits.analysesLeft;
         analysesLeft.textContent = leftCount.toString();
         analysesLeft.className = `analyses-left ${leftCount <= 1 ? 'low' : leftCount <= 3 ? 'medium' : 'high'}`;
-
-        logger.debug('⏱️ User limits UI updated', {
-          analysesLeft: leftCount,
-          updateTime: `${(performance.now() - startTime).toFixed(2)}ms`
-        });
       }
 
       // Сохраняем лимиты в localStorage для быстрой загрузки при следующем запуске
       try {
         localStorage.setItem('tgStyleLimits', JSON.stringify(this.userLimits));
       } catch (e) {
-        logger.warn('Failed to cache user limits', e);
+        logger.error('Failed to cache user limits', e);
       }
 
     } catch (error) {
@@ -205,7 +174,7 @@ class AuthManager {
       const initData = this.tg?.initData;
 
       if (!initData) {
-        logger.warn('InitData not available, continuing without server authentication');
+        logger.error('InitData not available, continuing without server authentication');
 
         // Создаем базовые лимиты для локального режима
         this.userLimits = {
@@ -244,7 +213,7 @@ class AuthManager {
       }
 
       if (validation.warnings.length > 0) {
-        logger.warn('Telegram initData warnings', { warnings: validation.warnings });
+        logger.error('Telegram initData warnings', { warnings: validation.warnings });
       }
 
       // Отправляем на сервер для валидации
@@ -265,7 +234,7 @@ class AuthManager {
             analysesLeft: 10,
             totalAnalyses: 0
           };
-          logger.warn('No user info from server, using fallback');
+          logger.error('No user info from server, using fallback');
         }
 
         // Обновляем отображение профиля с новой информацией

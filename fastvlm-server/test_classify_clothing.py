@@ -27,7 +27,7 @@ def test_simple_analyze(image_b64: str, prompt: str):
         }
 
         resp = requests.post(
-            f"{SERVER_URL}/simple_analyze",
+            f"{SERVER_URL}/classify_clothing",
             json=payload,
             timeout=120
         )
@@ -37,8 +37,8 @@ def test_simple_analyze(image_b64: str, prompt: str):
         if result.get("success"):
             return {
                 "success": True,
-                "answer": result.get("answer", ""),
-                "time": result.get("time", 0)
+                "answer": result.get("raw_analysis", ""),
+                "time": result.get("timing", {}).get("total_time", 0)
             }
         else:
             return {
@@ -57,7 +57,7 @@ def main():
         image_path = sys.argv[1]
     else:
         # Свитер по умолчанию
-        image_path = str(Path(__file__).parent.parent / "server" / "uploads" / "wardrobe" / "251053908" / "item_251053908_lkq2vjy5.png")
+        image_path = str(Path(__file__).parent.parent / "server" / "uploads" / "wardrobe" / "251053908" / "item_251053908_1xbrpoxu.png")
 
     if not os.path.exists(image_path):
         print(f"Image not found: {image_path}")
@@ -74,7 +74,7 @@ Do not deviate from this structure:
 6. [Style (casual, business, office, sport, streetwear, etc.)]
 7. [Season (spring, summer, autumn, winter, all-season)]
 8. [Pattern (solid, striped, checkered, floral, graphic, printed, etc.)]
-9. [Describe clothing in one sentence]
+9. [Describe clothing type, color, material, fit, style, season in one sentence]
 
 IMPORTANT: You must respond with exactly 9 numbered lines. Each line must start with the number and a period (1., 2., etc.).
 """

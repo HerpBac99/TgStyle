@@ -143,8 +143,6 @@ export class AnalysisLikesService {
     try {
       const initData = (window as any).Telegram?.WebApp?.initData || '';
 
-      logger.info('Unliking analysis', { historyItemId });
-
       const response = await api.delete(
         `/analysis-likes/${historyItemId}?initData=${encodeURIComponent(initData)}`
       ) as LikeApiResponse;

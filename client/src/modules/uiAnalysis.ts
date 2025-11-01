@@ -208,8 +208,6 @@ export class UIAnalysisManager {
    * Показать экран анализа с выбранной темой
    */
   private async showAnalysisWithTheme(imageData: ImageData, themeDescription: string): Promise<void> {
-    logger.info('Starting analysis with theme', { themeDescription });
-
     try {
       // Импортируем менеджер анализа динамически
       const { analysisManager } = await import('./analysis.js');
@@ -314,9 +312,6 @@ export class UIAnalysisManager {
       themeSelection.classList.add('hidden');
       resultContainer.classList.add('hidden');
       loadingIndicator.classList.remove('hidden');
-
-
-      logger.info('Loading indicator displayed');
     }
 
     // Показываем экран анализа
@@ -332,33 +327,21 @@ export class UIAnalysisManager {
     event.preventDefault();
     event.stopPropagation();
 
-    logger.info('Camera button clicked', {
-      timestamp: Date.now(),
-      userAgent: navigator.userAgent.split(' ')[0]
-    });
-
     try {
       // Захватываем фото с выбором источника
       const result = await cameraManager.capturePhoto();
 
       if (result.success && result.image) {
-        logger.info('Photo captured successfully', {
-          imageSize: result.image.originalSize,
-          format: result.image.format,
-          dimensions: `${result.image.width}x${result.image.height}`
-        });
-
         // Показ экрана анализа будет через событие photo:captured (избегаем дубликатов)
         // this.showFullscreenPreview() вызовется в handlePhotoCaptured()
 
         // Вибрация успеха
         authManager.vibrate('light');
       } else {
-        this.logError(result.error || 'Не удалось сделать фото');
+        logger.error(result.error || 'Не удалось сделать фото');
       }
     } catch (error) {
       logger.error('Error capturing photo', error);
-      this.logError('Ошибка при работе с камерой');
     }
   }
 
@@ -370,7 +353,7 @@ export class UIAnalysisManager {
 
     // Обрабатываем состояние ошибки
     if (state.status === 'error' && state.error) {
-      logger.warn('Analysis error occurred, showing in UI', { error: state.error });
+      logger.error('Analysis error occurred, showing in UI', { error: state.error });
       this.showAnalysisError();
     }
   }
@@ -379,7 +362,6 @@ export class UIAnalysisManager {
    * Показать результат анализа
    */
   showAnalysisResult(result: string, historyItemId?: number): void {
-    logger.info('Showing analysis result', { historyItemId });
 
     // Сохраняем historyItemId если передан
     if (historyItemId) {
@@ -406,11 +388,6 @@ export class UIAnalysisManager {
 
     // Сохраняем текст анализа для отправки
     this.currentAnalysisData.analysisText = extracted.cleanAnalysis;
-
-    logger.info('Purchase recommendation processed', {
-      hasRecommendations: extracted.hasRecommendations,
-      recommendationsHtmlLength: extracted.recommendationsHtml?.length || 0
-    });
 
     // Скрываем загрузку, показываем результат
     loadingIndicator.classList.add('hidden');
@@ -479,13 +456,6 @@ export class UIAnalysisManager {
         }
       }
     }
-
-    logger.info('Analysis result displayed with cascade animation', {
-      blocksCount: textBlocks.length,
-      blocksHtml: blocksHtml.substring(0, 200) + '...',
-      hasRecommendationButton: !!this.currentLamodaUrl,
-      historyItemId
-    });
   }
 
   /**
@@ -536,17 +506,6 @@ export class UIAnalysisManager {
       }
     }
 
-    logger.info('Parsed text blocks', {
-      totalBlocks: blocks.length,
-      originalParagraphs: paragraphs.length,
-      blocks: blocks.map((block, index) => ({
-        blockIndex: index + 1,
-        delay: block.delay,
-        contentLength: block.content.length,
-        contentPreview: block.content.substring(0, 80).replace(/\n/g, ' ') + '...'
-      }))
-    });
-
     return blocks;
   }
 
@@ -587,10 +546,10 @@ export class UIAnalysisManager {
     `;
     (button as HTMLButtonElement).disabled = true;
 
-    // Через 2 секунды открываем ссылку
+    // Через 0.5 секунды открываем ссылку
     setTimeout(() => {
       this.openRecommendationsUrl();
-    }, 2000);
+    }, 500);
 
     logger.info('Recommendation button clicked, showing spinner');
   }
@@ -669,7 +628,6 @@ export class UIAnalysisManager {
       const clonedCloseBtn = closeBtn.cloneNode(true) as HTMLElement;
       closeBtn.replaceWith(clonedCloseBtn);
       clonedCloseBtn.addEventListener('click', () => {
-        logger.info('Close analysis button clicked');
         this.closePreview();
       });
     }
@@ -764,7 +722,7 @@ export class UIAnalysisManager {
         uiMenuManager.updateHistoryDisplay({ preservePosition: true });
       }
     } catch (error) {
-      logger.warn('Failed to update history from server', { error });
+      logger.error('Failed to update history from server', { error });
       // Если загрузка с сервера не удалась, обновляем UI вручную
       uiMenuManager.updateHistoryDisplay();
     }
@@ -779,7 +737,7 @@ export class UIAnalysisManager {
       const initData = window.Telegram?.WebApp?.initData || '';
       
       if (!initData) {
-        logger.warn('No initData available for metadata sync');
+        logger.error('No initData available for metadata sync');
         return;
       }
       
@@ -788,20 +746,10 @@ export class UIAnalysisManager {
       
       if (response.success && response.metadata) {
         historyManager.updateMetadata(response.metadata);
-        logger.info('History metadata synced successfully', { 
-          itemsCount: response.metadata.length 
-        });
       }
     } catch (err) {
       logger.error('Error syncing history metadata', err);
     }
-  }
-
-  /**
-   * Логирование ошибки без отображения пользователю
-   */
-  private logError(message: string): void {
-    logger.error('Silent error handling', { message });
   }
 
   /**
@@ -842,15 +790,12 @@ export class UIAnalysisManager {
    * Очистка ресурсов
    */
   destroy(): void {
-    logger.info('Destroying Analysis UI Manager');
-
     // Останавливаем анимацию загрузки
     loadingTextAnimator.stop();
 
     // Очищаем обработчики событий
     this.cleanupFunctions.forEach(cleanup => cleanup());
     this.cleanupFunctions = [];
-
     logger.info('Analysis UI Manager destroyed');
   }
 

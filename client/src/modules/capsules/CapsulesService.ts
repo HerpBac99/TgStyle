@@ -51,8 +51,6 @@ export class CapsulesService {
    */
   async loadCapsule(capsuleId: number): Promise<Capsule> {
     try {
-      logger.info('Loading capsule data from server', { capsuleId });
-
       const response = await api.get(`/capsules/${capsuleId}`) as any;
 
       if (!response.success) {
@@ -96,8 +94,6 @@ export class CapsulesService {
    */
   async updateCapsule(capsuleId: number, data: UpdateCapsuleDto): Promise<Capsule> {
     try {
-      logger.info('Updating capsule on server', { capsuleId });
-
       const result = await api.updateCapsule(capsuleId, data) as any;
 
       if (!result.success) {
@@ -120,8 +116,6 @@ export class CapsulesService {
    */
   async deleteCapsule(capsuleId: number): Promise<void> {
     try {
-      logger.info('Deleting capsule', { capsuleId });
-
       const result = await api.deleteCapsule(capsuleId) as any;
 
       if (!result.success) {

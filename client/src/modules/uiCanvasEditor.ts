@@ -62,7 +62,6 @@ export class UICanvasEditor {
   // Приватный конструктор для Singleton
   private constructor(config: CanvasEditorConfig) {
     this.config = config;
-    logger.info('UICanvasEditor: Singleton instance created');
   }
 
   /**
@@ -91,8 +90,6 @@ export class UICanvasEditor {
       this.config.onNext !== config.onNext;
 
     if (configChanged) {
-      logger.debug('UICanvasEditor: Updating config callbacks');
-
       // Обновляем callbacks (с проверкой на undefined)
       if (config.onAddItem !== undefined) {
         this.config.onAddItem = config.onAddItem;
@@ -262,13 +259,11 @@ export class UICanvasEditor {
     });
 
     if (itemIdsToRemove.length > 0) {
-      logger.debug('Removing obsolete items from canvas', { count: itemIdsToRemove.length });
       await this.removeItems(itemIdsToRemove);
     }
 
     // Если нужно полностью очистить и загрузить заново
     if (itemsToAdd.length === items.length) {
-      logger.debug('Full reload: clearing canvas');
       this.fabricCanvas.clear();
       this.fabricCanvas.backgroundColor = UICanvasEditor.CANVAS_BACKGROUND_COLOR;
       this.fabricCanvas.renderAll();
@@ -276,19 +271,12 @@ export class UICanvasEditor {
 
     // Добавляем только новые элементы
     if (itemsToAdd.length > 0) {
-      logger.debug('Adding new items to canvas', { count: itemsToAdd.length });
       for (const canvasItem of itemsToAdd) {
         await this.addItem(canvasItem);
       }
     }
 
     this.fabricCanvas.renderAll();
-    logger.info('Items loaded to canvas successfully', {
-      total: items.length,
-      added: itemsToAdd.length,
-      removed: itemIdsToRemove.length,
-      reused: items.length - itemsToAdd.length
-    });
   }
 
   /**
@@ -302,11 +290,6 @@ export class UICanvasEditor {
       logger.error('Canvas not initialized, cannot load generated capsule');
       throw new Error('Canvas not initialized');
     }
-
-    logger.info('Loading generated capsule to canvas', {
-      capsuleId: capsule.id,
-      itemsCount: capsule.items.length
-    });
 
     // Очищаем canvas
     this.fabricCanvas.clear();
@@ -451,11 +434,6 @@ export class UICanvasEditor {
       }
     }
 
-    logger.debug('Items auto-positioned with calculateImagePosition logic', {
-      totalItems: items.length,
-      categoriesCount: Object.keys(itemsByCategory).length
-    });
-
     return positionedItems;
   }
 
@@ -510,7 +488,7 @@ export class UICanvasEditor {
       return baseScale;
 
     } catch (error) {
-      logger.warn('Failed to load image for scale calculation, using fallback', {
+      logger.error('Failed to load image for scale calculation, using fallback', {
         itemId: item.id,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -563,13 +541,6 @@ export class UICanvasEditor {
       finalY = position.y;
       finalScale = scale;
       finalAngle = angle || 0;
-
-      logger.debug('Using saved parameters', {
-        itemId: item.id,
-        position,
-        scale,
-        angle
-      });
     } else {
       // Рассчитываем автоматически (режим создания)
       const calculated = this.calculateImagePosition(imageObj, item);
@@ -577,11 +548,6 @@ export class UICanvasEditor {
       finalY = calculated.y;
       finalScale = calculated.scale;
       finalAngle = 0;
-
-      logger.debug('Calculated parameters automatically', {
-        itemId: item.id,
-        calculated
-      });
     }
 
     // Добавляем на canvas
@@ -598,8 +564,6 @@ export class UICanvasEditor {
     if (!this.fabricCanvas) {
       throw new Error('Canvas not initialized');
     }
-
-    logger.info('Adding items to canvas incrementally', { itemsCount: items.length });
 
     // Добавляем элементы последовательно для сохранения порядка слоев
     for (const canvasItem of items) {
@@ -618,7 +582,7 @@ export class UICanvasEditor {
    */
   async removeItems(itemIds: number[]): Promise<number> {
     if (!this.fabricCanvas) {
-      logger.warn('Canvas not initialized');
+      logger.error('Canvas not initialized');
       return 0;
     }
 
@@ -634,7 +598,6 @@ export class UICanvasEditor {
       if (itemData && itemIds.includes(itemData.id)) {
         this.fabricCanvas.remove(obj);
         removedCount++;
-        logger.debug('Item removed from canvas', { itemId: itemData.id });
       }
     }
 
@@ -708,11 +671,6 @@ export class UICanvasEditor {
     // Получаем thumbnail с автоматической обрезкой (removeBackground игнорируется)
     const thumbnailImage = await this.canvasToImage(false);
 
-    logger.debug('Canvas state collected', {
-      objectsCount: objects.length,
-      selectedItemsCount: currentSelectedItems.length
-    });
-
     return {
       canvasData,
       thumbnailImage: thumbnailImage || '' // Гарантируем, что thumbnailImage не undefined
@@ -729,11 +687,6 @@ export class UICanvasEditor {
       throw new Error('Canvas not initialized');
     }
 
-    logger.info('Restoring canvas state', {
-      objectsCount: savedData.canvas?.objects?.length || 0,
-      hasSelectedItems: !!savedData.selected_items
-    });
-
     // Очищаем canvas
     this.fabricCanvas.clear();
     // Используем сохраненный фон или цвет по умолчанию
@@ -742,7 +695,7 @@ export class UICanvasEditor {
 
     // Если нет объектов для отрисовки
     if (!savedData.canvas?.objects || savedData.canvas.objects.length === 0) {
-      logger.warn('No objects to restore in canvas');
+      logger.error('No objects to restore in canvas');
       return;
     }
 
@@ -766,13 +719,13 @@ export class UICanvasEditor {
       } else if (savedData.selected_items && savedData.selected_items[i]) {
         wardrobeItem = savedData.selected_items[i];
       } else {
-        logger.warn('No wardrobe item found for canvas object', { index: i, objData });
+        logger.error('No wardrobe item found for canvas object', { index: i, objData });
         continue;
       }
 
       // Проверяем что wardrobeItem не null
       if (!wardrobeItem) {
-        logger.warn('Wardrobe item is null, skipping', { index: i });
+        logger.error('Wardrobe item is null, skipping', { index: i });
         continue;
       }
 
@@ -785,7 +738,7 @@ export class UICanvasEditor {
           angle: objData.angle || 0
         });
       } catch (error) {
-        logger.warn('Failed to restore canvas item, skipping', {
+        logger.error('Failed to restore canvas item, skipping', {
           index: i,
           itemId: wardrobeItem.id,
           error: error instanceof Error ? error.message : String(error)
@@ -830,7 +783,7 @@ export class UICanvasEditor {
    */
   async removeItemById(itemId: number): Promise<boolean> {
     if (!this.fabricCanvas) {
-      logger.warn('Canvas not initialized');
+      logger.error('Canvas not initialized');
       return false;
     }
 
@@ -926,19 +879,16 @@ export class UICanvasEditor {
     this.fabricCanvas.on('object:modified', () => {
       // Отправляем событие об изменении canvas
       window.dispatchEvent(new CustomEvent('canvas:modified'));
-      logger.debug('Canvas modified - object changed');
     });
 
     this.fabricCanvas.on('object:added', () => {
       // Отправляем событие об изменении canvas
       window.dispatchEvent(new CustomEvent('canvas:modified'));
-      logger.debug('Canvas modified - object added');
     });
 
     this.fabricCanvas.on('object:removed', () => {
       // Отправляем событие об изменении canvas
       window.dispatchEvent(new CustomEvent('canvas:modified'));
-      logger.debug('Canvas modified - object removed');
     });
 
     logger.info('Selection and modification handlers configured');
@@ -977,7 +927,6 @@ export class UICanvasEditor {
         if (this.fabricCanvas) {
           this.fabricCanvas.discardActiveObject();
           this.fabricCanvas.renderAll();
-          logger.debug('Active object discarded before saving');
         }
 
         this.config.onNext!();
@@ -1005,7 +954,6 @@ export class UICanvasEditor {
       imageObj.crossOrigin = 'anonymous';
 
       imageObj.onload = () => {
-        logger.debug('Image loaded successfully', { url });
         resolve(imageObj);
       };
 
@@ -1079,13 +1027,6 @@ export class UICanvasEditor {
 
     // Добавляем изображение на canvas
     this.fabricCanvas.add(fabricImg);
-
-    logger.debug('Image added to canvas', {
-      itemId: item.id,
-      position: { x, y },
-      scale,
-      angle
-    });
   }
 
   /**
@@ -1280,7 +1221,7 @@ export class UICanvasEditor {
       const ctx = canvasElement.getContext('2d');
 
       if (!ctx) {
-        logger.warn('Cannot get canvas context for cropping');
+        logger.error('Cannot get canvas context for cropping');
         return null;
       }
 
@@ -1328,7 +1269,7 @@ export class UICanvasEditor {
 
       // Проверяем что нашли содержимое
       if (minX >= maxX || minY >= maxY) {
-        logger.warn('No content found on canvas for cropping');
+        logger.error('No content found on canvas for cropping');
         return null;
       }
 
@@ -1342,13 +1283,6 @@ export class UICanvasEditor {
       const croppedWidth = maxX - minX + 1;
       const croppedHeight = maxY - minY + 1;
 
-      logger.info('Cropping canvas to content', {
-        original: { width, height },
-        bounds: { minX, minY, maxX, maxY },
-        cropped: { width: croppedWidth, height: croppedHeight },
-        padding
-      });
-
       // Создаем новый canvas для обрезанного изображения
       const croppedCanvas = document.createElement('canvas');
       croppedCanvas.width = croppedWidth;
@@ -1356,7 +1290,7 @@ export class UICanvasEditor {
       const croppedCtx = croppedCanvas.getContext('2d');
 
       if (!croppedCtx) {
-        logger.warn('Cannot create cropped canvas context');
+        logger.error('Cannot create cropped canvas context');
         return null;
       }
 
@@ -1391,18 +1325,9 @@ export class UICanvasEditor {
       throw new Error('No canvas available');
     }
 
-    logger.info('canvasToImage called', { removeBackground });
-
     // НЕ делаем фон прозрачным - сохраняем градиент!
     // Автоматически обрезаем canvas по содержимому с отступом 25px
     const croppedCanvas = this.cropCanvasToContent(100);
-
-    logger.info('Canvas size', {
-      width: this.fabricCanvas.width,
-      height: this.fabricCanvas.height,
-      objectsCount: this.fabricCanvas.getObjects().length,
-      backgroundColor: 'transparent (temp)'
-    });
 
     // ДЕЛЕГИРОВАНИЕ: используем ImageProcessingService для конвертации canvas
     // Используем обрезанный canvas если он есть, иначе оригинальный
@@ -1415,14 +1340,12 @@ export class UICanvasEditor {
     // Удаляем фон только если это необходимо (например, для AI-generated капсул)
     if (removeBackground) {
       try {
-        logger.info('Sending canvas to background removal via ImageProcessingService');
-
         // ДЕЛЕГИРОВАНИЕ: используем ImageProcessingService для удаления фона
         const processedImage = await imageProcessingService.removeBackground(canvasBase64);
 
         // Проверяем что результат не пустой (base64 изображения обычно длиннее 1000 символов)
         if (!processedImage || processedImage.length < 1000) {
-          logger.warn('Background removal returned empty or invalid image, using original', {
+          logger.error('Background removal returned empty or invalid image, using original', {
             resultLength: processedImage?.length || 0
           });
           return canvasBase64 || '';

@@ -8,6 +8,6 @@ Do not deviate from this structure:
 6. [Style (casual, business, office, sport, streetwear, etc.)]
 7. [Season (spring, summer, autumn, winter, all-season)]
 8. [Pattern (solid, striped, checkered, floral, graphic, printed, etc.)]
-9. [Describe clothing in one sentence]
+9. [Describe clothing type, color, material, fit, style, season in one sentence]
 
 IMPORTANT: You must respond with exactly 9 numbered lines. Each line must start with the number and a period (1., 2., etc.).

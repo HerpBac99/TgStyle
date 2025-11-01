@@ -63,7 +63,6 @@ export class ModalService {
    * @param type - Тип модального окна (wardrobe, canvas, generic)
    */
   showLoading(config: LoadingConfig, type: LoadingModalType = 'generic'): void {
-    logger.info('Showing loading modal', { type, message: config.message });
 
     // Скрываем предыдущее loading окно если есть
     if (this.activeLoadingModal) {
@@ -123,13 +122,11 @@ export class ModalService {
    */
   hideLoading(): void {
     if (!this.activeLoadingModal) {
-      logger.warn('No active loading modal to hide');
+      logger.error('No active loading modal to hide');
       return;
     }
 
     const { type, element } = this.activeLoadingModal;
-
-    logger.info('Hiding loading modal', { type });
 
     // Скрываем элемент
     element.classList.add('hidden');
@@ -200,7 +197,7 @@ export class ModalService {
 
     // Проверяем, не показано ли уже это модальное окно
     if (this.activeModals.has(config.id)) {
-      logger.warn('Modal already shown', { id: config.id });
+      logger.error('Modal already shown', { id: config.id });
       return;
     }
 
@@ -236,7 +233,7 @@ export class ModalService {
     const modalElement = this.activeModals.get(modalId);
 
     if (!modalElement) {
-      logger.warn('Modal not found in active modals', { id: modalId });
+      logger.error('Modal not found in active modals', { id: modalId });
       
       // Попробуем найти в DOM
       const element = document.getElementById(modalId);

@@ -38,11 +38,6 @@ export class PublicFeedManager {
         localStorage.removeItem(this.cacheKey);
         return null;
       }
-
-      logger.info('Loaded public feed from cache', { 
-        count: data.capsules.length,
-        age: Math.round((now - data.timestamp) / 1000) + 's'
-      });
       
       return data.capsules;
     } catch (error) {
@@ -72,8 +67,6 @@ export class PublicFeedManager {
    */
   async open(): Promise<void> {
     try {
-      logger.info('Opening public feed');
-
       // Инициализируем UI компонент
       if (!this.uiFeed) {
         this.uiFeed = new UIPublicFeed({
@@ -92,7 +85,6 @@ export class PublicFeedManager {
 
     } catch (error) {
       logger.error('Error opening public feed', error);
-      alert('Не удалось загрузить ленту');
     }
   }
 
@@ -100,8 +92,6 @@ export class PublicFeedManager {
    * Закрыть ленту
    */
   close(): void {
-    logger.info('Closing public feed');
-
     if (this.uiFeed) {
       this.uiFeed.hide();
     }
@@ -121,7 +111,6 @@ export class PublicFeedManager {
       if (cachedCapsules && cachedCapsules.length > 0) {
         if (this.uiFeed) {
           this.uiFeed.render(cachedCapsules, false);
-          logger.info('Rendered feed from cache instantly');
         }
       } else if (this.uiFeed) {
         this.uiFeed.showLoading(true);
@@ -165,7 +154,6 @@ export class PublicFeedManager {
    */
   private async loadMore(): Promise<void> {
     if (this.isLoading || !this.hasMore) {
-      logger.info('Skipping loadMore', { isLoading: this.isLoading, hasMore: this.hasMore });
       return;
     }
 
@@ -206,16 +194,10 @@ export class PublicFeedManager {
    * Обработка просмотра капсулы
    */
   private handleViewCapsule(capsule: PublicCapsule): void {
-    logger.info('Viewing capsule from feed', { 
-      capsuleId: capsule.id,
-      capsuleName: capsule.name,
-      hasThumbnail: !!capsule.thumbnailUrl
-    });
 
     // Проверяем наличие изображения
     if (!capsule.thumbnailUrl) {
-      logger.warn('No thumbnail for capsule', { capsuleId: capsule.id });
-      alert('У этой капсулы нет изображения');
+      logger.error('No thumbnail for capsule', { capsuleId: capsule.id });
       return;
     }
 

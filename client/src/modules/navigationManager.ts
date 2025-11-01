@@ -108,7 +108,7 @@ export class NavigationManager {
    */
   private handleBackButtonClick(): void {
     if (this.stack.length === 0) {
-      logger.warn('BackButton clicked but stack is empty');
+      logger.error('BackButton clicked but stack is empty');
       return;
     }
 
@@ -144,7 +144,7 @@ export class NavigationManager {
       const tg = (window as any).Telegram?.WebApp;
       
       if (!tg) {
-        logger.warn('Telegram WebApp not available, cannot show BackButton');
+        logger.error('Telegram WebApp not available, cannot show BackButton');
         return;
       }
 

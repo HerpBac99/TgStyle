@@ -127,13 +127,6 @@ class TgStyleApp {
       const response = await api.get(apiUrl);
 
       if ((response as any).success && (response as any).data) {
-        logger.info('Shared analysis loaded from server', {
-          analysisId,
-          hasPhoto: !!(response as any).data.photo,
-          hasAnalysis: !!(response as any).data.analysis,
-          historyItemId: (response as any).data.historyItemId
-        });
-
         const data = (response as any).data;
 
         await uiManager.showSharedAnalysis(
@@ -169,13 +162,6 @@ class TgStyleApp {
       const response = await api.get(apiUrl);
 
       if ((response as any).success && (response as any).data) {
-        logger.info('Shared capsule loaded from server', {
-          capsuleId,
-          hasImage: !!(response as any).data.thumbnailUrl,
-          hasCanvasData: !!(response as any).data.canvasData,
-          itemsCount: (response as any).data.items?.length || 0
-        });
-
         const data = (response as any).data;
 
         await uiManager.showSharedCapsule(
@@ -229,11 +215,6 @@ class TgStyleApp {
 
       // Завершаем инициализацию
       this.completeInitialization();
-
-      logger.info('TgStyle application initialized successfully', {
-        initTime: Date.now() - this.initStartTime + 'ms',
-      });
-
     } catch (error) {
       logger.error('Failed to initialize TgStyle application', error);
       this.handleInitializationError(error);
@@ -309,10 +290,6 @@ class TgStyleApp {
 
     // Обработка изменения размера окна
     window.addEventListener('resize', () => {
-      logger.debug('Window resized', {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
     });
 
     // Обработка изменения ориентации
@@ -377,17 +354,9 @@ class TgStyleApp {
    */
   private optimisticUIRender(): void {
     try {
-      const startTime = performance.now();
-
       // Мгновенно отрисовываем карусель, используя данные из localStorage,
       // которые уже были загружены в конструкторе historyManager.
       uiManager.updateHistoryDisplay();
-
-      const renderTime = performance.now() - startTime;
-      logger.info('⚡ Optimistic UI render completed from cache', {
-        renderTime: `${renderTime.toFixed(2)}ms`,
-        historyItems: historyManager.getFilledCount()
-      });
     } catch (error) {
       logger.warn('Failed to perform optimistic UI render', error);
     }
@@ -398,18 +367,12 @@ class TgStyleApp {
    */
   private async performAuthentication(): Promise<void> {
     const authStartTime = performance.now();
-    logger.info('⏱️ Starting authentication');
 
     try {
       const authResponse = await authManager.authenticate();
       const authDuration = performance.now() - authStartTime;
 
       if (authResponse.success) {
-        logger.info('✅ Authentication successful', {
-          duration: `${authDuration.toFixed(2)}ms`,
-          analysesLeft: authResponse.user?.analysesLeft
-        });
-
         // Отправляем событие успешной авторизации
         this.dispatchAppEvent(APP_EVENTS.AUTH_SUCCESS, authResponse.user);
       } else {
@@ -438,8 +401,6 @@ class TgStyleApp {
    * Остальное грузится по требованию (lazy loading)
    */
   private preloadAppData(): void {
-    logger.info('Starting app data preload in background');
-
     Promise.allSettled([
       dataCacheManager.preloadData().catch(err => {
         logger.error('Error during data preload', err);
@@ -474,13 +435,6 @@ class TgStyleApp {
       });
       return;
     }
-
-    // Если истории много, загружаем только метаданные для синхронизации лайков
-    logger.info('Background metadata sync decision', {
-      filledSlots: stats.filledSlots,
-      willSync: true,
-      reason: 'Syncing likes without reloading images'
-    });
 
     try {
       const initData = window.Telegram?.WebApp?.initData || '';
@@ -520,13 +474,6 @@ class TgStyleApp {
     this.dispatchAppEvent(APP_EVENTS.READY, {
       initTime: Date.now() - this.initStartTime,
       features: APP_CONFIG.features,
-    });
-
-    // Логируем статистику всех модулей
-    this.logModulesStats();
-
-    logger.info('✅ TgStyle application fully initialized', {
-      totalTime: `${Date.now() - this.initStartTime}ms`
     });
   }
 
@@ -579,24 +526,6 @@ class TgStyleApp {
     });
 
     window.dispatchEvent(event);
-  }
-
-  /**
-   * Логирование статистики модулей
-   */
-  private logModulesStats(): void {
-    try {
-      const stats = {
-        auth: authManager.getAuthStats(),
-        history: historyManager.getStats(),
-        ui: uiManager.getStats(),
-        logger: logger.getStats(),
-      };
-
-      logger.info('Modules statistics', stats);
-    } catch (error) {
-      logger.warn('Error collecting modules stats', error);
-    }
   }
 
   /**

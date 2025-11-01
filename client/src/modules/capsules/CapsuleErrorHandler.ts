@@ -114,7 +114,6 @@ export class CapsuleErrorHandler {
    * @param operation - Название операции
    */
   static showUserError(error: unknown, operation: string): void {
-    // ВАЖНО: НЕ показываем alert пользователю!
     // Только логируем ошибку для отладки
     const userMessage = this.getUserFriendlyMessage(error, operation);
     logger.warn('Error occurred (not shown to user)', { 
@@ -122,11 +121,6 @@ export class CapsuleErrorHandler {
       userMessage,
       error: error instanceof Error ? error.message : String(error)
     });
-    
-    // Не показываем alert - пользователь не должен видеть технические ошибки
-    // this.modalService.showAlert(userMessage).catch(err => {
-    //   logger.error('Failed to show error alert', { error: err });
-    // });
   }
 
   /**
@@ -252,9 +246,7 @@ export class CapsuleErrorHandler {
     context: ErrorContext
   ): Promise<T> {
     try {
-      logger.debug(`Starting operation: ${context.operation}`, context);
       const result = await operation();
-      logger.debug(`Operation completed: ${context.operation}`);
       return result;
     } catch (error) {
       this.handle(error, context);

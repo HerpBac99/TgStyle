@@ -63,8 +63,6 @@ export class CapsuleSelectionManager {
     return new Promise(async (resolve) => {
       await CapsuleErrorHandler.handleWithFallback(
         async () => {
-          logger.info('Showing capsule selection modal', { preselectedIds });
-
           // Сбрасываем состояние
           this.selectedItems = [];
           this.isVisible = true;
@@ -162,7 +160,6 @@ export class CapsuleSelectionManager {
    * Скрыть модальное окно
    */
   hide(): void {
-    logger.info('Hiding capsule selection modal');
 
     const modal = document.getElementById(this.config.modalId!);
     if (modal) {
@@ -333,13 +330,6 @@ export class CapsuleSelectionManager {
    * Обработчик подтверждения выбора
    */
   onConfirm(): void {
-    logger.info('Selection confirmed', {
-      selectedCount: this.selectedItems.length,
-      items: this.selectedItems.map(item => ({ 
-        id: item.id, 
-        category: item.category 
-      }))
-    });
 
     // Вызываем callback если есть
     if (this.config.onConfirm) {
@@ -372,11 +362,6 @@ export class CapsuleSelectionManager {
     if (nextBtn) {
       const hasSelection = this.selectedItems.length > 0;
       nextBtn.disabled = !hasSelection;
-      
-      logger.debug('Next button state updated', { 
-        disabled: !hasSelection,
-        selectedCount: this.selectedItems.length 
-      });
     }
   }
 
@@ -449,7 +434,6 @@ export class CapsuleSelectionManager {
    */
   updateConfig(newConfig: Partial<CapsuleSelectionConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    logger.info('CapsuleSelectionManager config updated');
   }
 
   /**

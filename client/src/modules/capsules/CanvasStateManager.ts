@@ -35,8 +35,6 @@ export class CanvasStateManager {
   async saveState(canvasEditor: UICanvasEditor, cacheKey?: string): Promise<CanvasState> {
     return await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Saving canvas state with auto-crop', { cacheKey });
-
         // Получаем состояние из canvas editor (с автоматической обрезкой)
         const editorState = await canvasEditor.getState(false);
         
@@ -56,12 +54,6 @@ export class CanvasStateManager {
         if (cacheKey) {
           this.cache.set(cacheKey, state);
           this.thumbnailCache.set(cacheKey, state.thumbnailImage);
-          
-          logger.debug('Canvas state cached', {
-            cacheKey,
-            itemsCount: itemIds.length,
-            thumbnailSize: state.thumbnailImage?.length || 0
-          });
         }
 
         logger.info('Canvas state saved successfully', {
@@ -136,7 +128,6 @@ export class CanvasStateManager {
         if (useCache && cacheKey) {
           const cached = this.thumbnailCache.get(cacheKey);
           if (cached) {
-            logger.debug('Thumbnail loaded from cache', { cacheKey });
             return cached;
           }
         }
@@ -150,10 +141,6 @@ export class CanvasStateManager {
         // Кэшируем если указан ключ
         if (cacheKey) {
           this.thumbnailCache.set(cacheKey, thumbnail);
-          logger.debug('Thumbnail cached', {
-            cacheKey,
-            size: thumbnail.length
-          });
         }
 
         return thumbnail;
@@ -177,14 +164,7 @@ export class CanvasStateManager {
    */
   getCachedState(cacheKey: string): CanvasState | undefined {
     const state = this.cache.get(cacheKey);
-    
-    if (state) {
-      logger.debug('Canvas state loaded from cache', {
-        cacheKey,
-        age: Date.now() - state.timestamp
-      });
-    }
-    
+
     return state;
   }
 
@@ -209,8 +189,6 @@ export class CanvasStateManager {
     if (state) {
       state.isDirty = true;
       this.cache.set(cacheKey, state);
-      
-      logger.debug('Canvas state marked as dirty', { cacheKey });
     }
   }
 
@@ -273,19 +251,8 @@ export class CanvasStateManager {
    * @param cacheKey - Ключ кэша
    */
   clearCacheForKey(cacheKey: string): void {
-    const hadState = this.cache.has(cacheKey);
-    const hadThumbnail = this.thumbnailCache.has(cacheKey);
-
     this.cache.delete(cacheKey);
     this.thumbnailCache.delete(cacheKey);
-
-    if (hadState || hadThumbnail) {
-      logger.debug('Cache cleared for key', {
-        cacheKey,
-        hadState,
-        hadThumbnail
-      });
-    }
   }
 
   /**

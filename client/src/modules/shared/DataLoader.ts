@@ -39,7 +39,6 @@ export class DataLoader {
           logger.info('DataLoader: Cache ready, using cached data', { count: loadedData.length });
           return loadedData;
         }
-        logger.warn('DataLoader: Cache still loading after timeout, fallback to server');
       }
 
       // Если кэш загружен но пустой

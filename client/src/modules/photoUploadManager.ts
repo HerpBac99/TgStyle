@@ -41,7 +41,6 @@ export class PhotoUploadManager {
    */
   async handlePhotoUpload(): Promise<void> {
     try {
-      logger.info('Starting photo upload process');
 
       // Создаем input для выбора файла
       const input = document.createElement('input');
@@ -51,7 +50,6 @@ export class PhotoUploadManager {
 
       input.onchange = async (event) => {
         try {
-          logger.info('Input onchange triggered');
           const target = event.target as HTMLInputElement;
           const file = target.files?.[0];
 
@@ -63,7 +61,7 @@ export class PhotoUploadManager {
               await this.handler.processPhotoWithBackgroundRemoval(file);
             }
           } else {
-            logger.warn('No file selected');
+            logger.error('No file selected');
           }
         } catch (error) {
           logger.error('Error in photo upload onchange handler', error);
@@ -98,23 +96,6 @@ export class PhotoUploadManager {
 
     // Fallback
     return ClothingCategory.BODYWEAR;
-  }
-
-  /**
-   * Получить русское название категории
-   */
-  getCategoryNameRu(category: ClothingCategory): string {
-    const names: Record<ClothingCategory, string> = {
-      [ClothingCategory.OUTERWEAR]: 'Верхняя одежда',
-      [ClothingCategory.INNERWEAR]: 'Кофты',
-      [ClothingCategory.BODYWEAR]: 'Футболки и рубашки',
-      [ClothingCategory.FULLBODY]: 'Платья и костюмы',
-      [ClothingCategory.LEGWEAR]: 'Брюки',
-      [ClothingCategory.FOOTWEAR]: 'Обувь',
-      [ClothingCategory.HEADWEAR]: 'Головные уборы',
-      [ClothingCategory.ACCESSORIES]: 'Аксессуары'
-    };
-    return names[category] || category;
   }
 }
 

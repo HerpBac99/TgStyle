@@ -333,7 +333,6 @@ export class GenerationModal {
    * Уничтожить модальное окно
    */
   destroy(): void {
-    logger.info('Destroying GenerationModal');
     this.cleanup();
     this.currentCapsules = [];
     this.callbacks = {};

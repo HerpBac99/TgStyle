@@ -61,8 +61,6 @@ class ImageProcessingService {
    */
   async removeBackground(imageBase64: string): Promise<string> {
     try {
-      logger.info('ImageProcessingService: Removing background');
-
       const result = await api.removeBackground(imageBase64) as any;
 
       if (!result.success) {
@@ -164,9 +162,7 @@ class ImageProcessingService {
    */
   async addWatermark(imageBase64: string): Promise<string> {
     try {
-      logger.info('ImageProcessingService: Adding watermark');
       const result = await addWatermark(imageBase64);
-      logger.info('ImageProcessingService: Watermark added successfully');
       return result;
     } catch (error) {
       logger.error('ImageProcessingService: Error adding watermark', error);
@@ -184,7 +180,6 @@ class ImageProcessingService {
    */
   async processForSave(imageBase64: string): Promise<ProcessedImage> {
     try {
-      logger.info('ImageProcessingService: Processing image for save');
 
       // 1. Оптимизируем для классификации (меньший размер для быстрой передачи)
       const optimizedForClassification = await this.optimizeImage(imageBase64, {
@@ -223,12 +218,6 @@ class ImageProcessingService {
         metadata
       };
 
-      logger.info('ImageProcessingService: Image processed for save', {
-        originalSizeKB: Math.round(metadata.originalSize / 1024),
-        processedSizeKB: Math.round(metadata.processedSize / 1024),
-        thumbnailSizeKB: Math.round(metadata.thumbnailSize / 1024)
-      });
-
       return result;
 
     } catch (error) {
@@ -250,7 +239,6 @@ class ImageProcessingService {
       // Проверяем кэш
       const cacheKey = this.getCacheKey(imageBase64);
       if (useCache && this.cache.has(cacheKey)) {
-        logger.info('ImageProcessingService: Using cached processed image');
         return this.cache.get(cacheKey)!;
       }
 
@@ -287,13 +275,6 @@ class ImageProcessingService {
 
       // Сохраняем в кэш
       this.addToCache(cacheKey, result);
-
-      logger.info('ImageProcessingService: Image processed for share', {
-        originalSizeKB: Math.round(metadata.originalSize / 1024),
-        processedSizeKB: Math.round(metadata.processedSize / 1024),
-        thumbnailSizeKB: Math.round(metadata.thumbnailSize / 1024),
-        cached: useCache
-      });
 
       return result;
 
@@ -398,10 +379,6 @@ class ImageProcessingService {
     }
 
     this.imageCache.set(key, imageBase64);
-    logger.debug('ImageProcessingService: Image cached', {
-      key,
-      cacheSize: this.imageCache.size
-    });
   }
 
   /**
@@ -412,9 +389,6 @@ class ImageProcessingService {
    */
   getCachedImage(key: string): string | undefined {
     const cached = this.imageCache.get(key);
-    if (cached) {
-      logger.debug('ImageProcessingService: Image loaded from cache', { key });
-    }
     return cached;
   }
 
@@ -425,17 +399,12 @@ class ImageProcessingService {
    */
   clearCachedImage(key: string): void {
     this.imageCache.delete(key);
-    logger.debug('ImageProcessingService: Image removed from cache', { key });
   }
 
   /**
    * Очистить кэш
    */
   clearCache(): void {
-    logger.info('ImageProcessingService: Clearing cache', {
-      cachedItems: this.cache.size,
-      cachedImages: this.imageCache.size
-    });
     this.cache.clear();
     this.imageCache.clear();
   }
@@ -474,13 +443,6 @@ class ImageProcessingService {
         format = 'png'
       } = config;
 
-      logger.info('ImageProcessingService: Converting canvas to base64', {
-        width: canvas.width,
-        height: canvas.height,
-        format,
-        quality
-      });
-
       // Конвертируем canvas в base64
       const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
       const base64 = canvas.toDataURL(mimeType, quality);
@@ -505,7 +467,6 @@ class ImageProcessingService {
    */
   async fabricCanvasToImage(fabricCanvas: any): Promise<string> {
     try {
-      logger.info('ImageProcessingService: Converting Fabric canvas to image');
 
       // Получаем canvas element
       const canvasElement = fabricCanvas.getElement() as HTMLCanvasElement;

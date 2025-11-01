@@ -137,11 +137,6 @@ export class CapsulesManager implements PhotoUploadHandler {
         // Показываем грид без анимации
         this.capsulesGrid.show();
         this.capsulesGrid.render(this.capsules, false);
-
-        logger.info('Capsules opened', {
-          count: this.capsules.length,
-          cacheStats: this.stateManager.getCacheStats()
-        });
       },
       () => {
         // Fallback: показываем грид с пустым массивом (без анимации при ошибке)
@@ -157,8 +152,6 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Закрыть capsules полностью
    */
   closeCapsules(): void {
-    logger.info('Closing capsules');
-
     // Отменяем flow если активен
     this.flowManager.cancel();
 
@@ -173,7 +166,6 @@ export class CapsulesManager implements PhotoUploadHandler {
    */
   private cleanupCanvas(): void {
     if (this.canvasEditor) {
-      logger.info('Cleaning up canvas editor');
 
       // Очищаем canvas
       this.canvasEditor.hide();
@@ -198,7 +190,6 @@ export class CapsulesManager implements PhotoUploadHandler {
   private async handleAddCapsuleClick(): Promise<void> {
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Starting new capsule creation');
 
         // Скрываем грид
         this.capsulesGrid.hide();
@@ -221,8 +212,6 @@ export class CapsulesManager implements PhotoUploadHandler {
   private async showSelectionModal(): Promise<void> {
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Showing selection modal for new capsule');
-
         // Получаем уже выбранные элементы из flowManager (для возврата с канваса)
         const currentSelectedItems = this.flowManager.getSelectedItems();
         const preselectedIds = currentSelectedItems.map(item => item.id);
@@ -263,10 +252,6 @@ export class CapsulesManager implements PhotoUploadHandler {
   ): Promise<WardrobeItem[]> {
     return await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Showing item selection', {
-          context,
-          preselectedCount: preselectedIds?.length || 0
-        });
 
         // ДЕЛЕГИРУЕМ в CapsuleSelectionManager
         const selectedItems = await this.selectionManager.show(preselectedIds);
@@ -280,7 +265,7 @@ export class CapsulesManager implements PhotoUploadHandler {
       },
       () => {
         // Fallback: возвращаем пустой массив
-        logger.warn('Item selection failed, returning empty array');
+        logger.error('Item selection failed, returning empty array');
         return [];
       },
       CapsuleErrorHandler.createContext('Выбор вещей', {
@@ -299,7 +284,6 @@ export class CapsulesManager implements PhotoUploadHandler {
   private async handleViewCapsule(capsuleId: number): Promise<void> {
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Starting capsule view', { capsuleId });
 
         this.capsulesGrid.hide();
 
@@ -346,7 +330,6 @@ export class CapsulesManager implements PhotoUploadHandler {
   private async handleEditCapsuleWithCleanup(capsuleId: number): Promise<void> {
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Starting capsule edit with cleanup', { capsuleId });
 
         // ПРИНУДИТЕЛЬНАЯ ОЧИСТКА: Всегда очищаем canvas перед загрузкой новой капсулы
         this.cleanupCanvas();
@@ -369,7 +352,6 @@ export class CapsulesManager implements PhotoUploadHandler {
   private async handleEditCapsule(capsuleId: number): Promise<void> {
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Starting capsule edit', { capsuleId });
 
         // ДЕЛЕГИРУЕМ управление flow в CapsuleFlowManager
         await this.flowManager.editCapsule(capsuleId);
@@ -451,8 +433,6 @@ export class CapsulesManager implements PhotoUploadHandler {
   private async handleGeneratedCapsule(capsule: GeneratedCapsule, allCapsules: GeneratedCapsule[]): Promise<void> {
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Handling generated capsule', { name: capsule.name, totalCapsules: allCapsules.length });
-
         // Сохраняем все сгенерированные капсулы для возможности возврата
         this.currentGeneratedCapsules = allCapsules;
 
@@ -521,12 +501,10 @@ export class CapsulesManager implements PhotoUploadHandler {
    */
   private showGenerationModal(): void {
     if (!this.currentGeneratedCapsules || this.currentGeneratedCapsules.length === 0) {
-      logger.warn('No generated capsules to show, returning to grid');
+      logger.error('No generated capsules to show, returning to grid');
       this.capsulesGrid.show();
       return;
     }
-
-    logger.info('Showing generation modal with capsules', { count: this.currentGeneratedCapsules.length });
 
     // Получаем доступ к generationModal через capsulesGrid
     // Используем метод грида для показа модала
@@ -552,6 +530,15 @@ export class CapsulesManager implements PhotoUploadHandler {
       (this.capsulesGrid as any).handleGenerate();
     });
 
+    // ИСПРАВЛЕНО: Настраиваем callback для отмены/закрытия модального окна
+    (this.capsulesGrid as any).generationModal.onCancel(() => {
+      logger.info('Generation modal cancelled/closed from CapsulesManager');
+      (this.capsulesGrid as any).generationModal.hide();
+
+      // Возвращаемся к гриду капсул
+      this.capsulesGrid.show();
+    });
+
     // ИСПРАВЛЕНО: Удаляем обработчик BackButton, чтобы кнопка закрывала приложение
     // Удаляем предыдущий обработчик BackButton (возврат к модалу)
     navigationManager.pop();
@@ -572,7 +559,6 @@ export class CapsulesManager implements PhotoUploadHandler {
   private async showCanvas(): Promise<void> {
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Showing canvas');
 
         // Инициализируем canvas если нужно
         if (!this.canvasEditor) {
@@ -636,7 +622,6 @@ export class CapsulesManager implements PhotoUploadHandler {
    * SINGLETON: Использует UICanvasEditor.getInstance()
    */
   private initializeCanvasEditor(): void {
-    logger.debug('initializeCanvasEditor called');
 
     // SINGLETON: Получаем единственный экземпляр
     this.canvasEditor = UICanvasEditor.getInstance({
@@ -647,7 +632,6 @@ export class CapsulesManager implements PhotoUploadHandler {
       onItemDeleted: (itemId: number) => this.handleCanvasItemDeleted(itemId)
     });
 
-    logger.debug('Canvas editor singleton obtained');
     this.canvasEditor.show();
     this.canvasEditor.initializeCanvas();
   }
@@ -660,7 +644,6 @@ export class CapsulesManager implements PhotoUploadHandler {
     try {
       // Если находимся на канвасе, сохраняем его состояние
       if (this.flowManager.getCurrentStep() === 'canvas' && this.canvasEditor) {
-        logger.info('Saving canvas state before going back');
 
         // Сохраняем состояние канваса в stateManager
         await this.stateManager.saveState(this.canvasEditor, 'temp-canvas');
@@ -699,7 +682,6 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Синхронизирует состояние flowManager с актуальным состоянием канваса
    */
   private handleCanvasItemDeleted(itemId: number): void {
-    logger.info('Item deleted from canvas, updating flowManager', { itemId });
 
     // Получаем текущие выбранные элементы из flowManager
     const currentSelectedItems = this.flowManager.getSelectedItems();
@@ -962,7 +944,7 @@ export class CapsulesManager implements PhotoUploadHandler {
     const resultImage = this.flowManager.getResultImage();
 
     if (!resultImage) {
-      logger.warn('No result image to save');
+      logger.error('No result image to save');
       return;
     }
 
@@ -995,7 +977,7 @@ export class CapsulesManager implements PhotoUploadHandler {
     const resultImage = this.flowManager.getResultImage();
 
     if (!resultImage) {
-      logger.warn('No result image to share');
+      logger.error('No result image to share');
       return;
     }
 
@@ -1004,11 +986,6 @@ export class CapsulesManager implements PhotoUploadHandler {
         const capsuleId = this.flowManager.getCapsuleId();
         const capsule = this.capsules.find(c => c.id === capsuleId);
         const capsuleName = capsule?.name || `Капсула ${new Date().toLocaleDateString()}`;
-
-        logger.info('Sharing capsule from result screen', {
-          id: capsuleId,
-          name: capsuleName
-        });
 
         // Используем финальное изображение с watermark
         const success = await capsulesSharing.shareCapsule(
@@ -1038,8 +1015,6 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Сохранить капсулу при нажатии "Далее" на canvas
    */
   private async saveCapsuleFromCanvas(state: any): Promise<void> {
-    logger.info('Saving capsule from canvas');
-
     const capsuleId = this.flowManager.getCapsuleId();
     const metadata = this.flowManager.getMetadata();
 
@@ -1107,7 +1082,6 @@ export class CapsulesManager implements PhotoUploadHandler {
 
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Saving capsule from result screen');
 
         // ДЕЛЕГИРУЕМ в ModalService
         await this.modalSvc.executeWithLoading(
@@ -1200,16 +1174,13 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Вызывается из CapsuleFlowManager при complete()
    */
   private handleFlowComplete(): void {
-    logger.info('Flow completed');
 
     // Очищаем кэш временной капсулы после успешного сохранения
     this.stateManager.clearCacheForKey('temp-canvas');
-    logger.info('Temporary canvas cache cleared after successful save');
 
     // Очищаем канвас после успешного сохранения
     if (this.canvasEditor) {
       this.canvasEditor.clear();
-      logger.info('Canvas cleared after successful save');
       this.canvasEditor.hide();
     }
 
@@ -1230,16 +1201,13 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Вызывается из CapsuleFlowManager при cancel()
    */
   private handleFlowCancel(): void {
-    logger.info('Flow cancelled');
 
     // Очищаем кэш временной капсулы при отмене
     this.stateManager.clearCacheForKey('temp-canvas');
-    logger.info('Temporary canvas cache cleared on flow cancel');
 
     // Очищаем канвас от всех объектов при отмене
     if (this.canvasEditor) {
       this.canvasEditor.clear();
-      logger.info('Canvas cleared on flow cancel');
       this.canvasEditor.hide();
     }
 
@@ -1307,7 +1275,6 @@ export class CapsulesManager implements PhotoUploadHandler {
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
         const base64 = await fileToBase64(file);
-        logger.info('Processing photo with background removal');
 
         // ДЕЛЕГИРУЕМ в ModalService
         this.modalSvc.showLoading({ message: 'Загрузка...' }, 'wardrobe');
@@ -1382,7 +1349,6 @@ export class CapsulesManager implements PhotoUploadHandler {
   async handleWardrobePhotoUpload(): Promise<void> {
     await CapsuleErrorHandler.handleWithFallback(
       async () => {
-        logger.info('Starting wardrobe photo upload process via event');
 
         // Отправляем событие запроса на загрузку фото
         window.dispatchEvent(new CustomEvent('wardrobe:photo-upload-requested', {
@@ -1522,11 +1488,6 @@ export class CapsulesManager implements PhotoUploadHandler {
       const cacheKey = capsuleId ? `capsule-${capsuleId}` : `temp-canvas`;
 
       this.stateManager.markDirty(cacheKey);
-
-      logger.debug('Canvas state marked as dirty after modification', {
-        cacheKey,
-        step: this.flowManager.getCurrentStep()
-      });
     }
   }
 
@@ -1551,7 +1512,6 @@ export class CapsulesManager implements PhotoUploadHandler {
    * Очистка ресурсов
    */
   destroy(): void {
-    logger.info('Destroying CapsulesManager');
 
     this.closeCapsules();
 

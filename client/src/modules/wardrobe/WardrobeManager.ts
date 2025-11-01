@@ -36,8 +36,7 @@ export class WardrobeManager implements PhotoUploadHandler {
 
     // Подписываемся на событие запроса загрузки фото
     window.addEventListener('wardrobe:photo-upload-requested', ((event: CustomEvent) => {
-      const { source, onItemAdded } = event.detail;
-      logger.info('Photo upload requested via event', { source });
+      const { onItemAdded } = event.detail;
       this.handlePhotoUpload(onItemAdded);
     }) as EventListener);
   }
@@ -99,7 +98,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       this.cleanupFunctions.push(() => addBtn.removeEventListener('click', handleAdd));
       logger.info('Add button listener attached', { addBtnId });
     } else {
-      logger.warn('Add button not found', { addBtnId });
+      logger.error('Add button not found', { addBtnId });
     }
 
     if (confirmBtn) {
@@ -159,7 +158,7 @@ export class WardrobeManager implements PhotoUploadHandler {
   private createFilters(filtersId: string = 'wardrobe-filters'): void {
     const filterContainer = document.getElementById(filtersId);
     if (!filterContainer) {
-      logger.warn('Filter container not found', { filtersId });
+      logger.error('Filter container not found', { filtersId });
       return;
     }
 
@@ -210,16 +209,10 @@ export class WardrobeManager implements PhotoUploadHandler {
    * @param gridId - ID контейнера грида (с префиксом)
    */
   private renderGrid(withAnimation: boolean = false, gridId: string = 'wardrobe-clothes-grid'): void {
-    logger.info('🎨 renderGrid called', {
-      gridId,
-      withAnimation,
-      wardrobeItemsCount: this.wardrobeItems.length,
-      currentFilter: this.currentFilter
-    });
 
     const grid = document.getElementById(gridId);
     if (!grid) {
-      logger.error('❌ Wardrobe grid element not found!', { gridId });
+      logger.error('Wardrobe grid element not found!', { gridId });
       return;
     }
 
@@ -239,7 +232,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       if (btnByClass && !btnByClass.id) {
         btnByClass.id = addBtnId;
         addBtn = btnByClass;
-        logger.info('✅ Added missing ID to button', { addBtnId });
+        logger.info('Added missing ID to button', { addBtnId });
       }
     }
 
@@ -265,7 +258,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       grid.appendChild(addBtn);
       logger.info('Add button restored to grid', { addBtnId });
     } else {
-      logger.warn('Add button not found for grid', { addBtnId, gridId });
+      logger.error('Add button not found for grid', { addBtnId, gridId });
     }
 
     filteredItems.forEach((item, index) => {
@@ -273,7 +266,7 @@ export class WardrobeManager implements PhotoUploadHandler {
       grid.appendChild(card);
 
       if (index === 0) {
-        logger.info('✅ First card added to grid', {
+        logger.info('First card added to grid', {
           itemId: item.id,
           category: item.category,
           cardHTML: card.outerHTML.substring(0, 100)
@@ -340,8 +333,6 @@ export class WardrobeManager implements PhotoUploadHandler {
 
         // Получаем актуальный ID из DOM элемента (может быть обновлен после оптимистичного создания)
         const currentId = parseInt(card.dataset['itemId'] || '0');
-
-        logger.info('Long press detected, showing delete confirmation', { itemId: currentId });
 
         if (confirm('Удалить этот предмет из гардероба?')) {
           try {
@@ -430,7 +421,7 @@ export class WardrobeManager implements PhotoUploadHandler {
             this.showPreviewModal(currentItem);
           }
         } else {
-          logger.warn('Item not found', { itemId: currentId });
+          logger.error('Item not found', { itemId: currentId });
         }
       }
     };
@@ -507,7 +498,7 @@ export class WardrobeManager implements PhotoUploadHandler {
     // Проверяем, что элемент еще существует в массиве
     const existingIndex = this.wardrobeItems.findIndex(item => item.id === itemId);
     if (existingIndex === -1) {
-      logger.warn('Attempted to remove item that no longer exists', { itemId });
+      logger.error('Attempted to remove item that no longer exists', { itemId });
       return;
     }
 
@@ -825,13 +816,6 @@ export class WardrobeManager implements PhotoUploadHandler {
       this.currentClassification.color = finalData.color;
       if (finalData.material) this.currentClassification.material = finalData.material;
       if (finalData.style) this.currentClassification.style = finalData.style;
-      logger.info('Using modal data', {
-        category: finalData.category,
-        subtype: finalData.subtype,
-        color: finalData.color,
-        material: finalData.material,
-        style: finalData.style
-      });
     }
 
     uiModalManager.hide();
@@ -891,12 +875,6 @@ export class WardrobeManager implements PhotoUploadHandler {
 
         // Обновляем ID в DOM элементе без перерисовки
         this.updateItemIdInDOM(optimisticItem.id, serverItem.id, serverItem.imageUrl);
-
-        logger.info('Optimistic item replaced with server item', {
-          tempId: optimisticItem.id,
-          realId: serverItem.id,
-          imageUrl: serverItem.imageUrl
-        });
       }
 
       // Отправляем событие
@@ -969,14 +947,8 @@ export class WardrobeManager implements PhotoUploadHandler {
       if (imageElement && newImageUrl !== imageElement.src) {
         imageElement.src = newImageUrl;
       }
-
-      logger.info('DOM element updated', {
-        oldId,
-        newId,
-        imageUpdated: newImageUrl !== imageElement?.src
-      });
     } else {
-      logger.warn('DOM element not found for ID update', { oldId, newId });
+      logger.error('DOM element not found for ID update', { oldId, newId });
     }
   }
 

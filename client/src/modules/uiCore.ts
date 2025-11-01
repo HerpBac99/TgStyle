@@ -34,8 +34,6 @@ export class UICoreManager {
    * Показать уведомление о том, что анализы закончились
    */
   showLimitModal(): void {
-    logger.info('Showing limit notification');
-
     // Показываем простое уведомление
     this.showToast('Анализы закончились! У вас было 10 анализов при регистрации.', 'info');
 
@@ -131,11 +129,6 @@ export class UICoreManager {
         analysisPhoto.src = `data:image/jpeg;base64,${photoBase64}`;
       }
 
-      logger.info('Photo src set for shared analysis', {
-        hasPrefix: photoBase64.startsWith('data:image'),
-        srcLength: analysisPhoto.src.length
-      });
-
       // Скрываем результат, показываем загрузку
       resultContainer.classList.add('hidden');
       loadingIndicator.classList.remove('hidden');
@@ -171,8 +164,6 @@ export class UICoreManager {
             },
             'result' // Добавляем класс для экрана результата
           );
-
-          logger.info('Like button added for shared analysis', { historyItemId, likesCount, isLiked });
         }
       }
 

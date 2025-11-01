@@ -117,12 +117,6 @@ export class CapsuleLikesService {
         currentState = revertedState;
       }
     });
-
-    logger.info('Capsule like component created', { 
-      capsuleId, 
-      initialState: initialData,
-      componentClass 
-    });
   }
 
   /**

@@ -548,7 +548,6 @@ export class CapsuleFlowManager {
    */
   setCallbacks(callbacks: CapsuleFlowCallbacks): void {
     this.callbacks = { ...this.callbacks, ...callbacks };
-    logger.info('Callbacks updated');
   }
 
   /**

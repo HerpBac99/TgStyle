@@ -29,11 +29,6 @@ class CameraManager {
    * Захват фото через камеру
    */
   async capturePhoto(): Promise<PhotoCaptureResult> {
-    logger.info('Starting photo capture', { 
-      hasCurrentImage: !!this.currentImageData,
-      timestamp: Date.now()
-    });
-
     try {
       const file = await this.selectFile({ preferCamera: true });
       const imageData = await this.processImageFile(file);
@@ -47,8 +42,6 @@ class CameraManager {
         originalSize: Math.round(imageData.originalSize / 1024) + 'KB',
       });
 
-      // Отправляем событие о захвате фото для показа экрана выбора темы
-      logger.info('Photo captured, dispatching event for theme selection');
       window.dispatchEvent(new CustomEvent('photo:captured', {
         detail: { imageData }
       }));
@@ -261,12 +254,6 @@ class CameraManager {
   async compressImage(base64Image: string, quality: number = 0.8): Promise<string> {
     return new Promise((resolve, reject) => {
       try {
-        logger.info('Starting image compression', { 
-          quality,
-          imageLength: base64Image.length,
-          hasDataPrefix: base64Image.startsWith('data:')
-        });
-
         // Создаем изображение из base64
         const img = new Image();
 

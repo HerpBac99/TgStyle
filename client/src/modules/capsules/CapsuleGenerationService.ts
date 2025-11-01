@@ -456,11 +456,6 @@ export class CapsuleGenerationService {
       }
     }
 
-    logger.debug('Preview positions calculated with smart positioning', {
-      totalItems: items.length,
-      categoriesCount: Object.keys(itemsByCategory).length
-    });
-
     return positionedItems;
   }
 

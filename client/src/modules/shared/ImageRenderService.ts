@@ -112,7 +112,7 @@ export class ImageRenderService {
    */
   private async renderImage(ctx: CanvasRenderingContext2D, element: RenderElement): Promise<void> {
     if (!element.content || !element.width || !element.height) {
-      logger.warn('Image element missing required properties');
+      logger.error('Image element missing required properties');
       return;
     }
 
@@ -161,7 +161,7 @@ export class ImageRenderService {
    */
   private renderText(ctx: CanvasRenderingContext2D, element: RenderElement): void {
     if (!element.content) {
-      logger.warn('Text element has no content');
+      logger.error('Text element has no content');
       return;
     }
 

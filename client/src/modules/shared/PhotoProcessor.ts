@@ -21,19 +21,9 @@ export class PhotoProcessor {
     classification: ClassificationResult;
   }> {
     try {
-      logger.info('Sending photo to classify and remove background...');
-
       // Оптимизируем изображение перед отправкой на классификацию
       // Для классификации не нужно полное разрешение
-      const originalSize = Math.round((imageBase64.length * 3) / 4 / 1024);
       const optimizedForClassification = await this.optimizeForClassification(imageBase64);
-      const optimizedSize = Math.round((optimizedForClassification.length * 3) / 4 / 1024);
-
-      logger.info('Image optimized for classification', {
-        originalSizeKB: originalSize,
-        optimizedSizeKB: optimizedSize,
-        compressionRatio: ((1 - optimizedSize / originalSize) * 100).toFixed(1) + '%'
-      });
 
       const result = await api.classifyClothing(optimizedForClassification) as any;
 
@@ -127,8 +117,6 @@ export class PhotoProcessor {
     classification: ClassificationResult
   ): Promise<WardrobeItem> {
     try {
-      logger.info('Saving item to wardrobe');
-
       const requestData: CreateWardrobeItemDto = {
         imageBase64,
         category: classification.category,

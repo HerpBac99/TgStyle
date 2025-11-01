@@ -29,8 +29,6 @@ export class CapsulesSharing {
     thumbnailImage?: string
   ): Promise<boolean> {
     try {
-      logger.info('Starting capsule share', { capsuleName, capsuleId });
-
       // 1. Получаем изображение - используем thumbnail если есть, иначе берем с canvas
       let canvasImage: string;
       

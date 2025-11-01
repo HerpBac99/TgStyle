@@ -73,7 +73,7 @@ export class SharingService {
             shareBtn.classList.remove('shared');
           }, 2000);
         } else {
-          logger.warn('Sharing failed', { error: result.error });
+          logger.error('Sharing failed', { error: result.error });
         }
       } catch (error) {
         logger.error('Error in share button click handler', error);
@@ -94,11 +94,6 @@ export class SharingService {
     };
 
     try {
-      logger.info('Starting share process', {
-        type: config.type,
-        hasImage: !!config.image,
-        options: opts
-      });
 
       // 1. Генерируем ID и ссылку
       const shareId = this.generateShareId(config.type);
@@ -176,7 +171,7 @@ export class SharingService {
             fileSize: Math.round(blob.size / 1024) + 'KB'
           });
         } catch (imageError) {
-          logger.warn('Failed to add image to Web Share, sharing without image', imageError);
+          logger.error('Failed to add image to Web Share, sharing without image', imageError);
         }
       }
 
@@ -231,7 +226,7 @@ export class SharingService {
       };
 
     } catch (error) {
-      logger.warn('Telegram share failed', error);
+      logger.error('Telegram share failed', error);
       return { success: false };
     }
   }
@@ -292,7 +287,7 @@ export class SharingService {
         await this.sendCapsuleToServer(shareId, config);
       }
     } catch (error) {
-      logger.warn('Failed to send content to server', {
+      logger.error('Failed to send content to server', {
         shareId,
         type: config.type,
         error
@@ -309,7 +304,7 @@ export class SharingService {
     const historyItemId = config.metadata?.['historyItemId'];
 
     if (!historyItemId) {
-      logger.warn('No historyItemId for sharing, skipping server save', { shareId });
+      logger.error('No historyItemId for sharing, skipping server save', { shareId });
       return;
     }
 
@@ -338,7 +333,7 @@ export class SharingService {
         historyItemId 
       });
     } else {
-      logger.warn('Server save failed', { error: response.error });
+      logger.error('Server save failed', { error: response.error });
     }
   }
 
@@ -349,7 +344,7 @@ export class SharingService {
     const capsuleId = config.metadata?.['capsuleId'];
 
     if (!capsuleId) {
-      logger.warn('No capsuleId for sharing, skipping server save', { shareId });
+      logger.error('No capsuleId for sharing, skipping server save', { shareId });
       return;
     }
 
@@ -377,7 +372,7 @@ export class SharingService {
         capsuleId 
       });
     } else {
-      logger.warn('Server save failed', { error: response.error });
+      logger.error('Server save failed', { error: response.error });
     }
   }
 

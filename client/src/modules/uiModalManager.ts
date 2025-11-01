@@ -60,14 +60,8 @@ export class UIModalManager {
   private currentModal: ModalConfig | null = null;
   private cleanupFunctions: (() => void)[] = [];
 
-
-
   // Для item-modal/wardrobe-preview модалки
   private currentModalData: ItemModalData | null = null;
-
-
-
-
 
   // ============================================
   // ПУБЛИЧНЫЕ МЕТОДЫ - ITEM MODAL (УНИВЕРСАЛЬНОЕ МОДАЛЬНОЕ ОКНО)
@@ -78,13 +72,6 @@ export class UIModalManager {
    * Объединяет функционал showWardrobePreviewModal и showClassificationInfo
    */
   showItemModal(config: ItemModalConfig): void {
-    logger.info('Showing item modal', {
-      hasExistingItem: !!config.data.existingItem,
-      category: config.data.category,
-      allowEditCategory: config.allowEditCategory,
-      allowEditColorMaterial: config.allowEditColorMaterial
-    });
-
     // Сохраняем конфиг
     this.currentModal = config;
     this.currentModalData = config.data;
@@ -123,8 +110,6 @@ export class UIModalManager {
     logger.info('Item modal shown');
   }
 
-
-
   /**
    * Очистить модальное окно предпросмотра
    */
@@ -147,8 +132,6 @@ export class UIModalManager {
 
     logger.info('Preview modal cleared');
   }
-
-
 
   /**
    * Показать изображение в модальном окне предпросмотра
@@ -563,8 +546,6 @@ export class UIModalManager {
     return this.currentModalData;
   }
 
-
-
   // ============================================
   // ПУБЛИЧНЫЕ МЕТОДЫ - CAPSULE PREVIEW
   // ============================================
@@ -691,8 +672,6 @@ export class UIModalManager {
       });
     }
   }
-
-
 
   // ============================================
   // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ

@@ -202,10 +202,8 @@ export class UIMenuManager {
     const historyItem = historyManager.getFilledItem(index);
 
     if (historyItem) {
-      logger.info('History cell clicked', { index });
       this.showSavedAnalysis(historyItem);
     } else {
-      logger.info('Empty history cell clicked, checking limits', { index });
 
       // Проверяем лимиты перед открытием камеры
       if (!authManager.canAnalyze()) {
@@ -227,26 +225,10 @@ export class UIMenuManager {
    * #showSavedAnalysis #UI-MENU #UI-SHOW-SAVED-ANALYSIS
    */
   private showSavedAnalysis(analysisData: HistoryItem): void {
-    logger.info('Showing saved analysis', {
-      itemId: analysisData.id,
-      photoPath: analysisData.photoPath,
-      userId: analysisData.telegramId
-    });
-
-    // DEBUG: логируем все поля
-    logger.info('DEBUG: showSavedAnalysis full data', {
-      analysisData: JSON.stringify(analysisData).substring(0, 500)
-    });
-
     // Проверяем наличие фото (photoPath или base64)
     const hasPhoto = analysisData.photoPath;
     if (!hasPhoto) {
-      logger.warn('DEBUG: photoPath is missing!', {
-        itemId: analysisData.id,
-        hasPhotoPath: !!analysisData.photoPath,
-        photoPath: analysisData.photoPath
-      });
-      this.logError('Не удалось загрузить данные фотографии');
+      logger.error('Не удалось загрузить данные фотографии');
       return;
     }
 
@@ -265,12 +247,6 @@ export class UIMenuManager {
     if (analysisData.photoPath) {
       // photoPath это имя файла, нужно составить URL с использованием telegramId
       const photoUrl = `/uploads/analysis/${analysisData.telegramId}/${analysisData.photoPath}`;
-      logger.info('DEBUG: Setting photo URL', {
-        itemId: analysisData.id,
-        url: photoUrl,
-        photoPath: analysisData.photoPath,
-        userId: analysisData.telegramId
-      });
       savedAnalysisPhoto.src = photoUrl;
     }
 
@@ -330,9 +306,6 @@ export class UIMenuManager {
 
       if (response.success && response.metadata) {
         historyManager.updateMetadata(response.metadata);
-        logger.info('History metadata synced successfully', {
-          itemsCount: response.metadata.length
-        });
       }
     } catch (err) {
       logger.error('Error syncing history metadata', err);
@@ -413,13 +386,6 @@ export class UIMenuManager {
   private loadVisibleCardImages(): void {
     // Предотвращаем повторную загрузку если уже идет процесс
     if (this.isLoadingImages) {
-      logger.debug('⏭️ Skipping image loading - already in progress', {
-        currentState: {
-          priorityLoaded: this.imageLoadMetrics.priorityImagesLoaded,
-          backgroundLoaded: this.imageLoadMetrics.backgroundImagesLoaded,
-          totalToLoad: this.imageLoadMetrics.totalImagesToLoad
-        }
-      });
       return;
     }
 
@@ -448,12 +414,6 @@ export class UIMenuManager {
         // Когда все изображения загружены
         if (loadedCount === totalImagesToLoad) {
           this.imageLoadMetrics.priorityLoadEndTime = performance.now();
-          const totalLoadTime = Math.round(this.imageLoadMetrics.priorityLoadEndTime - this.imageLoadMetrics.priorityLoadStartTime);
-          logger.info('✅ All carousel images loaded', {
-            count: totalImagesToLoad,
-            loadTime: `${totalLoadTime}ms`
-          });
-
           // Сбрасываем флаг загрузки
           this.isLoadingImages = false;
         }
@@ -709,8 +669,6 @@ export class UIMenuManager {
    * #UI-MENU #UPDATE-CARD-DISPLAY
    */
   public updateCardDisplay(historyItemId: number): void {
-    logger.info('Updating single card display', { historyItemId });
-
     const historyItem = historyManager.getItemById(historyItemId);
     if (!historyItem) {
       logger.warn('History item not found for update', { historyItemId });
@@ -986,13 +944,6 @@ export class UIMenuManager {
   }
 
   /**
-   * Логирование ошибки без отображения пользователю
-   */
-  private logError(message: string): void {
-    logger.error('Silent error handling', { message });
-  }
-
-  /**
    * Обновление метаданных карточки (лайки, просмотры) без перерисовки
    * #OPTIMIZATION #METADATA-UPDATE
    */
@@ -1001,7 +952,6 @@ export class UIMenuManager {
       // Находим карточку по data-id
       const card = document.querySelector(`.history-card[data-id="${historyItemId}"]`);
       if (!card) {
-        logger.debug('Card not found for metadata update', { historyItemId });
         return;
       }
 
@@ -1020,8 +970,6 @@ export class UIMenuManager {
           likeBtn.classList.remove('liked');
         }
       }
-
-      logger.debug('Card metadata updated', { historyItemId, likesCount, isLiked });
     } catch (error) {
       logger.error('Error updating card metadata', { error, historyItemId });
     }
@@ -1387,8 +1335,6 @@ export class UIMenuManager {
    * Обработчик клика по кнопке удаления
    */
   private async handleDeleteClick(button: HTMLButtonElement, index: number): Promise<void> {
-    logger.info('Delete button clicked', { index });
-
     this.disableDeleteButton(button);
 
     try {
@@ -1402,7 +1348,6 @@ export class UIMenuManager {
     } catch (error) {
       logger.error('Failed to delete history item', error);
       this.restoreDeleteButton(button);
-      this.logError('Ошибка при удалении элемента');
     }
   }
 
@@ -1443,7 +1388,7 @@ export class UIMenuManager {
       // Обновляем отображение истории
       this.updateHistoryDisplay();
     } else {
-      throw new Error('Не удалось удалить элемент');
+      logger.error('Не удалось удалить элемент');
     }
   }
 
