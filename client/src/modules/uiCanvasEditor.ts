@@ -1059,6 +1059,10 @@ export class UICanvasEditor {
     else if (category === 'INNERWEAR' || category === 'BODYWEAR') {
       baseScale *= 1.3;
     }
+    else if (category === 'HEADWEAR')
+    {
+      baseScale *= 0.45;
+    }
 
     // Позиционирование по типам одежды
     let x: number;
@@ -1093,7 +1097,7 @@ export class UICanvasEditor {
 
       case 'HEADWEAR':
         x = canvasCenterX;
-        y = canvasCenterY - 200;
+        y = canvasCenterY - 230;
         break;
 
       case 'ACCESSORIES':
