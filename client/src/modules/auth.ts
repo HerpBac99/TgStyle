@@ -240,6 +240,13 @@ class AuthManager {
         // Обновляем отображение профиля с новой информацией
         this.displayUserProfile();
 
+        // НОВАЯ ЛОГИКА: Проверяем поле gender и показываем модальное окно если не заполнено
+        if (response.user && !response.user.gender) {
+          logger.info('User gender not set, will show gender selection modal');
+          // Устанавливаем флаг для показа модального окна в main.ts
+          (response as any).needsGenderSelection = true;
+        }
+
         logger.info('Authentication successful');
       } else {
         logger.error('Server authentication failed', { error: response.error });

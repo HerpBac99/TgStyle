@@ -1,9 +1,9 @@
 version: '3'
 
 services:
-  # База данных - PostgreSQL
+  # База данных - PostgreSQL с pgvector
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: telegramstyle-postgres
     restart: always
     environment:

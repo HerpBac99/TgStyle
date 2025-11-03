@@ -24,7 +24,7 @@ export class PhotoProcessor {
       // Оптимизируем изображение перед отправкой на классификацию
       // Для классификации не нужно полное разрешение
       const optimizedForClassification = await this.optimizeForClassification(imageBase64);
-
+      
       const result = await api.classifyClothing(optimizedForClassification) as any;
 
       if (!result.success) {
@@ -47,7 +47,8 @@ export class PhotoProcessor {
           fit: result.classification.fit,
           season: result.classification.season,
           pattern: result.classification.pattern,
-          description: result.classification.description
+          description: result.classification.description,
+          embedding: result.classification.embedding  // Добавляем embedding из ответа
         }
       };
 
@@ -69,10 +70,10 @@ export class PhotoProcessor {
       const img = new Image();
       
       img.onload = () => {
-        // Для классификации достаточно 800px (FastVLM все равно ресайзит)
+        // Для классификации достаточно 1200px (баланс качество/скорость)
         let width = img.width;
         let height = img.height;
-        const maxSize = 800;
+        const maxSize = 1200;
         
         if (width > maxSize || height > maxSize) {
           if (width > height) {
@@ -96,8 +97,8 @@ export class PhotoProcessor {
         
         ctx.drawImage(img, 0, 0, width, height);
         
-        // JPEG с качеством 80% для классификации достаточно
-        const optimized = canvas.toDataURL('image/jpeg', 0.80);
+        // JPEG с качеством 85% для классификации (баланс качество/размер)
+        const optimized = canvas.toDataURL('image/jpeg', 0.85);
         resolve(optimized);
       };
       
@@ -127,7 +128,8 @@ export class PhotoProcessor {
         fit: classification.fit,
         ...(classification.season && { season: classification.season }),
         ...(classification.pattern && { pattern: classification.pattern }),
-        description: classification.description
+        description: classification.description,
+        ...(classification.embedding && { embedding: classification.embedding })  // Передаем embedding если есть
       };
 
       const result = await api.createWardrobeItem(requestData) as any;

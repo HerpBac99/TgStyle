@@ -13,6 +13,7 @@ import { uiManager } from '@/modules/uiManager';
 import { historyManager } from '@/modules/history';
 import { api } from '@/modules/api';
 import { dataCacheManager } from '@/modules/dataCache';
+import { genderSelectionManager } from '@/modules/genderSelectionManager';
 
 /**
  * Класс главного приложения
@@ -182,6 +183,26 @@ class TgStyleApp {
       }
     } catch (error) {
       logger.error('Failed to show shared capsule', { capsuleId, error });
+    }
+  }
+
+  /**
+   * Показать модальное окно выбора пола
+   */
+  private async showGenderSelectionModal(): Promise<void> {
+    try {
+      const selectedGender = await genderSelectionManager.show();
+      
+      logger.info('Gender selected successfully', { gender: selectedGender });
+      
+      // Можно добавить дополнительную логику после выбора пола
+      // Например, обновить UI или отправить аналитику
+      
+    } catch (error) {
+      logger.error('Error in gender selection process', error);
+      
+      // В случае ошибки можно показать уведомление пользователю
+      // или попробовать показать модальное окно снова
     }
   }
 
@@ -375,6 +396,12 @@ class TgStyleApp {
       if (authResponse.success) {
         // Отправляем событие успешной авторизации
         this.dispatchAppEvent(APP_EVENTS.AUTH_SUCCESS, authResponse.user);
+
+        // НОВАЯ ЛОГИКА: Проверяем нужно ли показать модальное окно выбора пола
+        if ((authResponse as any).needsGenderSelection) {
+          logger.info('Showing gender selection modal after authentication');
+          this.showGenderSelectionModal();
+        }
       } else {
         logger.error('❌ Authentication failed', {
           error: authResponse.error,

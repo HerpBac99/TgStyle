@@ -14,6 +14,7 @@ model User {
   lastName             String?
   username             String?
   avatarUrl            String?
+  gender               String?        // Пол пользователя: 'male' или 'female'
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
   isActive             Boolean        @default(true)
@@ -134,6 +135,9 @@ model WardrobeItem {
   season     String?           @db.VarChar(50)   // Сезон: spring, summer, autumn, winter, all-season
   description String?          @db.VarChar(500)  // Описание предмета одежды
 
+  // AI Embedding для поиска похожих вещей
+  embedding  Unsupported("vector(512)")?  // FashionCLIP embedding вектор 512 измерений
+
   // Пользовательские данные
   name       String?           @db.VarChar(255)  // Название от пользователя
   tags       String[]                             // Теги
@@ -195,4 +199,65 @@ model CapsuleLike {
 
   @@unique([userId, capsuleId])
   @@map("capsule_likes")
+}
+
+// Таблица стильных образов для AI генерации
+model StyleOutfit {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(255)        // Название образа
+  description String?  @db.Text                // Описание стиля
+  imagePath   String            @map("image_path") @db.VarChar(500)
+  
+  // Метаданные
+  gender      String?  @db.VarChar(10)         // 'male', 'female', 'unisex'
+  season      String?  @db.VarChar(50)         // Сезон: spring, summer, autumn, winter, all-season
+  style       String?  @db.VarChar(100)        // Стиль: casual, formal, sport, business, etc.
+  theme       String?  @db.VarChar(100)        // Повод: work, party, date, casual, etc.
+  
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  
+  // Связь с элементами образа
+  items       StyleOutfitItem[]
+
+  @@index([gender], map: "idx_style_outfit_gender")
+  @@index([season], map: "idx_style_outfit_season")
+  @@index([style], map: "idx_style_outfit_style")
+  @@index([theme], map: "idx_style_outfit_theme")
+  @@map("style_outfits")
+}
+
+// Таблица элементов стильных образов
+model StyleOutfitItem {
+  id        Int      @id @default(autoincrement())
+  outfitId  Int      @map("outfit_id")
+  outfit    StyleOutfit @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  
+  // Классификация элемента
+  category  ClothingCategory  // Категория одежды
+  subtype   String?  @db.VarChar(100)        // Детализация: jacket, coat, jeans
+  color     String?  @db.VarChar(50)         // Основной цвет
+  material  String?  @db.VarChar(100)        // Материал: cotton, denim, leather
+  season    String?  @db.VarChar(50)         // Сезон: spring, summer, autumn, winter, all-season
+  
+  // Изображение и AI данные
+  imagePath   String            @map("image_path") @db.VarChar(500) // Путь к изображению элемента
+  embedding Unsupported("vector(512)")?  // FashionCLIP embedding вектор 512 измерений
+  
+  // Приоритет элемента в образе
+  priority  Int      @default(1)             // 1=обязательная, 2=желательная, 3=опциональная
+  
+  // Дополнительные атрибуты
+  style     String?  @db.VarChar(100)        // Стиль элемента
+  pattern   String?  @db.VarChar(100)        // Узор: plain, striped, checked
+  fit       String?  @db.VarChar(100)        // Посадка/фит: slim, regular, loose
+  
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  
+  @@index([outfitId], map: "idx_style_outfit_item_outfit")
+  @@index([category], map: "idx_style_outfit_item_category")
+  @@index([priority], map: "idx_style_outfit_item_priority")
+  @@index([color], map: "idx_style_outfit_item_color")
+  @@index([season], map: "idx_style_outfit_item_season")
+  @@map("style_outfit_items")
 }

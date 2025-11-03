@@ -45,6 +45,17 @@ from llava.model.builder import load_pretrained_model
 from llava.mm_utils import tokenizer_image_token, process_images, get_model_name_from_path
 from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 
+# Импортируем FashionCLIP для embeddings
+try:
+    from transformers import CLIPProcessor, CLIPModel
+    import open_clip
+    FASHION_CLIP_AVAILABLE = True
+    print("✅ FashionCLIP libraries loaded successfully")
+except ImportError as e:
+    FASHION_CLIP_AVAILABLE = False
+    print(f"⚠️  FashionCLIP libraries not available: {e}")
+    print("Install with: pip install open-clip-torch transformers")
+
 # Импортируем Gemini API
 
 # Импортируем модуль умной предобработки изображений
@@ -91,6 +102,10 @@ ollama_model = "gemma3:4b"  # Лучшая модель для стилисти�
 
 # Глобальная переменная для BackgroundRemover
 background_remover = None
+
+# Глобальные переменные для FashionCLIP
+fashion_clip_model = None
+fashion_clip_processor = None
 
 # Глобальные переменные для промптов
 default_prompt = None
@@ -746,6 +761,87 @@ def load_model():
         app.logger.error(f"Ошибка загрузки FastVLM модели: {e}")
         app.logger.error(traceback.format_exc())
         return False
+
+def load_fashion_clip():
+    """Загрузка FashionCLIP модели для генерации embeddings"""
+    global fashion_clip_model, fashion_clip_processor
+
+    try:
+        if not FASHION_CLIP_AVAILABLE:
+            app.logger.warning("FashionCLIP библиотеки недоступны")
+            return False
+
+        # Отключаем warning про symlinks на Windows
+        os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
+
+        app.logger.info("Начинаем загрузку FashionCLIP модели...")
+        start_time = time.time()
+
+        # Используем специализированную fashion модель через HuggingFace
+        model_name = "patrickjohncyh/fashion-clip"
+        
+        try:
+            # Пробуем загрузить через transformers (HuggingFace)
+            fashion_clip_processor = CLIPProcessor.from_pretrained(model_name)
+            fashion_clip_model = CLIPModel.from_pretrained(model_name)
+            app.logger.info(f"Загружена модель {model_name} через HuggingFace")
+        except Exception as hf_error:
+            app.logger.warning(f"Не удалось загрузить {model_name}: {hf_error}")
+            # Fallback на стандартную CLIP модель
+            model_name = "openai/clip-vit-base-patch32"
+            fashion_clip_processor = CLIPProcessor.from_pretrained(model_name)
+            fashion_clip_model = CLIPModel.from_pretrained(model_name)
+            app.logger.info(f"Загружена fallback модель {model_name}")
+
+        # GPU оптимизация
+        if torch.cuda.is_available() and Config.DEVICE == 'cuda':
+            fashion_clip_model = fashion_clip_model.to('cuda')
+            app.logger.info("FashionCLIP загружена на GPU")
+        else:
+            app.logger.info("FashionCLIP загружена на CPU")
+
+        fashion_clip_model.eval()
+
+        loading_time = time.time() - start_time
+        app.logger.info(f"FashionCLIP модель загружена успешно за {loading_time:.2f}с")
+
+        return True
+
+    except Exception as e:
+        app.logger.error(f"Ошибка загрузки FashionCLIP модели: {e}")
+        app.logger.error(traceback.format_exc())
+        return False
+
+def generate_fashion_embedding(image):
+    """Генерирует embedding вектор для изображения одежды"""
+    global fashion_clip_model, fashion_clip_processor
+
+    try:
+        if fashion_clip_model is None or fashion_clip_processor is None:
+            return None, "FashionCLIP model not loaded"
+
+        # Обрабатываем изображение
+        inputs = fashion_clip_processor(images=image, return_tensors="pt")
+        
+        # Переносим на нужное устройство
+        if torch.cuda.is_available() and Config.DEVICE == 'cuda':
+            inputs = {k: v.to('cuda') for k, v in inputs.items()}
+
+        # Генерируем embedding
+        with torch.no_grad():
+            image_features = fashion_clip_model.get_image_features(**inputs)
+            
+        # Нормализуем вектор
+        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+        
+        # Конвертируем в список
+        embedding = image_features.cpu().numpy().flatten().tolist()
+        
+        return embedding, None
+
+    except Exception as e:
+        app.logger.error(f"Ошибка генерации embedding: {e}")
+        return None, str(e)
 
 def save_fastvlm_result(clean_analysis, raw_output, image_debug):
     """Сохраняет результат FastVLM в JSON файл"""
@@ -2334,6 +2430,7 @@ def validate_and_correct_category(raw_type: str, subtype: str) -> str:
 @app.route('/classify_clothing', methods=['POST'])
 def classify_clothing():
     """Классификация одежды: удаление фона + анализ через FastVLM"""
+    app.logger.debug('[DEBUG] FastVLM /classify_clothing - START')
     start_time = time.time()
 
     try:
@@ -2352,6 +2449,7 @@ def classify_clothing():
             }), 400
 
         image_base64 = data['image_base64']
+        app.logger.debug(f'[DEBUG] FastVLM /classify_clothing - received image_base64 size: {len(image_base64) if image_base64 else 0}')
 
         # Получаем prompt (по умолчанию используем глобальный class_prompt)
         prompt = data.get('prompt', class_prompt)
@@ -2361,12 +2459,25 @@ def classify_clothing():
             image_base64 = image_base64.split(',', 1)[1] if ',' in image_base64 else image_base64
 
         app.logger.info(f"Промпт для классификации: {prompt}")
+        app.logger.info(f"Источник запроса: {'тестовый скрипт' if data.get('prompt') else 'приложение (default prompt)'}")
+        app.logger.info(f"Размер изображения после декодирования: будет определен после декодирования")
 
         # Шаг 1: Декодируем изображение
         try:
             image_data = base64.b64decode(image_base64)
             image = Image.open(io.BytesIO(image_data)).convert('RGB')
+            
+            # Детальная информация об изображении
             app.logger.info(f"Изображение декодировано: {image.size}")
+            app.logger.info(f"Формат изображения: {image.format}")
+            app.logger.info(f"Режим изображения: {image.mode}")
+            app.logger.info(f"Размер данных: {len(image_data)} байт")
+            app.logger.info(f"Размер base64: {len(image_base64)} символов")
+            
+            # Проверяем первые байты для определения формата
+            format_signature = image_data[:10].hex()
+            app.logger.info(f"Сигнатура файла (первые 10 байт): {format_signature}")
+            
         except Exception as e:
             app.logger.error(f"Ошибка декодирования изображения: {e}")
             return jsonify({
@@ -2506,19 +2617,35 @@ def classify_clothing():
                 'style': 'Неизвестно',
                 'season': 'Unknown',
                 'pattern': 'Unknown',
-                'raw_text': classification_text
+                'raw_text': classification_text,
+                'embedding': None  # Будет заполнено ниже
             }
 
+        # Генерируем embedding для обработанного изображения (10-й пункт)
+        embedding_start = time.time()
+        embedding, embedding_error = generate_fashion_embedding(result_image)
+        embedding_time = time.time() - embedding_start
+        
+        if embedding_error:
+            app.logger.warning(f"Не удалось сгенерировать embedding: {embedding_error}")
+            embedding = None
+        else:
+            app.logger.info(f"Embedding сгенерирован за {embedding_time:.2f}с")
+
+        # Добавляем embedding в classification как 10-й пункт
+        classification['embedding'] = embedding
+
         total_time = time.time() - start_time
-        post_processing_time = total_time - bg_removal_time - analysis_time
+        post_processing_time = total_time - bg_removal_time - analysis_time - embedding_time
         
         app.logger.info(f"✅ Классификация завершена за {total_time:.2f}с")
         app.logger.info(f"📊 Детализация времени:")
         app.logger.info(f"   - Удаление фона: {bg_removal_time:.2f}с ({bg_removal_time/total_time*100:.1f}%)")
         app.logger.info(f"   - LLM анализ: {analysis_time:.2f}с ({analysis_time/total_time*100:.1f}%)")
+        app.logger.info(f"   - Генерация embedding: {embedding_time:.2f}с ({embedding_time/total_time*100:.1f}%)")
         app.logger.info(f"   - Постобработка: {post_processing_time:.2f}с ({post_processing_time/total_time*100:.1f}%)")
 
-        # Возвращаем результат с изображением без фона
+        # Возвращаем результат с изображением без фона и embedding
         return jsonify({
             'success': True,
             'classification': classification,
@@ -2528,6 +2655,7 @@ def classify_clothing():
                 'total_time': round(total_time, 2),
                 'background_removal_time': round(bg_removal_time, 2),
                 'analysis_time': round(analysis_time, 2),
+                'embedding_time': round(embedding_time, 2),
                 'post_processing_time': round(post_processing_time, 2)
             },
             'image_info': {
@@ -2539,6 +2667,105 @@ def classify_clothing():
     except Exception as e:
         total_time = time.time() - start_time
         error_msg = f"Ошибка классификации: {e}"
+        app.logger.error(error_msg)
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timing': {
+                'total_time': round(total_time, 2)
+            }
+        }), 500
+
+@app.route('/embed-clothing', methods=['POST'])
+def embed_clothing():
+    """Генерация embedding вектора для изображения одежды"""
+    start_time = time.time()
+
+    try:
+        if fashion_clip_model is None:
+            return jsonify({
+                'success': False,
+                'error': 'FashionCLIP model not loaded'
+            }), 500
+
+        # Получаем данные
+        data = request.get_json()
+        if not data or 'image_base64' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'No image provided'
+            }), 400
+
+        image_base64 = data['image_base64']
+        preprocess = data.get('preprocess', True)
+
+        # Правильная обработка base64: удаляем префикс data:image если есть
+        if image_base64.startswith('data:image'):
+            image_base64 = image_base64.split(',', 1)[1] if ',' in image_base64 else image_base64
+
+        # Декодируем изображение
+        try:
+            image_data = base64.b64decode(image_base64)
+            image = Image.open(io.BytesIO(image_data)).convert('RGB')
+            app.logger.info(f"Изображение декодировано: {image.size}")
+        except Exception as e:
+            app.logger.error(f"Ошибка декодирования изображения: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Invalid image data: {e}'
+            }), 400
+
+        # Опциональная предобработка (удаление фона)
+        processed_image = image
+        preprocessing_time = 0
+        
+        if preprocess and background_remover is not None:
+            preprocessing_start = time.time()
+            processed_image, _ = background_remover.remove_background(image, upscale=True)
+            processed_image = background_remover.crop_to_content(processed_image, padding=10)
+            preprocessing_time = time.time() - preprocessing_start
+            app.logger.info(f"Предобработка завершена за {preprocessing_time:.2f}с")
+
+        # Генерируем embedding
+        embedding_start = time.time()
+        embedding, error = generate_fashion_embedding(processed_image)
+        embedding_time = time.time() - embedding_start
+
+        if error:
+            app.logger.error(f"Ошибка генерации embedding: {error}")
+            return jsonify({
+                'success': False,
+                'error': error
+            }), 500
+
+        total_time = time.time() - start_time
+
+        app.logger.info(f"✅ Embedding сгенерирован за {total_time:.2f}с")
+        app.logger.info(f"📊 Детализация времени:")
+        app.logger.info(f"   - Предобработка: {preprocessing_time:.2f}с")
+        app.logger.info(f"   - Генерация embedding: {embedding_time:.2f}с")
+
+        return jsonify({
+            'success': True,
+            'embedding': embedding,
+            'embedding_dimension': len(embedding) if embedding else 0,
+            'model_used': 'patrickjohncyh/fashion-clip',
+            'timing': {
+                'total_time': round(total_time, 2),
+                'preprocessing_time': round(preprocessing_time, 2),
+                'embedding_time': round(embedding_time, 2)
+            },
+            'image_info': {
+                'original_size': f'{image.size[0]}x{image.size[1]}',
+                'processed_size': f'{processed_image.size[0]}x{processed_image.size[1]}'
+            }
+        })
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        error_msg = f"Ошибка генерации embedding: {e}"
         app.logger.error(error_msg)
         app.logger.error(f"Traceback: {traceback.format_exc()}")
 
@@ -3456,6 +3683,13 @@ if __name__ == '__main__':
         if not load_model():
             app.logger.error("Не удалось загрузить модель, выходим")
             sys.exit(1)
+
+        # Загрузка FashionCLIP модели
+        app.logger.info("Загрузка FashionCLIP модели...")
+        if not load_fashion_clip():
+            app.logger.warning("FashionCLIP модель не загружена, embedding функции будут недоступны")
+        else:
+            app.logger.info("FashionCLIP модель загружена успешно")
 
         app.logger.info(f"FastVLM сервер запускается на {Config.HOST}:{Config.PORT}")
         app.logger.info(f"Конфигурация: {Config.THREADS} потоков, {Config.CONNECTION_LIMIT} соединений")

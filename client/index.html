@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="css/publicFeed.css">
     <link rel="stylesheet" href="css/resultMenu.css">
     <link rel="stylesheet" href="css/animations.css">
+    <link rel="stylesheet" href="css/genderSelection.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -459,6 +460,44 @@
                     </button>
                 
 
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно выбора пола -->
+    <div id="gender-selection-modal" class="gender-selection-modal hidden">
+        <div class="gender-selection-overlay"></div>
+        <div class="gender-selection-content">
+            <!-- Заголовок -->
+            <div class="gender-selection-header">
+                <h2>Укажите пол</h2>
+                <p class="gender-selection-subtitle">Это поможет нам лучше подбирать рекомендации</p>
+            </div>
+
+            <!-- Варианты выбора -->
+            <div class="gender-options">
+                <button id="gender-female-btn" class="gender-option-btn" data-gender="female">
+                    <div class="gender-option-icon">
+                        <svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="50" cy="35" r="30" stroke="currentColor" stroke-width="5" fill="none"/>
+                            <line x1="50" y1="65" x2="50" y2="95" stroke="currentColor" stroke-width="5"/>
+                            <line x1="35" y1="80" x2="65" y2="80" stroke="currentColor" stroke-width="5"/>
+                        </svg>
+                    </div>
+                    <span class="gender-option-text">Женский</span>
+                </button>
+
+                <button id="gender-male-btn" class="gender-option-btn" data-gender="male">
+                    <div class="gender-option-icon">
+                        <svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="45" cy="45" r="30" stroke="currentColor" stroke-width="6" fill="none"/>
+                        <line x1="65" y1="25" x2="85" y2="5" stroke="currentColor" stroke-width="6"/>
+                        <line x1="70" y1="5" x2="85" y2="5" stroke="currentColor" stroke-width="6"/>
+                        <line x1="85" y1="5" x2="85" y2="20" stroke="currentColor" stroke-width="6"/>
+                        </svg>
+                    </div>
+                    <span class="gender-option-text">Мужской</span>
+                </button>
             </div>
         </div>
     </div>

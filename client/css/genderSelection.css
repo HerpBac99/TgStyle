@@ -1,0 +1,159 @@
+/* Модальное окно выбора пола - в стиле приложения */
+.gender-selection-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gender-selection-modal.hidden {
+    display: none;
+}
+
+.gender-selection-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.gender-selection-content {
+    position: relative;
+    /* Используем неоморфный фон как в приложении */
+    background: var(--neumorph-bg);
+    border-radius: 20px;
+    padding: 32px 24px;
+    margin: 20px;
+    max-width: 400px;
+    width: 100%;
+    /* Неоморфные тени как в карточках */
+    /*box-shadow: var(--card-shadow-convex);*/
+    animation: genderModalSlideIn 0.3s ease-out;
+    /* Шрифт как в приложении */
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+@keyframes genderModalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.gender-selection-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.gender-selection-header h2 {
+    font-size: 24px;
+    font-weight: 600;
+    /* Используем цвет текста из приложения */
+    color: var(--tg-theme-text-color);
+    margin: 0 0 8px 0;
+    font-family: 'Manrope', sans-serif;
+}
+
+.gender-selection-subtitle {
+    font-size: 20px;
+    /* Используем цвет подсказок из приложения */
+    color: var(--tg-theme-text-color);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.gender-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.gender-option-btn {
+    display: flex;
+    align-items: center;
+    padding: 20px 24px;
+    /* Неоморфный фон кнопок */
+    background: var(--neumorph-bg);
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: 'Manrope', sans-serif;
+    width: 100%;
+    text-align: left;
+    /* Неоморфные тени - выпуклый эффект */
+    box-shadow: 12px 12px 20px var(--neumorph-dark), -12px -12px 20px var(--neumorph-light);
+}
+
+.gender-option-btn:hover {
+    /* Неоморфный hover эффект */
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 16px 16px 32px var(--neumorph-dark), -16px -16px 32px var(--neumorph-light), inset 2px 2px 4px rgba(255,255,255,0.2);
+}
+
+.gender-option-btn:active {
+    /* Эффект нажатия - вдавленность */
+    transform: translateY(1px) scale(0.98);
+    box-shadow: inset 8px 8px 16px var(--neumorph-dark), inset -8px -8px 16px var(--neumorph-light);
+}
+
+.gender-option-icon {
+    margin-right: 16px;
+    /* Используем акцентный цвет из приложения */
+    color: var(--accent-color);
+    flex-shrink: 0;
+}
+
+.gender-option-text {
+    font-size: 18px;
+    font-weight: 500;
+    /* Используем цвет текста из приложения */
+    color: var(--tg-theme-text-color);
+}
+
+/* Адаптивность */
+@media (max-width: 480px) {
+    .gender-selection-content {
+        margin: 16px;
+        padding: 24px 20px;
+        max-width: 95vw;
+    }
+    
+    .gender-selection-header h2 {
+        font-size: 20px;
+    }
+    
+    .gender-selection-subtitle {
+        font-size: 14px;
+    }
+    
+    .gender-option-btn {
+        padding: 16px 20px;
+    }
+    
+    .gender-option-text {
+        font-size: 16px;
+    }
+    
+    .gender-option-icon {
+        margin-right: 12px;
+    }
+    
+    .gender-option-icon svg {
+        width: 40px;
+        height: 40px;
+    }
+}

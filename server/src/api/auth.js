@@ -83,12 +83,87 @@ function formatUserResponse(user) {
         lastName: user.lastName,
         username: user.username,
         avatarUrl: user.avatarUrl,
+        gender: user.gender, // Пол пользователя
         analysesLeft: user.analysesCount, // Простой счетчик анализов
         totalAnalyses: user.totalAnalyses,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
     };
 }
+
+/**
+ * Update user gender
+ * PUT /api/auth/gender
+ */
+router.put('/gender', async (req, res) => {
+    const { initData, gender } = req.body;
+
+    try {
+        if (!initData) {
+            return res.status(400).json({
+                success: false,
+                error: 'No initData provided'
+            });
+        }
+
+        if (!gender || !['male', 'female'].includes(gender)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid gender value. Must be "male" or "female"'
+            });
+        }
+
+        // Validate Telegram initData
+        const validationResult = validateTelegramWebAppData(initData);
+
+        if (!validationResult.isValid) {
+            logger.error('Ошибка валидации Telegram initData при обновлении пола', {
+                error: validationResult.error
+            });
+            return res.status(401).json({
+                success: false,
+                error: validationResult.error
+            });
+        }
+
+        // Extract user information from Telegram
+        const { user: telegramUser } = validationResult.data;
+        const telegramId = BigInt(telegramUser.id);
+
+        // Update user gender in database
+        const updatedUser = await prisma.user.update({
+            where: { telegramId },
+            data: { 
+                gender,
+                updatedAt: new Date()
+            }
+        });
+
+        logger.info('User gender updated successfully', {
+            userId: updatedUser.id,
+            telegramId: updatedUser.telegramId,
+            gender
+        });
+
+        return res.json({
+            success: true,
+            user: formatUserResponse(updatedUser),
+            message: 'Gender updated successfully'
+        });
+
+    } catch (error) {
+        logger.error('Ошибка при обновлении пола пользователя', {
+            error: error.message,
+            stack: error.stack
+        });
+
+        return res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: 'Ошибка сервера при обновлении пола'
+        });
+    }
+});
 
 /**
  * Handle Telegram authentication

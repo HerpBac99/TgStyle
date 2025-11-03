@@ -133,6 +133,8 @@ client/index.html
 build/
 client/dist/
 fastvlm-server/dist/
+fastvlm-server/embedding_results
+pgvector-0.7.4
 
 # Environment and config files
 .env

@@ -231,6 +231,23 @@ class TgStyleApi extends ApiClient {
   }
 
   /**
+   * Обновление пола пользователя
+   */
+  async updateGender(gender: 'male' | 'female'): Promise<any> {
+    const initData = getInitData();
+    const request = { initData, gender };
+    const response = await this.put('/auth/gender', request, TIMEOUTS.AUTH_REQUEST) as any;
+    
+    if (response.success) {
+      logger.info('Gender updated successfully', { gender });
+    } else {
+      logger.error('Gender update failed', { error: response.error });
+    }
+    
+    return response;
+  }
+
+  /**
    * Анализ изображения
    */
   async analyzeImage(request: AnalysisRequest): Promise<AnalysisResponse> {

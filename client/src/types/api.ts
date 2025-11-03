@@ -24,10 +24,34 @@ export interface AuthResponse {
     lastName?: string;
     username?: string;
     avatarUrl?: string;
+    gender?: string; // Пол пользователя: 'male' или 'female'
     analysesLeft: number;
     totalAnalyses: number;
   };
   error?: string;
+}
+
+// Типы для обновления пола пользователя
+export interface UpdateGenderRequest {
+  initData: string;
+  gender: 'male' | 'female';
+}
+
+export interface UpdateGenderResponse {
+  success: boolean;
+  user?: {
+    id: string;
+    telegramId: number;
+    firstName: string;
+    lastName?: string;
+    username?: string;
+    avatarUrl?: string;
+    gender: string;
+    analysesLeft: number;
+    totalAnalyses: number;
+  };
+  error?: string;
+  message?: string;
 }
 
 // Типы для анализа изображений

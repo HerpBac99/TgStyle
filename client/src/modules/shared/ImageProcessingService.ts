@@ -172,61 +172,6 @@ class ImageProcessingService {
   }
 
   /**
-   * Полная обработка изображения для сохранения
-   * (оптимизация + удаление фона)
-   * 
-   * @param imageBase64 - Base64 изображение
-   * @returns Обработанное изображение с метаданными
-   */
-  async processForSave(imageBase64: string): Promise<ProcessedImage> {
-    try {
-
-      // 1. Оптимизируем для классификации (меньший размер для быстрой передачи)
-      const optimizedForClassification = await this.optimizeImage(imageBase64, {
-        maxWidth: 800,
-        maxHeight: 800,
-        quality: 0.8,
-        format: 'jpeg'
-      });
-
-      // 2. Удаляем фон (используем оптимизированное изображение)
-      const processedImage = await this.removeBackground(optimizedForClassification);
-
-      // 3. Оптимизируем результат для сохранения (PNG для прозрачности)
-      const finalProcessed = await this.optimizeImage(processedImage, {
-        maxWidth: 1200,
-        maxHeight: 1200,
-        quality: 0.9,
-        format: 'png'
-      });
-
-      // 4. Создаем thumbnail
-      const thumbnail = await this.optimizeImage(finalProcessed, {
-        maxWidth: 400,
-        maxHeight: 400,
-        quality: 0.8,
-        format: 'jpeg'
-      });
-
-      // 5. Собираем метаданные
-      const metadata = await this.getImageMetadata(imageBase64, finalProcessed, thumbnail);
-
-      const result: ProcessedImage = {
-        original: imageBase64,
-        processed: finalProcessed,
-        thumbnail,
-        metadata
-      };
-
-      return result;
-
-    } catch (error) {
-      logger.error('ImageProcessingService: Error processing image for save', error);
-      throw error;
-    }
-  }
-
-  /**
    * Полная обработка изображения для шеринга
    * (оптимизация + watermark + кэширование)
    * 

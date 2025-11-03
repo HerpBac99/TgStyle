@@ -109,7 +109,8 @@ export class WardrobeService {
         fit: classification.fit,
         season: classification.season,
         pattern: classification.pattern,
-        description: classification.description
+        description: classification.description,
+        ...(classification.embedding && { embedding: classification.embedding })  // Передаем embedding если есть
       }) as any;
 
       if (!result.success) {

@@ -19,7 +19,7 @@ const FileService = require('../services/FileService');
  */
 router.post('/', async (req, res) => {
     try {
-        const { imageBase64, name, category, subtype, color, material, style, fit, season, pattern, description, tags } = req.body;
+        const { imageBase64, name, category, subtype, color, material, style, fit, season, pattern, description, tags, embedding } = req.body;
 
         // FIXED: получаем initData из header или body
         const initData = getInitData(req);
@@ -56,27 +56,82 @@ router.post('/', async (req, res) => {
             category: category || 'uncategorized'
         });
 
+        // Embedding получен из классификации, которую делает клиент
+        if (embedding && Array.isArray(embedding) && embedding.length === 512) {
+            logger.info('Embedding received from client', {
+                telegramId: telegramId.toString(),
+                embeddingDimension: embedding.length,
+                embeddingPreview: embedding.slice(0, 5),
+                embeddingRange: [Math.min(...embedding), Math.max(...embedding)]
+            });
+        } else if (embedding) {
+            logger.warn('Invalid embedding received from client', {
+                telegramId: telegramId.toString(),
+                embeddingType: typeof embedding,
+                embeddingLength: Array.isArray(embedding) ? embedding.length : 'not array'
+            });
+        } else {
+            logger.info('No embedding received from client', {
+                telegramId: telegramId.toString()
+            });
+        }
+
         // Сохраняем изображение на диск
         const imagePath = await FileService.saveWardrobeImage(telegramId, imageBase64);
 
         // Создаем запись в БД
-        const wardrobeItem = await prisma.wardrobeItem.create({
-            data: {
-                telegramId,
-                imagePath,
-                name: name || null,
-                category: category || null,
-                subtype: subtype || null,
-                color: color || null,
-                material: material || null,
-                style: style || null,
-                fit: fit || null,
-                season: season || null,
-                pattern: pattern || null,
-                description: description || null,
-                tags: tags || []
-            }
-        });
+        let wardrobeItem;
+        
+        if (embedding && Array.isArray(embedding) && embedding.length === 512) {
+            // Вставляем сразу с embedding через raw SQL
+            const vectorString = `[${embedding.join(',')}]`;
+            
+            logger.info('Creating wardrobe item with embedding', {
+                telegramId: telegramId.toString(),
+                embeddingDimension: embedding.length,
+                embeddingPreview: embedding.slice(0, 5)
+            });
+            
+            const result = await prisma.$queryRaw`
+                INSERT INTO wardrobe_items (
+                    telegram_id, image_path, name, category, subtype, color, 
+                    material, style, fit, season, pattern, description, tags, embedding,
+                    created_at, updated_at
+                ) VALUES (
+                    ${telegramId}::bigint, ${imagePath}, ${name || null}, ${category || null}::"ClothingCategory", 
+                    ${subtype || null}, ${color || null}, ${material || null}, ${style || null}, 
+                    ${fit || null}, ${season || null}, ${pattern || null}, ${description || null}, 
+                    ${tags || []}::text[], ${vectorString}::vector,
+                    NOW(), NOW()
+                ) RETURNING id, telegram_id, image_path, name, category, subtype, color, 
+                           material, style, fit, season, pattern, description, tags, created_at, updated_at
+            `;
+            
+            wardrobeItem = result[0];
+        } else {
+            // Обычная вставка без embedding через Prisma
+            logger.info('Creating wardrobe item without embedding', {
+                telegramId: telegramId.toString()
+            });
+            
+            wardrobeItem = await prisma.wardrobeItem.create({
+                data: {
+                    telegramId,
+                    imagePath,
+                    name: name || null,
+                    category: category || null,
+                    subtype: subtype || null,
+                    color: color || null,
+                    material: material || null,
+                    style: style || null,
+                    fit: fit || null,
+                    season: season || null,
+                    pattern: pattern || null,
+                    description: description || null,
+                    tags: tags || []
+                }
+            });
+        }
 
         logger.info('Wardrobe item created', {
             id: wardrobeItem.id,

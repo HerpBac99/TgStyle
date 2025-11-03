@@ -51,6 +51,7 @@ export interface CreateWardrobeItemDto {
   season?: string;  // Сезон
   pattern?: string;  // Узор
   description?: string;
+  embedding?: number[];  // FashionCLIP embedding вектор (только для внутреннего использования)
 }
 
 /**
@@ -66,4 +67,5 @@ export interface ClassificationResult {
   season?: string;  // Сезон
   pattern?: string;  // Узор
   description: string;
+  embedding?: number[];  // FashionCLIP embedding вектор 512 измерений (только внутренне)
 }
