@@ -1180,6 +1180,18 @@ def analyze_for_test():
         try:
             image_data = base64.b64decode(image_base64)
             image = Image.open(io.BytesIO(image_data))
+            
+            # Конвертируем в RGB если нужно (для PNG с прозрачностью или palette режима)
+            if image.mode in ('RGBA', 'LA', 'P'):
+                # Создаем белый фон для прозрачных изображений
+                background = Image.new('RGB', image.size, (255, 255, 255))
+                if image.mode == 'P':
+                    image = image.convert('RGBA')
+                background.paste(image, mask=image.split()[-1] if image.mode in ('RGBA', 'LA') else None)
+                image = background
+            elif image.mode != 'RGB':
+                image = image.convert('RGB')
+                
         except Exception as e:
             app.logger.error(f"Ошибка декодирования изображения: {e}")
             return jsonify({
@@ -1187,7 +1199,7 @@ def analyze_for_test():
                 'error': f'Invalid image data: {e}'
             }), 400
 
-        # Сохраняем во временный файл
+        # Сохраняем во временный файл (теперь гарантированно RGB)
         with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
             image.save(temp_file, 'JPEG', quality=100, optimize=False, subsampling=0)
             temp_image_path = temp_file.name

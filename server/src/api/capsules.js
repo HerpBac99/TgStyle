@@ -520,7 +520,8 @@ async function generateCapsules(req, res) {
     });
 
     // Получаем все вещи гардероба с полными данными (9 полей)
-    const wardrobeItems = await prisma.wardrobeItem.findMany({
+    // ВАЖНО: embedding загружаем через raw SQL, т.к. это Unsupported тип в Prisma
+    const wardrobeItemsBase = await prisma.wardrobeItem.findMany({
       where: { telegramId },
       select: {
         id: true,
@@ -536,6 +537,34 @@ async function generateCapsules(req, res) {
         imagePath: true
       }
     });
+
+    // Загружаем embeddings через raw SQL для вещей с векторами
+    const itemIds = wardrobeItemsBase.map(item => item.id);
+    const embeddings = await prisma.$queryRaw`
+      SELECT id, embedding::text as embedding
+      FROM wardrobe_items
+      WHERE id = ANY(${itemIds}::int[])
+      AND embedding IS NOT NULL
+    `;
+
+    // Создаем map для быстрого доступа к embeddings
+    const embeddingsMap = new Map();
+    for (const row of embeddings) {
+      try {
+        // Парсим vector из PostgreSQL формата в JSON array
+        const vectorStr = row.embedding.replace(/[\[\]]/g, '');
+        const vector = vectorStr.split(',').map(v => parseFloat(v.trim()));
+        embeddingsMap.set(row.id, vector);
+      } catch (e) {
+        logger.warn('Failed to parse embedding', { itemId: row.id, error: e.message });
+      }
+    }
+
+    // Объединяем данные
+    const wardrobeItems = wardrobeItemsBase.map(item => ({
+      ...item,
+      embedding: embeddingsMap.get(item.id) || null
+    }));
 
     // Проверка минимального количества вещей
     if (wardrobeItems.length < 3) {

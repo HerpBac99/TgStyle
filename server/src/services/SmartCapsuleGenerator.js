@@ -362,10 +362,23 @@ class SmartCapsuleGenerator {
         break;
     }
 
-    // Сортируем по сезонной пригодности и выбираем лучшую
+    // Сортируем по комплексному score: сезонность + цвет + визуальная гармония
     candidates.sort((a, b) => {
-      const aScore = (a.seasonScore || 0.5) + this.getColorHarmonyScore(a, currentCombination);
-      const bScore = (b.seasonScore || 0.5) + this.getColorHarmonyScore(b, currentCombination);
+      // Веса для разных факторов (сумма = 1.0)
+      const SEASON_WEIGHT = 0.25;  // Сезонная пригодность
+      const COLOR_WEIGHT = 0.35;   // Цветовая гармония
+      const VISUAL_WEIGHT = 0.40;  // Визуальная гармония (самый важный!)
+
+      const aScore = 
+        (a.seasonScore || 0.5) * SEASON_WEIGHT +
+        this.getColorHarmonyScore(a, currentCombination) * COLOR_WEIGHT +
+        this.getVisualHarmonyScore(a, currentCombination) * VISUAL_WEIGHT;
+      
+      const bScore = 
+        (b.seasonScore || 0.5) * SEASON_WEIGHT +
+        this.getColorHarmonyScore(b, currentCombination) * COLOR_WEIGHT +
+        this.getVisualHarmonyScore(b, currentCombination) * VISUAL_WEIGHT;
+      
       return bScore - aScore;
     });
 
@@ -403,6 +416,103 @@ class SmartCapsuleGenerator {
       .replace(/light |dark |bright |pale /, '');
     
     return baseColor;
+  }
+
+  /**
+   * Вычисляет косинусное сходство между двумя векторами
+   * @param {Array<number>} vec1 - Первый вектор
+   * @param {Array<number>} vec2 - Второй вектор
+   * @returns {number} - Сходство от 0 до 1
+   */
+  cosineSimilarity(vec1, vec2) {
+    if (!vec1 || !vec2 || vec1.length !== vec2.length || vec1.length === 0) {
+      return 0;
+    }
+
+    let dotProduct = 0;
+    let norm1 = 0;
+    let norm2 = 0;
+
+    for (let i = 0; i < vec1.length; i++) {
+      dotProduct += vec1[i] * vec2[i];
+      norm1 += vec1[i] * vec1[i];
+      norm2 += vec2[i] * vec2[i];
+    }
+
+    norm1 = Math.sqrt(norm1);
+    norm2 = Math.sqrt(norm2);
+
+    if (norm1 === 0 || norm2 === 0) {
+      return 0;
+    }
+
+    return dotProduct / (norm1 * norm2);
+  }
+
+  /**
+   * Оценивает визуальную гармонию вещи с уже выбранными вещами
+   * Использует векторное сходство (embeddings) для оценки визуальной совместимости
+   * @param {Object} item - Вещь для оценки
+   * @param {Array<Object>} currentCombination - Уже выбранные вещи
+   * @returns {number} - Score от 0 до 1
+   */
+  getVisualHarmonyScore(item, currentCombination) {
+    if (currentCombination.length === 0) {
+      return 0.5; // Нейтральный score для первой вещи
+    }
+
+    // Парсим embedding если это JSON строка
+    let itemEmbedding = item.embedding;
+    if (typeof itemEmbedding === 'string') {
+      try {
+        itemEmbedding = JSON.parse(itemEmbedding);
+      } catch (e) {
+        logger.warn('Failed to parse item embedding', { itemId: item.id });
+        return 0.5;
+      }
+    }
+
+    if (!itemEmbedding || !Array.isArray(itemEmbedding) || itemEmbedding.length === 0) {
+      return 0.5; // Нет embedding - нейтральный score
+    }
+
+    let totalSimilarity = 0;
+    let count = 0;
+
+    for (const existingItem of currentCombination) {
+      // Парсим embedding существующей вещи
+      let existingEmbedding = existingItem.embedding;
+      if (typeof existingEmbedding === 'string') {
+        try {
+          existingEmbedding = JSON.parse(existingEmbedding);
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (existingEmbedding && Array.isArray(existingEmbedding) && existingEmbedding.length > 0) {
+        const similarity = this.cosineSimilarity(itemEmbedding, existingEmbedding);
+        
+        // Оптимальное сходство: 0.6-0.8 (похожи, но не идентичны)
+        // Слишком высокое сходство (>0.9) = почти одинаковые вещи (плохо)
+        // Слишком низкое сходство (<0.4) = несовместимые вещи (плохо)
+        let adjustedSimilarity;
+        if (similarity >= 0.6 && similarity <= 0.8) {
+          adjustedSimilarity = 1.0; // Идеальный диапазон
+        } else if (similarity > 0.8) {
+          adjustedSimilarity = 0.7; // Слишком похожи
+        } else if (similarity >= 0.4) {
+          adjustedSimilarity = 0.8; // Приемлемо
+        } else {
+          adjustedSimilarity = 0.4; // Слишком разные
+        }
+
+        totalSimilarity += adjustedSimilarity;
+        count++;
+      }
+    }
+
+    return count > 0 ? totalSimilarity / count : 0.5;
   }
 
   /**
@@ -465,10 +575,12 @@ class SmartCapsuleGenerator {
 
   /**
    * Оценивает общую гармонию капсулы
+   * Учитывает цвет, стиль и визуальное сходство
    */
   evaluateHarmony(combination) {
     let colorScore = 0;
     let styleScore = 0;
+    let visualScore = 0;
     let count = 0;
 
     // Оцениваем попарную совместимость
@@ -494,6 +606,34 @@ class SmartCapsuleGenerator {
           styleScore += 0.4;
         }
 
+        // Визуальная совместимость (через embeddings)
+        let embedding1 = item1.embedding;
+        let embedding2 = item2.embedding;
+
+        if (typeof embedding1 === 'string') {
+          try { embedding1 = JSON.parse(embedding1); } catch (e) { embedding1 = null; }
+        }
+        if (typeof embedding2 === 'string') {
+          try { embedding2 = JSON.parse(embedding2); } catch (e) { embedding2 = null; }
+        }
+
+        if (embedding1 && embedding2 && Array.isArray(embedding1) && Array.isArray(embedding2)) {
+          const similarity = this.cosineSimilarity(embedding1, embedding2);
+          
+          // Оптимальное сходство: 0.6-0.8
+          if (similarity >= 0.6 && similarity <= 0.8) {
+            visualScore += 1.0;
+          } else if (similarity > 0.8) {
+            visualScore += 0.7; // Слишком похожи
+          } else if (similarity >= 0.4) {
+            visualScore += 0.8;
+          } else {
+            visualScore += 0.4;
+          }
+        } else {
+          visualScore += 0.5; // Нет embedding - нейтральный score
+        }
+
         count++;
       }
     }
@@ -502,8 +642,10 @@ class SmartCapsuleGenerator {
 
     const avgColorScore = colorScore / count;
     const avgStyleScore = styleScore / count;
+    const avgVisualScore = visualScore / count;
 
-    return (avgColorScore * 0.6 + avgStyleScore * 0.4);
+    // Веса: визуальная гармония самая важная (40%), цвет (35%), стиль (25%)
+    return (avgColorScore * 0.35 + avgStyleScore * 0.25 + avgVisualScore * 0.40);
   }
 
   /**
@@ -583,10 +725,13 @@ class SmartCapsuleGenerator {
 
     let reasoning = `Многослойный образ: ${layers.join(' + ')}.`;
     
-    if (harmonyScore > 0.7) {
-      reasoning += ' Отличная цветовая гармония.';
-    } else if (harmonyScore > 0.5) {
-      reasoning += ' Хорошее сочетание цветов.';
+    // Оценка гармонии с учетом визуального сходства
+    if (harmonyScore > 0.75) {
+      reasoning += ' Отличная визуальная и цветовая гармония.';
+    } else if (harmonyScore > 0.6) {
+      reasoning += ' Хорошее сочетание вещей.';
+    } else if (harmonyScore > 0.45) {
+      reasoning += ' Сбалансированная комбинация.';
     }
 
     return reasoning;

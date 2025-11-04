@@ -1,5 +1,8 @@
--- AlterTable (embedding field will be added later when pgvector is installed)
--- ALTER TABLE "wardrobe_items" ADD COLUMN     "embedding" vector(512);
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- AlterTable
+ALTER TABLE "wardrobe_items" ADD COLUMN "embedding" vector(512);
 
 -- CreateTable
 CREATE TABLE "style_outfits" (
@@ -11,6 +14,7 @@ CREATE TABLE "style_outfits" (
     "season" VARCHAR(50),
     "style" VARCHAR(100),
     "theme" VARCHAR(100),
+    "embedding" vector(512),
     "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
