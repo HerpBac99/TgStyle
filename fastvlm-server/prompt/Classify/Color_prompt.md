@@ -1,0 +1,2 @@
+Describe What color of clothing is this? Answer with ONE WORD ONLY from this list:
+black, white, gray, silver, charcoal, blue, navy, lightblue, skyblue, turquoise, cyan, teal, aqua, red, burgundy, maroon, crimson, pink, hotpink, rose, coral, salmon, green, darkgreen, olive, lime, mint, emerald, yellow, gold, mustard, lemon, orange, tangerine, peach, brown, tan, beige, khaki, camel, chocolate, purple, violet, lavender, lilac, magenta, indigo, cream, ivory, offwhite, multicolor

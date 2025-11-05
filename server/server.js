@@ -18,6 +18,7 @@ const prisma = require('./src/lib/prisma');
 // Импорт API маршрутов
 const authRoutes = require('./src/api/auth');
 const analyzeRoutes = require('./src/api/analyze');
+const analyzeGeminiRoutes = require('./src/api/analyze_gemini');  // NEW: Gemini Direct
 const backgroundRemovalRoutes = require('./src/api/backgroundRemoval');
 const clothingClassificationRoutes = require('./src/api/clothingClassification');
 const historyRoutes = require('./src/api/history');
@@ -57,6 +58,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 logger.info('Loading API routes...');
 app.use('/api/auth', authRoutes);
 app.use('/api/analyze', analyzeRoutes);
+app.use('/api/analyze_gemini', analyzeGeminiRoutes);  // NEW: Gemini Direct анализ
 app.use('/api/remove-background', backgroundRemovalRoutes);
 app.use('/api/classify-clothing', clothingClassificationRoutes);
 app.use('/api/history', historyRoutes);

@@ -127,20 +127,33 @@ class SmartCapsuleGenerator {
       const itemsByCategory = this.groupByCategory(seasonalItems);
       
       // 3. Генерируем 3 разные стратегии
-      const strategies = ['balanced', 'popular', 'experimental'];
+      // ВАЖНО: Перемешиваем порядок стратегий для разнообразия
+      const strategies = ['balanced', 'popular', 'experimental'].sort(() => Math.random() - 0.5);
       const capsules = [];
       
+      // Пытаемся сгенерировать до 5 раз для каждой стратегии
+      const maxAttempts = 5;
+      
       for (const strategy of strategies) {
-        const capsule = this.generateSingleCapsule(
-          itemsByCategory, 
-          currentSeason, 
-          strategy,
-          [...capsules, ...existingCapsules],
-          excludeCombinations
-        );
+        let capsule = null;
         
-        if (capsule) {
-          capsules.push(capsule);
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          capsule = this.generateSingleCapsule(
+            itemsByCategory, 
+            currentSeason, 
+            strategy,
+            [...capsules, ...existingCapsules],
+            excludeCombinations
+          );
+          
+          if (capsule) {
+            capsules.push(capsule);
+            break; // Успешно сгенерировали, переходим к следующей стратегии
+          }
+        }
+        
+        if (!capsule) {
+          logger.warn(`Не удалось сгенерировать капсулу ${strategy} за ${maxAttempts} попыток`);
         }
       }
 
@@ -235,7 +248,7 @@ class SmartCapsuleGenerator {
 
     // 2. Добавляем рекомендуемые категории
     for (const category of layerRules.recommended) {
-      if (combination.length >= 5) break; // Ограничиваем размер капсулы
+      if (combination.length >= 6) break; // Увеличили лимит до 6
       
       const item = this.selectItemFromCategory(
         itemsByCategory[category] || [], 
@@ -250,8 +263,11 @@ class SmartCapsuleGenerator {
     }
 
     // 3. Добавляем опциональные категории для разнообразия
-    for (const category of layerRules.optional) {
-      if (combination.length >= 4) break;
+    // ВАЖНО: Перемешиваем порядок для случайности
+    const shuffledOptional = [...layerRules.optional].sort(() => Math.random() - 0.5);
+    
+    for (const category of shuffledOptional) {
+      if (combination.length >= 6) break; // Увеличили лимит до 6
       if (usedCategories.has(category)) continue;
       
       const item = this.selectItemFromCategory(
@@ -272,9 +288,13 @@ class SmartCapsuleGenerator {
       return null;
     }
 
+    // Логируем состав капсулы для отладки
+    const categories = combination.map(item => item.category).join(', ');
+    logger.info(`Капсула ${strategy}: ${combination.length} вещей (${categories})`);
+
     // Проверяем уникальность
     if (this.isDuplicateCombination(combination, existingCapsules, excludeCombinations)) {
-      logger.info(`Капсула ${strategy} дублирует существующую, пропускаем`);
+      logger.info(`Капсула ${strategy} дублирует существующую (${combination.length} вещей), пропускаем`);
       return null;
     }
 
@@ -381,6 +401,17 @@ class SmartCapsuleGenerator {
       
       return bScore - aScore;
     });
+
+    // Добавляем разнообразие: для experimental берем из топ-3, для других - лучшую
+    if (strategy === 'experimental' && candidates.length >= 3) {
+      // Выбираем случайно из топ-3 для разнообразия
+      const topCandidates = candidates.slice(0, 3);
+      return topCandidates[Math.floor(Math.random() * topCandidates.length)];
+    } else if (strategy === 'popular' && candidates.length >= 2) {
+      // Для popular берем из топ-2
+      const topCandidates = candidates.slice(0, 2);
+      return topCandidates[Math.floor(Math.random() * topCandidates.length)];
+    }
 
     return candidates[0];
   }
@@ -548,24 +579,27 @@ class SmartCapsuleGenerator {
   isDuplicateCombination(combination, existingCapsules, excludeCombinations) {
     const currentIds = new Set(combination.map(item => item.id));
 
-    // Проверяем исключенные комбинации
+    // Проверяем исключенные комбинации (строгий порог 90%)
     for (const excludedIds of excludeCombinations) {
       const excludedSet = new Set(excludedIds);
       const intersection = new Set([...currentIds].filter(id => excludedSet.has(id)));
       const similarity = intersection.size / Math.max(currentIds.size, excludedSet.size);
       
-      if (similarity > 0.7) {
+      // Строгий порог для исключенных комбинаций
+      if (similarity > 0.9) {
         return true;
       }
     }
 
-    // Проверяем существующие капсулы
+    // Проверяем существующие капсулы (мягкий порог 80%)
     for (const capsule of existingCapsules) {
       const existingIds = new Set(capsule.itemIds || []);
       const intersection = new Set([...currentIds].filter(id => existingIds.has(id)));
       const similarity = intersection.size / Math.max(currentIds.size, existingIds.size);
       
-      if (similarity > 0.7) {
+      // Мягкий порог для существующих капсул
+      // Позволяет генерировать похожие капсулы с 1-2 разными вещами
+      if (similarity > 0.8) {
         return true;
       }
     }

@@ -2441,7 +2441,7 @@ def validate_and_correct_category(raw_type: str, subtype: str) -> str:
 
 @app.route('/classify_clothing', methods=['POST'])
 def classify_clothing():
-    """Классификация одежды: удаление фона + анализ через FastVLM"""
+    """Классификация одежды: удаление фона + 6 последовательных промптов через FastVLM"""
     app.logger.debug('[DEBUG] FastVLM /classify_clothing - START')
     start_time = time.time()
 
@@ -2463,32 +2463,16 @@ def classify_clothing():
         image_base64 = data['image_base64']
         app.logger.debug(f'[DEBUG] FastVLM /classify_clothing - received image_base64 size: {len(image_base64) if image_base64 else 0}')
 
-        # Получаем prompt (по умолчанию используем глобальный class_prompt)
-        prompt = data.get('prompt', class_prompt)
-
         # Правильная обработка base64: удаляем префикс data:image если есть
         if image_base64.startswith('data:image'):
             image_base64 = image_base64.split(',', 1)[1] if ',' in image_base64 else image_base64
-
-        app.logger.info(f"Промпт для классификации: {prompt}")
-        app.logger.info(f"Источник запроса: {'тестовый скрипт' if data.get('prompt') else 'приложение (default prompt)'}")
-        app.logger.info(f"Размер изображения после декодирования: будет определен после декодирования")
 
         # Шаг 1: Декодируем изображение
         try:
             image_data = base64.b64decode(image_base64)
             image = Image.open(io.BytesIO(image_data)).convert('RGB')
             
-            # Детальная информация об изображении
             app.logger.info(f"Изображение декодировано: {image.size}")
-            app.logger.info(f"Формат изображения: {image.format}")
-            app.logger.info(f"Режим изображения: {image.mode}")
-            app.logger.info(f"Размер данных: {len(image_data)} байт")
-            app.logger.info(f"Размер base64: {len(image_base64)} символов")
-            
-            # Проверяем первые байты для определения формата
-            format_signature = image_data[:10].hex()
-            app.logger.info(f"Сигнатура файла (первые 10 байт): {format_signature}")
             
         except Exception as e:
             app.logger.error(f"Ошибка декодирования изображения: {e}")
@@ -2497,143 +2481,146 @@ def classify_clothing():
                 'error': f'Invalid image data: {e}'
             }), 400
 
-        # Шаг 2: Удаляем фон с upscaling для лучшего качества краев
+        # Шаг 2: Удаляем фон
         bg_removal_start = time.time()
         result_image, bg_processing_time = background_remover.remove_background(image, upscale=True)
-        # НЕ применяем дополнительное размытие - используем встроенную постобработку rembg
-        # result_image = background_remover.post_process_mask(result_image, feather=0)
         result_image = background_remover.crop_to_content(result_image, padding=10)
         bg_removal_time = time.time() - bg_removal_start
-        app.logger.info(f"Фон удален за {bg_removal_time:.2f}с (с upscaling)")
+        app.logger.info(f"Фон удален за {bg_removal_time:.2f}с")
 
         # Конвертируем результат в base64 для анализа
         output_buffer = io.BytesIO()
         result_image.save(output_buffer, format='PNG')
         processed_image_base64 = base64.b64encode(output_buffer.getvalue()).decode('utf-8')
 
-        # Шаг 3: Проверяем prompt
-        if prompt is None:
-            app.logger.error("Prompt не задан")
-            return jsonify({
-                'success': False,
-                'error': 'Classification prompt not provided'
-            }), 500
+        # Шаг 3: Загружаем 6 промптов из файлов
+        prompt_dir = os.path.join(os.path.dirname(__file__), 'prompt', 'Classify')
+        
+        prompts = {}
+        prompt_files = {
+            'category': 'Category_prompt.md',
+            'type': 'Type_prompt.md',
+            'color': 'Color_prompt.md',
+            'material': 'Material_prompt.md',
+            'style': 'Style_prompt.md',
+            'season': 'Season_prompt.md'
+        }
+        
+        for key, filename in prompt_files.items():
+            filepath = os.path.join(prompt_dir, filename)
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    prompts[key] = f.read().strip()
+                app.logger.debug(f"Загружен промпт {key}: {len(prompts[key])} символов")
+            except Exception as e:
+                app.logger.error(f"Ошибка загрузки промпта {key}: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Failed to load prompt {key}: {e}'
+                }), 500
 
-        app.logger.debug(f"Используем prompt: {prompt[:100]}...")
-
-        # Шаг 4: Анализируем через FastVLM
-        analysis_start = time.time()
-        classification_text, error = analyze_image_fastvlm(processed_image_base64, prompt)
-        analysis_time = time.time() - analysis_start
-
+        # Шаг 4: Последовательно вызываем 6 промптов
+        app.logger.info("Начинаем последовательную классификацию (6 промптов)")
+        
+        classification_results = {}
+        timing_details = {}
+        
+        # 1. Category
+        app.logger.info("1/6: Определяем категорию...")
+        cat_start = time.time()
+        category_raw, error = analyze_image_fastvlm(processed_image_base64, prompts['category'])
+        timing_details['category'] = time.time() - cat_start
         if error:
-            app.logger.error(f"Ошибка анализа: {error}")
-            return jsonify({
-                'success': False,
-                'error': error
-            }), 500
+            return jsonify({'success': False, 'error': f'Category analysis failed: {error}'}), 500
+        classification_results['category_raw'] = category_raw.strip().upper()
+        app.logger.info(f"   Категория: {classification_results['category_raw']} ({timing_details['category']:.2f}с)")
+        
+        # 2. Type
+        app.logger.info("2/6: Определяем тип одежды...")
+        type_start = time.time()
+        type_raw, error = analyze_image_fastvlm(processed_image_base64, prompts['type'])
+        timing_details['type'] = time.time() - type_start
+        if error:
+            return jsonify({'success': False, 'error': f'Type analysis failed: {error}'}), 500
+        classification_results['type_raw'] = type_raw.strip().lower()
+        app.logger.info(f"   Тип: {classification_results['type_raw']} ({timing_details['type']:.2f}с)")
+        
+        # 3. Color
+        app.logger.info("3/6: Определяем цвет...")
+        color_start = time.time()
+        color_raw, error = analyze_image_fastvlm(processed_image_base64, prompts['color'])
+        timing_details['color'] = time.time() - color_start
+        if error:
+            return jsonify({'success': False, 'error': f'Color analysis failed: {error}'}), 500
+        classification_results['color_raw'] = color_raw.strip().lower()
+        app.logger.info(f"   Цвет: {classification_results['color_raw']} ({timing_details['color']:.2f}с)")
+        
+        # 4. Material
+        app.logger.info("4/6: Определяем материал...")
+        material_start = time.time()
+        material_raw, error = analyze_image_fastvlm(processed_image_base64, prompts['material'])
+        timing_details['material'] = time.time() - material_start
+        if error:
+            return jsonify({'success': False, 'error': f'Material analysis failed: {error}'}), 500
+        classification_results['material_raw'] = material_raw.strip().lower()
+        app.logger.info(f"   Материал: {classification_results['material_raw']} ({timing_details['material']:.2f}с)")
+        
+        # 5. Style
+        app.logger.info("5/6: Определяем стиль...")
+        style_start = time.time()
+        style_raw, error = analyze_image_fastvlm(processed_image_base64, prompts['style'])
+        timing_details['style'] = time.time() - style_start
+        if error:
+            return jsonify({'success': False, 'error': f'Style analysis failed: {error}'}), 500
+        classification_results['style_raw'] = style_raw.strip().lower()
+        app.logger.info(f"   Стиль: {classification_results['style_raw']} ({timing_details['style']:.2f}с)")
+        
+        # 6. Season
+        app.logger.info("6/6: Определяем сезон...")
+        season_start = time.time()
+        season_raw, error = analyze_image_fastvlm(processed_image_base64, prompts['season'])
+        timing_details['season'] = time.time() - season_start
+        if error:
+            return jsonify({'success': False, 'error': f'Season analysis failed: {error}'}), 500
+        classification_results['season_raw'] = season_raw.strip().lower()
+        app.logger.info(f"   Сезон: {classification_results['season_raw']} ({timing_details['season']:.2f}с)")
+        
+        analysis_time = sum(timing_details.values())
 
-        app.logger.info(f"Анализ завершен за {analysis_time:.2f}с")
-        app.logger.info(f"Результат анализа: {classification_text}")
+        # Шаг 5: Валидация и маппинг результатов
+        app.logger.info("Валидация и маппинг результатов...")
+        
+        # Валидируем категорию на основе типа
+        validated_category = validate_and_correct_category(
+            classification_results['category_raw'],
+            classification_results['type_raw']
+        )
+        
+        # Переводим тип на русский
+        subtype_russian = map_subtype_to_russian(classification_results['type_raw'])
+        
+        # Переводим цвет на русский
+        color_russian = map_color_to_russian(classification_results['color_raw'])
+        
+        # Переводим материал на русский
+        material_russian = map_material_to_russian(classification_results['material_raw'])
+        
+        # Нормализуем стиль на русский enum
+        style_russian = map_style_to_enum(classification_results['style_raw'])
+        
+        classification = {
+            'category': validated_category,
+            'type': classification_results['type_raw'],
+            'subtype': subtype_russian,
+            'color': color_russian,
+            'material': material_russian,
+            'style': style_russian,
+            'season': classification_results['season_raw'],
+            'pattern': 'Unknown',  # Не определяем паттерн в новой версии
+            'description': f"{subtype_russian} {color_russian}"  # Простое описание
+        }
 
-        # Шаг 5: Парсим результат
-        parsing_start = time.time()
-        try:
-            lines = [line.strip() for line in classification_text.strip().split('\n') if line.strip()]
-
-            # Извлекаем значения (формат: "1. Value")
-            parsed_data = {}
-            for line in lines:
-                if '. ' in line:
-                    parts = line.split('. ', 1)
-                    if len(parts) == 2:
-                        index = parts[0].strip()
-                        value = parts[1].strip()
-                        parsed_data[index] = value
-
-            parsing_time = time.time() - parsing_start
-
-            # Новый формат ответа (9 пунктов):
-            # 1. Тип одежды (для определения категории)
-            # 2. Подтип одежды (ключевое слово)
-            # 3. Цвет
-            # 4. Материал
-            # 5. Посадка (fit)
-            # 6. Стиль
-            # 7. Сезон
-            # 8. Паттерн/узор
-            # 9. Описание (полное предложение)
-
-            raw_type = parsed_data.get('1', 'Unknown')  # Тип одежды для определения категории
-            raw_subtype = parsed_data.get('2', 'Unknown')  # Подтип одежды (ключевое слово)
-            raw_color = parsed_data.get('3', 'Unknown')  # Цвет
-            raw_material = parsed_data.get('4', 'Unknown')  # Материал
-            raw_fit = parsed_data.get('5', 'Unknown')  # Посадка
-            raw_style = parsed_data.get('6', 'Unknown')  # Стиль
-            raw_season = parsed_data.get('7', 'Unknown')  # Сезон
-            raw_pattern = parsed_data.get('8', 'Unknown')  # Паттерн
-            raw_description = parsed_data.get('9', 'Unknown')  # Описание
-
-            # Валидируем и корректируем категорию на основе subtype
-            mapping_start = time.time()
-            normalized_category = validate_and_correct_category(raw_type, raw_subtype)
-            mapping_time = time.time() - mapping_start
-
-            # Переводим subtype на русский
-            subtype_start = time.time()
-            subtype_russian = map_subtype_to_russian(raw_subtype) if raw_subtype != 'Unknown' else 'Неизвестно'
-            subtype_time = time.time() - subtype_start
-
-            # Цвет на английском от LLM - переводим на русский
-            color_start = time.time()
-            color_russian = map_color_to_russian(raw_color) if raw_color != 'Unknown' else 'Неизвестно'
-            color_time = time.time() - color_start
-
-            # Материал на английском от LLM - переводим на русский
-            material_start = time.time()
-            material_russian = map_material_to_russian(raw_material) if raw_material != 'Unknown' else 'Неизвестно'
-            material_time = time.time() - material_start
-
-            # Нормализуем стиль на русский enum
-            style_start = time.time()
-            style_russian = map_style_to_enum(raw_style) if raw_style != 'Unknown' else 'Неизвестно'
-            style_time = time.time() - style_start
-
-            # Логируем переводы для отладки
-            app.logger.debug(f"Переводы: subtype '{raw_subtype}' → '{subtype_russian}', style '{raw_style}' → '{style_russian}'")
-
-            classification = {
-                'category': normalized_category,  # Нормализованная категория (OUTERWEAR, INNERWEAR, etc.)
-                'type': raw_type,  # Оригинальный тип от LLM (для отладки)
-                'subtype': subtype_russian,  # Подтип одежды на русском
-                'color': color_russian,  # Цвет на русском языке
-                'material': material_russian,  # Материал на русском языке
-                'fit': raw_fit,  # Посадка (оставляем как есть)
-                'style': style_russian,  # Стиль на русском (нормализованный)
-                'season': raw_season,  # Сезон (оставляем как есть)
-                'pattern': raw_pattern,  # Паттерн/узор (оставляем как есть)
-                'description': raw_description  # Полное описание от LLM (пункт 9)
-            }
-
-            app.logger.info(f"Классификация распарсена: {classification}")
-
-        except Exception as e:
-            app.logger.error(f"Ошибка парсинга результата: {e}")
-            classification = {
-                'category': 'ACCESSORIES',
-                'type': 'Unknown',
-                'subtype': 'Неизвестно',
-                'color': 'Неизвестно',
-                'material': 'Неизвестно',
-                'fit': 'Unknown',
-                'style': 'Неизвестно',
-                'season': 'Unknown',
-                'pattern': 'Unknown',
-                'raw_text': classification_text,
-                'embedding': None  # Будет заполнено ниже
-            }
-
-        # Генерируем embedding для обработанного изображения (10-й пункт)
+        # Генерируем embedding
         embedding_start = time.time()
         embedding, embedding_error = generate_fashion_embedding(result_image)
         embedding_time = time.time() - embedding_start
@@ -2644,31 +2631,27 @@ def classify_clothing():
         else:
             app.logger.info(f"Embedding сгенерирован за {embedding_time:.2f}с")
 
-        # Добавляем embedding в classification как 10-й пункт
         classification['embedding'] = embedding
 
         total_time = time.time() - start_time
-        post_processing_time = total_time - bg_removal_time - analysis_time - embedding_time
         
         app.logger.info(f"✅ Классификация завершена за {total_time:.2f}с")
         app.logger.info(f"📊 Детализация времени:")
-        app.logger.info(f"   - Удаление фона: {bg_removal_time:.2f}с ({bg_removal_time/total_time*100:.1f}%)")
-        app.logger.info(f"   - LLM анализ: {analysis_time:.2f}с ({analysis_time/total_time*100:.1f}%)")
-        app.logger.info(f"   - Генерация embedding: {embedding_time:.2f}с ({embedding_time/total_time*100:.1f}%)")
-        app.logger.info(f"   - Постобработка: {post_processing_time:.2f}с ({post_processing_time/total_time*100:.1f}%)")
+        app.logger.info(f"   - Удаление фона: {bg_removal_time:.2f}с")
+        app.logger.info(f"   - 6 промптов FastVLM: {analysis_time:.2f}с")
+        app.logger.info(f"   - Генерация embedding: {embedding_time:.2f}с")
 
-        # Возвращаем результат с изображением без фона и embedding
         return jsonify({
             'success': True,
             'classification': classification,
             'processed_image_base64': f'data:image/png;base64,{processed_image_base64}',
-            'raw_analysis': classification_text,
+            'raw_analysis': classification_results,
             'timing': {
                 'total_time': round(total_time, 2),
                 'background_removal_time': round(bg_removal_time, 2),
                 'analysis_time': round(analysis_time, 2),
                 'embedding_time': round(embedding_time, 2),
-                'post_processing_time': round(post_processing_time, 2)
+                'detailed_timings': timing_details
             },
             'image_info': {
                 'original_size': f'{image.size[0]}x{image.size[1]}',
@@ -2941,6 +2924,290 @@ def simple_analyze():
             'success': False,
             'error': str(e),
             'time': round(total_time, 2)
+        }), 500
+
+
+@app.route('/analyze_gemini', methods=['POST'])
+def analyze_gemini():
+    """
+    Прямой анализ фотографии через Gemini 2.5 Flash (без FastVLM)
+    Отправляем фото напрямую в Gemini с промптом стилиста для сравнения подходов
+    """
+    analysis_start_time = time.time()
+
+    try:
+        if not gemini_client:
+            return jsonify({
+                'success': False,
+                'error': 'Gemini клиент не инициализирован'
+            }), 500
+
+        # Получаем данные
+        data = request.get_json()
+        if not data or 'image_base64' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'No image provided'
+            }), 400
+
+        image_base64 = data['image_base64']
+        nickname = data.get('nickname', 'unknown_user')
+        topic = data.get('topic', 'casual')
+
+        # Удаляем префикс data:image если есть
+        if image_base64.startswith('data:image'):
+            image_base64 = image_base64.split(',', 1)[1] if ',' in image_base64 else image_base64
+
+        app.logger.info(f"🚀 Прямой анализ через Gemini для пользователя {nickname} (тема: {topic})")
+
+        # Декодируем изображение для предобработки
+        try:
+            image_data = base64.b64decode(image_base64)
+            image = Image.open(io.BytesIO(image_data))
+
+            # Быстрая предобработка для мобильных фотографий
+            from image_preprocessing import fast_mobile_preprocess
+            image, processed_base64, metadata = fast_mobile_preprocess(
+                image.convert("RGB"),
+                target_width=1344,
+                target_height=1008,
+                quality=95
+            )
+
+            original_size_mb = len(image_data) / (1024 * 1024)
+            app.logger.info(f"📸 Предобработка: {metadata['original_size']} → {metadata['final_size']} пикселей, {original_size_mb:.2f} MB → {metadata['compressed_size_mb']:.2f} MB")
+
+        except Exception as e:
+            app.logger.error(f"Ошибка декодирования изображения: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Invalid image data: {e}'
+            }), 400
+
+        # Загружаем промпт стилиста
+        if not style_prompt:
+            return jsonify({
+                'success': False,
+                'error': 'Style prompt not loaded'
+            }), 500
+
+        # Получаем текущую дату для учета сезона и трендов
+        from datetime import datetime
+        current_date = datetime.now()
+        current_month = current_date.strftime('%B %Y')  # Например: "November 2024"
+        current_season = get_current_season(current_date.month)
+        
+        # Формируем детальный промпт для Gemini с учетом даты и трендов
+        gemini_prompt = f"""Ты профессиональный AI-стилист с 15-летним опытом работы в индустрии моды. Твоя задача - проанализировать фотографию и дать экспертные рекомендации по стилю.
+
+═══════════════════════════════════════════════════════════════
+📅 КОНТЕКСТ АНАЛИЗА
+═══════════════════════════════════════════════════════════════
+• Текущая дата: {current_month}
+• Сезон: {current_season}
+• Тема анализа: {topic}
+• Учитывай актуальные тренды {current_season} {current_date.year}
+
+═══════════════════════════════════════════════════════════════
+🎯 ЗАДАЧИ АНАЛИЗА
+═══════════════════════════════════════════════════════════════
+
+1️⃣ ДЕТАЛЬНОЕ ОПИСАНИЕ ОБРАЗА
+   Опиши каждый элемент одежды:
+   • Верхняя одежда (куртка, пальто, пиджак и т.д.)
+   • Средний слой (свитер, рубашка, блузка и т.д.)
+   • Низ (брюки, джинсы, юбка, шорты и т.д.)
+   • Обувь (тип, цвет, стиль)
+   • Аксессуары (сумка, украшения, головные уборы, очки и т.д.)
+   
+   Для каждого элемента укажи:
+   - Тип и фасон
+   - Цвет и материал (если видно)
+   - Посадка (oversized, slim-fit, regular и т.д.)
+
+2️⃣ АНАЛИЗ ЦВЕТОВОЙ ГАММЫ
+   • Основные цвета образа
+   • Акцентные цвета
+   • Оценка сочетаемости цветов (гармоничное/контрастное/монохромное)
+   • Соответствие цветовой палитры сезону {current_season}
+
+3️⃣ ОПРЕДЕЛЕНИЕ СТИЛЯ
+   • Основной стиль образа (casual, business, streetwear, smart casual, sporty и т.д.)
+   • Подстиль или микс стилей (если применимо)
+   • Соответствие трендам {current_season} {current_date.year}
+   • Уместность для темы "{topic}"
+
+4️⃣ ОЦЕНКА ОБРАЗА
+   Оцени по шкале от 1 до 10:
+   • Общая гармоничность образа
+   • Сочетаемость элементов
+   • Актуальность (соответствие трендам)
+   • Уместность для сезона
+
+═══════════════════════════════════════════════════════════════
+💡 РЕКОМЕНДАЦИИ ПО УЛУЧШЕНИЮ
+═══════════════════════════════════════════════════════════════
+
+Дай 3-5 КОНКРЕТНЫХ рекомендаций:
+
+✅ ЧТО РАБОТАЕТ ХОРОШО:
+   • Укажи 2-3 сильные стороны образа
+   • Что стоит сохранить
+
+🔄 ЧТО МОЖНО УЛУЧШИТЬ:
+   • Конкретные предложения по замене/добавлению элементов
+   • Альтернативные цветовые сочетания
+   • Рекомендации по аксессуарам
+
+🎨 СТИЛИСТИЧЕСКИЕ СОВЕТЫ:
+   • Как адаптировать образ под разные случаи
+   • Актуальные тренды {current_season} {current_date.year}, которые можно применить
+   • Сезонные рекомендации для {current_season}
+
+🛍️ РЕКОМЕНДАЦИИ ПО ПОКУПКАМ (если нужно):
+   • Какие элементы гардероба стоит добавить
+   • Приоритетные покупки для улучшения образа
+
+═══════════════════════════════════════════════════════════════
+📋 ПРАВИЛА ОТВЕТА
+═══════════════════════════════════════════════════════════════
+
+✓ Пиши на русском языке
+✓ Используй структурированный формат с эмодзи для читаемости
+✓ Будь конкретным и практичным
+✓ Учитывай актуальные тренды {current_season} {current_date.year}
+✓ Давай реалистичные советы, которые легко применить
+✓ Будь позитивным, но честным
+✓ Объясняй ПОЧЕМУ ты даешь ту или иную рекомендацию
+✓ Учитывай сезонность и погодные условия {current_season}
+
+✗ Не используй общие фразы типа "выглядит хорошо"
+✗ Не критикуй личность, только одежду
+✗ Не рекомендуй дорогие бренды без необходимости
+✗ Не игнорируй контекст темы "{topic}"
+
+═══════════════════════════════════════════════════════════════
+
+Начни анализ с краткого вступления, затем следуй структуре выше. Будь экспертом, который помогает человеку выглядеть лучше!"""
+
+        app.logger.info(f"📝 Промпт для Gemini: {len(gemini_prompt)} символов")
+
+        # Отправляем запрос в Gemini с изображением
+        gemini_request_start = time.time()
+
+        try:
+            # Конвертируем base64 в bytes для Gemini
+            image_bytes = base64.b64decode(processed_base64)
+
+            # Создаем запрос с изображением и текстом
+            response = gemini_client.models.generate_content(
+                model=Config.STYLIST_GEMINI_MODEL,
+                contents=[{
+                    "parts": [
+                        {
+                            "inline_data": {
+                                "mime_type": "image/jpeg",
+                                "data": processed_base64
+                            }
+                        },
+                        {"text": gemini_prompt}
+                    ]
+                }],
+                config=types.GenerateContentConfig(
+                    temperature=Config.STYLIST_GEMINI_TEMPERATURE,
+                    max_output_tokens=Config.STYLIST_GEMINI_MAX_TOKENS,
+                    thinking_config=types.ThinkingConfig(
+                        thinking_budget=Config.STYLIST_GEMINI_THINKING_BUDGET
+                    )
+                )
+            )
+
+            if not response or not hasattr(response, 'text') or not response.text:
+                raise Exception("Gemini API вернул пустой ответ")
+
+            gemini_response = response.text.strip()
+            gemini_time = time.time() - gemini_request_start
+
+            app.logger.info(f"✅ Gemini ответил за {gemini_time:.2f}с: {len(gemini_response)} символов")
+
+        except Exception as e:
+            app.logger.error(f"Ошибка запроса к Gemini: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Gemini API error: {str(e)}'
+            }), 500
+
+        total_time = time.time() - analysis_start_time
+
+        # Сохраняем результат для сравнения
+        try:
+            logs_dir = os.path.join(os.path.dirname(__file__), 'logs')
+            os.makedirs(logs_dir, exist_ok=True)
+
+            from datetime import datetime
+            timestamp_str = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            safe_nickname = nickname.replace('/', '_').replace('\\', '_')[:50]
+            filename = f"gemini_direct_{safe_nickname}_{timestamp_str}.json"
+            filepath = os.path.join(logs_dir, filename)
+
+            result_data = {
+                "timestamp": timestamp_str,
+                "nickname": nickname,
+                "topic": topic,
+                "method": "gemini_direct",
+                "image_info": {
+                    "original_size": metadata['original_size'],
+                    "final_size": metadata['final_size'],
+                    "compressed_size_mb": metadata['compressed_size_mb']
+                },
+                "gemini_response": gemini_response,
+                "timing": {
+                    "gemini_time_seconds": round(gemini_time, 2),
+                    "total_time_seconds": round(total_time, 2)
+                },
+                "response_length": len(gemini_response)
+            }
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(result_data, f, ensure_ascii=False, indent=2)
+
+            app.logger.info(f"💾 Результат сохранен: {filepath}")
+
+        except Exception as e:
+            app.logger.error(f"Ошибка сохранения результата: {e}")
+
+        app.logger.info(f"🎯 Прямой анализ через Gemini завершен за {total_time:.2f}с")
+
+        return jsonify({
+            'success': True,
+            'analysis': gemini_response,
+            'technical_analysis': '',  # Нет технического анализа от FastVLM
+            'model_used': 'gemini_direct',
+            'model_type': Config.STYLIST_GEMINI_MODEL,
+            'timing': {
+                'total_time': round(total_time, 2),
+                'gemini_time': round(gemini_time, 2),
+                'fastvlm_time': 0  # FastVLM не использовался
+            },
+            'image_info': {
+                'original_size': metadata['original_size'],
+                'final_size': metadata['final_size'],
+                'compressed_size_mb': metadata['compressed_size_mb']
+            }
+        })
+
+    except Exception as e:
+        total_time = time.time() - analysis_start_time
+        error_msg = f"Ошибка прямого анализа через Gemini: {e}"
+        app.logger.error(error_msg)
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timing': {
+                'total_time': round(total_time, 2)
+            }
         }), 500
 
 

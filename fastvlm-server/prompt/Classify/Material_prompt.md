@@ -1,0 +1,2 @@
+Describe What material of clothing is this? Answer with ONE WORD ONLY from this list:
+cotton, polyester, wool, leather, denim, silk, linen, nylon, spandex, fleece, cashmere, suede, canvas, velvet, satin, chiffon, jersey, tweed, corduroy, knit, mesh, synthetic, rubber, plastic, metal, fabric
