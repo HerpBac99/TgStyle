@@ -19,48 +19,33 @@ from typing import List, Dict, Any
 # URL FastVLM сервера
 FASTVLM_URL = "http://127.0.0.1:3001"
 
-# Путь к изображению или папке с изображениями
-# Примеры:
-# - Одно изображение: "../server/uploads/wardrobe/251053908/item_251053908_9na5rrt5.png"
-# - Папка пользователя: "../server/uploads/wardrobe/251053908"
-# - Вся папка wardrobe: "../server/uploads/wardrobe"
-#IMAGE_PATH = "server/uploads/wardrobe/251053908/item_251053908_yyz78fw2.png" #джинсы
-#IMAGE_PATH = "server/uploads/wardrobe/251053908/item_251053908_9na5rrt5.png" #пальто
-#IMAGE_PATH = "server/uploads/wardrobe/251053908/item_251053908_74kyg057.png" #t-shirt
-#IMAGE_PATH = "server/uploads/wardrobe/251053908/item_251053908_uqwj3pcw.png" #ботинки
-#IMAGE_PATH = "server/uploads/wardrobe/251053908/item_251053908_11p6hb3h.png" #кардиган
-#IMAGE_PATH = "server/uploads/wardrobe/251053908/item_251053908_8tcxxbvt.png" #кроссовки
-#IMAGE_PATH = "server/uploads/wardrobe/251053908/item_251053908_smcwebwq.png" #пальто
-#IMAGE_PATH = "server/uploads/wardrobe/251053908/item_251053908_3n53vvpb.png" #кроссовки
-#IMAGE_PATH = "server/uploads/wardrobe/251053908/item_251053908_3oicl12g.png" #кроссовки
-#IMAGE_PATH = "server/uploads/wardrobe/251053908/item_251053908_iy0o0ael.png" #кроссовки
-IMAGE_PATH = "server/uploads/stock/StyleOutfit/Woman/Пальто_бежевое/Set_1/6.png" #кроссовки
+IMAGE_PATH = "server/uploads/wardrobe/568613134/item_568613134_wst2meh8.png" #кроссовки
 
 # Список промптов для тестирования
 PROMPTS = [
     
     # Промпт 1: Конкретный тип одежды (максимально полный список)
-    """Describe What category is this? Answer with ONE WORD ONLY:
-OUTERWEAR, INNERWEAR, BODYWEAR, FULLBODY, LEGWEAR, FOOTWEAR, HEADWEAR, ACCESSORIES""",
+    """What category of clothing? Answer with ONE WORD ONLY from this list:
+OUTERWEAR(), INNERWEAR, BODYWEAR, FULLBODY, LEGWEAR, FOOTWEAR, HEADWEAR, ACCESSORIES""",
     
     # Промпт 2: Конкретный тип одежды (максимально полный список 250+ вариантов)
-    """Describe What type of clothing is this? Answer with ONE WORD ONLY from this list:
+    """What type of clothing? Answer with ONE WORD ONLY from this list:
 jacket, coat, blazer, parka, trench, trenchcoat, bomber, bomberjacket, windbreaker, raincoat, puffer, pufferjacket, downcoat, downjacket, vest, puffervest, fleecevest, denimjacket, leatherjacket, suedejacket, peacoat, dufflecoat, anorak, cagoule, mackintosh, overcoat, topcoat, cardigan, opencardigan, longcardigan, cropcardigan, sweater, pullover, jumper, hoodie, hoodiepullover, ziphoodie, sweatshirt, crewneck, vneck, turtleneck, rollneck, mockneck, fleece, fleecejacket, polartec, poncho, shawl, cape, capelet, wrap, stole, bolero, shrug, shirt, blouse, top, tshirt, tee, tanktop, tank, camisole, cami, tunic, longline, crop, croptop, halter, haltertop, bandeau, bralette, corset, bustier, bodysuit, leotard, polo, poloshirt, henley, buttondown, buttonup, oxfordshirt, flannelshirt, chambray, denimshirt, silkblouse, peasantblouse, peplum, offshoulder, coldshoulder, sleeveless, longsleeve, shortsleeve, threequarter, raglan, batwing, bellsleeve, puffsleeve, dress, gown, eveninggown, ballgown, cocktaildress, partydress, sundress, shirtdress, wrapdress, sheathdress, fitandflare, aline, empire, shift, slip, slipdress, cami, camidress, maxi, maxidress, midi, mididress, mini, minidress, tea, teadress, asymmetric, highlow, mermaid, trumpet, bodycon, skater, tunic, tunicdress, smock, smockdress, pinafore, jumper, jumperdress, jumpsuit, playsuit, romper, shortalls, overalls, dungarees, coveralls, boilersuit, catsuit, unitard, pants, trousers, jeans, denim, skinnyjeans, slimjeans, straightjeans, bootcut, flare, wideleg, boyfriend, momjeans, highrisedjeans, lowrise, midrise, distressed, ripped, chinos, khakis, slacks, dresspants, trousers, cargopants, cargo, utilitytrousers, joggers, trackpants, sweatpants, loungepants, pajamapants, leggings, tights, jeggings, treggings, stirruppants, capris, cropped, croppedpants, anklepants, culottes, gauchos, palazzopants, harem, haremtrousers, shorts, denimshorts, cargoshorts, bermudashorts, chino, chinoshorts, athletic, athleticshorts, running, runningshorts, basketball, basketballshorts, cycling, cyclingshorts, board, boardshorts, swim, swimshorts, hotpants, skirt, miniskirt, midiskirt, maxiskirt, pencilskirt, alineskirt, pleatedskirt, wrapskirt, denimskirt, tuleskirt, circskirt, asymmetricskirt, tieredskirt, ruffledskirt, shoes, boots, sneakers, trainers, runners, kicks, hightops, lowtops, slipons, sandals, slides, flipflops, thongs, heels, highheels, pumps, stilettos, kitten, kittenheel, wedges, platforms, platformheels, flats, balletflats, loafers, pennyloafers, moccasins, drivingshoes, oxfords, brogues, derbys, monks, monkstraps, chelsea, chelseaboots, ankle, ankleboots, booties, knee, kneehighboots, thigh, thighhighboots, overtheknee, combat, combatboots, military, militaryboots, hiking, hikingboots, workboots, cowboy, cowboyboots, western, westernboots, riding, ridingboots, rain, rainboots, wellingtons, wellies, uggs, snowboots, winterboots, espadrilles, slippers, mules, clogs, crocs, boat, boatshoes, topsiders, canvas, canvasshoes, converse, vans, hat, cap, baseballcap, snapback, fitted, trucker, truckercap, dad, dadhat, beanie, knit, knithat, skullcap, watchcap, beret, fedora, trilby, panama, panamaha, bucket, buckethat, sunhat, widebrim, floppy, floppyhat, visor, headband, hairband, scrunchie, scarf, neckscarf, infinity, infinityscarf, bandana, kerchief, neckerchief, turban, headwrap, hijab, shemagh, snood, cowl, balaclava, bag, purse, handbag, shoulderbag, backpack, rucksack, daypack, tote, totebag, shopper, clutch, clutchbag, minaudiere, satchel, messenger, messengerbag, crossbody, crossbodybag, hobo, hobobag, bucket, bucketbag, drawstring, drawstringbag, duffel, duffelbag, weekender, weekenderbag, travelag, gym, gymbag, fanny, fannypack, beltbag, wristlet, pouch, wallet, billfold, cardholder, coinpurse, belt, leatherbelt, canvas, canvasbelt, chain, chainbelt, studded, studdedbelt, woven, wovenbelt, tie, necktie, bowtie, ascot, cravat, bolo, bolotie, suspenders, braces, gloves, mittens, fingerless, fingerlessgloves, socks, anklesocks, crew, crewsocks, knee, kneehighsocks, thigh, thighhighsocks, stockings, tights, pantyhose, fishnets, legwarmers, jewelry, necklace, pendant, choker, collar, chain, locket, pearls, beads, bracelet, bangle, cuff, charm, charmbracelet, anklet, ring, band, signet, cocktailring, stackable, earrings, studs, hoops, dangles, drops, chandelier, watch, wristwatch, smartwatch, chronograph, diver, diverwatch, sunglasses, shades, aviators, wayfarers, cateye, round, oversized, glasses, eyeglasses, spectacles, readers, readingglasses""",
     
     # Промпт 3: Цвет (расширенный список с оттенками)
-    """Describe What color of clothing is this? Answer with ONE WORD ONLY from this list:
+    """What color of clothing? Answer with ONE WORD ONLY from this list:
 black, white, gray, silver, charcoal, blue, navy, lightblue, skyblue, turquoise, cyan, teal, aqua, red, burgundy, maroon, crimson, pink, hotpink, rose, coral, salmon, green, darkgreen, olive, lime, mint, emerald, yellow, gold, mustard, lemon, orange, tangerine, peach, brown, tan, beige, khaki, camel, chocolate, purple, violet, lavender, lilac, magenta, indigo, cream, ivory, offwhite, multicolor""",
     
     # Промпт 4: Стиль (синхронизировано с UI - 10 вариантов)
-    """Describe What style of clothing is this? Answer with ONE WORD ONLY from this list:
+    """What style of clothing? Answer with ONE WORD ONLY from this list:
 casual, business, sporty, streetwear, formal, businesscasual, bohemian, vintage, minimalist, romantic""",
     
     # Промпт 5: Материал
-    """Describe What material of clothing is this? Answer with ONE WORD ONLY from this list:
+    """What material of clothing? Answer with ONE WORD ONLY from this list:
 cotton, polyester, wool, leather, denim, silk, linen, nylon, spandex, fleece, cashmere, suede, canvas, velvet, satin, chiffon, jersey, tweed, corduroy, knit, mesh, synthetic, rubber, plastic, metal, fabric""",
     
     # Промпт 6: Сезон
-    """Describe What season of clothing is this? Answer with ONE WORD ONLY from this list:
+    """What season of clothing? Answer with ONE WORD ONLY from this list:
 winter, spring, summer, autumn, allseason""",
 ]
 

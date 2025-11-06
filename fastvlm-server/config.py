@@ -96,8 +96,7 @@ class Config:
     if torch.cuda.is_available():
         DEVICE = 'cuda'
         gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3  # GB
-        print(f"GPU доступен: {torch.cuda.get_device_name(0)}")
-        print(f"GPU память: {gpu_memory:.1f} GB")
+        print(f"✅ GPU доступен: {torch.cuda.get_device_name(0)}")
     else:
         print("GPU не найден, используем CPU")
         DEVICE = 'cpu'
@@ -237,7 +236,6 @@ class Config:
             raise FileNotFoundError(f"Модель не найдена: {cls.MODEL_PATH}")
 
         # Выводим информацию о выбранной модели
-        print(f"Модель: {os.path.basename(cls.MODEL_PATH)}")
         print(f"Тип модели: {cls.MODEL_TYPE}")
 
         if cls.IS_7B_MODEL:
@@ -287,19 +285,3 @@ class Config:
             raise ValueError(f"Некорректное максимальное количество токенов Gemini: {cls.STYLIST_GEMINI_MAX_TOKENS}")
         if not (0 <= cls.STYLIST_GEMINI_THINKING_BUDGET <= 4096):
             raise ValueError(f"Некорректный thinking_budget Gemini: {cls.STYLIST_GEMINI_THINKING_BUDGET}")
-
-        print("FastVLM сервер запускается:")
-        print(f"  Модель: {os.path.basename(cls.MODEL_PATH)}")
-        print(f"  Порт: {cls.PORT}")
-        print(f"  Потоки (threads): {cls.THREADS}")
-        print(f"  Ограничение соединений: {cls.CONNECTION_LIMIT}")
-        print(f"  Таймаут соединений: {cls.CONNECTION_TIMEOUT}с")
-
-        # Параметры генерации для текущей модели
-        print(f"\n⚙️  Параметры генерации ({cls.MODEL_TYPE}):")
-        print(f"   - Температура: {cls.TEMPERATURE}")
-        print(f"   - Top-p: {cls.TOP_P}")
-        print(f"   - Top-k: {cls.TOP_K}")
-        print(f"   - Repetition penalty: {cls.REPETITION_PENALTY}")
-        print(f"   - Num beams: {cls.NUM_BEAMS}")
-        print(f"   - Early stopping: {cls.EARLY_STOPPING}")

@@ -19,7 +19,6 @@ def check_python_version():
         print(f"   Текущая версия: {version.major}.{version.minor}.{version.micro}")
         return False
 
-    print(f"✅ Python {version.major}.{version.minor}.{version.micro}")
     return True
 
 def check_gpu():
@@ -34,13 +33,6 @@ def check_gpu():
 
         gpu_name = torch.cuda.get_device_name(0)
         gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3  # GB
-
-        print(f"✅ GPU: {gpu_name}")
-        print(f"   Память: {gpu_memory:.1f} GB")
-
-        if gpu_memory < 12:
-            print("⚠️  GPU память < 12GB, возможны проблемы с 7B моделью")
-
         return True
 
     except ImportError:
@@ -51,12 +43,6 @@ def check_memory():
     """Проверка оперативной памяти"""
     memory = psutil.virtual_memory()
     memory_gb = memory.total / 1024**3
-
-    print(f"💾 RAM: {memory_gb:.1f} GB")
-
-    if memory_gb < 16:
-        print("⚠️  Предупреждение: Для 7B модели рекомендуется минимум 16GB RAM")
-
     return memory_gb >= 8  # Минимум 8GB
 
 def check_dependencies(model_type='1.5b', is_7b=False):
@@ -74,7 +60,6 @@ def check_dependencies(model_type='1.5b', is_7b=False):
     for package, name in required_packages:
         try:
             __import__(package)
-            print(f"✅ {name}")
         except ImportError:
             print(f"❌ {name} не установлен")
             missing.append(package)
@@ -103,7 +88,6 @@ def get_model_info():
                     line = line.strip()
                     if line.startswith('FASTVLM_MODEL='):
                         model_type = line.split('=')[1].strip()
-                        print(f"🎯 Загружена модель из .env файла: {model_type}")
                         break
         except UnicodeDecodeError:
             # Если проблемы с кодировкой, пробуем cp1251
@@ -113,7 +97,6 @@ def get_model_info():
                         line = line.strip()
                         if line.startswith('FASTVLM_MODEL='):
                             model_type = line.split('=')[1].strip()
-                            print(f"🎯 Загружена модель из .env файла (cp1251): {model_type}")
                             break
             except Exception as e:
                 print(f"⚠️  Не удалось прочитать .env файл: {e}, используется модель по умолчанию")
@@ -126,7 +109,6 @@ def get_model_info():
         model_path = os.path.join(os.path.dirname(__file__), 'models/llava-fastvithd_1.5b_stage3')
 
     is_7b = model_type.lower() == '7b'
-    print(f"✅ Используется модель: {model_type.upper()} ({model_path})")
 
     return model_type, model_path, is_7b
 
@@ -135,9 +117,9 @@ def check_model(model_path, model_type, is_7b):
     if not os.path.exists(model_path):
         print(f"❌ Модель {model_type} не найдена: {model_path}")
         if is_7b:
-            print("   Загрузите FastVLM 7B модель с официального сайта Apple")
+            print("Загрузите FastVLM 7B модель с официального сайта Apple")
         else:
-            print("   Загрузите FastVLM 1.5B модель с официального сайта Apple")
+            print("Загрузите FastVLM 1.5B модель с официального сайта Apple")
         return False
 
     if is_7b:
@@ -162,7 +144,6 @@ def check_model(model_path, model_type, is_7b):
             return False
 
     # Проверка уже была сделана в get_model_info(), просто подтверждаем
-    print(f"✅ FastVLM {model_type.upper()} модель проверена")
     return True
 
 def check_port(port):
@@ -177,19 +158,13 @@ def check_port(port):
         print(f"❌ Порт {port} уже занят")
         return False
 
-    print(f"✅ Порт {port} доступен")
     return True
-
 
 def main():
     """Основная функция запуска"""
-    print("🚀 FastVLM Unified Server Launcher")
-    print("=" * 50)
-
     # Получаем информацию о модели
     model_type, model_path, is_7b = get_model_info()
     # Проверки системы
-    print("🔍 Проверяю систему...")
 
     checks = [
         ("Python версия", check_python_version),
@@ -202,17 +177,12 @@ def main():
 
     all_passed = True
     for check_name, check_func in checks:
-        print(f"\n📋 {check_name}:")
         if not check_func():
             all_passed = False
 
     if not all_passed:
         print("\n❌ Некоторые проверки не прошли. Исправьте ошибки перед запуском.")
         return 1
-
-    print("\n" + "=" * 50)
-    print(f"✅ Все проверки пройдены! Запускаю FastVLM {model_type.upper()} сервер...")
-    print("=" * 50)
 
     # Запуск сервера
     try:
@@ -223,9 +193,6 @@ def main():
             return 1
 
         print("🎯 Запускаю server.py...")
-        print("   Ctrl+C для остановки сервера")
-        print("   Сервер будет доступен на http://127.0.0.1:3001")
-        print()
 
         # Запускаем сервер
         subprocess.run([sys.executable, server_script], check=True)
