@@ -474,9 +474,11 @@ export class CapsuleGenerationService {
     // Коэффициенты по категориям
     switch (category) {
       case 'OUTERWEAR':
-        targetSize = 144; // 1.2x от базового (куртки/пальто)
+        targetSize = 160; // 1.2x от базового (куртки/пальто)
         break;
       case 'INNERWEAR':
+        targetSize = 140;
+        break;
       case 'BODYWEAR':
         targetSize = 120; // 1.0x базовый размер (футболки/рубашки)
         break;

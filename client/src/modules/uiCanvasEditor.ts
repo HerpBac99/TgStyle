@@ -361,11 +361,14 @@ export class UICanvasEditor {
         // ИСПОЛЬЗУЕМ ТЕ ЖЕ СМЕЩЕНИЯ, что и в calculateImagePosition
         switch (category) {
           case 'INNERWEAR':
-          case 'BODYWEAR':
             x = canvasCenterX;
             y = canvasCenterY - 100;
             break;
 
+          case 'BODYWEAR':
+            x = canvasCenterX + 50;
+            y = canvasCenterY - 100;
+            break;
           case 'LEGWEAR':
             x = canvasCenterX;
             y = canvasCenterY + 90;
@@ -464,13 +467,16 @@ export class UICanvasEditor {
 
       // Применяем те же коэффициенты по категориям
       if (category === 'OUTERWEAR') {
-        baseScale *= 1.5;
+        baseScale *= 1.8;
       }
-      else if (category === 'INNERWEAR' || category === 'BODYWEAR') {
-        baseScale *= 1.3;
+      else if (category === 'INNERWEAR') {
+        baseScale *= 1.4;
+      }
+      else if (category === 'BODYWEAR') {
+        baseScale *= 1.15;
       }
       else if (category === 'LEGWEAR') {
-        baseScale *= 1.5;
+        baseScale *= 1.4;
       }
       else if (category === 'FOOTWEAR') {
         baseScale *= 0.8;
@@ -1070,8 +1076,12 @@ export class UICanvasEditor {
 
     switch (category) {
       case 'INNERWEAR':
-      case 'BODYWEAR':
         x = canvasCenterX;
+        y = canvasCenterY - 120;
+        break;
+
+      case 'BODYWEAR':
+        x = canvasCenterX + 50;
         y = canvasCenterY - 120;
         break;
 
