@@ -66,24 +66,19 @@ class ClothingClassifier:
         if any(keyword in text for keyword in [
             'sweater', 'sweatshirt', 'pullover', 'hoodie', 'cardigan',
             'turtleneck', 'crewneck', 'v-neck', 'vneck', 'mock neck', 'mockneck', 'rollneck',
-            'fleece', 'fleecejacket', 'polartec', 'jacket'
+            'fleece', 'fleecejacket', 'polartec'
             'knit'
         ]):
             return 'INNERWEAR'
         
         # OUTERWEAR - верхняя одежда (куртки, пальто, жакеты)
-        # Исключаем fleece jacket (это INNERWEAR)
-        outerwear_keywords = [
+        if any(keyword in text for keyword in [
             'coat', 'blazer', 'parka', 'trench', 'trenchcoat', 'bomber', 'bomberjacket',
             'windbreaker', 'raincoat', 'puffer', 'pufferjacket', 'downcoat', 'downjacket',
-            'vest', 'puffervest', 'denimjacket', 'leatherjacket', 'suedejacket',
+            'vest', 'puffervest', 'denimjacket', 'leatherjacket', 'suedejacket', 'jacket',
             'peacoat', 'dufflecoat', 'anorak', 'cagoule', 'mackintosh', 'overcoat', 'topcoat'
-        ]
-        
-        # Проверяем OUTERWEAR (исключая fleece)
-        if 'fleece' not in text:
-            if any(keyword in text for keyword in outerwear_keywords):
-                return 'OUTERWEAR'
+        ]):
+            return 'OUTERWEAR'
         
         # BODYWEAR - футболки, рубашки, блузки, топы
         if any(keyword in text for keyword in [

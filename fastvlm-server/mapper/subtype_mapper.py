@@ -38,7 +38,7 @@ def map_subtype_to_russian(subtype_input: str) -> str:
         'raincoat': 'Дождевик',
         'mac': 'Макинтош',
         
-        'jacket': 'Кардиган',
+        'jacket': 'Куртка',
         'blazer': 'Блейзер',
         'sport coat': 'Спортивный пиджак',
         'suit jacket': 'Пиджак от костюма',
@@ -65,6 +65,7 @@ def map_subtype_to_russian(subtype_input: str) -> str:
         'waistcoat': 'Жилет',
         'gilet': 'Жилет',
         'puffer vest': 'Пуховый жилет',
+        'puffer': 'Пуховик',
         'down vest': 'Пуховый жилет',
         'fleece vest': 'Флисовый жилет',
         
@@ -76,7 +77,7 @@ def map_subtype_to_russian(subtype_input: str) -> str:
         
         # === СВИТЕРЫ И КОФТЫ (INNERWEAR) ===
         'sweater': 'Свитер',
-        'jumper': 'Свитер',
+        'jumper': 'Джемпер',
         'pullover': 'Пуловер',
         'knit': 'Вязаная кофта',
         'knitwear': 'Трикотаж',
