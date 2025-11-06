@@ -17,6 +17,13 @@ class SmartCapsuleGenerator {
           base: ['BODYWEAR', 'INNERWEAR'], // Базовый слой
           middle: ['INNERWEAR'], // Средний слой (свитеры)
           outer: ['OUTERWEAR'] // Верхний слой (куртки)
+        },
+        // Умные правила для аксессуаров
+        accessories: {
+          min: 1,  // Минимум 1 аксессуар (сумка)
+          max: 4,  // Максимум 4 (сумка, шарф, перчатки, шапка)
+          priority: ['HEADWEAR', 'ACCESSORIES'], // Приоритет: сначала головной убор, потом аксессуары
+          recommended: 3 // Рекомендуемое количество
         }
       },
       spring: {
@@ -27,6 +34,12 @@ class SmartCapsuleGenerator {
           base: ['BODYWEAR'],
           middle: ['INNERWEAR'],
           outer: ['OUTERWEAR']
+        },
+        accessories: {
+          min: 1,  // Минимум 1 (сумка)
+          max: 3,  // Максимум 3 (сумка, очки, легкий шарф)
+          priority: ['ACCESSORIES'], // Только аксессуары
+          recommended: 2
         }
       },
       summer: {
@@ -37,6 +50,12 @@ class SmartCapsuleGenerator {
           base: ['BODYWEAR'],
           middle: [], // Летом средний слой обычно не нужен
           outer: [] // Верхний слой только для кондиционера
+        },
+        accessories: {
+          min: 1,  // Минимум 1 (сумка)
+          max: 3,  // Максимум 3 (сумка, очки, украшения)
+          priority: ['ACCESSORIES', 'HEADWEAR'], // Аксессуары + панама/шляпа
+          recommended: 2
         }
       },
       autumn: {
@@ -47,6 +66,12 @@ class SmartCapsuleGenerator {
           base: ['BODYWEAR'],
           middle: ['INNERWEAR'],
           outer: ['OUTERWEAR']
+        },
+        accessories: {
+          min: 1,  // Минимум 1 (сумка)
+          max: 4,  // Максимум 4 (сумка, шарф, шапка, перчатки)
+          priority: ['ACCESSORIES', 'HEADWEAR'], // Аксессуары + головной убор
+          recommended: 3
         }
       }
     };
@@ -77,27 +102,129 @@ class SmartCapsuleGenerator {
       }
     };
 
-    // Правила сочетаемости цветов (расширенные)
+    // Правила сочетаемости цветов (РАСШИРЕННЫЕ - все 52 цвета из Color_prompt.md)
     this.colorHarmony = {
-      // Нейтральные цвета - сочетаются со всем
-      neutral: ['черный', 'белый', 'серый', 'бежевый', 'кремовый', 'слоновая кость'],
+      // Нейтральные цвета - сочетаются со всем (базовая палитра)
+      neutral: [
+        'черный', 'белый', 'серый', 'серебряный', 'угольный',
+        'бежевый', 'кремовый', 'слоновая кость', 'молочный',
+        'желтовато-коричневый', 'верблюжий'
+      ],
       
-      // Цветовые схемы
+      // Цветовые схемы (гармоничные комбинации)
       schemes: {
-        monochrome: ['черный', 'белый', 'серый'],
-        earth: ['коричневый', 'бежевый', 'оливковый', 'хаки'],
-        classic: ['темно-синий', 'белый', 'серый', 'черный'],
-        warm: ['красный', 'оранжевый', 'желтый', 'коричневый'],
-        cool: ['синий', 'зеленый', 'фиолетовый', 'серый']
+        // Монохромная (оттенки серого)
+        monochrome: ['черный', 'белый', 'серый', 'серебряный', 'угольный'],
+        
+        // Земляные тона
+        earth: [
+          'коричневый', 'бежевый', 'оливковый', 'хаки', 'верблюжий',
+          'шоколадный', 'желтовато-коричневый', 'кремовый'
+        ],
+        
+        // Классическая (деловая)
+        classic: ['темно-синий', 'белый', 'серый', 'черный', 'бежевый'],
+        
+        // Теплые тона
+        warm: [
+          'красный', 'оранжевый', 'желтый', 'коричневый', 'золотой',
+          'горчичный', 'мандариновый', 'персиковый', 'коралловый'
+        ],
+        
+        // Холодные тона
+        cool: [
+          'синий', 'темно-синий', 'зеленый', 'фиолетовый', 'серый',
+          'бирюзовый', 'голубой', 'сине-зеленый', 'индиго'
+        ],
+        
+        // Пастельные тона
+        pastel: [
+          'светло-синий', 'небесно-голубой', 'розовый', 'лавандовый',
+          'сиреневый', 'мятный', 'персиковый', 'кремовый', 'лимонный'
+        ],
+        
+        // Яркие/насыщенные
+        vibrant: [
+          'красный', 'ярко-розовый', 'оранжевый', 'желтый', 'лаймовый',
+          'изумрудный', 'пурпурный', 'малиновый'
+        ],
+        
+        // Морская тема
+        nautical: [
+          'темно-синий', 'белый', 'красный', 'синий', 'голубой',
+          'бирюзовый', 'аква'
+        ],
+        
+        // Осенняя палитра
+        autumn: [
+          'бургунди', 'бордовый', 'горчичный', 'оливковый', 'коричневый',
+          'оранжевый', 'шоколадный'
+        ],
+        
+        // Весенняя палитра
+        spring: [
+          'розовый', 'мятный', 'лимонный', 'светло-синий', 'лавандовый',
+          'персиковый', 'коралловый'
+        ]
       },
       
-      // Комплементарные пары
+      // Комплементарные пары (противоположные на цветовом круге)
       complementary: {
-        'красный': ['зеленый', 'белый', 'черный', 'серый'],
-        'синий': ['оранжевый', 'желтый', 'белый', 'серый'],
-        'зеленый': ['красный', 'розовый', 'белый', 'бежевый'],
-        'желтый': ['фиолетовый', 'синий', 'серый', 'черный'],
-        'фиолетовый': ['желтый', 'зеленый', 'белый', 'серый']
+        // Красные оттенки
+        'красный': ['зеленый', 'темно-зеленый', 'изумрудный', 'белый', 'черный', 'серый', 'бежевый'],
+        'бургунди': ['зеленый', 'оливковый', 'белый', 'серый', 'кремовый'],
+        'бордовый': ['зеленый', 'мятный', 'белый', 'серый', 'бежевый'],
+        'малиновый': ['зеленый', 'белый', 'черный', 'серый'],
+        'розовый': ['зеленый', 'оливковый', 'белый', 'серый', 'бежевый'],
+        'ярко-розовый': ['зеленый', 'белый', 'черный', 'серый'],
+        'коралловый': ['бирюзовый', 'голубой', 'белый', 'бежевый', 'серый'],
+        'лососевый': ['голубой', 'мятный', 'белый', 'бежевый', 'серый'],
+        
+        // Синие оттенки
+        'синий': ['оранжевый', 'желтый', 'золотой', 'белый', 'серый', 'бежевый'],
+        'темно-синий': ['оранжевый', 'коралловый', 'белый', 'серый', 'бежевый', 'кремовый'],
+        'светло-синий': ['персиковый', 'коралловый', 'белый', 'бежевый'],
+        'небесно-голубой': ['персиковый', 'коралловый', 'белый', 'кремовый'],
+        'бирюзовый': ['коралловый', 'оранжевый', 'белый', 'бежевый', 'серый'],
+        'голубой': ['оранжевый', 'персиковый', 'белый', 'бежевый'],
+        'сине-зеленый': ['коралловый', 'оранжевый', 'белый', 'серый'],
+        'аква': ['коралловый', 'персиковый', 'белый', 'бежевый'],
+        'индиго': ['оранжевый', 'золотой', 'белый', 'серый'],
+        
+        // Зеленые оттенки
+        'зеленый': ['красный', 'розовый', 'бургунди', 'белый', 'бежевый', 'серый'],
+        'темно-зеленый': ['красный', 'бордовый', 'белый', 'серый', 'бежевый'],
+        'оливковый': ['бордовый', 'бургунди', 'белый', 'бежевый', 'кремовый'],
+        'лаймовый': ['пурпурный', 'фиолетовый', 'белый', 'черный'],
+        'мятный': ['коралловый', 'розовый', 'белый', 'бежевый'],
+        'изумрудный': ['красный', 'бордовый', 'белый', 'серый', 'золотой'],
+        
+        // Желтые оттенки
+        'желтый': ['фиолетовый', 'пурпурный', 'синий', 'серый', 'черный', 'белый'],
+        'золотой': ['синий', 'темно-синий', 'фиолетовый', 'белый', 'черный'],
+        'горчичный': ['темно-синий', 'бургунди', 'белый', 'серый', 'черный'],
+        'лимонный': ['фиолетовый', 'лавандовый', 'белый', 'серый'],
+        
+        // Оранжевые оттенки
+        'оранжевый': ['синий', 'темно-синий', 'бирюзовый', 'белый', 'серый', 'черный'],
+        'мандариновый': ['синий', 'голубой', 'белый', 'серый'],
+        'персиковый': ['голубой', 'бирюзовый', 'белый', 'бежевый', 'серый'],
+        
+        // Коричневые оттенки
+        'коричневый': ['синий', 'голубой', 'белый', 'бежевый', 'кремовый'],
+        'желтовато-коричневый': ['синий', 'белый', 'кремовый'],
+        'хаки': ['бордовый', 'темно-синий', 'белый', 'бежевый'],
+        'верблюжий': ['темно-синий', 'бордовый', 'белый', 'кремовый'],
+        'шоколадный': ['синий', 'голубой', 'белый', 'бежевый', 'кремовый'],
+        
+        // Фиолетовые оттенки
+        'фиолетовый': ['желтый', 'золотой', 'зеленый', 'белый', 'серый'],
+        'лавандовый': ['желтый', 'лимонный', 'белый', 'серый', 'бежевый'],
+        'сиреневый': ['желтый', 'зеленый', 'белый', 'серый'],
+        'пурпурный': ['желтый', 'лаймовый', 'белый', 'черный', 'серый'],
+        
+        // Многоцветный - сочетается с нейтральными
+        'многоцветный': ['черный', 'белый', 'серый', 'бежевый']
       }
     };
 
@@ -267,7 +394,7 @@ class SmartCapsuleGenerator {
     const shuffledOptional = [...layerRules.optional].sort(() => Math.random() - 0.5);
     
     for (const category of shuffledOptional) {
-      if (combination.length >= 6) break; // Увеличили лимит до 6
+      if (combination.length >= 8) break; // Увеличили лимит до 8 (базовая одежда + аксессуары)
       if (usedCategories.has(category)) continue;
       
       const item = this.selectItemFromCategory(
@@ -279,6 +406,39 @@ class SmartCapsuleGenerator {
       if (item) {
         combination.push(item);
         usedCategories.add(category);
+      }
+    }
+
+    // 4. УМНОЕ ДОБАВЛЕНИЕ АКСЕССУАРОВ по сезону
+    const accessoryRules = layerRules.accessories;
+    if (accessoryRules) {
+      const currentAccessoriesCount = combination.filter(item => 
+        accessoryRules.priority.includes(item.category?.toUpperCase())
+      ).length;
+
+      // Если аксессуаров меньше рекомендуемого, добавляем еще
+      if (currentAccessoriesCount < accessoryRules.recommended) {
+        const neededAccessories = accessoryRules.recommended - currentAccessoriesCount;
+        
+        // Проходим по приоритетным категориям
+        for (const category of accessoryRules.priority) {
+          if (currentAccessoriesCount >= accessoryRules.max) break;
+          if (usedCategories.has(category)) continue;
+          if (combination.length >= 8) break;
+          
+          const item = this.selectItemFromCategory(
+            itemsByCategory[category] || [], 
+            strategy, 
+            combination,
+            currentSeason
+          );
+          
+          if (item) {
+            combination.push(item);
+            usedCategories.add(category);
+            logger.info(`Добавлен аксессуар ${category} для сезона ${currentSeason}`);
+          }
+        }
       }
     }
 
@@ -313,7 +473,20 @@ class SmartCapsuleGenerator {
         category: item.category,
         subtype: item.subtype,
         color: item.color,
-        imageUrl: item.imageUrl || `/uploads/${item.imagePath?.replace(/\\/g, '/')}`
+        // ИСПРАВЛЕНО: Для товаров из стока добавляем префикс /stock/
+        imageUrl: item.imageUrl || (item.isFromStock 
+          ? `/uploads/stock/${item.imagePath?.replace(/\\/g, '/')}`
+          : `/uploads/${item.imagePath?.replace(/\\/g, '/')}`),
+        // Сохраняем метаданные товаров из стока
+        isFromStock: item.isFromStock || false,
+        ...(item.isFromStock && {
+          stockId: item.stockId,
+          productName: item.productName,
+          price: item.price,
+          productUrl: item.productUrl,
+          affiliateLink: item.affiliateLink,
+          priority: item.priority
+        })
       })),
       metadata: {
         strategy,
@@ -382,38 +555,48 @@ class SmartCapsuleGenerator {
         break;
     }
 
-    // Сортируем по комплексному score: сезонность + цвет + визуальная гармония
+    // Сортируем по комплексному score: сезонность + цвет + визуальная гармония + приоритет
     candidates.sort((a, b) => {
-      // Веса для разных факторов (сумма = 1.0)
-      const SEASON_WEIGHT = 0.25;  // Сезонная пригодность
-      const COLOR_WEIGHT = 0.35;   // Цветовая гармония
-      const VISUAL_WEIGHT = 0.40;  // Визуальная гармония (самый важный!)
+      // Веса для разных факторов
+      const SEASON_WEIGHT = 0.20;   // Сезонная пригодность
+      const COLOR_WEIGHT = 0.30;    // Цветовая гармония
+      const VISUAL_WEIGHT = 0.35;   // Визуальная гармония (самый важный!)
+      const PRIORITY_WEIGHT = 0.15; // Приоритет товара из стока
+
+      // Для товаров из стока добавляем бонус за priority
+      const aPriority = a.isFromStock ? (a.priority || 0) / 100 : 0;
+      const bPriority = b.isFromStock ? (b.priority || 0) / 100 : 0;
 
       const aScore = 
         (a.seasonScore || 0.5) * SEASON_WEIGHT +
         this.getColorHarmonyScore(a, currentCombination) * COLOR_WEIGHT +
-        this.getVisualHarmonyScore(a, currentCombination) * VISUAL_WEIGHT;
+        this.getVisualHarmonyScore(a, currentCombination) * VISUAL_WEIGHT +
+        aPriority * PRIORITY_WEIGHT;
       
       const bScore = 
         (b.seasonScore || 0.5) * SEASON_WEIGHT +
         this.getColorHarmonyScore(b, currentCombination) * COLOR_WEIGHT +
-        this.getVisualHarmonyScore(b, currentCombination) * VISUAL_WEIGHT;
+        this.getVisualHarmonyScore(b, currentCombination) * VISUAL_WEIGHT +
+        bPriority * PRIORITY_WEIGHT;
       
       return bScore - aScore;
     });
 
     // Добавляем разнообразие: для experimental берем из топ-3, для других - лучшую
+    let selectedItem;
     if (strategy === 'experimental' && candidates.length >= 3) {
       // Выбираем случайно из топ-3 для разнообразия
       const topCandidates = candidates.slice(0, 3);
-      return topCandidates[Math.floor(Math.random() * topCandidates.length)];
+      selectedItem = topCandidates[Math.floor(Math.random() * topCandidates.length)];
     } else if (strategy === 'popular' && candidates.length >= 2) {
       // Для popular берем из топ-2
       const topCandidates = candidates.slice(0, 2);
-      return topCandidates[Math.floor(Math.random() * topCandidates.length)];
+      selectedItem = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+    } else {
+      selectedItem = candidates[0];
     }
 
-    return candidates[0];
+    return selectedItem;
   }
 
   /**
@@ -548,29 +731,46 @@ class SmartCapsuleGenerator {
 
   /**
    * Вычисляет совместимость двух цветов
+   * Учитывает все 52 цвета из Color_prompt.md
+   * 
+   * @param {string} color1 - Первый цвет (на русском)
+   * @param {string} color2 - Второй цвет (на русском)
+   * @returns {number} - Score от 0 до 1
    */
   calculateColorCompatibility(color1, color2) {
-    if (color1 === color2) return 0.3; // Одинаковые цвета - низкий приоритет
+    // Одинаковые цвета - низкий приоритет (избегаем монотонности)
+    if (color1 === color2) return 0.3;
 
-    // Нейтральные цвета сочетаются со всем
+    // Нейтральные цвета сочетаются со всем (высокий приоритет)
     if (this.colorHarmony.neutral.includes(color1) || this.colorHarmony.neutral.includes(color2)) {
       return 1.0;
     }
 
-    // Проверяем комплементарные пары
-    const complementary = this.colorHarmony.complementary[color1];
-    if (complementary && complementary.includes(color2)) {
+    // Проверяем комплементарные пары (прямая проверка)
+    const complementary1 = this.colorHarmony.complementary[color1];
+    if (complementary1 && complementary1.includes(color2)) {
       return 0.9;
     }
 
-    // Проверяем цветовые схемы
-    for (const scheme of Object.values(this.colorHarmony.schemes)) {
-      if (scheme.includes(color1) && scheme.includes(color2)) {
-        return 0.8;
+    // Проверяем комплементарные пары (обратная проверка)
+    const complementary2 = this.colorHarmony.complementary[color2];
+    if (complementary2 && complementary2.includes(color1)) {
+      return 0.9;
+    }
+
+    // Проверяем цветовые схемы (гармоничные комбинации)
+    for (const [schemeName, schemeColors] of Object.entries(this.colorHarmony.schemes)) {
+      if (schemeColors.includes(color1) && schemeColors.includes(color2)) {
+        // Разные приоритеты для разных схем
+        if (schemeName === 'monochrome' || schemeName === 'classic') {
+          return 0.85; // Высокий приоритет для классических схем
+        }
+        return 0.8; // Хороший приоритет для остальных схем
       }
     }
 
-    return 0.4; // Базовая совместимость
+    // Базовая совместимость (цвета не конфликтуют, но и не идеальны)
+    return 0.4;
   }
 
   /**
@@ -772,22 +972,246 @@ class SmartCapsuleGenerator {
   }
 
   /**
-   * Генерирует рекомендации
+   * Умная подмена вещей из стока
+   * Заменяет вещи пользователя на товары из каталога ТОЛЬКО если они лучше подходят
+   * 
+   * @param {Array} capsule - Сгенерированная капсула с вещами пользователя
+   * @param {Object} prisma - Prisma client для доступа к БД
+   * @param {string} currentSeason - Текущий сезон
+   * @returns {Promise<Array>} - Капсула с подмененными вещами (если есть улучшения)
+   */
+  async enhanceWithStockItems(capsule, prisma, currentSeason) {
+    try {
+      logger.info(`Проверка возможности улучшения капсулы товарами из стока`);
+      
+      const enhancedCapsule = [];
+      let replacementsCount = 0;
+      
+      for (const userItem of capsule) {
+        // Ищем товары из стока той же категории
+        const stockCandidates = await prisma.stockItem.findMany({
+          where: {
+            category: userItem.category,
+            isActive: true,
+            // Опционально: фильтр по полу если есть
+            ...(userItem.gender && { gender: userItem.gender })
+          }
+        });
+        
+        if (stockCandidates.length === 0) {
+          // Нет товаров из стока - оставляем оригинальную вещь
+          enhancedCapsule.push(userItem);
+          continue;
+        }
+        
+        // Оцениваем каждый товар из стока
+        const scoredCandidates = stockCandidates.map(stockItem => {
+          const score = this.calculateStockItemScore(
+            stockItem,
+            userItem,
+            capsule,
+            currentSeason
+          );
+          return { item: stockItem, score };
+        });
+        
+        // Сортируем по score (лучшие первыми)
+        scoredCandidates.sort((a, b) => b.score - a.score);
+        
+        const bestStockItem = scoredCandidates[0];
+        
+        // Вычисляем score оригинальной вещи
+        const userItemScore = this.calculateUserItemScore(
+          userItem,
+          capsule,
+          currentSeason
+        );
+        
+        // КРИТЕРИЙ ЗАМЕНЫ: товар из стока должен быть ЗНАЧИТЕЛЬНО лучше
+        // Используем порог 0.15 (15%) для избежания незначительных замен
+        const REPLACEMENT_THRESHOLD = 0.15;
+        
+        if (bestStockItem.score > userItemScore + REPLACEMENT_THRESHOLD) {
+          // Товар из стока лучше - заменяем!
+          logger.info(
+            `Замена: ${userItem.subtype} (score: ${userItemScore.toFixed(2)}) → ` +
+            `${bestStockItem.item.subtype} (score: ${bestStockItem.score.toFixed(2)})`
+          );
+          
+          enhancedCapsule.push({
+            ...bestStockItem.item,
+            // Добавляем метаданные о замене
+            isFromStock: true,
+            replacedItem: {
+              id: userItem.id,
+              subtype: userItem.subtype,
+              color: userItem.color,
+              score: userItemScore
+            },
+            replacementScore: bestStockItem.score,
+            replacementReason: this.getReplacementReason(
+              bestStockItem.score,
+              userItemScore,
+              bestStockItem.item,
+              userItem
+            )
+          });
+          
+          replacementsCount++;
+        } else {
+          // Оригинальная вещь лучше или разница незначительна - оставляем
+          enhancedCapsule.push(userItem);
+        }
+      }
+      
+      logger.info(`Улучшение завершено: ${replacementsCount} замен из ${capsule.length} вещей`);
+      
+      return {
+        items: enhancedCapsule,
+        replacementsCount,
+        hasReplacements: replacementsCount > 0
+      };
+      
+    } catch (error) {
+      logger.error('Ошибка улучшения капсулы товарами из стока:', error);
+      // В случае ошибки возвращаем оригинальную капсулу
+      return {
+        items: capsule,
+        replacementsCount: 0,
+        hasReplacements: false,
+        error: error.message
+      };
+    }
+  }
+  
+  /**
+   * Вычисляет score товара из стока
+   */
+  calculateStockItemScore(stockItem, userItem, capsule, currentSeason) {
+    // Веса для разных факторов (сумма = 1.0)
+    const SEASON_WEIGHT = 0.20;    // Сезонная пригодность
+    const COLOR_WEIGHT = 0.30;     // Цветовая гармония
+    const VISUAL_WEIGHT = 0.35;    // Визуальная гармония (embeddings)
+    const PRIORITY_WEIGHT = 0.15;  // Приоритет товара (priority поле)
+    
+    // 1. Сезонная пригодность
+    const seasonScore = this.evaluateSeasonalSuitability([stockItem], currentSeason)[0].seasonScore || 0.5;
+    
+    // 2. Цветовая гармония с остальными вещами в капсуле
+    const otherItems = capsule.filter(item => item.id !== userItem.id);
+    const colorScore = this.getColorHarmonyScore(stockItem, otherItems);
+    
+    // 3. Визуальная гармония (embeddings)
+    const visualScore = this.getVisualHarmonyScore(stockItem, otherItems);
+    
+    // 4. Приоритет товара (0-100 → 0-1)
+    const priorityScore = (stockItem.priority || 0) / 100;
+    
+    const totalScore = 
+      seasonScore * SEASON_WEIGHT +
+      colorScore * COLOR_WEIGHT +
+      visualScore * VISUAL_WEIGHT +
+      priorityScore * PRIORITY_WEIGHT;
+    
+    return totalScore;
+  }
+  
+  /**
+   * Вычисляет score вещи пользователя (для сравнения)
+   */
+  calculateUserItemScore(userItem, capsule, currentSeason) {
+    // Используем те же веса, но без priority (у вещей пользователя нет priority)
+    const SEASON_WEIGHT = 0.25;    // Увеличиваем веса остальных факторов
+    const COLOR_WEIGHT = 0.35;
+    const VISUAL_WEIGHT = 0.40;
+    
+    const seasonScore = this.evaluateSeasonalSuitability([userItem], currentSeason)[0].seasonScore || 0.5;
+    const otherItems = capsule.filter(item => item.id !== userItem.id);
+    const colorScore = this.getColorHarmonyScore(userItem, otherItems);
+    const visualScore = this.getVisualHarmonyScore(userItem, otherItems);
+    
+    const totalScore = 
+      seasonScore * SEASON_WEIGHT +
+      colorScore * COLOR_WEIGHT +
+      visualScore * VISUAL_WEIGHT;
+    
+    return totalScore;
+  }
+  
+  /**
+   * Генерирует причину замены для UI
+   */
+  getReplacementReason(stockScore, userScore, stockItem, userItem) {
+    const scoreDiff = stockScore - userScore;
+    const reasons = [];
+    
+    // Анализируем что именно лучше
+    if (scoreDiff > 0.3) {
+      reasons.push('Значительно лучше подходит к образу');
+    } else if (scoreDiff > 0.2) {
+      reasons.push('Лучше сочетается с другими вещами');
+    } else {
+      reasons.push('Немного улучшает общую гармонию');
+    }
+    
+    // Добавляем конкретные улучшения
+    if (stockItem.color !== userItem.color) {
+      reasons.push(`Цвет "${stockItem.color}" лучше гармонирует`);
+    }
+    
+    if (stockItem.priority && stockItem.priority > 50) {
+      reasons.push('Популярный товар');
+    }
+    
+    return reasons.join('. ');
+  }
+
+  /**
+   * Генерирует рекомендации с учетом сезонных правил для аксессуаров
    */
   generateRecommendations(combination, season) {
     const recommendations = [];
     
-    // Проверяем наличие аксессуаров
-    const hasAccessories = combination.some(item => 
-      item.category?.toUpperCase() === 'ACCESSORIES'
-    );
+    // Получаем правила для текущего сезона
+    const layerRules = this.layeringRules[season];
+    const accessoryRules = layerRules?.accessories;
     
-    if (!hasAccessories) {
-      recommendations.push('Добавьте аксессуары для завершения образа');
+    if (accessoryRules) {
+      // Подсчитываем текущие аксессуары
+      const currentAccessories = combination.filter(item => 
+        accessoryRules.priority.includes(item.category?.toUpperCase())
+      );
+      
+      const accessoriesCount = currentAccessories.length;
+      
+      // Проверяем минимум
+      if (accessoriesCount < accessoryRules.min) {
+        recommendations.push('Добавьте аксессуары для завершения образа');
+      }
+      // Проверяем рекомендуемое количество
+      else if (accessoriesCount < accessoryRules.recommended) {
+        // Сезонные рекомендации
+        if (season === 'winter') {
+          const hasHeadwear = currentAccessories.some(item => 
+            item.category?.toUpperCase() === 'HEADWEAR'
+          );
+          if (!hasHeadwear) {
+            recommendations.push('Добавьте шапку или шарф для тепла');
+          } else {
+            recommendations.push('Можно добавить перчатки или шарф');
+          }
+        } else if (season === 'autumn') {
+          recommendations.push('Можно добавить шарф или шапку');
+        } else if (season === 'summer') {
+          recommendations.push('Можно добавить солнцезащитные очки или украшения');
+        } else if (season === 'spring') {
+          recommendations.push('Можно добавить легкий шарф или очки');
+        }
+      }
     }
 
-    // Сезонные рекомендации
-    if (season === 'winter') {
+    // Сезонные рекомендации по одежде
+    if (season === 'winter' || season === 'autumn') {
       const hasOuterwear = combination.some(item => 
         item.category?.toUpperCase() === 'OUTERWEAR'
       );
@@ -796,6 +1220,7 @@ class SmartCapsuleGenerator {
       }
     }
 
+    // Если все хорошо
     if (recommendations.length === 0) {
       recommendations.push('Образ готов к использованию');
     }

@@ -391,7 +391,7 @@ export class UICanvasEditor {
 
           case 'HEADWEAR':
             x = canvasCenterX;
-            y = canvasCenterY - 200;
+            y = canvasCenterY - 250;
             break;
 
           case 'ACCESSORIES':
@@ -482,7 +482,7 @@ export class UICanvasEditor {
         baseScale *= 0.8;
       }
       else if (category === 'HEADWEAR') {
-        baseScale *= 0.8;
+        baseScale *= 0.6;
       }
       else if (category === 'ACCESSORIES') {
         baseScale *= 0.7;
@@ -1001,6 +1001,9 @@ export class UICanvasEditor {
       throw new Error('Canvas not initialized');
     }
 
+    // Проверяем является ли товаром из стока
+    const isFromStock = (item as any).isFromStock || false;
+
     // Создаем Fabric.js Image объект
     const fabricImg = new fabric.Image(imageObj, {
       left: x,
@@ -1018,18 +1021,32 @@ export class UICanvasEditor {
       cornerColor: '#ffffff',
       cornerStrokeColor: '#333333',
       cornerStyle: 'circle',
-      borderColor: '#333333',
+      // НОВОЕ: Синяя обводка для товаров из стока
+      borderColor: isFromStock ? '#3b82f6' : '#333333',
       borderOpacityWhenMoving: 0.8,
       cornerSize: 8,
       touchCornerSize: 24,
+      // НОВОЕ: Добавляем тень для товаров из стока
+      shadow: isFromStock ? new fabric.Shadow({
+        color: 'rgba(59, 130, 246, 0.5)',
+        blur: 15,
+        offsetX: 0,
+        offsetY: 0
+      }) : null
     });
 
     // Сохраняем данные элемента гардероба в объекте canvas
     (fabricImg as any).itemData = item;
     (fabricImg as any).id = item.id;
+    (fabricImg as any).isFromStock = isFromStock;
 
     // Добавляем контрол удаления
     this.addDeleteControl(fabricImg);
+
+    // Добавляем кнопку "В магазин" для товаров из стока
+    if (isFromStock) {
+      this.addShopControl(fabricImg, item);
+    }
 
     // Добавляем изображение на canvas
     this.fabricCanvas.add(fabricImg);
@@ -1107,7 +1124,7 @@ export class UICanvasEditor {
 
       case 'HEADWEAR':
         x = canvasCenterX;
-        y = canvasCenterY - 230;
+        y = canvasCenterY - 270;
         break;
 
       case 'ACCESSORIES':
@@ -1144,6 +1161,86 @@ export class UICanvasEditor {
     });
     fabricImg.controls = fabricImg.controls || {};
     fabricImg.controls['deleteControl'] = deleteControl;
+  }
+
+  /**
+   * Добавить контрол "В магазин" к товару из стока
+   */
+  private addShopControl(fabricImg: fabric.Image, item: any): void {
+    const shopControl = new fabric.Control({
+      x: 0.5,
+      y: -0.5,
+      offsetX: 4,
+      offsetY: -25,
+      cursorStyle: 'pointer',
+      mouseUpHandler: (_eventData: any, _transform: any) => {
+        // Открываем ссылку на товар через Telegram WebApp API
+        if (item.productUrl) {
+          try {
+            // Используем Telegram WebApp API для открытия ссылки без подтверждения
+            if (window.Telegram?.WebApp?.openLink) {
+              window.Telegram.WebApp.openLink(item.productUrl);
+            } else {
+              // Fallback для случая если Telegram API недоступен
+              window.open(item.productUrl, '_blank');
+            }
+          } catch (error) {
+            logger.error('Failed to open product link', { 
+              error: error instanceof Error ? error.message : String(error),
+              url: item.productUrl 
+            });
+          }
+        }
+        return true;
+      },
+      render: this.renderShopIcon.bind(this)
+    });
+    fabricImg.controls = fabricImg.controls || {};
+    fabricImg.controls['shopControl'] = shopControl;
+  }
+
+  /**
+   * Рендер иконки "В магазин"
+   */
+  private renderShopIcon(ctx: CanvasRenderingContext2D, left: number, top: number, _styleOverride: any, _fabricObject: fabric.Object): void {
+    const width = 80;
+    const height = 24;
+    const centerX = left;
+    const centerY = top;
+
+    // Рисуем синий прямоугольник с закругленными углами
+    ctx.save();
+    ctx.fillStyle = '#3b82f6';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    
+    const radius = 12;
+    const x = centerX - width / 2;
+    const y = centerY - height / 2;
+    
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    
+    ctx.fill();
+    ctx.stroke();
+
+    // Рисуем текст "В магазин"
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('В магазин', centerX, centerY);
+
+    ctx.restore();
   }
 
   /**

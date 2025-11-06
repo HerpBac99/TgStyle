@@ -282,3 +282,63 @@ model StyleOutfitItem {
   @@index([season], map: "idx_style_outfit_item_season")
   @@map("style_outfit_items")
 }
+
+// Таблица товаров из каталога (сток)
+model StockItem {
+  id          Int               @id @default(autoincrement())
+  
+  // Путь к изображению (относительно server/uploads/stock)
+  imagePath   String            @map("image_path") @db.VarChar(500)
+  
+  // Пол (для организации по папкам)
+  gender      String            @db.VarChar(10)  // 'man' или 'woman'
+  
+  // Классификация (автоматически от FastVLM)
+  category    ClothingCategory? // Основная категория
+  subtype     String?           @db.VarChar(100)  // Детализация: jacket, coat, jeans
+  
+  // Атрибуты от FastVLM
+  color       String?           @db.VarChar(50)   // Основной цвет
+  style       String?           @db.VarChar(100)  // Стиль: casual, formal, sport
+  material    String?           @db.VarChar(100)  // Материал: cotton, denim, leather
+  pattern     String?           @db.VarChar(100)  // Узор: plain, striped, checked
+  fit         String?           @db.VarChar(100)  // Посадка/фит: slim, regular, loose
+  season      String?           @db.VarChar(50)   // Сезон: spring, summer, autumn, winter, all-season
+  description String?           @db.VarChar(500)  // Описание предмета одежды
+  
+  // AI Embedding для поиска похожих вещей
+  embedding   Unsupported("vector(512)")?  // FashionCLIP embedding вектор 512 измерений
+  
+  // Данные о товаре (заполняются вручную или из названия файла)
+  productName String?           @db.VarChar(255)  // Название товара (из имени файла)
+  brand       String?           @db.VarChar(100)  // Бренд (Nike, Adidas, Zara)
+  price       Decimal?          @db.Decimal(10, 2) // Цена товара
+  currency    String?           @db.VarChar(3)    // Валюта (RUB, USD, EUR)
+  
+  // Ссылки на товар
+  productUrl  String?           @db.VarChar(500)  // Ссылка на товар в магазине
+  merchant    String?           @db.VarChar(50)   // Магазин: lamoda, wildberries, ozon
+  affiliateLink String?         @db.VarChar(500)  // Партнерская ссылка
+  
+  // Метаданные
+  isActive    Boolean           @default(true)    // Активен ли товар (можно отключить)
+  priority    Int               @default(0)       // Приоритет показа (выше = чаще показывается)
+  
+  // Статистика
+  viewsCount  Int               @default(0) @map("views_count")   // Сколько раз показали
+  clicksCount Int               @default(0) @map("clicks_count")  // Сколько раз кликнули
+  
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  
+  // Индексы для быстрого поиска
+  @@index([gender], map: "idx_stock_gender")
+  @@index([category], map: "idx_stock_category")
+  @@index([subtype], map: "idx_stock_subtype")
+  @@index([color], map: "idx_stock_color")
+  @@index([season], map: "idx_stock_season")
+  @@index([isActive], map: "idx_stock_is_active")
+  @@index([merchant], map: "idx_stock_merchant")
+  @@index([priority(sort: Desc)], map: "idx_stock_priority")
+  @@map("stock_items")
+}

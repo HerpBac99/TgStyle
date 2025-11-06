@@ -411,7 +411,7 @@ export class CapsuleGenerationService {
 
           case 'HEADWEAR':
             x = canvasCenterX;
-            y = canvasCenterY - 100; // Уменьшенное смещение для превью
+            y = canvasCenterY - 130; // Уменьшенное смещение для превью
             break;
 
           case 'ACCESSORIES':
@@ -489,10 +489,10 @@ export class CapsuleGenerationService {
         targetSize = 80;  // 0.6x от базового (обувь)
         break;
       case 'HEADWEAR':
-        targetSize = 84;  // 0.7x от базового (головные уборы)
+        targetSize = 70;  // 0.7x от базового (головные уборы)
         break;
       case 'ACCESSORIES':
-        targetSize = 72;  // 0.6x от базового (аксессуары)
+        targetSize = 70;  // 0.6x от базового (аксессуары)
         break;
       case 'FULLBODY':
         targetSize = 132; // 1.1x от базового (платья/комбинезоны)

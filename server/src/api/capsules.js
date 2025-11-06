@@ -51,8 +51,10 @@ async function createCapsule(req, res) {
       thumbnailPath = await FileService.saveCapsuleThumbnail(telegramId, thumbnailImage);
     }
 
-    // Проверяем, что у пользователя есть доступ к wardrobe items
-    const wardrobeItemIds = itemIds || [];
+    // ИСПРАВЛЕНО: Фильтруем только вещи пользователя (исключаем товары из стока)
+    const allItemIds = itemIds || [];
+    const wardrobeItemIds = allItemIds.filter(id => typeof id === 'number' || !String(id).startsWith('stock_'));
+    
     if (wardrobeItemIds.length > 0) {
       const userItems = await prisma.wardrobeItem.findMany({
         where: {
@@ -563,20 +565,80 @@ async function generateCapsules(req, res) {
     // Объединяем данные
     const wardrobeItems = wardrobeItemsBase.map(item => ({
       ...item,
-      embedding: embeddingsMap.get(item.id) || null
+      embedding: embeddingsMap.get(item.id) || null,
+      isFromStock: false // Вещи пользователя
     }));
 
-    // Проверка минимального количества вещей
-    if (wardrobeItems.length < 3) {
-      logger.warn('Insufficient wardrobe items for generation', {
-        telegramId: telegramId.toString(),
-        itemCount: wardrobeItems.length
-      });
-      return res.status(400).json({
-        success: false,
-        error: 'Недостаточно вещей в гардеробе (минимум 3)'
-      });
+    // НОВОЕ: Загружаем товары из стока для дополнения гардероба
+    const stockItemsBase = await prisma.stockItem.findMany({
+      where: { 
+        isActive: true
+        // Можно добавить фильтр по полу если нужно
+      },
+      select: {
+        id: true,
+        category: true,
+        subtype: true,
+        color: true,
+        material: true,
+        fit: true,
+        style: true,
+        season: true,
+        pattern: true,
+        description: true,
+        imagePath: true,
+        productName: true,
+        price: true,
+        productUrl: true,
+        affiliateLink: true,
+        priority: true
+      }
+    });
+
+    // Загружаем embeddings для товаров из стока
+    const stockItemIds = stockItemsBase.map(item => item.id);
+    const stockEmbeddings = await prisma.$queryRaw`
+      SELECT id, embedding::text as embedding
+      FROM stock_items
+      WHERE id = ANY(${stockItemIds}::int[])
+      AND embedding IS NOT NULL
+    `;
+
+    // Создаем map для embeddings товаров из стока
+    const stockEmbeddingsMap = new Map();
+    for (const row of stockEmbeddings) {
+      try {
+        const vectorStr = row.embedding.replace(/[\[\]]/g, '');
+        const vector = vectorStr.split(',').map(v => parseFloat(v.trim()));
+        stockEmbeddingsMap.set(row.id, vector);
+      } catch (e) {
+        logger.warn('Failed to parse stock embedding', { itemId: row.id, error: e.message });
+      }
     }
+
+    // Преобразуем товары из стока в формат вещей гардероба
+    const stockItems = stockItemsBase.map(item => ({
+      id: `stock_${item.id}`, // Префикс для отличия от вещей пользователя
+      stockId: item.id, // Оригинальный ID товара
+      category: item.category,
+      subtype: item.subtype,
+      color: item.color,
+      material: item.material,
+      fit: item.fit,
+      style: item.style,
+      season: item.season,
+      pattern: item.pattern,
+      description: item.description,
+      imagePath: item.imagePath,
+      embedding: stockEmbeddingsMap.get(item.id) || null,
+      isFromStock: true, // Флаг товара из стока
+      productName: item.productName,
+      price: item.price,
+      productUrl: item.productUrl,
+      affiliateLink: item.affiliateLink,
+      priority: item.priority,
+      usageCount: 0 // Товары из стока всегда новые
+    }));
 
     // Получаем существующие капсулы для вычисления usageCount
     const existingCapsules = await prisma.capsule.findMany({
@@ -584,20 +646,40 @@ async function generateCapsules(req, res) {
       select: { id: true, canvasData: true }
     });
 
-    logger.info('Loaded wardrobe and capsules', {
+    // Объединяем вещи пользователя и товары из стока
+    const allItems = [...wardrobeItems, ...stockItems];
+
+    logger.info('Loaded wardrobe, stock and capsules', {
       telegramId: telegramId.toString(),
       wardrobeItemsCount: wardrobeItems.length,
+      stockItemsCount: stockItems.length,
+      totalItemsCount: allItems.length,
       existingCapsulesCount: existingCapsules.length
     });
 
-    // Вычисляем usageCount для каждой вещи
+    // Проверка минимального количества вещей
+    if (allItems.length < 3) {
+      logger.warn('Insufficient items for generation', {
+        telegramId: telegramId.toString(),
+        itemCount: allItems.length
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'Недостаточно вещей для генерации (минимум 3)'
+      });
+    }
+
+    // Вычисляем usageCount только для вещей пользователя
     const itemsWithUsage = wardrobeUsageService.calculateUsageStats(
       wardrobeItems,
       existingCapsules
     );
 
-    // Приоритизируем редко используемые вещи (1-3)
-    const prioritizedItems = wardrobeUsageService.prioritizeRarelyUsedItems(itemsWithUsage);
+    // Приоритизируем редко используемые вещи пользователя (1-3)
+    const prioritizedUserItems = wardrobeUsageService.prioritizeRarelyUsedItems(itemsWithUsage);
+
+    // Объединяем приоритизированные вещи пользователя с товарами из стока
+    const prioritizedItems = [...prioritizedUserItems, ...stockItems];
 
     // Определяем текущий сезон и месяц
     const currentSeason = wardrobeUsageService.getCurrentSeason();
@@ -627,7 +709,7 @@ async function generateCapsules(req, res) {
       existingCapsulesCount: existingCapsulesData.length
     });
 
-    // Генерируем капсулы через умный алгоритм
+    // Генерируем капсулы через умный алгоритм (из объединенного пула)
     const generatedCapsules = await smartGenerator.generateCapsules(
       prioritizedItems,
       currentSeason,
@@ -637,7 +719,10 @@ async function generateCapsules(req, res) {
 
     logger.info('Capsules generated by smart algorithm', {
       telegramId: telegramId.toString(),
-      capsulesCount: generatedCapsules.length
+      capsulesCount: generatedCapsules.length,
+      stockItemsUsed: generatedCapsules.reduce((sum, c) => 
+        sum + c.items.filter(item => item.isFromStock).length, 0
+      )
     });
 
     // Проверяем уникальность и обогащаем данными
