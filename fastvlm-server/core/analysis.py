@@ -1014,8 +1014,8 @@ class AnalysisService:
                 from image_preprocessing import fast_mobile_preprocess
                 image, image_base64, metadata = fast_mobile_preprocess(
                     image.convert("RGB"),
-                    target_width=1344,
-                    target_height=1008,
+                    target_width=1008,
+                    target_height=1344,
                     quality=95
                 )
 
@@ -1089,15 +1089,28 @@ class AnalysisService:
 
                 # Быстрая предобработка для мобильных фотографий
                 from image_preprocessing import fast_mobile_preprocess
+                
+                # Определяем ориентацию и подбираем правильные размеры
+                width, height = image.size
+                is_portrait = height > width
+                
+                if is_portrait:
+                    # Для портретных фото: высота больше ширины
+                    target_w, target_h = 1008, 1344
+                else:
+                    # Для ландшафтных фото: ширина больше высоты
+                    target_w, target_h = 1344, 1008
+                
                 image, processed_base64, metadata = fast_mobile_preprocess(
                     image.convert("RGB"),
-                    target_width=1344,
-                    target_height=1008,
+                    target_width=target_w,
+                    target_height=target_h,
                     quality=95
                 )
 
                 original_size_mb = len(image_data) / (1024 * 1024)
-                self.logger.info(f"📸 Предобработка: {metadata['original_size']} → {metadata['final_size']} пикселей, {original_size_mb:.2f} MB → {metadata['compressed_size_mb']:.2f} MB")
+                orientation = "портрет" if is_portrait else "ландшафт"
+                self.logger.info(f"📸 Предобработка ({orientation}): {metadata['original_size']} → {metadata['final_size']} пикселей, {original_size_mb:.2f} MB → {metadata['compressed_size_mb']:.2f} MB")
 
             except Exception as e:
                 self.logger.error(f"Ошибка декодирования изображения: {e}")

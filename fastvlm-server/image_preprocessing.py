@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def fast_mobile_preprocess(image: Image.Image, target_width: int = 1344, target_height: int = 1008,
+def fast_mobile_preprocess(image: Image.Image, target_width: int = 1008, target_height: int = 1344,
                           quality: int = 95) -> tuple:
     """
     Быстрая предобработка для мобильных фотографий
@@ -32,8 +32,22 @@ def fast_mobile_preprocess(image: Image.Image, target_width: int = 1344, target_
     if image.mode != 'RGB':
         image = image.convert('RGB')
 
-    # Сжимаем до целевого размера с сохранением пропорций
-    image.thumbnail((target_width, target_height), Image.Resampling.LANCZOS)
+    # Вычисляем новый размер с сохранением пропорций
+    # Подгоняем так, чтобы изображение вписывалось в целевой размер
+    original_width, original_height = image.size
+    width_ratio = target_width / original_width
+    height_ratio = target_height / original_height
+    
+    # Выбираем минимальное соотношение, чтобы изображение вписалось в рамки
+    scale_ratio = min(width_ratio, height_ratio)
+    
+    # Вычисляем новые размеры
+    new_width = int(original_width * scale_ratio)
+    new_height = int(original_height * scale_ratio)
+    
+    # Масштабируем изображение (может как увеличивать, так и уменьшать)
+    if (new_width, new_height) != original_size:
+        image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
     # Сохраняем в base64 с оптимизацией
     buffer = io.BytesIO()
@@ -48,13 +62,14 @@ def fast_mobile_preprocess(image: Image.Image, target_width: int = 1344, target_
         'final_mode': image.mode,
         'jpeg_quality': quality,
         'compressed_size_mb': round(len(image_base64) / (1024 * 1024), 2),
-        'resized': image.size != original_size
+        'resized': image.size != original_size,
+        'scale_ratio': round(scale_ratio, 2)
     }
 
     # Конвертируем в base64 строку (чистые данные без префикса)
     base64_string = __import__('base64').b64encode(image_base64).decode('utf-8')
 
-    logger.debug(f"Изображение обработано: {original_size} → {image.size}, {metadata['compressed_size_mb']:.2f} MB")
+    logger.debug(f"Изображение обработано: {original_size} → {image.size} (масштаб: {scale_ratio:.2f}x), {metadata['compressed_size_mb']:.2f} MB")
 
     return image, base64_string, metadata
 
@@ -65,7 +80,7 @@ def smart_preprocess_image(image: Image.Image, optimal_max_size: int = 1344, min
     Упрощенная версия smart_preprocess_image для совместимости
     """
     # Быстрая обработка для мобильных фото
-    processed_image, _, metadata = fast_mobile_preprocess(image, target_width=1344, target_height=1008)
+    processed_image, _, metadata = fast_mobile_preprocess(image, target_width=1008, target_height=1344)
 
     # Преобразуем метаданные в старый формат
     quality_info = {

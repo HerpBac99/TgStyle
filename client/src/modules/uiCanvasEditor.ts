@@ -1203,8 +1203,8 @@ export class UICanvasEditor {
    * Рендер иконки "В магазин"
    */
   private renderShopIcon(ctx: CanvasRenderingContext2D, left: number, top: number, _styleOverride: any, _fabricObject: fabric.Object): void {
-    const width = 80;
-    const height = 24;
+    const width = 90;
+    const height = 30;
     const centerX = left;
     const centerY = top;
 
@@ -1235,7 +1235,7 @@ export class UICanvasEditor {
 
     // Рисуем текст "В магазин"
     ctx.fillStyle = '#ffffff';
-    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.font = '16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('В магазин', centerX, centerY);
