@@ -312,6 +312,7 @@ def map_subtype_to_russian(subtype_input: str) -> str:
         'low-top sneakers': 'Низкие кроссовки',
         'slip-on sneakers': 'Слипоны',
         
+        'boot': 'Ботинки',
         'boots': 'Ботинки',
         'ankle boots': 'Ботильоны',
         'chelsea boots': 'Челси',

@@ -113,7 +113,7 @@ class ClothingClassifier:
         
         # FOOTWEAR - обувь
         if any(keyword in text for keyword in [
-            'shoes', 'boots', 'sneakers', 'trainers', 'runners', 'kicks',
+            'shoes', 'boot', 'boots', 'sneakers', 'trainers', 'runners', 'kicks',
             'sandals', 'slides', 'flipflops', 'thongs',
             'heels', 'highheels', 'pumps', 'stilettos', 'kittenheel', 'wedges', 'platforms',
             'flats', 'balletflats', 'loafers', 'pennyloafers', 'moccasins',

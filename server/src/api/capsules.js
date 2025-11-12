@@ -569,14 +569,33 @@ async function generateCapsules(req, res) {
       isFromStock: false // Вещи пользователя
     }));
 
+    // Получаем gender пользователя
+    const user = await prisma.user.findUnique({
+      where: { telegramId },
+      select: { gender: true }
+    });
+
+    const userGender = user?.gender; // 'male' или 'female' или null
+
+    logger.info('User gender for stock filtering', {
+      telegramId: telegramId.toString(),
+      gender: userGender || 'not specified'
+    });
+
     // НОВОЕ: Загружаем товары из стока для дополнения гардероба
+    // Фильтруем по gender пользователя (если указан)
     const stockItemsBase = await prisma.stockItem.findMany({
       where: { 
-        isActive: true
-        // Можно добавить фильтр по полу если нужно
+        isActive: true,
+        // Фильтруем по gender: если у пользователя указан пол, берем только соответствующие товары
+        // Если пол не указан, берем все товары
+        ...(userGender && {
+          gender: userGender === 'male' ? 'man' : 'woman'
+        })
       },
       select: {
         id: true,
+        gender: true, // Добавляем gender для логирования
         category: true,
         subtype: true,
         color: true,
@@ -651,8 +670,10 @@ async function generateCapsules(req, res) {
 
     logger.info('Loaded wardrobe, stock and capsules', {
       telegramId: telegramId.toString(),
+      userGender: userGender || 'not specified',
       wardrobeItemsCount: wardrobeItems.length,
       stockItemsCount: stockItems.length,
+      stockGenderFilter: userGender ? (userGender === 'male' ? 'man' : 'woman') : 'all',
       totalItemsCount: allItems.length,
       existingCapsulesCount: existingCapsules.length
     });

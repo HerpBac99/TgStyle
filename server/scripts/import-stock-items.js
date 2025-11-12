@@ -23,6 +23,8 @@ const fs = require('fs');
 const path = require('path');
 // Используем Prisma Client из папки db
 const { PrismaClient } = require('../../db/node_modules/@prisma/client');
+// Используем FileService для оптимизации изображений
+const FileService = require('../src/services/FileService');
 
 const prisma = new PrismaClient();
 
@@ -141,19 +143,41 @@ async function importFile(filePath, gender, category) {
     
     const { classification, processedImageBase64 } = result;
     
-    // Сохраняем обработанное изображение как PNG (с тем же именем)
+    // Добавляем data URL префикс если его нет
+    let imageDataUrl = processedImageBase64;
+    if (!imageDataUrl.startsWith('data:image')) {
+      imageDataUrl = `data:image/png;base64,${processedImageBase64}`;
+    }
+    
+    // Используем тот же метод что и для вещей из гардероба
+    // Создаем временный telegramId для сохранения в папку stock
+    const tempTelegramId = BigInt(0); // Специальный ID для товаров из стока
+    const optimizedImagePath = await FileService.saveWardrobeImage(tempTelegramId, imageDataUrl);
+    
+    // Перемещаем оптимизированное изображение в правильную папку stock
     const processedFileName = path.parse(filePath).name + '.png';
     const processedDir = path.dirname(filePath);
     const processedPath = path.join(processedDir, processedFileName);
     
-    // Конвертируем base64 в buffer и сохраняем
-    const imageBuffer = Buffer.from(processedImageBase64, 'base64');
-    fs.writeFileSync(processedPath, imageBuffer);
+    // Копируем оптимизированный файл
+    const optimizedFullPath = path.join(__dirname, '..', 'uploads', optimizedImagePath);
+    fs.copyFileSync(optimizedFullPath, processedPath);
+    
+    // Удаляем временный файл
+    fs.unlinkSync(optimizedFullPath);
+    
+    // Удаляем временную папку если она пустая
+    const tempDir = path.dirname(optimizedFullPath);
+    try {
+      fs.rmdirSync(tempDir);
+    } catch (e) {
+      // Папка не пустая или не существует - игнорируем
+    }
     
     // Относительный путь для обработанного изображения
     const processedRelativePath = path.relative(CONFIG.stockDir, processedPath).replace(/\\/g, '/');
     
-    console.log(`  💾 Сохранено: ${processedRelativePath}`);
+    console.log(`  💾 Сохранено и оптимизировано: ${processedRelativePath}`);
     
     // Удаляем исходный файл после успешной обработки
     try {

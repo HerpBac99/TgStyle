@@ -473,9 +473,10 @@ class SmartCapsuleGenerator {
         category: item.category,
         subtype: item.subtype,
         color: item.color,
-        // ИСПРАВЛЕНО: Для товаров из стока добавляем префикс /stock/
+        // ИСПРАВЛЕНО: Для товаров из стока добавляем префикс /stock/ и cache busting параметр
+        // Cache busting: меняйте версию при обновлении изображений в стоке
         imageUrl: item.imageUrl || (item.isFromStock 
-          ? `/uploads/stock/${item.imagePath?.replace(/\\/g, '/')}`
+          ? `/uploads/stock/${item.imagePath?.replace(/\\/g, '/')}?v=20251110`
           : `/uploads/${item.imagePath?.replace(/\\/g, '/')}`),
         // Сохраняем метаданные товаров из стока
         isFromStock: item.isFromStock || false,
